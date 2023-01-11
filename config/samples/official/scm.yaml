@@ -1,0 +1,13 @@
+apiVersion: k8s.cloudogu.com/v1
+kind: Dogu
+metadata:
+  name: scm
+  annotations:
+    test: dev
+  labels:
+    dogu.name: scm
+    app: ces
+spec:
+  name: official/scm
+  version: 2.40.0-1
+#  version: 2.39.1-1
