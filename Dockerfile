@@ -1,7 +1,5 @@
 # Build the manager binary
-FROM golang:1.18 as builder
-
-ENV GOPRIVATE=github.com/cloudogu/cesapp/v5
+FROM golang:1.21 AS builder
 
 WORKDIR /workspace
 
@@ -35,7 +33,7 @@ RUN make compile-generic
 FROM gcr.io/distroless/static:nonroot
 LABEL maintainer="hello@cloudogu.com" \
       NAME="k8s-backup-operator" \
-      VERSION="0.19.0"
+      VERSION="0.1.0"
 
 WORKDIR /
 COPY --from=builder /workspace/target/k8s-backup-operator .

@@ -3,32 +3,33 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/cloudogu/k8s-backup-operator/pkg/config"
-	"github.com/cloudogu/k8s-backup-operator/pkg/controllers"
-	"github.com/cloudogu/k8s-backup-operator/pkg/logging"
 	"os"
-
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
+	// to ensure that exec-entrypoint and run can make use of them.
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	// +kubebuilder:scaffold:imports
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
+	"github.com/cloudogu/k8s-backup-operator/pkg/controllers"
+	//+kubebuilder:scaffold:imports
 )
 
 var (
-	scheme = runtime.NewScheme()
-	// set up the logger before the actual logger is instantiated
-	// the logger will be replaced later-on with a more sophisticated instance
-	setupLog             = ctrl.Log.WithName("setup")
-	metricsAddr          string
-	enableLeaderElection bool
-	probeAddr            string
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
 )
 
 var (
@@ -38,7 +39,9 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	// +kubebuilder:scaffold:scheme
+	utilruntime.Must(k8sv1.AddToScheme(scheme))
+
+	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
@@ -50,99 +53,102 @@ func main() {
 }
 
 func startOperator() error {
-	err := logging.ConfigureLogger()
-	if err != nil {
-		return err
-	}
-
 	operatorConfig, err := config.NewOperatorConfig(Version)
-	if err != nil {
-		return fmt.Errorf("failed to create new operator configuration: %w", err)
-	}
 
 	options := getK8sManagerOptions(operatorConfig)
 	k8sManager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
-		return fmt.Errorf("failed to start manager: %w", err)
+		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
 	err = configureManager(k8sManager, operatorConfig)
 	if err != nil {
-		return fmt.Errorf("failed to configure manager: %w", err)
+		return fmt.Errorf("unable to configure manager: %w", err)
 	}
-
-	// print starting info to stderr; we don't use the logger here because by default the level must be ERROR
-	println("Starting manager...")
 
 	return startK8sManager(k8sManager)
 }
 
 func configureManager(k8sManager manager.Manager, operatorConfig *config.OperatorConfig) error {
-	err := configureReconciler(k8sManager, operatorConfig)
+	err := configureReconcilers(k8sManager, operatorConfig)
 	if err != nil {
-		return fmt.Errorf("failed to configure reconciler: %w", err)
+		return fmt.Errorf("unable to configure reconciler: %w", err)
 	}
 
-	// +kubebuilder:scaffold:builder
 	err = addChecks(k8sManager)
 	if err != nil {
-		return fmt.Errorf("failed to add checks to the manager: %w", err)
+		return fmt.Errorf("unable to add checks to the manager: %w", err)
 	}
 
 	return nil
 }
 
-func getK8sManagerOptions(operatorConfig *config.OperatorConfig) manager.Options {
+func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
+	var metricsAddr string
+	var enableLeaderElection bool
+	var probeAddr string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	opts := zap.Options{
+		Development: config.IsStageDevelopment(),
+	}
+	opts.BindFlags(flag.CommandLine)
+	flag.Parse()
 
-	options := ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
-		Namespace:              operatorConfig.Namespace,
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	return ctrl.Options{
+		Scheme:  scheme,
+		Metrics: server.Options{BindAddress: metricsAddr},
+		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
+			operatorConfig.Namespace: {},
+		}},
+		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "951e217a.cloudogu.com",
+		LeaderElectionID:       "e3f6c1a7.cloudogu.com",
+	}
+}
+
+func configureReconcilers(k8sManager manager.Manager, operatorConfig *config.OperatorConfig) error {
+	eventRecorder := k8sManager.GetEventRecorderFor("k8s-backup-operator")
+
+	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("unable to create clientset: %w", err)
 	}
 
-	return options
+	ecosystemClientSet, err := ecosystem.NewClientSet(k8sManager.GetConfig(), k8sClientSet)
+
+	if err = (controller.NewRestoreReconciler(ecosystemClientSet, eventRecorder, operatorConfig.Namespace)).SetupWithManager(k8sManager); err != nil {
+		return fmt.Errorf("unable to create restore controller: %w", err)
+	}
+	if err = (controller.NewBackupReconciler(ecosystemClientSet, eventRecorder, operatorConfig.Namespace)).SetupWithManager(k8sManager); err != nil {
+		return fmt.Errorf("unable to create backup controller: %w", err)
+	}
+	// +kubebuilder:scaffold:builder
+
+	return nil
+}
+
+func addChecks(k8sManager manager.Manager) error {
+	if err := k8sManager.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		return fmt.Errorf("unable to set up health check: %w", err)
+	}
+	if err := k8sManager.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		return fmt.Errorf("unable to set up ready check: %w", err)
+	}
+
+	return nil
 }
 
 func startK8sManager(k8sManager manager.Manager) error {
 	setupLog.Info("starting manager")
-	err := k8sManager.Start(ctrl.SetupSignalHandler())
-	if err != nil {
-		return fmt.Errorf("failed to start manager: %w", err)
-	}
-
-	return nil
-}
-
-func configureReconciler(k8sManager manager.Manager, operatorConfig *config.OperatorConfig) error {
-	eventRecorder := k8sManager.GetEventRecorderFor("k8s-backup-operator")
-	backupReconciler := controllers.NewBackupReconciler(k8sManager.GetClient(), eventRecorder)
-
-	err := backupReconciler.SetupWithManager(k8sManager)
-	if err != nil {
-		return fmt.Errorf("failed to setup reconciler with manager: %w", err)
-	}
-
-	return nil
-}
-
-func addChecks(mgr manager.Manager) error {
-	err := mgr.AddHealthzCheck("healthz", healthz.Ping)
-	if err != nil {
-		return fmt.Errorf("failed to add healthz check: %w", err)
-	}
-
-	err = mgr.AddReadyzCheck("readyz", healthz.Ping)
-	if err != nil {
-		return fmt.Errorf("failed to add readyz check: %w", err)
+	if err := k8sManager.Start(ctrl.SetupSignalHandler()); err != nil {
+		return fmt.Errorf("problem running manager: %w", err)
 	}
 
 	return nil
