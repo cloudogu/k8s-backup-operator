@@ -60,7 +60,7 @@ node('docker') {
 
                             stage('Generate k8s Resources') {
                                 make 'k8s-create-temporary-resource'
-                                archiveArtifacts 'target/*.yaml'
+                                archiveArtifacts 'target/make/k8s/*.yaml'
                             }
                         }
 
