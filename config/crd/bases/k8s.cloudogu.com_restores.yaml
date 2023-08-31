@@ -4,6 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.13.0
+  labels:
+    app: ces
+    app.kubernetes.io/name: k8s-backup-operator
   name: restores.k8s.cloudogu.com
 spec:
   group: k8s.cloudogu.com
