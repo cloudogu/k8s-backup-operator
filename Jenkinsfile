@@ -140,7 +140,7 @@ void stageLintK8SResources() {
             .image(kubevalImage)
             .inside("-v ${WORKSPACE}/target:/data -t --entrypoint=")
                     {
-                        sh "kubeval /data/${repositoryName}_${controllerVersion}.yaml --ignore-missing-schemas"
+                        sh "kubeval /data/make/k8s/${repositoryName}_${controllerVersion}.yaml --ignore-missing-schemas"
                     }
 }
 
