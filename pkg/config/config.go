@@ -11,7 +11,7 @@ import (
 const (
 	StageDevelopment = "development"
 	StageProduction  = "production"
-	stageEnvVar      = "STAGE"
+	StageEnvVar      = "STAGE"
 	namespaceEnvVar  = "NAMESPACE"
 )
 
@@ -55,7 +55,7 @@ func NewOperatorConfig(version string) (*OperatorConfig, error) {
 
 func configureStage() {
 	var err error
-	Stage, err = getEnvVar(stageEnvVar)
+	Stage, err = getEnvVar(StageEnvVar)
 	if err != nil {
 		log.Error(err, "Error reading stage environment variable. Use stage production")
 	}

@@ -4,61 +4,132 @@
 package controller
 
 import (
+	"context"
+	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	//+kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-var cfg *rest.Config
-var k8sClient client.Client
 var testEnv *envtest.Environment
+var cfg *rest.Config
+var cancel context.CancelFunc
+
+// Used in other integration tests
+var (
+	ecosystemClientSet ecosystem.Interface
+	recorderMock       *mockEventRecorder
+	namespace          = "default"
+)
+
+const TimeoutInterval = time.Second * 10
+const PollingInterval = time.Second * 1
+
+var oldGetConfig func() (*rest.Config, error)
+var oldGetConfigOrDie func() *rest.Config
 
 func TestControllers(t *testing.T) {
-	RegisterFailHandler(Fail)
+	gomega.RegisterFailHandler(ginkgo.Fail)
 
-	RunSpecs(t, "Controller Suite")
+	ginkgo.RunSpecs(t, "Controller Suite")
 }
 
-var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+var _ = ginkgo.BeforeSuite(func() {
+	// We need to ensure that the development stage flag is not passed by our makefiles to prevent the component operator
+	// from running in the developing mode. The developing mode changes some operator behaviour. Our integration test
+	// aim to test the production functionality of the operator.
+	err := os.Unsetenv(config.StageEnvVar)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	err = os.Setenv(config.StageEnvVar, config.StageProduction)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	config.Stage = config.StageProduction
 
-	By("bootstrapping test environment")
+	logf.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
+
+	var ctx context.Context
+	ctx, cancel = context.WithCancel(context.TODO())
+
+	ginkgo.By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
-	var err error
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
-	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(cfg).NotTo(gomega.BeNil())
+
+	oldGetConfig = ctrl.GetConfig
+	ctrl.GetConfig = func() (*rest.Config, error) {
+		return cfg, nil
+	}
+
+	oldGetConfigOrDie = ctrl.GetConfigOrDie
+	ctrl.GetConfigOrDie = func() *rest.Config {
+		return cfg
+	}
 
 	err = k8sv1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
+	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme.Scheme,
+	})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(k8sManager).NotTo(gomega.BeNil())
+	t := &testing.T{}
+	recorderMock = newMockEventRecorder(t)
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
+	clientSet, err := kubernetes.NewForConfig(cfg)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-})
+	ecosystemClientSet, err = ecosystem.NewClientSet(k8sManager.GetConfig(), clientSet)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-var _ = AfterSuite(func() {
-	By("tearing down the test environment")
+	backupReconciler := NewBackupReconciler(ecosystemClientSet, recorderMock, namespace)
+	gomega.Expect(backupReconciler).NotTo(gomega.BeNil())
+
+	err = backupReconciler.SetupWithManager(k8sManager)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	restoreReconciler := NewRestoreReconciler(ecosystemClientSet, recorderMock, namespace)
+	gomega.Expect(restoreReconciler).NotTo(gomega.BeNil())
+
+	err = restoreReconciler.SetupWithManager(k8sManager)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	go func() {
+		err = k8sManager.Start(ctx)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}()
+}, 60)
+
+var _ = ginkgo.AfterSuite(func() {
+	cancel()
+	ginkgo.By("tearing down the test environment")
 	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	ctrl.GetConfig = oldGetConfig
+	ctrl.GetConfigOrDie = oldGetConfigOrDie
 })
