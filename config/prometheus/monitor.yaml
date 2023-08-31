@@ -12,7 +12,6 @@ metadata:
     app.kubernetes.io/part-of: k8s-backup-operator
     app.kubernetes.io/managed-by: kustomize
   name: controller-manager-metrics-monitor
-  namespace: system
 spec:
   endpoints:
     - path: /metrics
