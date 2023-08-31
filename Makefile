@@ -37,7 +37,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	@echo "Generate manifests..."
 	@$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	@make template-crd-labels
-	@cp config/crd/bases/k8s.cloudogu.com_dogus.yaml api/v1/
+	@cp config/crd/bases/k8s.cloudogu.com_dogus.yaml pkg/api/v1/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
