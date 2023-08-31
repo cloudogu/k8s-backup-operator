@@ -23,6 +23,7 @@ include build/make/digital-signature.mk
 include build/make/mocks.mk
 
 PRE_COMPILE=generate
+K8S_RESOURCE_TEMP_FOLDER ?= $(TARGET_DIR)
 K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource template-dev-only-image-pull-policy
 
 include build/make/k8s-controller.mk
