@@ -6,8 +6,8 @@ metadata:
     app.kubernetes.io/name: clusterrole
     app.kubernetes.io/instance: restore-viewer-role
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: kubebuilder-backup-operator
-    app.kubernetes.io/part-of: kubebuilder-backup-operator
+    app.kubernetes.io/created-by: k8s-backup-operator
+    app.kubernetes.io/part-of: k8s-backup-operator
     app.kubernetes.io/managed-by: kustomize
   name: restore-viewer-role
 rules:
