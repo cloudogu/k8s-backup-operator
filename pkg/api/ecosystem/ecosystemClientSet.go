@@ -10,21 +10,26 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
 
+// Interface extends the kubernetes.Interface to add functionality for handling the custom resources of this operator.
 type Interface interface {
 	kubernetes.Interface
+	// EcosystemV1Alpha1 returns a getter for the custom resources of this operator.
 	EcosystemV1Alpha1() V1Alpha1Interface
 }
 
+// V1Alpha1Interface is a getter for the custom resources of this operator.
 type V1Alpha1Interface interface {
 	BackupsGetter
 	RestoresGetter
 }
 
 type BackupsGetter interface {
+	// Backups returns a client for backups in the given namespace.
 	Backups(namespace string) BackupInterface
 }
 
 type RestoresGetter interface {
+	// Restores returns a client for restores in the given namespace.
 	Restores(namespace string) RestoreInterface
 }
 
@@ -41,11 +46,13 @@ func NewClientSet(config *rest.Config, clientSet *kubernetes.Clientset) (*Client
 	}, nil
 }
 
+// ClientSet extends the kubernetes.Interface to add functionality for handling the custom resources of this operator.
 type ClientSet struct {
 	kubernetes.Interface
 	ecosystemV1Alpha1 V1Alpha1Interface
 }
 
+// EcosystemV1Alpha1 returns a getter for the custom resources of this operator.
 func (cs *ClientSet) EcosystemV1Alpha1() V1Alpha1Interface {
 	return cs.ecosystemV1Alpha1
 }
@@ -75,10 +82,12 @@ func NewForConfig(c *rest.Config) (*V1Alpha1Client, error) {
 	return &V1Alpha1Client{restClient: client}, nil
 }
 
+// V1Alpha1Client is a getter for the custom resources of this operator.
 type V1Alpha1Client struct {
 	restClient rest.Interface
 }
 
+// Backups returns a client for backups in the given namespace.
 func (brc *V1Alpha1Client) Backups(namespace string) BackupInterface {
 	return &backupClient{
 		client: brc.restClient,
@@ -86,6 +95,7 @@ func (brc *V1Alpha1Client) Backups(namespace string) BackupInterface {
 	}
 }
 
+// Restores returns a client for restores in the given namespace.
 func (brc *V1Alpha1Client) Restores(namespace string) RestoreInterface {
 	return &restoreClient{
 		client: brc.restClient,

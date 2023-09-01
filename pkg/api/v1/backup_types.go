@@ -36,7 +36,9 @@ type Backup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   BackupSpec   `json:"spec,omitempty"`
+	// Spec defines the desired state of Backup
+	Spec BackupSpec `json:"spec,omitempty"`
+	// Status defines the observed state of Backup
 	Status BackupStatus `json:"status,omitempty"`
 }
 

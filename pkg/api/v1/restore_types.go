@@ -36,7 +36,9 @@ type Restore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   RestoreSpec   `json:"spec,omitempty"`
+	// Spec defines the desired state of Restore
+	Spec RestoreSpec `json:"spec,omitempty"`
+	// Status defines the observed state of Restore
 	Status RestoreStatus `json:"status,omitempty"`
 }
 
