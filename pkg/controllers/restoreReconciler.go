@@ -41,7 +41,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *restoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *restoreReconciler) SetupWithManager(mgr controllerManager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&k8sv1.Restore{}).
 		Complete(r)
