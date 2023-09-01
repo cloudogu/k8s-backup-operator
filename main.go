@@ -3,13 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"k8s.io/client-go/tools/record"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -104,7 +104,7 @@ func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
 		WebhookServer:    webhook.NewServer(webhook.Options{Port: 9443}),
 		LeaderElectionID: "e3f6c1a7.cloudogu.com",
 	}
-	zapOpts := zap.Options{}
+	var zapOpts zap.Options
 	controllerOpts, zapOpts = parseFlags(controllerOpts)
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
@@ -112,7 +112,9 @@ func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
 	return controllerOpts
 }
 
-var parseFlags = func(options ctrl.Options) (ctrl.Options, zap.Options) {
+// parseFlags is a closure because it panics when its called twice in tests.
+// Therefore, we must overwrite it for all but one single test.
+var parseFlags = func(ctrlOpts ctrl.Options) (ctrl.Options, zap.Options) {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -121,17 +123,17 @@ var parseFlags = func(options ctrl.Options) (ctrl.Options, zap.Options) {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	opts := zap.Options{
+	zapOpts := zap.Options{
 		Development: config.IsStageDevelopment(),
 	}
-	opts.BindFlags(flag.CommandLine)
+	zapOpts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	options.Metrics = server.Options{BindAddress: metricsAddr}
-	options.HealthProbeBindAddress = probeAddr
-	options.LeaderElection = enableLeaderElection
+	ctrlOpts.Metrics = server.Options{BindAddress: metricsAddr}
+	ctrlOpts.HealthProbeBindAddress = probeAddr
+	ctrlOpts.LeaderElection = enableLeaderElection
 
-	return options, opts
+	return ctrlOpts, zapOpts
 }
 
 func configureReconcilers(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {

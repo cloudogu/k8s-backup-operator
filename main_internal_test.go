@@ -2,17 +2,19 @@ package main
 
 import (
 	"context"
-	"github.com/go-logr/logr"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/config"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,6 +23,36 @@ import (
 )
 
 var testCtx = context.Background()
+
+// WARNING: We can test parseFlags only one single time.
+// If it is called more than once, it will panic.
+// For all other tests it has to be overwritten.
+func Test_parseFlags(t *testing.T) {
+	// given
+	ctrlOpts := ctrl.Options{
+		Scheme: scheme,
+		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
+			"ecosystem": {},
+		}},
+		WebhookServer:        webhook.NewServer(webhook.Options{Port: 9443}),
+		LeaderElectionID:     "e3f6c1a7.cloudogu.com",
+		LivenessEndpointName: "/lifez",
+	}
+
+	// when
+	newCtrlOpts, _ := parseFlags(ctrlOpts)
+
+	// then
+	require.NotEmpty(t, newCtrlOpts)
+	assert.Equal(t, ":8080", newCtrlOpts.Metrics.BindAddress)
+	assert.Equal(t, ":8081", newCtrlOpts.HealthProbeBindAddress)
+	assert.False(t, newCtrlOpts.LeaderElection)
+	assert.Same(t, ctrlOpts.Scheme, newCtrlOpts.Scheme)
+	assert.Equal(t, ctrlOpts.Cache, newCtrlOpts.Cache)
+	assert.Equal(t, ctrlOpts.WebhookServer, newCtrlOpts.WebhookServer)
+	assert.Equal(t, ctrlOpts.LeaderElectionID, newCtrlOpts.LeaderElectionID)
+	assert.Equal(t, ctrlOpts.LivenessEndpointName, newCtrlOpts.LivenessEndpointName)
+}
 
 func Test_startOperator(t *testing.T) {
 	oldParseFlagsFunc := parseFlags
