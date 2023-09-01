@@ -82,9 +82,13 @@ func NewForConfig(c *rest.Config) (*V1Alpha1Client, error) {
 	return &V1Alpha1Client{restClient: client}, nil
 }
 
+type restInterface interface {
+	rest.Interface
+}
+
 // V1Alpha1Client is a getter for the custom resources of this operator.
 type V1Alpha1Client struct {
-	restClient rest.Interface
+	restClient restInterface
 }
 
 // Backups returns a client for backups in the given namespace.
