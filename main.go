@@ -87,6 +87,23 @@ func configureManager(k8sManager manager.Manager, operatorConfig *config.Operato
 }
 
 func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
+	controllerOpts := ctrl.Options{
+		Scheme: scheme,
+		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
+			operatorConfig.Namespace: {},
+		}},
+		WebhookServer:    webhook.NewServer(webhook.Options{Port: 9443}),
+		LeaderElectionID: "e3f6c1a7.cloudogu.com",
+	}
+	zapOpts := zap.Options{}
+	controllerOpts, zapOpts = parseFlags(controllerOpts)
+
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
+
+	return controllerOpts
+}
+
+var parseFlags = func(options ctrl.Options) (ctrl.Options, zap.Options) {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -101,19 +118,11 @@ func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	options.Metrics = server.Options{BindAddress: metricsAddr}
+	options.HealthProbeBindAddress = probeAddr
+	options.LeaderElection = enableLeaderElection
 
-	return ctrl.Options{
-		Scheme:  scheme,
-		Metrics: server.Options{BindAddress: metricsAddr},
-		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
-			operatorConfig.Namespace: {},
-		}},
-		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "e3f6c1a7.cloudogu.com",
-	}
+	return options, opts
 }
 
 func configureReconcilers(k8sManager manager.Manager, operatorConfig *config.OperatorConfig) error {
