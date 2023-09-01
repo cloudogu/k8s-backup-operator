@@ -75,9 +75,9 @@ func getNamespace() (string, error) {
 }
 
 func getEnvVar(name string) (string, error) {
-	ns, found := os.LookupEnv(name)
+	env, found := os.LookupEnv(name)
 	if !found {
 		return "", fmt.Errorf("environment variable %s must be set", name)
 	}
-	return ns, nil
+	return env, nil
 }
