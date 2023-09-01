@@ -54,6 +54,9 @@ func main() {
 
 func startOperator() error {
 	operatorConfig, err := config.NewOperatorConfig(Version)
+	if err != nil {
+		return fmt.Errorf("unable to create operator config: %w", err)
+	}
 
 	options := getK8sManagerOptions(operatorConfig)
 	k8sManager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
@@ -118,10 +121,13 @@ func configureReconcilers(k8sManager manager.Manager, operatorConfig *config.Ope
 
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
-		return fmt.Errorf("unable to create clientset: %w", err)
+		return fmt.Errorf("unable to create k8s clientset: %w", err)
 	}
 
 	ecosystemClientSet, err := ecosystem.NewClientSet(k8sManager.GetConfig(), k8sClientSet)
+	if err != nil {
+		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
+	}
 
 	if err = (controller.NewRestoreReconciler(ecosystemClientSet, eventRecorder, operatorConfig.Namespace)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
