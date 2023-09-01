@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"k8s.io/client-go/tools/record"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,6 +37,14 @@ var (
 	// Version of the application
 	Version = "0.0.0"
 )
+
+type eventRecorder interface {
+	record.EventRecorder
+}
+
+type controllerManager interface {
+	manager.Manager
+}
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -72,7 +81,7 @@ func startOperator() error {
 	return startK8sManager(k8sManager)
 }
 
-func configureManager(k8sManager manager.Manager, operatorConfig *config.OperatorConfig) error {
+func configureManager(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
 	err := configureReconcilers(k8sManager, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("unable to configure reconciler: %w", err)
@@ -125,8 +134,8 @@ var parseFlags = func(options ctrl.Options) (ctrl.Options, zap.Options) {
 	return options, opts
 }
 
-func configureReconcilers(k8sManager manager.Manager, operatorConfig *config.OperatorConfig) error {
-	eventRecorder := k8sManager.GetEventRecorderFor("k8s-backup-operator")
+func configureReconcilers(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
+	var eventRecorder eventRecorder = k8sManager.GetEventRecorderFor("k8s-backup-operator")
 
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
@@ -149,7 +158,7 @@ func configureReconcilers(k8sManager manager.Manager, operatorConfig *config.Ope
 	return nil
 }
 
-func addChecks(k8sManager manager.Manager) error {
+func addChecks(k8sManager controllerManager) error {
 	if err := k8sManager.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return fmt.Errorf("unable to set up health check: %w", err)
 	}
@@ -160,7 +169,7 @@ func addChecks(k8sManager manager.Manager) error {
 	return nil
 }
 
-func startK8sManager(k8sManager manager.Manager) error {
+func startK8sManager(k8sManager controllerManager) error {
 	setupLog.Info("starting manager")
 	if err := k8sManager.Start(ctrl.SetupSignalHandler()); err != nil {
 		return fmt.Errorf("problem running manager: %w", err)
