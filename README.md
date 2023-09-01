@@ -1,5 +1,5 @@
 # k8s-backup-operator
-Cloudogu EcoSystem Dogu operator for Kubernetes
+Cloudogu EcoSystem backup operator for Kubernetes
 
 ---
 
