@@ -29,7 +29,7 @@ K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource template-dev-only-image-p
 include build/make/k8s-controller.mk
 
 .PHONY: build-boot
-build-boot: image-import k8s-apply kill-operator-pod ## Builds a new version of the dogu and deploys it into the K8s-EcoSystem.
+build-boot: image-import k8s-apply kill-operator-pod ## Builds a new version of the operator and deploys it into the K8s-EcoSystem.
 
 ##@ Controller specific targets
 
@@ -37,8 +37,8 @@ build-boot: image-import k8s-apply kill-operator-pod ## Builds a new version of 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	@echo "Generate manifests..."
 	@$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	@make template-crd-labels
-	@cp config/crd/bases/k8s.cloudogu.com_dogus.yaml pkg/api/v1/
+	@cp config/crd/bases/k8s.cloudogu.com_backups.yaml pkg/api/v1/
+	@cp config/crd/bases/k8s.cloudogu.com_restores.yaml pkg/api/v1/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -55,10 +55,6 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@$(KUSTOMIZE) build config/crd | kubectl delete --wait=false --ignore-not-found=true -f -
 	@kubectl patch crd/backups.k8s.cloudogu.com -p '{"metadata":{"finalizers":[]}}' --type=merge || true
-
-.PHONY: template-crd-labels
-template-crd-labels: kustomize
-	@$(KUSTOMIZE) build config/labels -o config/crd/bases/k8s.cloudogu.com_dogus.yaml
 
 .PHONY: template-stage
 template-stage:
