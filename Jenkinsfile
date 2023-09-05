@@ -13,6 +13,7 @@ changelog = new Changelog(this)
 Docker docker = new Docker(this)
 gpg = new Gpg(this, docker)
 goVersion = "1.21"
+Makefile makefile = new Makefile(this)
 
 // Configuration of repository
 repositoryOwner = "cloudogu"
@@ -66,7 +67,7 @@ node('docker') {
                         }
 
         stage("Lint k8s Resources") {
-            stageLintK8SResources()
+            stageLintK8SResources(makefile)
         }
 
         stage('SonarQube') {
@@ -76,7 +77,6 @@ node('docker') {
         K3d k3d = new K3d(this, "${WORKSPACE}", "${WORKSPACE}/k3d", env.PATH)
 
         try {
-            Makefile makefile = new Makefile(this)
             String controllerVersion = makefile.getVersion()
 
             stage('Set up k3d cluster') {
@@ -114,7 +114,7 @@ node('docker') {
                 k3d.kubectl("--namespace default wait --for=condition=Ready pods --all")
             }
 
-            stageAutomaticRelease()
+            stageAutomaticRelease(makefile)
         } finally {
             stage('Remove k3d cluster') {
                 k3d.deleteK3d()
@@ -132,9 +132,8 @@ void gitWithCredentials(String command) {
     }
 }
 
-void stageLintK8SResources() {
+void stageLintK8SResources(Makefile makefile) {
     String kubevalImage = "cytopia/kubeval:0.13"
-    Makefile makefile = new Makefile(this)
     String controllerVersion = makefile.getVersion()
 
     docker
@@ -186,7 +185,7 @@ void stageStaticAnalysisSonarQube() {
     }
 }
 
-void stageAutomaticRelease() {
+void stageAutomaticRelease(Makefile makefile) {
     if (gitflow.isReleaseBranch()) {
         String releaseVersion = git.getSimpleBranchName()
         String dockerReleaseVersion = releaseVersion.split("v")[1]
