@@ -13,6 +13,7 @@ changelog = new Changelog(this)
 Docker docker = new Docker(this)
 gpg = new Gpg(this, docker)
 goVersion = "1.21"
+Makefile makefile = new Makefile(this)
 
 // Configuration of repository
 repositoryOwner = "cloudogu"
@@ -76,7 +77,6 @@ node('docker') {
         K3d k3d = new K3d(this, "${WORKSPACE}", "${WORKSPACE}/k3d", env.PATH)
 
         try {
-            Makefile makefile = new Makefile(this)
             String controllerVersion = makefile.getVersion()
 
             stage('Set up k3d cluster') {
@@ -134,7 +134,6 @@ void gitWithCredentials(String command) {
 
 void stageLintK8SResources() {
     String kubevalImage = "cytopia/kubeval:0.13"
-    Makefile makefile = new Makefile(this)
     String controllerVersion = makefile.getVersion()
 
     docker
