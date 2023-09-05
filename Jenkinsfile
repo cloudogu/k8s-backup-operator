@@ -1,19 +1,26 @@
 #!groovy
 
-@Library(['github.com/cloudogu/dogu-build-lib@v1.6.0', 'github.com/cloudogu/ces-build-lib@1.56.0'])
+@Library('github.com/cloudogu/ces-build-lib@1.66.1')
 import com.cloudogu.ces.cesbuildlib.*
-import com.cloudogu.ces.dogubuildlib.*
 
 // Creating necessary git objects
 git = new Git(this, "cesmarvin")
 git.committerName = 'cesmarvin'
 git.committerEmail = 'cesmarvin@cloudogu.com'
+gitflow = new GitFlow(this, git)
+github = new GitHub(this, git)
+changelog = new Changelog(this)
+Docker docker = new Docker(this)
+gpg = new Gpg(this, docker)
 goVersion = "1.21"
+Makefile makefile = new Makefile(this)
 
 // Configuration of repository
 repositoryOwner = "cloudogu"
 repositoryName = "k8s-backup-operator"
 project = "github.com/${repositoryOwner}/${repositoryName}"
+registry = "registry.cloudogu.com"
+registry_namespace = "k8s"
 
 // Configuration of branches
 productionReleaseBranch = "main"
@@ -25,6 +32,10 @@ node('docker') {
         stage('Checkout') {
             checkout scm
             make 'clean'
+        }
+
+        stage('Lint') {
+            lintDockerfile()
         }
 
         new Docker(this)
@@ -41,13 +52,73 @@ node('docker') {
                                 junit allowEmptyResults: true, testResults: 'target/unit-tests/*-tests.xml'
                             }
 
+                            stage('k8s-Integration-Test') {
+                                make 'k8s-integration-test'
+                            }
+
                             stage("Review dog analysis") {
                                 stageStaticAnalysisReviewDog()
                             }
+
+                            stage('Generate k8s Resources') {
+                                make 'k8s-create-temporary-resource'
+                                archiveArtifacts 'target/*.yaml'
+                            }
                         }
+
+        stage("Lint k8s Resources") {
+            stageLintK8SResources(makefile)
+        }
 
         stage('SonarQube') {
             stageStaticAnalysisSonarQube()
+        }
+
+        K3d k3d = new K3d(this, "${WORKSPACE}", "${WORKSPACE}/k3d", env.PATH)
+
+        try {
+            String controllerVersion = makefile.getVersion()
+
+            stage('Set up k3d cluster') {
+                k3d.startK3d()
+            }
+
+            def imageName
+            stage('Build & Push Image') {
+                imageName = k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", controllerVersion)
+            }
+
+            GString sourceDeploymentYaml = "target/${repositoryName}_${controllerVersion}.yaml"
+            stage('Update development resources') {
+                docker.image('mikefarah/yq:4.22.1')
+                        .mountJenkinsUser()
+                        .inside("--volume ${WORKSPACE}:/workdir -w /workdir") {
+                            sh "yq -i '(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.name == \"manager\")).image=\"${imageName}\"' ${sourceDeploymentYaml}"
+                        }
+            }
+
+            stage('Deploy etcd') {
+                k3d.kubectl("apply -f https://raw.githubusercontent.com/cloudogu/k8s-etcd/develop/manifests/etcd.yaml")
+            }
+
+            stage('Wait for etcd to be ready') {
+                sleep(time: 5, unit: "SECONDS")
+                k3d.kubectl("wait --for=condition=ready pod -l statefulset.kubernetes.io/pod-name=etcd-0 --timeout=300s")
+            }
+
+            stage('Deploy Manager') {
+                k3d.kubectl("apply -f ${sourceDeploymentYaml}")
+            }
+
+            stage('Wait for Ready Rollout') {
+                k3d.kubectl("--namespace default wait --for=condition=Ready pods --all")
+            }
+
+            stageAutomaticRelease(makefile)
+        } finally {
+            stage('Remove k3d cluster') {
+                k3d.deleteK3d()
+            }
         }
     }
 }
@@ -59,6 +130,18 @@ void gitWithCredentials(String command) {
                 returnStdout: true
         )
     }
+}
+
+void stageLintK8SResources(Makefile makefile) {
+    String kubevalImage = "cytopia/kubeval:0.13"
+    String controllerVersion = makefile.getVersion()
+
+    docker
+            .image(kubevalImage)
+            .inside("-v ${WORKSPACE}/target:/data -t --entrypoint=")
+                    {
+                        sh "kubeval /data/${repositoryName}_${controllerVersion}.yaml --ignore-missing-schemas"
+                    }
 }
 
 void stageStaticAnalysisReviewDog() {
@@ -98,6 +181,74 @@ void stageStaticAnalysisSonarQube() {
         def qGate = waitForQualityGate()
         if (qGate.status != 'OK') {
             unstable("Pipeline unstable due to SonarQube quality gate failure")
+        }
+    }
+}
+
+void stageAutomaticRelease(Makefile makefile) {
+    if (gitflow.isReleaseBranch()) {
+        String releaseVersion = git.getSimpleBranchName()
+        String dockerReleaseVersion = releaseVersion.split("v")[1]
+        String controllerVersion = makefile.getVersion()
+
+        stage('Build & Push Image') {
+            withCredentials([usernamePassword(credentialsId: 'cesmarvin',
+                    passwordVariable: 'CES_MARVIN_PASSWORD',
+                    usernameVariable: 'CES_MARVIN_USERNAME')]) {
+                // .netrc is necessary to access private repos
+                sh "echo \"machine github.com\n" +
+                        "login ${CES_MARVIN_USERNAME}\n" +
+                        "password ${CES_MARVIN_PASSWORD}\" >> ~/.netrc"
+            }
+            def dockerImage = docker.build("cloudogu/${repositoryName}:${dockerReleaseVersion}")
+            sh "rm ~/.netrc"
+            docker.withRegistry('https://registry.hub.docker.com/', 'dockerHubCredentials') {
+                dockerImage.push("${dockerReleaseVersion}")
+            }
+        }
+
+        stage('Finish Release') {
+            gitflow.finishRelease(releaseVersion, productionReleaseBranch)
+        }
+
+        stage('Sign after Release') {
+            gpg.createSignature()
+        }
+
+        stage('Regenerate resources for release') {
+            new Docker(this)
+                    .image("golang:${goVersion}")
+                    .mountJenkinsUser()
+                    .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
+                            {
+                                make 'k8s-create-temporary-resource'
+                            }
+        }
+
+        stage('Push to Registry') {
+            GString targetOperatorResourceYaml = "target/${repositoryName}_${controllerVersion}.yaml"
+
+            DoguRegistry registry = new DoguRegistry(this)
+            registry.pushK8sYaml(targetOperatorResourceYaml, repositoryName, "k8s", "${controllerVersion}")
+        }
+
+        stage('Push Helm chart to Harbor') {
+            new Docker(this)
+                    .image("golang:${goVersion}")
+                    .mountJenkinsUser()
+                    .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
+                            {
+                                make 'k8s-helm-package-release'
+
+                                withCredentials([usernamePassword(credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD')]) {
+                                    sh ".bin/helm registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'"
+                                    sh ".bin/helm push target/helm/${repositoryName}-${controllerVersion}.tgz oci://${registry}/${registry_namespace}/"
+                                }
+                            }
+        }
+
+        stage('Add Github-Release') {
+            releaseId = github.createReleaseWithChangelog(releaseVersion, changelog, productionReleaseBranch)
         }
     }
 }
