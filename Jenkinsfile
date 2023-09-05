@@ -67,7 +67,7 @@ node('docker') {
                         }
 
         stage("Lint k8s Resources") {
-            stageLintK8SResources()
+            stageLintK8SResources(makefile)
         }
 
         stage('SonarQube') {
@@ -114,7 +114,7 @@ node('docker') {
                 k3d.kubectl("--namespace default wait --for=condition=Ready pods --all")
             }
 
-            stageAutomaticRelease()
+            stageAutomaticRelease(makefile)
         } finally {
             stage('Remove k3d cluster') {
                 k3d.deleteK3d()
@@ -132,7 +132,7 @@ void gitWithCredentials(String command) {
     }
 }
 
-void stageLintK8SResources() {
+void stageLintK8SResources(Makefile makefile) {
     String kubevalImage = "cytopia/kubeval:0.13"
     String controllerVersion = makefile.getVersion()
 
@@ -185,7 +185,7 @@ void stageStaticAnalysisSonarQube() {
     }
 }
 
-void stageAutomaticRelease() {
+void stageAutomaticRelease(Makefile makefile) {
     if (gitflow.isReleaseBranch()) {
         String releaseVersion = git.getSimpleBranchName()
         String dockerReleaseVersion = releaseVersion.split("v")[1]
