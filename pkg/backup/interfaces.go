@@ -46,4 +46,6 @@ type deleteManager interface {
 type Provider interface {
 	// CreateBackup creates backup according to the backup configuration in v1.Backup.
 	CreateBackup(ctx context.Context, backup *v1.Backup) error
+	// DeleteBackup deletes backup from the cluster state and the backup storage.
+	DeleteBackup(ctx context.Context, backup *v1.Backup) error
 }

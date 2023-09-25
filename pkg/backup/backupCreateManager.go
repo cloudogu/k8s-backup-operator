@@ -2,7 +2,6 @@ package backup
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
@@ -16,11 +15,6 @@ import (
 var newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder) Provider {
 	return velero.New(client, recorder)
 }
-
-const (
-	CreateEventReason        = "Creation"
-	ErrorOnCreateEventReason = "ErrCreation"
-)
 
 const (
 	// TODO
@@ -43,11 +37,16 @@ func NewBackupCreateManager(client ecosystemBackupInterface, recorder eventRecor
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {
 	logger := log.FromContext(ctx)
-	bcm.recorder.Event(backup, corev1.EventTypeNormal, CreateEventReason, "Start backup process")
+	bcm.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 
 	backup, err := bcm.client.UpdateStatusInProgress(ctx, backup)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in backup resource: %w", v1.BackupStatusInProgress, err)
+	}
+
+	backup, err = bcm.client.AddFinalizer(ctx, backup, v1.BackupFinalizer)
+	if err != nil {
+		return fmt.Errorf("failed to set finalizer %s to backup resource: %w", v1.BackupFinalizer, err)
 	}
 
 	err = bcm.maintenanceModeSwitch.ActivateMaintenanceMode(maintenanceModeTitle, maintenanceModeText)
@@ -76,14 +75,9 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 }
 
 func (bcm *backupCreateManager) triggerBackup(ctx context.Context, backup *v1.Backup) error {
-	provider := backup.Spec.Provider
-	var backupProvider Provider = nil
-	switch provider {
-	case v1.ProviderVelero:
-		bcm.recorder.Event(backup, corev1.EventTypeNormal, CreateEventReason, "Use velero as backup provider")
-		backupProvider = newVeleroProvider(bcm.client, bcm.recorder)
-	default:
-		return errors.New(fmt.Sprintf("unknown backup provider %s", provider))
+	backupProvider, err := getBackupProvider(backup, bcm.client, bcm.recorder)
+	if err != nil {
+		return fmt.Errorf("failed to get backup provider: %w", err)
 	}
 
 	return backupProvider.CreateBackup(ctx, backup)

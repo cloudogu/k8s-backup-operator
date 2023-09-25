@@ -65,6 +65,49 @@ func (_c *MockProvider_CreateBackup_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// DeleteBackup provides a mock function with given fields: ctx, backup
+func (_m *MockProvider) DeleteBackup(ctx context.Context, backup *v1.Backup) error {
+	ret := _m.Called(ctx, backup)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) error); ok {
+		r0 = rf(ctx, backup)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockProvider_DeleteBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteBackup'
+type MockProvider_DeleteBackup_Call struct {
+	*mock.Call
+}
+
+// DeleteBackup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - backup *v1.Backup
+func (_e *MockProvider_Expecter) DeleteBackup(ctx interface{}, backup interface{}) *MockProvider_DeleteBackup_Call {
+	return &MockProvider_DeleteBackup_Call{Call: _e.mock.On("DeleteBackup", ctx, backup)}
+}
+
+func (_c *MockProvider_DeleteBackup_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *MockProvider_DeleteBackup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Backup))
+	})
+	return _c
+}
+
+func (_c *MockProvider_DeleteBackup_Call) Return(_a0 error) *MockProvider_DeleteBackup_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockProvider_DeleteBackup_Call) RunAndReturn(run func(context.Context, *v1.Backup) error) *MockProvider_DeleteBackup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 type mockConstructorTestingTNewMockProvider interface {
 	mock.TestingT
 	Cleanup(func())

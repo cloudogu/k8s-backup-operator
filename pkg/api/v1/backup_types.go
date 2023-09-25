@@ -18,6 +18,13 @@ const (
 	ProviderVelero = "velero"
 )
 
+const (
+	CreateEventReason        = "Creation"
+	ErrorOnCreateEventReason = "ErrCreation"
+)
+
+const BackupFinalizer = "backup-finalizer"
+
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // BackupSpec defines the desired state of Backup

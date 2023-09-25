@@ -41,9 +41,9 @@ func Test_backupCreateManager_create(t *testing.T) {
 		defer func() { newVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Start backup process")
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Use velero as backup provider")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
+		clientMock.EXPECT().AddFinalizer(context.TODO(), backup, v1.BackupFinalizer).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(context.TODO(), backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
@@ -65,7 +65,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}}
 
 		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Start backup process")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(nil, assert.AnError)
 
@@ -80,14 +80,37 @@ func Test_backupCreateManager_create(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to set status [in progress] in backup resource")
 	})
 
+	t.Run("should return error on finalizer update", func(t *testing.T) {
+		// given
+		backupName := "backup"
+		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
+		clientMock := newMockEcosystemBackupInterface(t)
+		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(backup, nil)
+		clientMock.EXPECT().AddFinalizer(context.TODO(), backup, v1.BackupFinalizer).Return(nil, assert.AnError)
+
+		sut := &backupCreateManager{recorder: recorderMock, client: clientMock}
+
+		// when
+		err := sut.create(context.TODO(), backup)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to set finalizer backup-finalizer to backup resource")
+	})
+
 	t.Run("should return error activate maintenance mode error", func(t *testing.T) {
 		// given
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}}
 
 		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Start backup process")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
+		clientMock.EXPECT().AddFinalizer(context.TODO(), backup, v1.BackupFinalizer).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(assert.AnError)
@@ -109,8 +132,9 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "unknown123"}}
 
 		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Start backup process")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
+		clientMock.EXPECT().AddFinalizer(context.TODO(), backup, v1.BackupFinalizer).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
@@ -123,7 +147,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to trigger backup provider: unknown backup provider unknown123")
+		assert.ErrorContains(t, err, "failed to trigger backup provider: failed to get backup provider: unknown backup provider unknown123")
 	})
 
 	t.Run("should return error on provider error", func(t *testing.T) {
@@ -140,9 +164,9 @@ func Test_backupCreateManager_create(t *testing.T) {
 		defer func() { newVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Start backup process")
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Use velero as backup provider")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
+		clientMock.EXPECT().AddFinalizer(context.TODO(), backup, v1.BackupFinalizer).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
@@ -172,9 +196,9 @@ func Test_backupCreateManager_create(t *testing.T) {
 		defer func() { newVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Start backup process")
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Use velero as backup provider")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
+		clientMock.EXPECT().AddFinalizer(context.TODO(), backup, v1.BackupFinalizer).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(context.TODO(), backup).Return(nil, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
@@ -204,9 +228,9 @@ func Test_backupCreateManager_create(t *testing.T) {
 		defer func() { newVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Start backup process")
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Use velero as backup provider")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
+		clientMock.EXPECT().AddFinalizer(context.TODO(), backup, v1.BackupFinalizer).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(context.TODO(), backup).Return(nil, assert.AnError)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)

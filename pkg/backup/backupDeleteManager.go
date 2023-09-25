@@ -2,6 +2,8 @@ package backup
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
 
@@ -15,6 +17,40 @@ func NewBackupDeleteManager(client ecosystemBackupInterface, recorder eventRecor
 	return &backupDeleteManager{client: client, recorder: recorder}
 }
 
-func (bcm *backupDeleteManager) delete(ctx context.Context, backup *v1.Backup) error {
+func (bdm *backupDeleteManager) delete(ctx context.Context, backup *v1.Backup) error {
+	backup, err := bdm.client.UpdateStatusDeleting(ctx, backup)
+	if err != nil {
+		return fmt.Errorf("failed to set status [%s] in backup resource: %w", v1.BackupStatusDeleting, err)
+	}
+
+	err = bdm.triggerBackupDelete(ctx, backup)
+	if err != nil {
+		return fmt.Errorf("failed to delete backup: %w", err)
+	}
+
+	_, err = bdm.client.RemoveFinalizer(ctx, backup, v1.BackupFinalizer)
+	if err != nil {
+		return fmt.Errorf("failed to remove finalizer %s from backup resource: %w", v1.BackupFinalizer, err)
+	}
+
 	return nil
+}
+
+func (bdm *backupDeleteManager) triggerBackupDelete(ctx context.Context, backup *v1.Backup) error {
+	backupProvider, err := getBackupProvider(backup, bdm.client, bdm.recorder)
+	if err != nil {
+		return fmt.Errorf("failed to get backup provider: %w", err)
+	}
+
+	return backupProvider.DeleteBackup(ctx, backup)
+}
+
+func getBackupProvider(backup *v1.Backup, client ecosystemBackupInterface, recorder eventRecorder) (Provider, error) {
+	provider := backup.Spec.Provider
+	switch provider {
+	case v1.ProviderVelero:
+		return newVeleroProvider(client, recorder), nil
+	default:
+		return nil, errors.New(fmt.Sprintf("unknown backup provider %s", provider))
+	}
 }

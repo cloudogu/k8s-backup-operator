@@ -47,7 +47,6 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	backup, err := r.clientSet.EcosystemV1Alpha1().Backups(r.namespace).Get(ctx, req.Name, metav1.GetOptions{})
 	if err != nil {
-		// TODO Throws not found on delete. Will be fixed with finalizers.
 		return ctrl.Result{}, fmt.Errorf("failed to get backup resource %s: %w", req.NamespacedName, err)
 	}
 
