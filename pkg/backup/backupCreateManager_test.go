@@ -114,6 +114,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -145,6 +146,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -156,7 +158,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to trigger backup provider")
 	})
 
-	t.Run("should return error on deactivating maintenance mode", func(t *testing.T) {
+	t.Run("should log error on deactivating maintenance mode", func(t *testing.T) {
 		// given
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
@@ -174,6 +176,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, CreateEventReason, "Use velero as backup provider")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().UpdateStatusInProgress(context.TODO(), backup).Return(backup, nil)
+		clientMock.EXPECT().UpdateStatusCompleted(context.TODO(), backup).Return(nil, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(assert.AnError)
@@ -184,8 +187,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		err := sut.create(context.TODO(), backup)
 
 		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to deactivate maintenance mode")
+		require.NoError(t, err)
 	})
 
 	t.Run("should return error on set status completed error", func(t *testing.T) {

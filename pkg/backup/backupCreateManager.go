@@ -10,6 +10,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/maintenance"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider/velero"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder) Provider {
@@ -41,6 +42,7 @@ func NewBackupCreateManager(client ecosystemBackupInterface, recorder eventRecor
 }
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {
+	logger := log.FromContext(ctx)
 	bcm.recorder.Event(backup, corev1.EventTypeNormal, CreateEventReason, "Start backup process")
 
 	backup, err := bcm.client.UpdateStatusInProgress(ctx, backup)
@@ -53,14 +55,16 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 		return fmt.Errorf("failed to active maintenance mode: %w", err)
 	}
 
+	defer func() {
+		errDefer := bcm.maintenanceModeSwitch.DeactivateMaintenanceMode()
+		if errDefer != nil {
+			logger.Error(fmt.Errorf("failed to deactivate maintenance mode: [%w]", errDefer), "backup error")
+		}
+	}()
+
 	err = bcm.triggerBackup(ctx, backup)
 	if err != nil {
 		return fmt.Errorf("failed to trigger backup provider: %w", err)
-	}
-
-	err = bcm.maintenanceModeSwitch.DeactivateMaintenanceMode()
-	if err != nil {
-		return fmt.Errorf("failed to deactivate maintenance mode: %w", err)
 	}
 
 	_, err = bcm.client.UpdateStatusCompleted(ctx, backup)
