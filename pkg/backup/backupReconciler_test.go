@@ -2,11 +2,12 @@ package backup
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	v12 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -109,13 +110,98 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		managerMock := newMockBackupControllerManager(t)
 		managerMock.EXPECT().delete(context.TODO(), backup).Return(nil)
 
-		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock}
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, v12.EventTypeNormal, "Delete", "Delete successful")
+
+		requeueHandlerMock := newMockRequeueHandler(t)
+		requeueHandlerMock.EXPECT().Handle(context.TODO(), "Delete failed with backup backup", backup, nil, v1.BackupStatusCompleted).Return(ctrl.Result{}, nil)
+
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
 
 		// when
 		actual, err := sut.Reconcile(context.TODO(), request)
 
 		// then
 		require.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, actual)
+	})
+
+	t.Run("should return no error when manager throws requeue error", func(t *testing.T) {
+		// given
+		backupName := "backup"
+
+		request := ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: testNamespace,
+			Name:      backupName,
+		}}
+		now := metav1.NewTime(time.Now())
+		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace, DeletionTimestamp: &now}, Status: v1.BackupStatus{Status: "completed"}}
+
+		clientSetMock := newMockEcosystemInterface(t)
+		backupInterfaceMock := newMockEcosystemBackupInterface(t)
+		backupInterfaceMock.EXPECT().Get(context.TODO(), backupName, metav1.GetOptions{}).Return(backup, nil)
+		backupClientGetterMock := newMockBackupV1Alpha1Interface(t)
+		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
+
+		testErr := requeueError{errors.New("test")}
+		managerMock := newMockBackupControllerManager(t)
+		managerMock.EXPECT().delete(context.TODO(), backup).Return(testErr)
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, v12.EventTypeWarning, "Delete", "Delete failed. Reason: test")
+
+		requeueHandlerMock := newMockRequeueHandler(t)
+		requeueHandlerMock.EXPECT().Handle(context.TODO(), "Delete failed with backup backup", backup, testErr, v1.BackupStatusCompleted).Return(ctrl.Result{}, nil)
+
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
+
+		// when
+		actual, err := sut.Reconcile(context.TODO(), request)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, actual)
+	})
+
+	t.Run("should return error if the requeue handler returns an error", func(t *testing.T) {
+		// given
+		backupName := "backup"
+
+		request := ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: testNamespace,
+			Name:      backupName,
+		}}
+		now := metav1.NewTime(time.Now())
+		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace, DeletionTimestamp: &now}, Status: v1.BackupStatus{Status: "completed"}}
+
+		clientSetMock := newMockEcosystemInterface(t)
+		backupInterfaceMock := newMockEcosystemBackupInterface(t)
+		backupInterfaceMock.EXPECT().Get(context.TODO(), backupName, metav1.GetOptions{}).Return(backup, nil)
+		backupClientGetterMock := newMockBackupV1Alpha1Interface(t)
+		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
+
+		testErr := requeueError{errors.New("test")}
+		managerMock := newMockBackupControllerManager(t)
+		managerMock.EXPECT().delete(context.TODO(), backup).Return(testErr)
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, v12.EventTypeWarning, "Delete", "Delete failed. Reason: test")
+		recorderMock.EXPECT().Eventf(backup, v12.EventTypeWarning, "Requeue", "Failed to requeue the %s.", "delete")
+
+		requeueHandlerMock := newMockRequeueHandler(t)
+		requeueHandlerMock.EXPECT().Handle(context.TODO(), "Delete failed with backup backup", backup, testErr, v1.BackupStatusCompleted).Return(ctrl.Result{}, assert.AnError)
+
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
+
+		// when
+		actual, err := sut.Reconcile(context.TODO(), request)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to handle requeue")
 		assert.Equal(t, ctrl.Result{}, actual)
 	})
 
@@ -143,8 +229,15 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.Equal(t, ctrl.Result{}, actual)
-		assert.ErrorContains(t, err, fmt.Sprintf("failed to get backup resource %s/%s", testNamespace, backupName))
 	})
+}
+
+type requeueError struct {
+	error
+}
+
+func (rq *requeueError) GetRequeueTime(requeueTimeNanos time.Duration) time.Duration {
+	return requeueTimeNanos
 }
 
 func Test_backupReconciler_SetupWithManager(t *testing.T) {

@@ -99,7 +99,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to set finalizer backup-finalizer to backup resource")
+		assert.ErrorContains(t, err, "failed to set finalizer cloudogu-backup-finalizer to backup resource")
 	})
 
 	t.Run("should return error activate maintenance mode error", func(t *testing.T) {

@@ -1,6 +1,7 @@
 package velero
 
 import (
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/record"
 
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
@@ -23,4 +24,12 @@ type veleroInterface interface {
 
 type veleroBackupInterface interface {
 	velerov1.BackupInterface
+}
+
+type veleroDeleteBackupRequest interface {
+	velerov1.DeleteBackupRequestInterface
+}
+
+type ecosystemWatch interface {
+	watch.Interface
 }

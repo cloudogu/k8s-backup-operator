@@ -61,7 +61,7 @@ func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 
 // DeleteBackup deletes a velero backup with a delete backup request.
 // Potential errors from the request will be returned. Nil if no occur.
-// TODO Reconcile failed backup deletion.
+// TODO maybe the delete process should become an own CRD.
 func (p *provider) DeleteBackup(ctx context.Context, backup *v1.Backup) error {
 	p.recorder.Event(backup, corev1.EventTypeNormal, v1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
 	requestCR := getDeleteBackupRequestCR(backup.Name, backup.Namespace)
