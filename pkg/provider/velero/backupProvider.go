@@ -4,16 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"time"
 )
 
 const veleroBackupDeleteRequestKind = "DeleteBackupRequest"
@@ -35,11 +37,26 @@ func New(client ecosystem.BackupInterface, recorder eventRecorder, namespace str
 	return &provider{recorder: recorder, veleroClientSet: clientSet}, nil
 }
 
+// CreateBackup triggers a velero backup.
 func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 	p.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Use velero as backup provider")
-	println("Hier könnte ihre Backup-Lösung verwendet werden")
-	time.Sleep(time.Second * 5)
-	println("Ende")
+
+	namespace := backup.Namespace
+	volumeFsBackup := false
+	veleroBackup := &velerov1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: namespace},
+		Spec: velerov1.BackupSpec{
+			ExcludedNamespaces:       []string{namespace},
+			StorageLocation:          "default",
+			DefaultVolumesToFsBackup: &volumeFsBackup,
+		},
+	}
+
+	_, err := p.veleroClientSet.VeleroV1().Backups(namespace).Create(ctx, veleroBackup, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to apply velero backup to cluster: %w", err)
+	}
+
 	return nil
 }
 
