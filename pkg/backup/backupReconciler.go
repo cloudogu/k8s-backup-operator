@@ -51,8 +51,8 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	logger := log.FromContext(ctx)
 
 	backup, err := r.clientSet.EcosystemV1Alpha1().Backups(r.namespace).Get(ctx, req.Name, metav1.GetOptions{})
-	if err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+	if client.IgnoreNotFound(err) != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get backup resource %s/%s: %w", r.namespace, req.Name, err)
 	}
 
 	logger.Info(fmt.Sprintf("found backup resource %s", req.NamespacedName))
