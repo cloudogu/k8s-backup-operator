@@ -136,6 +136,7 @@ func (p *provider) DeleteBackup(ctx context.Context, backup *v1.Backup) error {
 		if event.Type == watch.Modified {
 			cr, ok := event.Object.(*velerov1.DeleteBackupRequest)
 			if ok && cr.Status.Phase == velerov1.DeleteBackupRequestPhaseProcessed {
+				watcher.Stop()
 				break
 			}
 		}

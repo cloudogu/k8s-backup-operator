@@ -102,6 +102,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		watchChannel := make(chan watch.Event)
 		watchMock := newMockEcosystemWatch(t)
 		watchMock.EXPECT().ResultChan().Return(watchChannel)
+		watchMock.EXPECT().Stop()
 
 		veleroBackupDeleteRequestClientMock := newMockVeleroDeleteBackupRequest(t)
 		expectedRequest := getVeleroDeleteBackupRequest(backup.Name, testNamespace)
