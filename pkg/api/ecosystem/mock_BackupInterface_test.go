@@ -690,6 +690,61 @@ func (_c *MockBackupInterface_UpdateStatusDeleting_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// UpdateStatusFailed provides a mock function with given fields: ctx, backup
+func (_m *MockBackupInterface) UpdateStatusFailed(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
+	ret := _m.Called(ctx, backup)
+
+	var r0 *v1.Backup
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, error)); ok {
+		return rf(ctx, backup)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
+		r0 = rf(ctx, backup)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Backup)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
+		r1 = rf(ctx, backup)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockBackupInterface_UpdateStatusFailed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStatusFailed'
+type MockBackupInterface_UpdateStatusFailed_Call struct {
+	*mock.Call
+}
+
+// UpdateStatusFailed is a helper method to define mock.On call
+//   - ctx context.Context
+//   - backup *v1.Backup
+func (_e *MockBackupInterface_Expecter) UpdateStatusFailed(ctx interface{}, backup interface{}) *MockBackupInterface_UpdateStatusFailed_Call {
+	return &MockBackupInterface_UpdateStatusFailed_Call{Call: _e.mock.On("UpdateStatusFailed", ctx, backup)}
+}
+
+func (_c *MockBackupInterface_UpdateStatusFailed_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *MockBackupInterface_UpdateStatusFailed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Backup))
+	})
+	return _c
+}
+
+func (_c *MockBackupInterface_UpdateStatusFailed_Call) Return(_a0 *v1.Backup, _a1 error) *MockBackupInterface_UpdateStatusFailed_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockBackupInterface_UpdateStatusFailed_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, error)) *MockBackupInterface_UpdateStatusFailed_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateStatusInProgress provides a mock function with given fields: ctx, backup
 func (_m *MockBackupInterface) UpdateStatusInProgress(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
 	ret := _m.Called(ctx, backup)

@@ -23,7 +23,7 @@ var testNamespace = "ecosystem-test"
 func TestNewBackupReconciler(t *testing.T) {
 	t.Run("should create backup reconciler", func(t *testing.T) {
 		// when
-		actual := NewBackupReconciler(nil, nil, "default", nil)
+		actual := NewBackupReconciler(nil, nil, "default", nil, nil)
 
 		// then
 		assert.NotNil(t, actual)

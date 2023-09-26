@@ -6,6 +6,7 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"time"
 )
 
 type ecosystemInterface interface {
@@ -48,4 +49,15 @@ type Provider interface {
 	CreateBackup(ctx context.Context, backup *v1.Backup) error
 	// DeleteBackup deletes backup from the cluster state and the backup storage.
 	DeleteBackup(ctx context.Context, backup *v1.Backup) error
+}
+
+type requeueHandler interface {
+	Handle(ctx context.Context, contextMessage string, backup *v1.Backup, originalErr error, requeueStatus string) (ctrl.Result, error)
+}
+
+// requeuableError indicates that the current error requires the operator to requeue the component.
+type requeuableError interface {
+	error
+	// GetRequeueTime returns the time to wait before the next reconciliation.
+	GetRequeueTime(requeueTimeNanos time.Duration) time.Duration
 }

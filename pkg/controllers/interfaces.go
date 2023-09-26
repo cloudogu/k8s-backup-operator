@@ -1,10 +1,9 @@
 package controller
 
 import (
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 )
 
 type ecosystemInterface interface {

@@ -25,8 +25,8 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().DeleteBackup(context.TODO(), backup).Return(nil)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder) Provider {
-			return providerMock
+		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
 
@@ -88,8 +88,8 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().DeleteBackup(context.TODO(), backup).Return(assert.AnError)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder) Provider {
-			return providerMock
+		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
 

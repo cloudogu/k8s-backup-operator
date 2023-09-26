@@ -3,6 +3,7 @@ package v1
 import (
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
 )
 
 const (
@@ -21,6 +22,7 @@ const (
 
 const (
 	CreateEventReason        = "Creation"
+	DeleteEventReason        = "Delete"
 	ErrorOnCreateEventReason = "ErrCreation"
 )
 
@@ -29,7 +31,7 @@ const (
 	ErrorOnProviderDeleteEventReason = "Error provider delete"
 )
 
-const BackupFinalizer = "backup-finalizer"
+const BackupFinalizer = "cloudogu-backup-finalizer"
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -44,7 +46,10 @@ type BackupSpec struct {
 
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
+	// Status represents the state of the backup.
 	Status string `json:"status,omitempty"`
+	// RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.
+	RequeueTimeNanos time.Duration `json:"requeueTimeNanos,omitempty"`
 }
 
 // +kubebuilder:object:root=true

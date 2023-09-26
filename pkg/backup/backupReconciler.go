@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"strings"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
@@ -23,15 +25,16 @@ const (
 
 // backupReconciler reconciles a Backup object
 type backupReconciler struct {
-	clientSet ecosystem.Interface
-	recorder  eventRecorder
-	namespace string
-	manager   backupControllerManager
+	clientSet      ecosystem.Interface
+	recorder       eventRecorder
+	namespace      string
+	manager        backupControllerManager
+	requeueHandler requeueHandler
 }
 
 // NewBackupReconciler creates a new instance of backupReconciler.
-func NewBackupReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, manager backupControllerManager) *backupReconciler {
-	return &backupReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager}
+func NewBackupReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, manager backupControllerManager, handler requeueHandler) *backupReconciler {
+	return &backupReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager, requeueHandler: handler}
 }
 
 // +kubebuilder:rbac:groups=k8s.cloudogu.com,resources=backups,verbs=get;list;watch;create;update;patch;delete
@@ -60,12 +63,51 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	case operationCreate:
 		return ctrl.Result{}, r.manager.create(ctx, backup)
 	case operationDelete:
-		return ctrl.Result{}, r.manager.delete(ctx, backup)
+		return r.performDeleteOperation(ctx, backup)
 	case operationIgnore:
 		return ctrl.Result{}, nil
 	default:
 		return ctrl.Result{}, fmt.Errorf("unknown operation: %s", requiredOperation)
 	}
+}
+
+func (r *backupReconciler) performDeleteOperation(ctx context.Context, backup *k8sv1.Backup) (ctrl.Result, error) {
+	return r.performOperation(ctx, backup, k8sv1.DeleteEventReason, k8sv1.BackupStatusCompleted, r.manager.delete)
+}
+
+// performOperation executes the given operationFn and requeues if necessary.
+// When requeueing, the sourceComponentStatus is set as the backup status.
+func (r *backupReconciler) performOperation(
+	ctx context.Context,
+	backup *k8sv1.Backup,
+	eventReason string,
+	requeueStatus string,
+	operationFn func(context.Context, *k8sv1.Backup) error,
+) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	operationError := operationFn(ctx, backup)
+	contextMessageOnError := fmt.Sprintf("%s failed with backup %s", eventReason, backup.Name)
+	eventType := corev1.EventTypeNormal
+	message := fmt.Sprintf("%s successful", eventReason)
+	if operationError != nil {
+		eventType = corev1.EventTypeWarning
+		printError := strings.ReplaceAll(operationError.Error(), "\n", "")
+		message = fmt.Sprintf("%s failed. Reason: %s", eventReason, printError)
+		logger.Error(operationError, message)
+	}
+
+	// on self-upgrade of the backup-operator this event might not get send, because the operator is already shutting down
+	r.recorder.Event(backup, eventType, eventReason, message)
+
+	result, handleErr := r.requeueHandler.Handle(ctx, contextMessageOnError, backup, operationError, requeueStatus)
+	if handleErr != nil {
+		r.recorder.Eventf(backup, corev1.EventTypeWarning, RequeueEventReason,
+			"Failed to requeue the %s.", strings.ToLower(eventReason))
+		return ctrl.Result{}, fmt.Errorf("failed to handle requeue: %w", handleErr)
+	}
+
+	return result, nil
 }
 
 func evaluateRequiredOperation(backup *k8sv1.Backup) operation {

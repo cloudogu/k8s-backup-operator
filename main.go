@@ -166,7 +166,10 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 	if err = (controller.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
-	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager)).SetupWithManager(k8sManager); err != nil {
+
+	requeueHandler := backup.NewBackupRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
+
+	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
 	// +kubebuilder:scaffold:builder

@@ -35,8 +35,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().CreateBackup(context.TODO(), backup).Return(nil)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder) Provider {
-			return providerMock
+		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
 
@@ -158,8 +158,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().CreateBackup(context.TODO(), backup).Return(assert.AnError)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder) Provider {
-			return providerMock
+		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
 
@@ -190,8 +190,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().CreateBackup(context.TODO(), backup).Return(nil)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder) Provider {
-			return providerMock
+		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
 
@@ -222,8 +222,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().CreateBackup(context.TODO(), backup).Return(nil)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder) Provider {
-			return providerMock
+		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
 
