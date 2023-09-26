@@ -12,8 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder) Provider {
-	return velero.New(client, recorder)
+var newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+	return velero.New(client, recorder, namespace)
 }
 
 const (

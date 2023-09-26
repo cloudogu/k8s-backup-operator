@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -21,6 +22,11 @@ const (
 const (
 	CreateEventReason        = "Creation"
 	ErrorOnCreateEventReason = "ErrCreation"
+)
+
+const (
+	ProviderDeleteEventReason        = "Provider delete"
+	ErrorOnProviderDeleteEventReason = "Error provider delete"
 )
 
 const BackupFinalizer = "backup-finalizer"
@@ -67,4 +73,8 @@ type BackupList struct {
 
 func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
+}
+
+func (b *Backup) GetFieldSelectorWithName() string {
+	return fmt.Sprintf("metadata.name=%s", b.Name)
 }

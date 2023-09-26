@@ -6,6 +6,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -47,7 +48,7 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	backup, err := r.clientSet.EcosystemV1Alpha1().Backups(r.namespace).Get(ctx, req.Name, metav1.GetOptions{})
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get backup resource %s: %w", req.NamespacedName, err)
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	logger.Info(fmt.Sprintf("found backup resource %s", req.NamespacedName))
@@ -68,6 +69,10 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func evaluateRequiredOperation(backup *k8sv1.Backup) operation {
+	if backup.Status.Status == k8sv1.BackupStatusFailed {
+		return operationIgnore
+	}
+
 	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.IsZero() {
 		return operationDelete
 	}

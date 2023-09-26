@@ -1,0 +1,33 @@
+# permissions for end users to delete backups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/name: role
+    app.kubernetes.io/instance: velero-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: k8s-backup-operator
+    app.kubernetes.io/part-of: k8s-backup-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: velero-role
+rules:
+  - apiGroups:
+      - velero.io
+    resources:
+      - deletebackuprequests
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - velero.io
+    resources:
+      - deletebackuprequests/status
+    verbs:
+      - get
+      - list
+      - watch
