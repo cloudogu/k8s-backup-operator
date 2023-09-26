@@ -26,7 +26,7 @@ type provider struct {
 	veleroClientSet veleroClientSet
 }
 
-func New(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (*provider, error) {
+func New(_ ecosystem.BackupInterface, recorder eventRecorder, namespace string) (*provider, error) {
 	factory := veleroclient.NewFactory("k8s-backup-operator", map[string]interface{}{"namespace": namespace})
 	clientSet, err := factory.Client()
 	if err != nil {
@@ -74,6 +74,7 @@ func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event, namespace string, veleroBackup *velerov1.Backup, p *provider, backup *v1.Backup, watcher watch.Interface) error {
 	for veleroChange := range veleroBackupChan {
 		switch veleroChange.Type {
+		// TODO The watch throws an error event und a regular backup creation.
 		case watch.Error:
 			message := fmt.Sprintf("failed to complete velero backup '%s/%s': watch returned error", namespace, veleroBackup.Name)
 			p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, message)

@@ -20,8 +20,23 @@ rules:
       - delete
       - get
       - list
-      - patch
-      - update
+      - watch
+  - apiGroups:
+      - velero.io
+    resources:
+      - deletebackuprequests/status
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - velero.io
+    resources:
+      - backups
+    verbs:
+      - create
+      - get
+      - list
       - watch
   - apiGroups:
       - velero.io
