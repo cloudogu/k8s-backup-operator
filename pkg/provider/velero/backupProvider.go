@@ -10,7 +10,6 @@ import (
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +23,7 @@ var deleteWaitTimeout = int64(300)
 
 type provider struct {
 	recorder        eventRecorder
-	veleroClientSet versioned.Interface
+	veleroClientSet veleroClientSet
 }
 
 func New(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (*provider, error) {
@@ -39,7 +38,7 @@ func New(client ecosystem.BackupInterface, recorder eventRecorder, namespace str
 
 // CreateBackup triggers a velero backup.
 func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
-	p.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Use velero as backup provider")
+	p.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as backup provider")
 
 	namespace := backup.Namespace
 	volumeFsBackup := false
@@ -54,7 +53,7 @@ func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 
 	_, err := p.veleroClientSet.VeleroV1().Backups(namespace).Create(ctx, veleroBackup, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to apply velero backup to cluster: %w", err)
+		return fmt.Errorf("failed to apply velero backup '%s/%s' to cluster: %w", namespace, backup.Name, err)
 	}
 
 	return nil
