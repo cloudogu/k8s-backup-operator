@@ -45,7 +45,7 @@ func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 	veleroBackup := &velerov1.Backup{
 		ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: namespace},
 		Spec: velerov1.BackupSpec{
-			ExcludedNamespaces:       []string{namespace},
+			IncludedNamespaces:       []string{namespace},
 			StorageLocation:          "default",
 			DefaultVolumesToFsBackup: &volumeFsBackup,
 		},
