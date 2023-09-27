@@ -2,7 +2,6 @@ package backup
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
@@ -37,22 +36,11 @@ func (bdm *backupDeleteManager) delete(ctx context.Context, backup *k8sv1.Backup
 }
 
 func (bdm *backupDeleteManager) triggerBackupDelete(ctx context.Context, backup *k8sv1.Backup) error {
-	backupProvider, err := getBackupProvider(backup, bdm.client, bdm.recorder)
+	backupProvider, err := getBackupProvider(ctx, backup, bdm.client, bdm.recorder)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}
 
 	err = backupProvider.DeleteBackup(ctx, backup)
 	return err
-}
-
-func getBackupProvider(backup *k8sv1.Backup, client ecosystemBackupInterface, recorder eventRecorder) (Provider, error) {
-	provider := backup.Spec.Provider
-	// TODO Check if Provider is really installed.
-	switch provider {
-	case k8sv1.ProviderVelero:
-		return newVeleroProvider(client, recorder, backup.Namespace)
-	default:
-		return nil, errors.New(fmt.Sprintf("unknown backup provider %s", provider))
-	}
 }

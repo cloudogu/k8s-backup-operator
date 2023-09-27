@@ -22,6 +22,48 @@ func (_m *MockProvider) EXPECT() *MockProvider_Expecter {
 	return &MockProvider_Expecter{mock: &_m.Mock}
 }
 
+// CheckReady provides a mock function with given fields: ctx
+func (_m *MockProvider) CheckReady(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockProvider_CheckReady_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckReady'
+type MockProvider_CheckReady_Call struct {
+	*mock.Call
+}
+
+// CheckReady is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockProvider_Expecter) CheckReady(ctx interface{}) *MockProvider_CheckReady_Call {
+	return &MockProvider_CheckReady_Call{Call: _e.mock.On("CheckReady", ctx)}
+}
+
+func (_c *MockProvider_CheckReady_Call) Run(run func(ctx context.Context)) *MockProvider_CheckReady_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockProvider_CheckReady_Call) Return(_a0 error) *MockProvider_CheckReady_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockProvider_CheckReady_Call) RunAndReturn(run func(context.Context) error) *MockProvider_CheckReady_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateBackup provides a mock function with given fields: ctx, backup
 func (_m *MockProvider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 	ret := _m.Called(ctx, backup)

@@ -49,6 +49,8 @@ type Provider interface {
 	CreateBackup(ctx context.Context, backup *v1.Backup) error
 	// DeleteBackup deletes backup from the cluster state and the backup storage.
 	DeleteBackup(ctx context.Context, backup *v1.Backup) error
+	// CheckReady validates if the provider is ready to receive backup requests.
+	CheckReady(ctx context.Context) error
 }
 
 type requeueHandler interface {

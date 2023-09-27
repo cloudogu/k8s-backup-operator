@@ -5,18 +5,12 @@ import (
 	"fmt"
 
 	"github.com/cloudogu/cesapp-lib/registry"
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/maintenance"
-	"github.com/cloudogu/k8s-backup-operator/pkg/provider/velero"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-var newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
-	return velero.New(client, recorder, namespace)
-}
 
 const (
 	// TODO
@@ -77,7 +71,7 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 }
 
 func (bcm *backupCreateManager) triggerBackup(ctx context.Context, backup *v1.Backup) error {
-	backupProvider, err := getBackupProvider(backup, bcm.client, bcm.recorder)
+	backupProvider, err := getBackupProvider(ctx, backup, bcm.client, bcm.recorder)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}

@@ -36,6 +36,12 @@ func New(backupClient ecosystemBackupInterface, recorder eventRecorder, namespac
 	return &provider{recorder: recorder, veleroClientSet: clientSet, backupClient: backupClient}, nil
 }
 
+// CheckReady validates that velero is installed and can establish a connection to its backup store.
+func (p *provider) CheckReady(ctx context.Context) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 // CreateBackup triggers a velero backup and waits for its completion.
 func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 	p.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as backup provider")
