@@ -1,6 +1,7 @@
 package velero
 
 import (
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/record"
 
@@ -10,6 +11,10 @@ import (
 
 type eventRecorder interface {
 	record.EventRecorder
+}
+
+type ecosystemBackupInterface interface {
+	ecosystem.BackupInterface
 }
 
 type veleroClientSet interface {

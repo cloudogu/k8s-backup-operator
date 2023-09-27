@@ -22,12 +22,70 @@ var testCtx = context.TODO()
 const testNamespace = "test-namespace"
 
 func Test_provider_CreateBackup(t *testing.T) {
+	t.Run("should fail to update status to 'InProgress' and 'Failed'", func(t *testing.T) {
+		// given
+		testBackup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace}}
+
+		mockRecorder := newMockEventRecorder(t)
+		mockRecorder.EXPECT().Event(testBackup, "Normal", "Creation", "Using velero as backup provider")
+		mockRecorder.EXPECT().Event(testBackup, "Warning", "ErrCreation", "failed to update status of backup to 'InProgress': assert.AnError general error for testing\nfailed to update status of backup to 'Failed': assert.AnError general error for testing")
+
+		mockVeleroClient := newMockVeleroClientSet(t)
+
+		mockEcosystemBackupClient := newMockEcosystemBackupInterface(t)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusInProgress(testCtx, testBackup).Return(nil, assert.AnError)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusFailed(testCtx, testBackup).Return(nil, assert.AnError)
+
+		sut := &provider{
+			recorder:        mockRecorder,
+			veleroClientSet: mockVeleroClient,
+			backupClient:    mockEcosystemBackupClient,
+		}
+
+		// when
+		err := sut.CreateBackup(testCtx, testBackup)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to update status of backup to 'InProgress'")
+		assert.ErrorContains(t, err, "failed to update status of backup to 'Failed'")
+	})
+	t.Run("should fail to update status to 'InProgress' and succeed with status 'Failed'", func(t *testing.T) {
+		// given
+		testBackup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace}}
+
+		mockRecorder := newMockEventRecorder(t)
+		mockRecorder.EXPECT().Event(testBackup, "Normal", "Creation", "Using velero as backup provider")
+		mockRecorder.EXPECT().Event(testBackup, "Warning", "ErrCreation", "failed to update status of backup to 'InProgress': assert.AnError general error for testing")
+
+		mockVeleroClient := newMockVeleroClientSet(t)
+
+		mockEcosystemBackupClient := newMockEcosystemBackupInterface(t)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusInProgress(testCtx, testBackup).Return(nil, assert.AnError)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusFailed(testCtx, testBackup).Return(testBackup, nil)
+
+		sut := &provider{
+			recorder:        mockRecorder,
+			veleroClientSet: mockVeleroClient,
+			backupClient:    mockEcosystemBackupClient,
+		}
+
+		// when
+		err := sut.CreateBackup(testCtx, testBackup)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to update status of backup to 'InProgress'")
+	})
 	t.Run("should fail to create velero backup", func(t *testing.T) {
 		// given
 		testBackup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace}}
 
 		mockRecorder := newMockEventRecorder(t)
 		mockRecorder.EXPECT().Event(testBackup, "Normal", "Creation", "Using velero as backup provider")
+		mockRecorder.EXPECT().Event(testBackup, "Warning", "ErrCreation", "failed to apply velero backup 'test-namespace/testBackup' to cluster: assert.AnError general error for testing")
 
 		volumeFsBackup := false
 		expectedVeleroBackup := &velerov1.Backup{
@@ -38,16 +96,21 @@ func Test_provider_CreateBackup(t *testing.T) {
 				DefaultVolumesToFsBackup: &volumeFsBackup,
 			},
 		}
-		mockBackupInterface := newMockVeleroBackupInterface(t)
-		mockBackupInterface.EXPECT().Create(testCtx, expectedVeleroBackup, metav1.CreateOptions{}).Return(nil, assert.AnError)
+		mockVeleroBackupClient := newMockVeleroBackupInterface(t)
+		mockVeleroBackupClient.EXPECT().Create(testCtx, expectedVeleroBackup, metav1.CreateOptions{}).Return(nil, assert.AnError)
 		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().Backups(testNamespace).Return(mockBackupInterface)
+		mockVeleroInterface.EXPECT().Backups(testNamespace).Return(mockVeleroBackupClient)
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+
+		mockEcosystemBackupClient := newMockEcosystemBackupInterface(t)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusInProgress(testCtx, testBackup).Return(testBackup, nil)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusFailed(testCtx, testBackup).Return(testBackup, nil)
 
 		sut := &provider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
+			backupClient:    mockEcosystemBackupClient,
 		}
 
 		// when
@@ -64,6 +127,7 @@ func Test_provider_CreateBackup(t *testing.T) {
 
 		mockRecorder := newMockEventRecorder(t)
 		mockRecorder.EXPECT().Event(testBackup, "Normal", "Creation", "Using velero as backup provider")
+		mockRecorder.EXPECT().Event(testBackup, "Warning", "ErrCreation", "failed to create watch for velero backup 'test-namespace/testBackup': assert.AnError general error for testing")
 
 		volumeFsBackup := false
 		expectedVeleroBackup := &velerov1.Backup{
@@ -82,9 +146,14 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
+		mockEcosystemBackupClient := newMockEcosystemBackupInterface(t)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusInProgress(testCtx, testBackup).Return(testBackup, nil)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusFailed(testCtx, testBackup).Return(testBackup, nil)
+
 		sut := &provider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
+			backupClient:    mockEcosystemBackupClient,
 		}
 
 		// when
@@ -127,14 +196,24 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
+		mockEcosystemBackupClient := newMockEcosystemBackupInterface(t)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusInProgress(testCtx, testBackup).Return(testBackup, nil)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusFailed(testCtx, testBackup).Return(testBackup, nil)
+
 		sut := &provider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
+			backupClient:    mockEcosystemBackupClient,
 		}
 
 		go func() {
 			// has to be run in goroutine to work
-			resultChan <- watch.Event{Type: watch.Deleted}
+			resultChan <- watch.Event{
+				Type: watch.Deleted,
+				Object: &velerov1.Backup{
+					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+				},
+			}
 		}()
 
 		// when
@@ -176,9 +255,14 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
+		mockEcosystemBackupClient := newMockEcosystemBackupInterface(t)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusInProgress(testCtx, testBackup).Return(testBackup, nil)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusFailed(testCtx, testBackup).Return(testBackup, nil)
+
 		sut := &provider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
+			backupClient:    mockEcosystemBackupClient,
 		}
 
 		go func() {
@@ -186,7 +270,7 @@ func Test_provider_CreateBackup(t *testing.T) {
 			resultChan <- watch.Event{
 				Type: watch.Modified,
 				Object: &velerov1.Backup{
-					ObjectMeta: metav1.ObjectMeta{Name: "testBackup"},
+					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
 					Status:     velerov1.BackupStatus{Phase: velerov1.BackupPhaseFailedValidation},
 				},
 			}
@@ -231,9 +315,14 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
+		mockEcosystemBackupClient := newMockEcosystemBackupInterface(t)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusInProgress(testCtx, testBackup).Return(testBackup, nil)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusFailed(testCtx, testBackup).Return(testBackup, nil)
+
 		sut := &provider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
+			backupClient:    mockEcosystemBackupClient,
 		}
 
 		go func() {
@@ -241,7 +330,7 @@ func Test_provider_CreateBackup(t *testing.T) {
 			resultChan <- watch.Event{
 				Type: watch.Modified,
 				Object: &velerov1.Backup{
-					ObjectMeta: metav1.ObjectMeta{Name: "testBackup"},
+					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
 					Status:     velerov1.BackupStatus{Phase: velerov1.BackupPhaseDeleting},
 				},
 			}
@@ -253,6 +342,68 @@ func Test_provider_CreateBackup(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to complete velero backup 'test-namespace/testBackup': invalid status phase 'Deleting'")
+	})
+	t.Run("should fail to update status to 'Completed'", func(t *testing.T) {
+		// given
+		testBackup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace}}
+
+		mockRecorder := newMockEventRecorder(t)
+		mockRecorder.EXPECT().Event(testBackup, "Normal", "Creation", "Using velero as backup provider")
+		mockRecorder.EXPECT().Event(testBackup, "Warning", "ErrCreation", "failed to update status of backup to 'Completed': assert.AnError general error for testing")
+
+		volumeFsBackup := false
+		expectedVeleroBackup := &velerov1.Backup{
+			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+			Spec: velerov1.BackupSpec{
+				IncludedNamespaces:       []string{testNamespace},
+				StorageLocation:          "default",
+				DefaultVolumesToFsBackup: &volumeFsBackup,
+			},
+		}
+
+		resultChan := make(chan watch.Event)
+		mockWatcher := newMockEcosystemWatch(t)
+		mockWatcher.EXPECT().ResultChan().Return(resultChan)
+		mockWatcher.EXPECT().Stop().Run(func() {
+			close(resultChan)
+		})
+		mockBackupInterface := newMockVeleroBackupInterface(t)
+		mockBackupInterface.EXPECT().Create(testCtx, expectedVeleroBackup, metav1.CreateOptions{}).Return(expectedVeleroBackup, nil)
+		mockBackupInterface.EXPECT().Watch(testCtx, metav1.ListOptions{FieldSelector: testBackup.GetFieldSelectorWithName()}).Return(mockWatcher, nil)
+		mockVeleroInterface := newMockVeleroInterface(t)
+		mockVeleroInterface.EXPECT().Backups(testNamespace).Return(mockBackupInterface)
+		mockVeleroClient := newMockVeleroClientSet(t)
+		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+
+		mockEcosystemBackupClient := newMockEcosystemBackupInterface(t)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusInProgress(testCtx, testBackup).Return(testBackup, nil)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusCompleted(testCtx, testBackup).Return(nil, assert.AnError)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusFailed(testCtx, testBackup).Return(testBackup, nil)
+
+		sut := &provider{
+			recorder:        mockRecorder,
+			veleroClientSet: mockVeleroClient,
+			backupClient:    mockEcosystemBackupClient,
+		}
+
+		go func() {
+			// has to be run in goroutine to work
+			resultChan <- watch.Event{
+				Type: watch.Modified,
+				Object: &velerov1.Backup{
+					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+					Status:     velerov1.BackupStatus{Phase: velerov1.BackupPhaseCompleted},
+				},
+			}
+		}()
+
+		// when
+		err := sut.CreateBackup(testCtx, testBackup)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to update status of backup to 'Completed'")
 	})
 	t.Run("should succeed when velero backup is completed", func(t *testing.T) {
 		// given
@@ -286,9 +437,14 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
+		mockEcosystemBackupClient := newMockEcosystemBackupInterface(t)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusInProgress(testCtx, testBackup).Return(testBackup, nil)
+		mockEcosystemBackupClient.EXPECT().UpdateStatusCompleted(testCtx, testBackup).Return(testBackup, nil)
+
 		sut := &provider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
+			backupClient:    mockEcosystemBackupClient,
 		}
 
 		go func() {
@@ -296,7 +452,7 @@ func Test_provider_CreateBackup(t *testing.T) {
 			resultChan <- watch.Event{
 				Type: watch.Modified,
 				Object: &velerov1.Backup{
-					ObjectMeta: metav1.ObjectMeta{Name: "testBackup"},
+					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
 					Status:     velerov1.BackupStatus{Phase: velerov1.BackupPhaseCompleted},
 				},
 			}

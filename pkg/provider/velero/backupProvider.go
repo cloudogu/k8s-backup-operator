@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -24,65 +23,85 @@ var deleteWaitTimeout = int64(300)
 type provider struct {
 	recorder        eventRecorder
 	veleroClientSet veleroClientSet
+	backupClient    ecosystemBackupInterface
 }
 
-func New(_ ecosystem.BackupInterface, recorder eventRecorder, namespace string) (*provider, error) {
+func New(backupClient ecosystemBackupInterface, recorder eventRecorder, namespace string) (*provider, error) {
 	factory := veleroclient.NewFactory("k8s-backup-operator", map[string]interface{}{"namespace": namespace})
 	clientSet, err := factory.Client()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create velero clientset: %w", err)
 	}
 
-	return &provider{recorder: recorder, veleroClientSet: clientSet}, nil
+	return &provider{recorder: recorder, veleroClientSet: clientSet, backupClient: backupClient}, nil
 }
 
 // CreateBackup triggers a velero backup and waits for its completion.
 func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 	p.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as backup provider")
 
-	namespace := backup.Namespace
+	_, err := p.backupClient.UpdateStatusInProgress(ctx, backup)
+	if err != nil {
+		return p.handleFailedBackup(ctx, backup, fmt.Errorf("failed to update status of backup to 'InProgress': %w", err))
+	}
+
 	volumeFsBackup := false
 	veleroBackup := &velerov1.Backup{
-		ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace},
 		Spec: velerov1.BackupSpec{
-			IncludedNamespaces:       []string{namespace},
+			IncludedNamespaces:       []string{backup.Namespace},
 			StorageLocation:          "default",
 			DefaultVolumesToFsBackup: &volumeFsBackup,
 		},
 	}
 
-	backupsClient := p.veleroClientSet.VeleroV1().Backups(namespace)
-	_, err := backupsClient.Create(ctx, veleroBackup, metav1.CreateOptions{})
+	veleroBackupClient := p.veleroClientSet.VeleroV1().Backups(backup.Namespace)
+	_, err = veleroBackupClient.Create(ctx, veleroBackup, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to apply velero backup '%s/%s' to cluster: %w", namespace, veleroBackup.Name, err)
+		return p.handleFailedBackup(ctx, backup, fmt.Errorf("failed to apply velero backup '%s/%s' to cluster: %w", veleroBackup.Namespace, veleroBackup.Name, err))
 	}
 
-	watcher, err := backupsClient.Watch(ctx, metav1.ListOptions{FieldSelector: backup.GetFieldSelectorWithName()})
+	watcher, err := veleroBackupClient.Watch(ctx, metav1.ListOptions{FieldSelector: backup.GetFieldSelectorWithName()})
 	if err != nil {
-		return fmt.Errorf("failed to create watch for velero backup '%s/%s': %w", namespace, veleroBackup.Name, err)
+		return p.handleFailedBackup(ctx, backup, fmt.Errorf("failed to create watch for velero backup '%s/%s': %w", veleroBackup.Namespace, veleroBackup.Name, err))
 	}
 
 	veleroBackupChan := watcher.ResultChan()
-	err = waitForBackupCompletionOrFailure(veleroBackupChan, namespace, veleroBackup, p, backup, watcher)
+	defer watcher.Stop()
+
+	err = waitForBackupCompletionOrFailure(veleroBackupChan)
 	if err != nil {
-		return err
+		return p.handleFailedBackup(ctx, backup, err)
 	}
 
+	_, err = p.backupClient.UpdateStatusCompleted(ctx, backup)
+	if err != nil {
+		return p.handleFailedBackup(ctx, backup, fmt.Errorf("failed to update status of backup to 'Completed': %w", err))
+	}
+
+	p.recorder.Eventf(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Successfully completed velero backup '%s/%s'", veleroBackup.Namespace, veleroBackup.Name)
 	return nil
 }
 
-func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event, namespace string, veleroBackup *velerov1.Backup, p *provider, backup *v1.Backup, watcher watch.Interface) error {
+func (p *provider) handleFailedBackup(ctx context.Context, backup *v1.Backup, err error) error {
+	_, updateStatusErr := p.backupClient.UpdateStatusFailed(ctx, backup)
+	if updateStatusErr != nil {
+		err = errors.Join(err, fmt.Errorf("failed to update status of backup to 'Failed': %w", updateStatusErr))
+	}
+
+	p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, err.Error())
+	return err
+}
+
+func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event) error {
+eventLoop:
 	for veleroChange := range veleroBackupChan {
+		changedBackup := veleroChange.Object.(*velerov1.Backup)
 		switch veleroChange.Type {
 		case watch.Deleted:
-			watcher.Stop()
-			message := fmt.Sprintf("failed to complete velero backup '%s/%s': the backup got deleted", namespace, veleroBackup.Name)
-			p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, message)
-			return fmt.Errorf(message)
+			return fmt.Errorf("failed to complete velero backup '%s/%s': the backup got deleted", changedBackup.Namespace, changedBackup.Name)
 		case watch.Modified:
-			modifiedBackup := veleroChange.Object.(*velerov1.Backup)
-
-			switch modifiedBackup.Status.Phase {
+			switch changedBackup.Status.Phase {
 			case velerov1.BackupPhaseFailedValidation:
 				fallthrough
 			case velerov1.BackupPhaseWaitingForPluginOperationsPartiallyFailed:
@@ -92,22 +111,15 @@ func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event, names
 			case velerov1.BackupPhasePartiallyFailed:
 				fallthrough
 			case velerov1.BackupPhaseFailed:
-				watcher.Stop()
-				message := fmt.Sprintf("failed to complete velero backup '%s/%s': has status phase '%s'", namespace, modifiedBackup.Name, modifiedBackup.Status.Phase)
-				p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, message)
-				return fmt.Errorf(message)
+				return fmt.Errorf("failed to complete velero backup '%s/%s': has status phase '%s'", changedBackup.Namespace, changedBackup.Name, changedBackup.Status.Phase)
 			case velerov1.BackupPhaseDeleting:
-				watcher.Stop()
-				message := fmt.Sprintf("failed to complete velero backup '%s/%s': invalid status phase 'Deleting'", namespace, modifiedBackup.Name)
-				p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, message)
-				return fmt.Errorf(message)
+				return fmt.Errorf("failed to complete velero backup '%s/%s': invalid status phase 'Deleting'", changedBackup.Namespace, changedBackup.Name)
 			case velerov1.BackupPhaseCompleted:
-				watcher.Stop()
-				p.recorder.Eventf(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Successfully completed velero backup '%s/%s'", namespace, modifiedBackup.Name)
-				break
+				break eventLoop
 			}
 		}
 	}
+
 	return nil
 }
 
