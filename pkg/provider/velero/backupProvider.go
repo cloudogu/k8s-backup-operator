@@ -36,7 +36,7 @@ func New(_ ecosystem.BackupInterface, recorder eventRecorder, namespace string) 
 	return &provider{recorder: recorder, veleroClientSet: clientSet}, nil
 }
 
-// CreateBackup triggers a velero backup.
+// CreateBackup triggers a velero backup and waits for its completion.
 func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 	p.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as backup provider")
 
