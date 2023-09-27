@@ -23,6 +23,7 @@ var deleteWaitTimeout = int64(300)
 type provider struct {
 	recorder        eventRecorder
 	veleroClientSet veleroClientSet
+	namespace       string
 }
 
 func New(_ ecosystemBackupInterface, recorder eventRecorder, namespace string) (*provider, error) {
@@ -32,13 +33,21 @@ func New(_ ecosystemBackupInterface, recorder eventRecorder, namespace string) (
 		return nil, fmt.Errorf("failed to create velero clientset: %w", err)
 	}
 
-	return &provider{recorder: recorder, veleroClientSet: clientSet}, nil
+	return &provider{recorder: recorder, veleroClientSet: clientSet, namespace: namespace}, nil
 }
 
 // CheckReady validates that velero is installed and can establish a connection to its backup store.
 func (p *provider) CheckReady(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
+	defaultBsl, err := p.veleroClientSet.VeleroV1().BackupStorageLocations(p.namespace).Get(ctx, "default", metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get backup storage location from cluster: %w", err)
+	}
+
+	if defaultBsl.Status.Phase != velerov1.BackupStorageLocationPhaseAvailable {
+		return fmt.Errorf("velero is unable to reach the default backup storage location: %s", defaultBsl.Status.Message)
+	}
+
+	return nil
 }
 
 // CreateBackup triggers a velero backup and waits for its completion.

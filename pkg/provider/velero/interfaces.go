@@ -34,6 +34,11 @@ type veleroBackupInterface interface {
 }
 
 //goland:noinspection GoUnusedType
+type veleroBackupStorageLocationInterface interface {
+	velerov1.BackupStorageLocationInterface
+}
+
+//goland:noinspection GoUnusedType
 type veleroDeleteBackupRequest interface {
 	velerov1.DeleteBackupRequestInterface
 }
