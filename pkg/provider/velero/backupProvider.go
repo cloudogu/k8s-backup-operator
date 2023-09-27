@@ -75,8 +75,9 @@ func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event, names
 	for veleroChange := range veleroBackupChan {
 		switch veleroChange.Type {
 		case watch.Deleted:
-			message := fmt.Sprintf("failed to complete velero backup '%s/%s': the backup is being deleted", namespace, veleroBackup.Name)
 			watcher.Stop()
+			message := fmt.Sprintf("failed to complete velero backup '%s/%s': the backup got deleted", namespace, veleroBackup.Name)
+			p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, message)
 			return fmt.Errorf(message)
 		case watch.Modified:
 			modifiedBackup := veleroChange.Object.(*velerov1.Backup)
@@ -91,18 +92,18 @@ func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event, names
 			case velerov1.BackupPhasePartiallyFailed:
 				fallthrough
 			case velerov1.BackupPhaseFailed:
+				watcher.Stop()
 				message := fmt.Sprintf("failed to complete velero backup '%s/%s': has status phase '%s'", namespace, modifiedBackup.Name, modifiedBackup.Status.Phase)
 				p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, message)
-				watcher.Stop()
 				return fmt.Errorf(message)
 			case velerov1.BackupPhaseDeleting:
+				watcher.Stop()
 				message := fmt.Sprintf("failed to complete velero backup '%s/%s': invalid status phase 'Deleting'", namespace, modifiedBackup.Name)
 				p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, message)
-				watcher.Stop()
 				return fmt.Errorf(message)
 			case velerov1.BackupPhaseCompleted:
-				p.recorder.Eventf(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Successfully completed velero backup '%s/%s'", namespace, modifiedBackup.Name)
 				watcher.Stop()
+				p.recorder.Eventf(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Successfully completed velero backup '%s/%s'", namespace, modifiedBackup.Name)
 				break
 			}
 		}
