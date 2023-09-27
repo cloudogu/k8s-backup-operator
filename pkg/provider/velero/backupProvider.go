@@ -23,17 +23,16 @@ var deleteWaitTimeout = int64(300)
 type provider struct {
 	recorder        eventRecorder
 	veleroClientSet veleroClientSet
-	backupClient    ecosystemBackupInterface
 }
 
-func New(backupClient ecosystemBackupInterface, recorder eventRecorder, namespace string) (*provider, error) {
+func New(_ ecosystemBackupInterface, recorder eventRecorder, namespace string) (*provider, error) {
 	factory := veleroclient.NewFactory("k8s-backup-operator", map[string]interface{}{"namespace": namespace})
 	clientSet, err := factory.Client()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create velero clientset: %w", err)
 	}
 
-	return &provider{recorder: recorder, veleroClientSet: clientSet, backupClient: backupClient}, nil
+	return &provider{recorder: recorder, veleroClientSet: clientSet}, nil
 }
 
 // CheckReady validates that velero is installed and can establish a connection to its backup store.
@@ -46,11 +45,6 @@ func (p *provider) CheckReady(ctx context.Context) error {
 func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 	p.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as backup provider")
 
-	_, err := p.backupClient.UpdateStatusInProgress(ctx, backup)
-	if err != nil {
-		return p.handleFailedBackup(ctx, backup, fmt.Errorf("failed to update status of backup to 'InProgress': %w", err))
-	}
-
 	volumeFsBackup := false
 	veleroBackup := &velerov1.Backup{
 		ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace},
@@ -62,14 +56,14 @@ func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 	}
 
 	veleroBackupClient := p.veleroClientSet.VeleroV1().Backups(backup.Namespace)
-	_, err = veleroBackupClient.Create(ctx, veleroBackup, metav1.CreateOptions{})
+	_, err := veleroBackupClient.Create(ctx, veleroBackup, metav1.CreateOptions{})
 	if err != nil {
-		return p.handleFailedBackup(ctx, backup, fmt.Errorf("failed to apply velero backup '%s/%s' to cluster: %w", veleroBackup.Namespace, veleroBackup.Name, err))
+		return p.handleFailedBackup(backup, fmt.Errorf("failed to apply velero backup '%s/%s' to cluster: %w", veleroBackup.Namespace, veleroBackup.Name, err))
 	}
 
 	watcher, err := veleroBackupClient.Watch(ctx, metav1.ListOptions{FieldSelector: backup.GetFieldSelectorWithName()})
 	if err != nil {
-		return p.handleFailedBackup(ctx, backup, fmt.Errorf("failed to create watch for velero backup '%s/%s': %w", veleroBackup.Namespace, veleroBackup.Name, err))
+		return p.handleFailedBackup(backup, fmt.Errorf("failed to create watch for velero backup '%s/%s': %w", veleroBackup.Namespace, veleroBackup.Name, err))
 	}
 
 	veleroBackupChan := watcher.ResultChan()
@@ -77,24 +71,14 @@ func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 
 	err = waitForBackupCompletionOrFailure(veleroBackupChan)
 	if err != nil {
-		return p.handleFailedBackup(ctx, backup, err)
-	}
-
-	_, err = p.backupClient.UpdateStatusCompleted(ctx, backup)
-	if err != nil {
-		return p.handleFailedBackup(ctx, backup, fmt.Errorf("failed to update status of backup to 'Completed': %w", err))
+		return p.handleFailedBackup(backup, err)
 	}
 
 	p.recorder.Eventf(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Successfully completed velero backup '%s/%s'", veleroBackup.Namespace, veleroBackup.Name)
 	return nil
 }
 
-func (p *provider) handleFailedBackup(ctx context.Context, backup *v1.Backup, err error) error {
-	_, updateStatusErr := p.backupClient.UpdateStatusFailed(ctx, backup)
-	if updateStatusErr != nil {
-		err = errors.Join(err, fmt.Errorf("failed to update status of backup to 'Failed': %w", updateStatusErr))
-	}
-
+func (p *provider) handleFailedBackup(backup *v1.Backup, err error) error {
 	p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, err.Error())
 	return err
 }

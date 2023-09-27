@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cloudogu/cesapp-lib/registry"
@@ -59,7 +60,13 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 
 	err = bcm.triggerBackup(ctx, backup)
 	if err != nil {
-		return fmt.Errorf("failed to trigger backup provider: %w", err)
+		err = fmt.Errorf("failed to trigger backup provider: %w", err)
+		_, updateStatusErr := bcm.client.UpdateStatusFailed(ctx, backup)
+		if updateStatusErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to update backups status to 'Failed': %w", updateStatusErr))
+		}
+
+		return err
 	}
 
 	_, err = bcm.client.UpdateStatusCompleted(ctx, backup)

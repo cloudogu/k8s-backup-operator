@@ -140,6 +140,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
+		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
@@ -170,6 +171,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
+		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
@@ -203,6 +205,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
+		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
@@ -237,6 +240,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
+		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
@@ -249,6 +253,42 @@ func Test_backupCreateManager_create(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to trigger backup provider")
+	})
+
+	t.Run("should return error on provider error and fail to update status to 'Failed'", func(t *testing.T) {
+		// given
+		backupName := "backup"
+		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
+
+		providerMock := NewMockProvider(t)
+		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
+		oldVeleroProvider := newVeleroProvider
+		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+			return providerMock, nil
+		}
+		defer func() { newVeleroProvider = oldVeleroProvider }()
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
+		clientMock := newMockEcosystemBackupInterface(t)
+		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
+		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(nil, assert.AnError)
+		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+
+		// when
+		err := sut.create(testCtx, backup)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to trigger backup provider")
+		assert.ErrorContains(t, err, "failed to update backups status to 'Failed'")
 	})
 
 	t.Run("should log error on deactivating maintenance mode", func(t *testing.T) {
