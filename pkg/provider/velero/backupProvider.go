@@ -93,7 +93,6 @@ func (p *provider) handleFailedBackup(backup *v1.Backup, err error) error {
 }
 
 func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event) error {
-eventLoop:
 	for veleroChange := range veleroBackupChan {
 		changedBackup := veleroChange.Object.(*velerov1.Backup)
 		switch veleroChange.Type {
@@ -114,12 +113,10 @@ eventLoop:
 			case velerov1.BackupPhaseDeleting:
 				return fmt.Errorf("failed to complete velero backup '%s/%s': invalid status phase 'Deleting'", changedBackup.Namespace, changedBackup.Name)
 			case velerov1.BackupPhaseCompleted:
-				break eventLoop
+				return nil
 			}
 		}
 	}
-
-	return nil
 }
 
 // DeleteBackup deletes a velero backup with a delete backup request.
