@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
@@ -62,4 +63,8 @@ type requeuableError interface {
 	error
 	// GetRequeueTime returns the time to wait before the next reconciliation.
 	GetRequeueTime(requeueTimeNanos time.Duration) time.Duration
+}
+
+type etcdRegistry interface {
+	registry.Registry
 }

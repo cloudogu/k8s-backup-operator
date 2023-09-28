@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
 	"os"
 	"path/filepath"
 	"testing"
@@ -106,7 +107,15 @@ var _ = ginkgo.BeforeSuite(func() {
 	ecosystemClientSet, err = ecosystem.NewClientSet(k8sManager.GetConfig(), clientSet)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	backupReconciler := NewBackupReconciler(ecosystemClientSet, recorderMock, namespace)
+	mockRegistry := newMockEtcdRegistry(t)
+	globalConfigMock := newMockEtcdContext(t)
+	mockRegistry.EXPECT().GlobalConfig().Return(globalConfigMock)
+	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(namespace), recorderMock, mockRegistry)
+	gomega.Expect(backupManager).NotTo(gomega.BeNil())
+	backupRequeueHandler := backup.NewBackupRequeueHandler(ecosystemClientSet, recorderMock, namespace)
+	gomega.Expect(backupRequeueHandler).NotTo(gomega.BeNil())
+
+	backupReconciler := backup.NewBackupReconciler(ecosystemClientSet, recorderMock, namespace, backupManager, backupRequeueHandler)
 	gomega.Expect(backupReconciler).NotTo(gomega.BeNil())
 
 	err = backupReconciler.SetupWithManager(k8sManager)
