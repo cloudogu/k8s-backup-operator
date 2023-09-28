@@ -18,6 +18,8 @@ import (
 
 const veleroBackupDeleteRequestKind = "DeleteBackupRequest"
 
+const defaultStorageLocation = "default"
+
 var deleteWaitTimeout = int64(300)
 
 type provider struct {
@@ -38,7 +40,7 @@ func New(_ ecosystemBackupInterface, recorder eventRecorder, namespace string) (
 
 // CheckReady validates that velero is installed and can establish a connection to its backup store.
 func (p *provider) CheckReady(ctx context.Context) error {
-	defaultBsl, err := p.veleroClientSet.VeleroV1().BackupStorageLocations(p.namespace).Get(ctx, "default", metav1.GetOptions{})
+	defaultBsl, err := p.veleroClientSet.VeleroV1().BackupStorageLocations(p.namespace).Get(ctx, defaultStorageLocation, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get backup storage location from cluster: %w", err)
 	}
@@ -59,7 +61,7 @@ func (p *provider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
 		ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace},
 		Spec: velerov1.BackupSpec{
 			IncludedNamespaces:       []string{backup.Namespace},
-			StorageLocation:          "default",
+			StorageLocation:          defaultStorageLocation,
 			DefaultVolumesToFsBackup: &volumeFsBackup,
 		},
 	}
