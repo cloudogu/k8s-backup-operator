@@ -121,6 +121,8 @@ func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event) error
 			}
 		}
 	}
+
+	return nil
 }
 
 // DeleteBackup deletes a velero backup with a delete backup request.
