@@ -94,7 +94,11 @@ func (p *provider) handleFailedBackup(backup *v1.Backup, err error) error {
 
 func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event) error {
 	for veleroChange := range veleroBackupChan {
-		changedBackup := veleroChange.Object.(*velerov1.Backup)
+		changedBackup, ok := veleroChange.Object.(*velerov1.Backup)
+		if !ok {
+			return fmt.Errorf("got event with wrong object type when watching velero backup")
+		}
+
 		switch veleroChange.Type {
 		case watch.Deleted:
 			return fmt.Errorf("failed to complete velero backup '%s/%s': the backup got deleted", changedBackup.Namespace, changedBackup.Name)
