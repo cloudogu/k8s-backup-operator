@@ -14,27 +14,25 @@ rules:
   - apiGroups:
       - velero.io
     resources:
-      - deletebackuprequests
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - velero.io
-    resources:
-      - deletebackuprequests/status
+      - backupstoragelocations
     verbs:
       - get
-      - list
-      - watch
   - apiGroups:
       - velero.io
     resources:
       - backups
     verbs:
       - create
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - velero.io
+    resources:
+      - deletebackuprequests
+    verbs:
+      - create
+      - delete
       - get
       - list
       - watch
