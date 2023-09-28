@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	// TODO
 	maintenanceModeTitle = "Service temporary unavailable"
 	maintenanceModeText  = "Backup in progress"
 )
