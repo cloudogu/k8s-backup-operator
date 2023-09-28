@@ -21,11 +21,13 @@ type controllerManager interface {
 
 // used for mocks
 
+//nolint:unused
 //goland:noinspection GoUnusedType
 type etcdRegistry interface {
 	registry.Registry
 }
 
+//nolint:unused
 //goland:noinspection GoUnusedType
 type etcdContext interface {
 	registry.ConfigurationContext

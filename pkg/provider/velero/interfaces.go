@@ -23,26 +23,31 @@ type veleroClientSet interface {
 
 // The following interfaces are here to generate mocks.
 
+//nolint:unused
 //goland:noinspection GoUnusedType
 type veleroInterface interface {
 	velerov1.VeleroV1Interface
 }
 
+//nolint:unused
 //goland:noinspection GoUnusedType
 type veleroBackupInterface interface {
 	velerov1.BackupInterface
 }
 
+//nolint:unused
 //goland:noinspection GoUnusedType
 type veleroBackupStorageLocationInterface interface {
 	velerov1.BackupStorageLocationInterface
 }
 
+//nolint:unused
 //goland:noinspection GoUnusedType
 type veleroDeleteBackupRequest interface {
 	velerov1.DeleteBackupRequestInterface
 }
 
+//nolint:unused
 //goland:noinspection GoUnusedType
 type ecosystemWatch interface {
 	watch.Interface
