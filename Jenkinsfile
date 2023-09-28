@@ -237,19 +237,15 @@ void stageAutomaticRelease(Makefile makefile) {
                     .mountJenkinsUser()
                     .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
                             {
-                                // Package & Push operator-chart
+                                // Package operator-chart & crd-chart
                                 make 'helm-package-release'
-
-                                withCredentials([usernamePassword(credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD')]) {
-                                    sh ".bin/helm registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'"
-                                    sh ".bin/helm push target/helm/${repositoryName}-${controllerVersion}.tgz oci://${registry}/${registry_namespace}/"
-                                }
-
-                                // Package & Push crd-chart
                                 make 'crd-helm-package'
 
+                                // Push charts
                                 withCredentials([usernamePassword(credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD')]) {
                                     sh ".bin/helm registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'"
+
+                                    sh ".bin/helm push target/helm/${repositoryName}-${controllerVersion}.tgz oci://${registry}/${registry_namespace}/"
                                     sh ".bin/helm push target/helm-crd/${repositoryName}-crd-${controllerVersion}.tgz oci://${registry}/${registry_namespace}/"
                                 }
                             }
