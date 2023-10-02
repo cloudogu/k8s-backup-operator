@@ -24,5 +24,6 @@ version: 0.0.0-replaceme
 appVersion: "0.0.0-replaceme"
 
 annotations:
-  "k8s.cloudogu.com/ces-dependency/k8s-velero": "" # TODO add version
-  "k8s.cloudogu.com/ces-dependency/k8s-snapshot-controller": "" # TODO add version; should this maybe be optional? should it come with longhorn?
+  "k8s.cloudogu.com/ces-dependency/k8s-etcd": "3.5.x-0"
+  "k8s.cloudogu.com/ces-dependency/k8s-service-discovery": ">=0.14.3 <1.0"
+  "k8s.cloudogu.com/ces-dependency/k8s-velero": "5.0.x-0"
