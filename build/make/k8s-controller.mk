@@ -14,15 +14,10 @@
 #	@$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 # This script requires the k8s.mk script
-include $(WORKDIR)/build/make/k8s.mk
+include $(WORKDIR)/build/make/k8s-component.mk
+include $(WORKDIR)/build/make/k8s-crd.mk
 
 ## Variables
-
-# Setting SHELL to bash allows bash commands to be executed by recipes.
-# This is a requirement for 'setup-envtest.sh' in the test target.
-# Options are set to exit when a recipe line exits non-zero or a piped command fails.
-SHELL = /usr/bin/env bash -o pipefail
-.SHELLFLAGS = -ec
 
 # make sure to create a statically linked binary otherwise it may quit with
 # "exec user process caused: no such file or directory"
@@ -38,7 +33,7 @@ K8S_INTEGRATION_TEST_DIR=${TARGET_DIR}/k8s-integration-test
 ##@ K8s - EcoSystem
 
 .PHONY: build
-build: k8s-helm-apply ## Builds a new version of the dogu and deploys it into the K8s-EcoSystem.
+build: helm-apply ## Builds a new version of the dogu and deploys it into the K8s-EcoSystem.
 
 ##@ Release
 
