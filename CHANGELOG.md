@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.2.0] - 2023-10-05
+### Added
+- [#4] Add CRD-Release to Jenkinsfile
+
 ## [v0.1.0] - 2023-09-05
 
 Initial release
