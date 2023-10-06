@@ -3,7 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/cloudogu/cesapp-lib/core"
+	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
 	"os"
+
+	reg "github.com/cloudogu/cesapp-lib/registry"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -25,7 +29,7 @@ import (
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/controllers"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -50,7 +54,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(k8sv1.AddToScheme(scheme))
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 }
 
 func main() {
@@ -137,7 +141,7 @@ var parseFlags = func(ctrlOpts ctrl.Options) (ctrl.Options, zap.Options) {
 }
 
 func configureReconcilers(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
-	var eventRecorder eventRecorder = k8sManager.GetEventRecorderFor("k8s-backup-operator")
+	var recorder eventRecorder = k8sManager.GetEventRecorderFor("k8s-backup-operator")
 
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
@@ -149,10 +153,23 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
 	}
 
-	if err = (controller.NewRestoreReconciler(ecosystemClientSet, eventRecorder, operatorConfig.Namespace)).SetupWithManager(k8sManager); err != nil {
+	registry, err := reg.New(core.Registry{
+		Type:      "etcd",
+		Endpoints: []string{fmt.Sprintf("http://etcd.%s.svc.cluster.local:4001", operatorConfig.Namespace)},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create CES registry: %w", err)
+	}
+
+	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(operatorConfig.Namespace), recorder, registry)
+
+	if err = (controller.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
-	if err = (controller.NewBackupReconciler(ecosystemClientSet, eventRecorder, operatorConfig.Namespace)).SetupWithManager(k8sManager); err != nil {
+
+	requeueHandler := backup.NewBackupRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
+
+	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
 	// +kubebuilder:scaffold:builder

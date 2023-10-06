@@ -1,7 +1,9 @@
 package v1
 
 import (
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
 )
 
 const (
@@ -9,7 +11,27 @@ const (
 	BackupStatusInProgress = "in progress"
 	BackupStatusCompleted  = "completed"
 	BackupStatusDeleting   = "deleting"
+	BackupStatusFailed     = "failed"
 )
+
+type Provider string
+
+const (
+	ProviderVelero = "velero"
+)
+
+const (
+	CreateEventReason        = "Creation"
+	DeleteEventReason        = "Delete"
+	ErrorOnCreateEventReason = "ErrCreation"
+)
+
+const (
+	ProviderDeleteEventReason        = "Provider delete"
+	ErrorOnProviderDeleteEventReason = "Error provider delete"
+)
+
+const BackupFinalizer = "cloudogu-backup-finalizer"
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -18,18 +40,21 @@ type BackupSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Backup. Edit backup_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Provider defines the backup provider which should be used for the backup.
+	Provider Provider `json:"provider,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
+	// Status represents the state of the backup.
 	Status string `json:"status,omitempty"`
+	// RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.
+	RequeueTimeNanos time.Duration `json:"requeueTimeNanos,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:metadata:labels=app=ces;app.kubernetes.io/name=k8s-backup-operator
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:metadata:labels=app=ces;app.kubernetes.io/name=k8s-backup-operator
 
 // Backup is the Schema for the backups API
 type Backup struct {
@@ -42,7 +67,7 @@ type Backup struct {
 	Status BackupStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BackupList contains a list of Backup
 type BackupList struct {
@@ -53,4 +78,8 @@ type BackupList struct {
 
 func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
+}
+
+func (b *Backup) GetFieldSelectorWithName() string {
+	return fmt.Sprintf("metadata.name=%s", b.Name)
 }
