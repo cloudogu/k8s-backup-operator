@@ -5,4 +5,4 @@ kind: Kustomization
 images:
   - name: controller
     newName: cloudogu/k8s-backup-operator
-    newTag: 0.2.0
+    newTag: 0.3.0

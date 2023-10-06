@@ -63,6 +63,9 @@ func Test_startOperator(t *testing.T) {
 
 	t.Run("should fail to create operator config", func(t *testing.T) {
 		// when
+		oldVersion := Version
+		Version = "invalid"
+		defer func() { Version = oldVersion }()
 		err := startOperator()
 
 		// then
