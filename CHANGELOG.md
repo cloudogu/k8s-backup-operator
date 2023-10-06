@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.3.0] - 2023-10-06
 ### Added
 - [#3] Add functionality to create a backup from the namespace where the backup-operator is deployed. Velero is used as a first provider.
 
