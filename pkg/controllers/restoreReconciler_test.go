@@ -14,6 +14,8 @@ import (
 	"testing"
 )
 
+var testCtx = context.TODO()
+
 func TestNewRestoreReconciler(t *testing.T) {
 	t.Run("should create restore reconciler", func(t *testing.T) {
 		// when
@@ -31,7 +33,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		sut := &restoreReconciler{}
 
 		// when
-		actual, err := sut.Reconcile(context.TODO(), request)
+		actual, err := sut.Reconcile(testCtx, request)
 
 		// then
 		require.NoError(t, err)
@@ -56,7 +58,7 @@ func Test_restoreReconciler_SetupWithManager(t *testing.T) {
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
-		logger := log.FromContext(context.TODO())
+		logger := log.FromContext(testCtx)
 		ctrlManMock.EXPECT().GetLogger().Return(logger)
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetCache().Return(nil)
