@@ -35,6 +35,9 @@ type BackupInterface interface {
 	// UpdateStatusDeleting sets the status of the backup to "deleting".
 	UpdateStatusDeleting(ctx context.Context, backup *v1.Backup) (*v1.Backup, error)
 
+	// UpdateStatusFailed sets the status of the backup to "failed".
+	UpdateStatusFailed(ctx context.Context, backup *v1.Backup) (*v1.Backup, error)
+
 	// Delete takes name of the backup and deletes it. Returns an error if one occurs.
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 
@@ -78,6 +81,11 @@ func (d *backupClient) UpdateStatusCompleted(ctx context.Context, backup *v1.Bac
 // UpdateStatusDeleting sets the status of the backup to "deleting".
 func (d *backupClient) UpdateStatusDeleting(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
 	return d.updateStatusWithRetry(ctx, backup, v1.BackupStatusDeleting)
+}
+
+// UpdateStatusFailed sets the status of the backup to "failed".
+func (d *backupClient) UpdateStatusFailed(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
+	return d.updateStatusWithRetry(ctx, backup, v1.BackupStatusFailed)
 }
 
 func (d *backupClient) updateStatusWithRetry(ctx context.Context, backup *v1.Backup, targetStatus string) (*v1.Backup, error) {
