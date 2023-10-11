@@ -112,19 +112,18 @@ func (r *backupReconciler) performOperation(
 }
 
 func evaluateRequiredOperation(backup *k8sv1.Backup) operation {
-	if backup.Status.Status == k8sv1.BackupStatusFailed {
-		return operationIgnore
-	}
-
 	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.IsZero() {
 		return operationDelete
 	}
 
-	if backup.Status.Status == k8sv1.BackupStatusNew {
+	switch backup.Status.Status {
+	case k8sv1.BackupStatusFailed:
+		return operationIgnore
+	case k8sv1.BackupStatusNew:
 		return operationCreate
+	default:
+		return operationIgnore
 	}
-
-	return operationIgnore
 }
 
 // SetupWithManager sets up the controller with the Manager.
