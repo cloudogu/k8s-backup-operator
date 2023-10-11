@@ -37,9 +37,8 @@ spec:
           spec:
             description: Spec defines the desired state of Restore
             properties:
-              foo:
-                description: Foo is an example field of Restore. Edit restore_types.go
-                  to remove/update
+              backupName:
+                description: BackupName references the backup that should be restored.
                 type: string
             type: object
           status:
