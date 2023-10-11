@@ -1,18 +1,17 @@
 //go:build k8s_integration
 // +build k8s_integration
 
-package controller
+package main
 
 import (
 	"context"
-	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
+	k8sScheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -24,7 +23,9 @@ import (
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
+	"github.com/cloudogu/k8s-backup-operator/pkg/restore"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -89,12 +90,12 @@ var _ = ginkgo.BeforeSuite(func() {
 		return cfg
 	}
 
-	err = k8sv1.AddToScheme(scheme.Scheme)
+	err = k8sv1.AddToScheme(k8sScheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme: scheme.Scheme,
+		Scheme: k8sScheme.Scheme,
 	})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(k8sManager).NotTo(gomega.BeNil())
@@ -121,7 +122,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = backupReconciler.SetupWithManager(k8sManager)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	restoreReconciler := NewRestoreReconciler(ecosystemClientSet, recorderMock, namespace)
+	restoreReconciler := restore.NewRestoreReconciler(ecosystemClientSet, recorderMock, namespace)
 	gomega.Expect(restoreReconciler).NotTo(gomega.BeNil())
 
 	err = restoreReconciler.SetupWithManager(k8sManager)

@@ -1,4 +1,4 @@
-package controller
+package restore
 
 import (
 	"github.com/cloudogu/cesapp-lib/registry"

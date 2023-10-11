@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
+	"github.com/cloudogu/k8s-backup-operator/pkg/restore"
 	"os"
 
 	reg "github.com/cloudogu/cesapp-lib/registry"
@@ -13,7 +14,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -21,14 +21,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
-	"github.com/cloudogu/k8s-backup-operator/pkg/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -41,14 +39,6 @@ var (
 	// Version of the application
 	Version = "0.0.0"
 )
-
-type eventRecorder interface {
-	record.EventRecorder
-}
-
-type controllerManager interface {
-	manager.Manager
-}
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -163,7 +153,7 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 
 	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(operatorConfig.Namespace), recorder, registry)
 
-	if err = (controller.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace)).SetupWithManager(k8sManager); err != nil {
+	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
