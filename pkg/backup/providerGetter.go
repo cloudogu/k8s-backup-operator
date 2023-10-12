@@ -17,6 +17,8 @@ func getBackupProvider(ctx context.Context, backup *k8sv1.Backup, client ecosyst
 	var provider Provider
 	var err error
 	switch backup.Spec.Provider {
+	case "":
+		fallthrough
 	case k8sv1.ProviderVelero:
 		provider, err = newVeleroProvider(client, recorder, backup.Namespace)
 		if err != nil {
