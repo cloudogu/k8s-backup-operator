@@ -8,7 +8,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -51,7 +50,7 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	logger := log.FromContext(ctx)
 
 	backup, err := r.clientSet.EcosystemV1Alpha1().Backups(r.namespace).Get(ctx, req.Name, metav1.GetOptions{})
-	if client.IgnoreNotFound(err) != nil {
+	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get backup resource %s/%s: %w", r.namespace, req.Name, err)
 	}
 
