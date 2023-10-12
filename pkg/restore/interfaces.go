@@ -7,8 +7,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/cloudogu/cesapp-lib/registry"
-
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
@@ -61,16 +59,4 @@ type ecosystemRestoreInterface interface {
 //goland:noinspection GoUnusedType
 type ecosystemV1Alpha1Interface interface {
 	ecosystem.V1Alpha1Interface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type etcdRegistry interface {
-	registry.Registry
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type etcdContext interface {
-	registry.ConfigurationContext
 }
