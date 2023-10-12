@@ -97,7 +97,6 @@ func (r *backupReconciler) performOperation(
 		logger.Error(operationError, message)
 	}
 
-	// on self-upgrade of the backup-operator this event might not get send, because the operator is already shutting down
 	r.recorder.Event(backup, eventType, eventReason, message)
 
 	result, handleErr := r.requeueHandler.Handle(ctx, contextMessageOnError, backup, operationError, requeueStatus)
