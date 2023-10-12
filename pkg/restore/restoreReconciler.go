@@ -20,8 +20,8 @@ const (
 	operationIgnore = operation("ignore")
 )
 
-func NewRestoreReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *restoreReconciler {
-	return &restoreReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace}
+func NewRestoreReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, manager restoreManager, handler requeueHandler) *restoreReconciler {
+	return &restoreReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager, requeueHandler: handler}
 }
 
 // restoreReconciler reconciles a Restore object

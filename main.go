@@ -151,15 +151,15 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		return fmt.Errorf("failed to create CES registry: %w", err)
 	}
 
-	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(operatorConfig.Namespace), recorder, registry)
-
-	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace)).SetupWithManager(k8sManager); err != nil {
+	restoreManager := restore.NewRestoreManager(ecosystemClientSet, recorder)
+	restoreRequeueHandler := restore.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
+	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, restoreRequeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
-	requeueHandler := backup.NewBackupRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
-
-	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
+	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(operatorConfig.Namespace), recorder, registry)
+	backupRequeueHandler := backup.NewBackupRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
+	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, backupRequeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
 	// +kubebuilder:scaffold:builder
