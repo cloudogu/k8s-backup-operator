@@ -19,6 +19,8 @@ const (
 type RestoreSpec struct {
 	// BackupName references the backup that should be restored.
 	BackupName string `json:"backupName,omitempty"`
+	// Provider defines the backup provider which should be used for the restore.
+	Provider Provider `json:"provider,omitempty"`
 }
 
 // RestoreStatus defines the observed state of Restore
