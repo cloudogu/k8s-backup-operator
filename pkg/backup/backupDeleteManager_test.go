@@ -1,7 +1,6 @@
 package backup
 
 import (
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +24,7 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		newVeleroProvider = func(recorder eventRecorder, namespace string) (Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
@@ -89,7 +88,7 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		newVeleroProvider = func(recorder eventRecorder, namespace string) (Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
@@ -117,7 +116,7 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		newVeleroProvider = func(recorder eventRecorder, namespace string) (Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()

@@ -28,7 +28,7 @@ type provider struct {
 	namespace       string
 }
 
-func New(_ ecosystemBackupInterface, recorder eventRecorder, namespace string) (*provider, error) {
+func NewBackupProvider(recorder eventRecorder, namespace string) (*provider, error) {
 	factory := veleroclient.NewFactory("k8s-backup-operator", map[string]interface{}{"namespace": namespace})
 	clientSet, err := factory.Client()
 	if err != nil {

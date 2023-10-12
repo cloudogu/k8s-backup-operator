@@ -3,7 +3,6 @@ package backup
 import (
 	"testing"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -39,7 +38,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		newVeleroProvider = func(recorder eventRecorder, namespace string) (Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
@@ -161,7 +160,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		newVeleroProvider = func(recorder eventRecorder, namespace string) (Provider, error) {
 			return nil, assert.AnError
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
@@ -195,7 +194,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(assert.AnError)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		newVeleroProvider = func(recorder eventRecorder, namespace string) (Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
@@ -230,7 +229,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		newVeleroProvider = func(recorder eventRecorder, namespace string) (Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
@@ -264,7 +263,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		newVeleroProvider = func(recorder eventRecorder, namespace string) (Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
@@ -300,7 +299,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		newVeleroProvider = func(recorder eventRecorder, namespace string) (Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()
@@ -333,7 +332,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		newVeleroProvider = func(recorder eventRecorder, namespace string) (Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { newVeleroProvider = oldVeleroProvider }()

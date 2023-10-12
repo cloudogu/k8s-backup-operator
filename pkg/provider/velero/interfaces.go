@@ -13,10 +13,6 @@ type eventRecorder interface {
 	record.EventRecorder
 }
 
-type ecosystemBackupInterface interface {
-	ecosystem.BackupInterface
-}
-
 type veleroClientSet interface {
 	versioned.Interface
 }
