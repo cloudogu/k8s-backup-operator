@@ -2,11 +2,16 @@ package restore
 
 import (
 	"context"
-	"testing"
-
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,6 +24,9 @@ import (
 
 var testCtx = context.TODO()
 
+var testNamespace = "ecosystem-test"
+var testRestore = "test-restore"
+
 func TestNewRestoreReconciler(t *testing.T) {
 	t.Run("should create restore reconciler", func(t *testing.T) {
 		// when
@@ -30,17 +38,322 @@ func TestNewRestoreReconciler(t *testing.T) {
 }
 
 func Test_restoreReconciler_Reconcile(t *testing.T) {
-	t.Run("should succeed", func(t *testing.T) {
+	t.Run("should fail on getting restore", func(t *testing.T) {
 		// given
-		request := ctrl.Request{}
-		sut := &restoreReconciler{}
+		request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
+		restoreClientMock := newMockEcosystemRestoreInterface(t)
+		restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(nil, assert.AnError)
+		v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
+		v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+		sut := &restoreReconciler{
+			namespace: testNamespace,
+			clientSet: clientSetMock,
+		}
 
 		// when
 		actual, err := sut.Reconcile(testCtx, request)
 
 		// then
-		require.NoError(t, err)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, fmt.Sprintf("failed to get restore resource %s/%s", testNamespace, testRestore))
 		assert.Equal(t, ctrl.Result{}, actual)
+	})
+
+	t.Run("deletion tests", func(t *testing.T) {
+		t.Run("should fail to handle requeue on deletion error", func(t *testing.T) {
+			// given
+			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
+			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
+				Name:              testRestore,
+				Namespace:         testNamespace,
+				DeletionTimestamp: &metav1.Time{Time: time.Now()},
+			}}
+
+			restoreClientMock := newMockEcosystemRestoreInterface(t)
+			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
+			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
+			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+			clientSetMock := newMockEcosystemInterface(t)
+			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+
+			managerMock := newMockRestoreManager(t)
+			managerMock.EXPECT().delete(testCtx, restore).Return(assert.AnError)
+			recorderMock := newMockEventRecorder(t)
+			recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, v1.DeleteEventReason, "Delete failed. Reason: assert.AnError general error for testing").Return()
+			recorderMock.EXPECT().Eventf(restore, corev1.EventTypeWarning, RequeueEventReason, "Failed to requeue the %s.", "delete")
+			requeueHandlerMock := newMockRequeueHandler(t)
+			requeueHandlerMock.EXPECT().Handle(testCtx, "Delete of restore test-restore failed", restore, assert.AnError, v1.RestoreStatusNew).Return(reconcile.Result{}, assert.AnError)
+
+			sut := &restoreReconciler{
+				namespace:      testNamespace,
+				clientSet:      clientSetMock,
+				manager:        managerMock,
+				recorder:       recorderMock,
+				requeueHandler: requeueHandlerMock,
+			}
+
+			// when
+			actual, err := sut.Reconcile(testCtx, request)
+
+			// then
+			require.Error(t, err)
+			assert.ErrorIs(t, err, assert.AnError)
+			assert.ErrorContains(t, err, "failed to handle requeue")
+			assert.Equal(t, ctrl.Result{}, actual)
+		})
+		t.Run("should succeed to handle requeue on deletion error", func(t *testing.T) {
+			// given
+			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
+			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
+				Name:              testRestore,
+				Namespace:         testNamespace,
+				DeletionTimestamp: &metav1.Time{Time: time.Now()},
+			}}
+
+			restoreClientMock := newMockEcosystemRestoreInterface(t)
+			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
+			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
+			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+			clientSetMock := newMockEcosystemInterface(t)
+			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+
+			managerMock := newMockRestoreManager(t)
+			managerMock.EXPECT().delete(testCtx, restore).Return(assert.AnError)
+			recorderMock := newMockEventRecorder(t)
+			recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, v1.DeleteEventReason, "Delete failed. Reason: assert.AnError general error for testing").Return()
+			requeueHandlerMock := newMockRequeueHandler(t)
+			requeueHandlerMock.EXPECT().Handle(testCtx, "Delete of restore test-restore failed", restore, assert.AnError, v1.RestoreStatusNew).Return(reconcile.Result{Requeue: true}, nil)
+
+			sut := &restoreReconciler{
+				namespace:      testNamespace,
+				clientSet:      clientSetMock,
+				manager:        managerMock,
+				recorder:       recorderMock,
+				requeueHandler: requeueHandlerMock,
+			}
+
+			// when
+			actual, err := sut.Reconcile(testCtx, request)
+
+			// then
+			require.NoError(t, err)
+			assert.Equal(t, ctrl.Result{Requeue: true}, actual)
+		})
+		t.Run("should succeed with delete", func(t *testing.T) {
+			// given
+			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
+			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
+				Name:              testRestore,
+				Namespace:         testNamespace,
+				DeletionTimestamp: &metav1.Time{Time: time.Now()},
+			}}
+
+			restoreClientMock := newMockEcosystemRestoreInterface(t)
+			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
+			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
+			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+			clientSetMock := newMockEcosystemInterface(t)
+			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+
+			managerMock := newMockRestoreManager(t)
+			managerMock.EXPECT().delete(testCtx, restore).Return(nil)
+			recorderMock := newMockEventRecorder(t)
+			recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.DeleteEventReason, "Delete successful").Return()
+			requeueHandlerMock := newMockRequeueHandler(t)
+			requeueHandlerMock.EXPECT().Handle(testCtx, "Delete of restore test-restore failed", restore, nil, v1.RestoreStatusNew).Return(reconcile.Result{}, nil)
+
+			sut := &restoreReconciler{
+				namespace:      testNamespace,
+				clientSet:      clientSetMock,
+				manager:        managerMock,
+				recorder:       recorderMock,
+				requeueHandler: requeueHandlerMock,
+			}
+
+			// when
+			actual, err := sut.Reconcile(testCtx, request)
+
+			// then
+			require.NoError(t, err)
+			assert.Equal(t, ctrl.Result{}, actual)
+		})
+	})
+
+	t.Run("ignore tests", func(t *testing.T) {
+		t.Run("should ignore when status is failed", func(t *testing.T) {
+			// given
+			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
+			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
+				Name:      testRestore,
+				Namespace: testNamespace,
+			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusFailed}}
+
+			restoreClientMock := newMockEcosystemRestoreInterface(t)
+			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
+			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
+			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+			clientSetMock := newMockEcosystemInterface(t)
+			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+
+			sut := &restoreReconciler{
+				namespace: testNamespace,
+				clientSet: clientSetMock,
+			}
+
+			// when
+			actual, err := sut.Reconcile(testCtx, request)
+
+			// then
+			require.NoError(t, err)
+			assert.Equal(t, ctrl.Result{}, actual)
+		})
+		t.Run("should ignore when status is unknown", func(t *testing.T) {
+			// given
+			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
+			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
+				Name:      testRestore,
+				Namespace: testNamespace,
+			}, Status: v1.RestoreStatus{Status: "some-unknown-status"}}
+
+			restoreClientMock := newMockEcosystemRestoreInterface(t)
+			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
+			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
+			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+			clientSetMock := newMockEcosystemInterface(t)
+			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+
+			sut := &restoreReconciler{
+				namespace: testNamespace,
+				clientSet: clientSetMock,
+			}
+
+			// when
+			actual, err := sut.Reconcile(testCtx, request)
+
+			// then
+			require.NoError(t, err)
+			assert.Equal(t, ctrl.Result{}, actual)
+		})
+	})
+
+	t.Run("creation tests", func(t *testing.T) {
+		t.Run("should fail to handle requeue on create error", func(t *testing.T) {
+			// given
+			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
+			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
+				Name:      testRestore,
+				Namespace: testNamespace,
+			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusNew}}
+
+			restoreClientMock := newMockEcosystemRestoreInterface(t)
+			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
+			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
+			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+			clientSetMock := newMockEcosystemInterface(t)
+			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+
+			managerMock := newMockRestoreManager(t)
+			managerMock.EXPECT().create(testCtx, restore).Return(assert.AnError)
+			recorderMock := newMockEventRecorder(t)
+			recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, v1.CreateEventReason, "Creation failed. Reason: assert.AnError general error for testing").Return()
+			recorderMock.EXPECT().Eventf(restore, corev1.EventTypeWarning, RequeueEventReason, "Failed to requeue the %s.", "creation")
+			requeueHandlerMock := newMockRequeueHandler(t)
+			requeueHandlerMock.EXPECT().Handle(testCtx, "Creation of restore test-restore failed", restore, assert.AnError, v1.RestoreStatusNew).Return(reconcile.Result{}, assert.AnError)
+
+			sut := &restoreReconciler{
+				namespace:      testNamespace,
+				clientSet:      clientSetMock,
+				manager:        managerMock,
+				recorder:       recorderMock,
+				requeueHandler: requeueHandlerMock,
+			}
+
+			// when
+			actual, err := sut.Reconcile(testCtx, request)
+
+			// then
+			require.Error(t, err)
+			assert.ErrorIs(t, err, assert.AnError)
+			assert.ErrorContains(t, err, "failed to handle requeue")
+			assert.Equal(t, ctrl.Result{}, actual)
+		})
+		t.Run("should succeed to handle requeue on creation error", func(t *testing.T) {
+			// given
+			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
+			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
+				Name:      testRestore,
+				Namespace: testNamespace,
+			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusNew}}
+
+			restoreClientMock := newMockEcosystemRestoreInterface(t)
+			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
+			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
+			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+			clientSetMock := newMockEcosystemInterface(t)
+			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+
+			managerMock := newMockRestoreManager(t)
+			managerMock.EXPECT().create(testCtx, restore).Return(assert.AnError)
+			recorderMock := newMockEventRecorder(t)
+			recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, v1.CreateEventReason, "Creation failed. Reason: assert.AnError general error for testing").Return()
+			requeueHandlerMock := newMockRequeueHandler(t)
+			requeueHandlerMock.EXPECT().Handle(testCtx, "Creation of restore test-restore failed", restore, assert.AnError, v1.RestoreStatusNew).Return(reconcile.Result{Requeue: true}, nil)
+
+			sut := &restoreReconciler{
+				namespace:      testNamespace,
+				clientSet:      clientSetMock,
+				manager:        managerMock,
+				recorder:       recorderMock,
+				requeueHandler: requeueHandlerMock,
+			}
+
+			// when
+			actual, err := sut.Reconcile(testCtx, request)
+
+			// then
+			require.NoError(t, err)
+			assert.Equal(t, ctrl.Result{Requeue: true}, actual)
+		})
+		t.Run("should succeed with create", func(t *testing.T) {
+			// given
+			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
+			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
+				Name:      testRestore,
+				Namespace: testNamespace,
+			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusNew}}
+
+			restoreClientMock := newMockEcosystemRestoreInterface(t)
+			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
+			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
+			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+			clientSetMock := newMockEcosystemInterface(t)
+			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+
+			managerMock := newMockRestoreManager(t)
+			managerMock.EXPECT().create(testCtx, restore).Return(nil)
+			recorderMock := newMockEventRecorder(t)
+			recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Creation successful").Return()
+			requeueHandlerMock := newMockRequeueHandler(t)
+			requeueHandlerMock.EXPECT().Handle(testCtx, "Creation of restore test-restore failed", restore, nil, v1.RestoreStatusNew).Return(reconcile.Result{}, nil)
+
+			sut := &restoreReconciler{
+				namespace:      testNamespace,
+				clientSet:      clientSetMock,
+				manager:        managerMock,
+				recorder:       recorderMock,
+				requeueHandler: requeueHandlerMock,
+			}
+
+			// when
+			actual, err := sut.Reconcile(testCtx, request)
+
+			// then
+			require.NoError(t, err)
+			assert.Equal(t, ctrl.Result{}, actual)
+		})
 	})
 }
 

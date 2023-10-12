@@ -2,11 +2,13 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
 )
 
 const (
 	RestoreStatusNew        = ""
 	RestoreStatusInProgress = "in progress"
+	RestoreStatusFailed     = "failed"
 	RestoreStatusCompleted  = "completed"
 	RestoreStatusDeleting   = "deleting"
 )
@@ -21,7 +23,10 @@ type RestoreSpec struct {
 
 // RestoreStatus defines the observed state of Restore
 type RestoreStatus struct {
+	// Status represents the state of the backup.
 	Status string `json:"status,omitempty"`
+	// RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.
+	RequeueTimeNanos time.Duration `json:"requeueTimeNanos,omitempty"`
 }
 
 //+kubebuilder:object:root=true
