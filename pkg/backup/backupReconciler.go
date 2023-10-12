@@ -73,7 +73,7 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *backupReconciler) performDeleteOperation(ctx context.Context, backup *k8sv1.Backup) (ctrl.Result, error) {
-	return r.performOperation(ctx, backup, k8sv1.DeleteEventReason, k8sv1.BackupStatusCompleted, r.manager.delete)
+	return r.performOperation(ctx, backup, k8sv1.DeleteEventReason, backup.Status.Status, r.manager.delete)
 }
 
 // performOperation executes the given operationFn and requeues if necessary.
