@@ -46,7 +46,7 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
-		sut := &provider{
+		sut := &backupProvider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
 		}
@@ -84,7 +84,7 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
-		sut := &provider{
+		sut := &backupProvider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
 		}
@@ -129,7 +129,7 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
-		sut := &provider{
+		sut := &backupProvider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
 		}
@@ -183,7 +183,7 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
-		sut := &provider{
+		sut := &backupProvider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
 		}
@@ -238,7 +238,7 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
-		sut := &provider{
+		sut := &backupProvider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
 		}
@@ -293,7 +293,7 @@ func Test_provider_CreateBackup(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
-		sut := &provider{
+		sut := &backupProvider{
 			recorder:        mockRecorder,
 			veleroClientSet: mockVeleroClient,
 		}
@@ -345,7 +345,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Provider delete request successful.")
 
-		sut := provider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
+		sut := backupProvider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
 
 		watchTimer := time.NewTimer(time.Second * 2)
 		go func() {
@@ -377,7 +377,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
 
-		sut := provider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
+		sut := backupProvider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
 
 		// when
 		err := sut.DeleteBackup(context.TODO(), backup)
@@ -405,7 +405,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
 
-		sut := provider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
+		sut := backupProvider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
 
 		// when
 		err := sut.DeleteBackup(context.TODO(), backup)
@@ -440,7 +440,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
 
-		sut := provider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
+		sut := backupProvider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
 
 		watchTimer := time.NewTimer(time.Second * 1)
 		go func() {
@@ -483,7 +483,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeWarning, backupv1.ProviderDeleteEventReason, "Cleanup velero delete request.")
 
-		sut := provider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
+		sut := backupProvider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
 
 		watchTimer := time.NewTimer(time.Second * 1)
 		go func() {
@@ -526,7 +526,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeWarning, backupv1.ProviderDeleteEventReason, "Cleanup velero delete request.")
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeWarning, backupv1.ErrorOnProviderDeleteEventReason, "velero backup delete request error: error1\nvelero backup delete request error: error2")
-		sut := provider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
+		sut := backupProvider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
 
 		watchTimer := time.NewTimer(time.Second * 1)
 		go func() {
@@ -575,88 +575,10 @@ func Test_provider_cleanUpDeleteRequest(t *testing.T) {
 		veleroV1ClientMock.EXPECT().DeleteBackupRequests(testNamespace).Return(veleroBackupDeleteRequestClientMock)
 		veleroBackupDeleteRequestClientMock.EXPECT().Delete(context.TODO(), request.Name, metav1.DeleteOptions{}).Return(assert.AnError)
 
-		sut := provider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
+		sut := backupProvider{recorder: recorderMock, veleroClientSet: veleroClientSetMock}
 
 		// when
 		sut.cleanUpDeleteRequest(context.TODO(), backup, request)
 
-	})
-}
-
-func Test_provider_CheckReady(t *testing.T) {
-	t.Run("should fail to get bsl", func(t *testing.T) {
-		// given
-		mockBslInterface := newMockVeleroBackupStorageLocationInterface(t)
-		mockBslInterface.EXPECT().Get(testCtx, "default", metav1.GetOptions{}).Return(nil, assert.AnError)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().BackupStorageLocations(testNamespace).Return(mockBslInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
-
-		sut := &provider{
-			veleroClientSet: mockVeleroClient,
-			namespace:       testNamespace,
-		}
-
-		// when
-		err := sut.CheckReady(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to get backup storage location from cluster")
-	})
-	t.Run("should fail if bsl is unavailable", func(t *testing.T) {
-		// given
-		bsl := &velerov1.BackupStorageLocation{
-			Status: velerov1.BackupStorageLocationStatus{
-				Phase:   velerov1.BackupStorageLocationPhaseUnavailable,
-				Message: "could not reach minio storage location",
-			},
-		}
-		mockBslInterface := newMockVeleroBackupStorageLocationInterface(t)
-		mockBslInterface.EXPECT().Get(testCtx, "default", metav1.GetOptions{}).Return(bsl, nil)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().BackupStorageLocations(testNamespace).Return(mockBslInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
-
-		sut := &provider{
-			veleroClientSet: mockVeleroClient,
-			namespace:       testNamespace,
-		}
-
-		// when
-		err := sut.CheckReady(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "velero is unable to reach the default backup storage location")
-		assert.ErrorContains(t, err, "could not reach minio storage location")
-	})
-	t.Run("should succeed if bsl is available", func(t *testing.T) {
-		// given
-		bsl := &velerov1.BackupStorageLocation{
-			Status: velerov1.BackupStorageLocationStatus{
-				Phase: velerov1.BackupStorageLocationPhaseAvailable,
-			},
-		}
-		mockBslInterface := newMockVeleroBackupStorageLocationInterface(t)
-		mockBslInterface.EXPECT().Get(testCtx, "default", metav1.GetOptions{}).Return(bsl, nil)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().BackupStorageLocations(testNamespace).Return(mockBslInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
-
-		sut := &provider{
-			veleroClientSet: mockVeleroClient,
-			namespace:       testNamespace,
-		}
-
-		// when
-		err := sut.CheckReady(testCtx)
-
-		// then
-		require.NoError(t, err)
 	})
 }

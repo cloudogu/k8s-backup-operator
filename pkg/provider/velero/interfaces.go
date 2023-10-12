@@ -1,13 +1,19 @@
 package velero
 
 import (
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	"context"
+
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/record"
 
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 )
+
+type readinessChecker interface {
+	// CheckReady validates if the provider is ready to receive backup requests.
+	CheckReady(ctx context.Context) error
+}
 
 type eventRecorder interface {
 	record.EventRecorder
