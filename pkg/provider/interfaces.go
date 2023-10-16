@@ -10,7 +10,7 @@ type EventRecorder interface {
 	record.EventRecorder
 }
 
-// Provider encapsulates different backup provider like velero.
+// Provider encapsulates different provider like velero.
 type Provider interface {
 	// CreateBackup creates backup according to the backup configuration in v1.Backup.
 	CreateBackup(ctx context.Context, backup *v1.Backup) error
@@ -18,4 +18,6 @@ type Provider interface {
 	DeleteBackup(ctx context.Context, backup *v1.Backup) error
 	// CheckReady validates if the provider is ready to receive backup requests.
 	CheckReady(ctx context.Context) error
+	// CreateRestore creates a restore according to the restore configuration in v1.Restore.
+	CreateRestore(ctx context.Context, restore *v1.Restore) error
 }

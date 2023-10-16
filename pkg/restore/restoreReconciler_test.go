@@ -30,7 +30,7 @@ var testRestore = "test-restore"
 func TestNewRestoreReconciler(t *testing.T) {
 	t.Run("should create restore reconciler", func(t *testing.T) {
 		// when
-		actual := NewRestoreReconciler(nil, nil, "default")
+		actual := NewRestoreReconciler(nil, nil, "default", nil, nil)
 
 		// then
 		assert.NotNil(t, actual)

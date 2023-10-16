@@ -32,6 +32,9 @@ type RestoreInterface interface {
 	// UpdateStatusCompleted sets the status of the restore to "completed".
 	UpdateStatusCompleted(ctx context.Context, restore *v1.Restore) (*v1.Restore, error)
 
+	// UpdateStatusFailed sets the status of the restore to "failed".
+	UpdateStatusFailed(ctx context.Context, restore *v1.Restore) (*v1.Restore, error)
+
 	// UpdateStatusDeleting sets the status of the restore to "deleting".
 	UpdateStatusDeleting(ctx context.Context, restore *v1.Restore) (*v1.Restore, error)
 
@@ -73,6 +76,11 @@ func (d *restoreClient) UpdateStatusInProgress(ctx context.Context, restore *v1.
 // UpdateStatusCompleted sets the status of the restore to "completed".
 func (d *restoreClient) UpdateStatusCompleted(ctx context.Context, restore *v1.Restore) (*v1.Restore, error) {
 	return d.updateStatusWithRetry(ctx, restore, v1.RestoreStatusCompleted)
+}
+
+// UpdateStatusFailed sets the status of the restore to "failed".
+func (d *restoreClient) UpdateStatusFailed(ctx context.Context, restore *v1.Restore) (*v1.Restore, error) {
+	return d.updateStatusWithRetry(ctx, restore, v1.RestoreStatusFailed)
 }
 
 // UpdateStatusDeleting sets the status of the restore to "deleting".

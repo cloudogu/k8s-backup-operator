@@ -56,6 +56,9 @@ type Provider interface {
 	DeleteBackup(ctx context.Context, backup *v1.Backup) error
 	// CheckReady validates if the provider is ready to receive backup requests.
 	CheckReady(ctx context.Context) error
+	// CreateRestore creates a restore according to the restore configuration in v1.Restore.
+	// TODO Split interface.
+	CreateRestore(ctx context.Context, restore *v1.Restore) error
 }
 
 type requeueHandler interface {
