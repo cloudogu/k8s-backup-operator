@@ -34,6 +34,7 @@ func (ms *maintenanceSwitch) ActivateMaintenanceMode(title string, text string) 
 		return fmt.Errorf("failed to marshal maintenance globalConfig value object [%+v]: %w", value, err)
 	}
 
+	// TODO Check if maintenance mode is already active. If yes something other might happen. Requeue
 	return ms.globalConfig.Set(registryKeyMaintenance, string(marshal))
 }
 

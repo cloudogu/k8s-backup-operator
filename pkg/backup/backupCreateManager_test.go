@@ -1,9 +1,9 @@
 package backup
 
 import (
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"testing"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -38,11 +38,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 
-		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
-		defer func() { newVeleroProvider = oldVeleroProvider }()
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
@@ -152,7 +152,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to trigger backup provider: failed to get backup provider: unknown backup provider unknown123")
+		assert.ErrorContains(t, err, "failed to trigger backup provider: failed to get backup provider: unknown provider unknown123")
 	})
 
 	t.Run("should return error on velero provider creation", func(t *testing.T) {
@@ -160,11 +160,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return nil, assert.AnError
 		}
-		defer func() { newVeleroProvider = oldVeleroProvider }()
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
@@ -194,11 +194,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(assert.AnError)
-		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
-		defer func() { newVeleroProvider = oldVeleroProvider }()
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
@@ -229,11 +229,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
-		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
-		defer func() { newVeleroProvider = oldVeleroProvider }()
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
@@ -263,11 +263,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
-		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
-		defer func() { newVeleroProvider = oldVeleroProvider }()
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
@@ -299,11 +299,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
-		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
-		defer func() { newVeleroProvider = oldVeleroProvider }()
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
@@ -332,11 +332,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := NewMockProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
-		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
-		defer func() { newVeleroProvider = oldVeleroProvider }()
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")

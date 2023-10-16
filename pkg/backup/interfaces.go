@@ -14,6 +14,10 @@ type ecosystemInterface interface {
 	ecosystem.Interface
 }
 
+type backupV1Alpha1Interface interface {
+	ecosystem.V1Alpha1Interface
+}
+
 type ecosystemBackupInterface interface {
 	ecosystem.BackupInterface
 }
@@ -67,4 +71,8 @@ type requeuableError interface {
 
 type etcdRegistry interface {
 	registry.Registry
+}
+
+type configurationContext interface {
+	registry.ConfigurationContext
 }
