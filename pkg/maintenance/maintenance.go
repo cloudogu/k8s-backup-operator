@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cloudogu/cesapp-lib/registry"
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 )
 
 const registryKeyMaintenance = "maintenance"
@@ -24,6 +25,36 @@ func New(globalConfig registry.ConfigurationContext) *maintenanceSwitch {
 
 // ActivateMaintenanceMode activates the maintenance mode with given title and text by writing in the global config.
 func (ms *maintenanceSwitch) ActivateMaintenanceMode(title string, text string) error {
+	isActive, err := ms.isActive()
+	if err != nil {
+		return err
+	}
+
+	if isActive {
+		return &requeue.GenericRequeueableError{
+			ErrMsg: "maybe currently other critical processes running: requeue",
+			Err:    fmt.Errorf("error: maintenance mode is active but should be inactive"),
+		}
+	}
+
+	return ms.activate(title, text)
+}
+
+// DeactivateMaintenanceMode deactivates the maintenance mode by deleting the maintenance key in the global config.
+func (ms *maintenanceSwitch) DeactivateMaintenanceMode() error {
+	return ms.globalConfig.Delete(registryKeyMaintenance)
+}
+
+func (ms *maintenanceSwitch) isActive() (bool, error) {
+	exists, err := ms.globalConfig.Exists(registryKeyMaintenance)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if maintenance mode is active: %w", err)
+	}
+
+	return exists, nil
+}
+
+func (ms *maintenanceSwitch) activate(title, text string) error {
 	value := maintenanceRegistryObject{
 		Title: title,
 		Text:  text,
@@ -34,11 +65,5 @@ func (ms *maintenanceSwitch) ActivateMaintenanceMode(title string, text string) 
 		return fmt.Errorf("failed to marshal maintenance globalConfig value object [%+v]: %w", value, err)
 	}
 
-	// TODO Check if maintenance mode is already active. If yes something other might happen. Requeue
 	return ms.globalConfig.Set(registryKeyMaintenance, string(marshal))
-}
-
-// DeactivateMaintenanceMode deactivates the maintenance mode by deleting the maintenance key in the global config.
-func (ms *maintenanceSwitch) DeactivateMaintenanceMode() error {
-	return ms.globalConfig.Delete(registryKeyMaintenance)
 }
