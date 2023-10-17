@@ -13,7 +13,7 @@ func TestNewRestoreManager(t *testing.T) {
 		registryMock.EXPECT().GlobalConfig().Return(globalConfigMock)
 
 		// when
-		manager := NewRestoreManager(nil, nil, registryMock)
+		manager := NewRestoreManager(nil, nil, nil, registryMock)
 
 		// then
 		require.NotNil(t, manager)

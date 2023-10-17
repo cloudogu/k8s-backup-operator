@@ -34,7 +34,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 
@@ -192,7 +192,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
@@ -226,7 +226,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
@@ -260,7 +260,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
@@ -296,7 +296,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
@@ -329,7 +329,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider

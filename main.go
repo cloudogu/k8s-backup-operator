@@ -151,7 +151,7 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		return fmt.Errorf("failed to create CES registry: %w", err)
 	}
 
-	restoreManager := restore.NewRestoreManager(ecosystemClientSet, recorder, registry)
+	restoreManager := restore.NewRestoreManager(ecosystemClientSet.EcosystemV1Alpha1().Restores(operatorConfig.Namespace), ecosystemClientSet.EcosystemV1Alpha1().Backups(operatorConfig.Namespace), recorder, registry)
 	restoreRequeueHandler := restore.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
 	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, restoreRequeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)

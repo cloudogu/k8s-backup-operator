@@ -21,7 +21,7 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
@@ -85,7 +85,7 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
@@ -113,7 +113,7 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider

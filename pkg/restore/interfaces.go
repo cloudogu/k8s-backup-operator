@@ -3,6 +3,7 @@ package restore
 import (
 	"context"
 	"github.com/cloudogu/cesapp-lib/registry"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"time"
 
 	"k8s.io/client-go/tools/record"
@@ -69,6 +70,12 @@ type ecosystemRestoreInterface interface {
 
 //nolint:unused
 //goland:noinspection GoUnusedType
+type ecosystemBackupInterface interface {
+	ecosystem.BackupInterface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
 type ecosystemV1Alpha1Interface interface {
 	ecosystem.V1Alpha1Interface
 }
@@ -77,4 +84,10 @@ type ecosystemV1Alpha1Interface interface {
 //goland:noinspection GoUnusedType
 type configurationContext interface {
 	registry.ConfigurationContext
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type restoreProvider interface {
+	provider.Provider
 }

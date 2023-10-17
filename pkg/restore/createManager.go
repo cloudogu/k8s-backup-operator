@@ -21,29 +21,30 @@ const (
 )
 
 type defaultCreateManager struct {
-	clientSet             ecosystemInterface
+	restoreClient         ecosystemRestoreInterface
+	backupClient          ecosystemBackupInterface
 	recorder              eventRecorder
 	maintenanceModeSwitch maintenanceModeSwitch
 }
 
-func newCreateManager(clientSet ecosystemInterface, recorder eventRecorder, registry cesRegistry) *defaultCreateManager {
+func newCreateManager(restoreClient ecosystemRestoreInterface, backupClient ecosystemBackupInterface, recorder eventRecorder, registry cesRegistry) *defaultCreateManager {
 	maintenanceSwitch := maintenance.New(registry.GlobalConfig())
-	return &defaultCreateManager{clientSet: clientSet, recorder: recorder, maintenanceModeSwitch: maintenanceSwitch}
+	return &defaultCreateManager{restoreClient: restoreClient, backupClient: backupClient, recorder: recorder, maintenanceModeSwitch: maintenanceSwitch}
 }
 
 func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore) error {
 	logger := log.FromContext(ctx)
 	cm.recorder.Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
 
-	restoreClient := cm.clientSet.EcosystemV1Alpha1().Restores(restore.Namespace)
-	restore, err := restoreClient.UpdateStatusInProgress(ctx, restore)
+	restoreName := restore.Name
+	restore, err := cm.restoreClient.UpdateStatusInProgress(ctx, restore)
 	if err != nil {
-		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusInProgress, restore.Name, err)
+		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusInProgress, restoreName, err)
 	}
 
-	restore, err = restoreClient.AddFinalizer(ctx, restore, v1.RestoreFinalizer)
+	restore, err = cm.restoreClient.AddFinalizer(ctx, restore, v1.RestoreFinalizer)
 	if err != nil {
-		return fmt.Errorf("failed to add finalizer [%s] in restore resource [%s]: %w", v1.RestoreFinalizer, restore.Name, err)
+		return fmt.Errorf("failed to add finalizer [%s] in restore resource [%s]: %w", v1.RestoreFinalizer, restoreName, err)
 	}
 
 	backup, err := cm.getBackupFromRestore(ctx, restore)
@@ -53,7 +54,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 
 	provider, err := restoreprovider.GetProvider(ctx, backup.Spec.Provider, restore.Namespace, cm.recorder)
 	if err != nil {
-		return fmt.Errorf("failed to get restore provider: %w", err)
+		return fmt.Errorf("failed to get restore provider [%s]: %w", backup.Spec.Provider, err)
 	}
 
 	err = cm.maintenanceModeSwitch.ActivateMaintenanceMode(maintenanceModeTitle, maintenanceModeText)
@@ -71,15 +72,17 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	err = provider.CreateRestore(ctx, restore)
 	if err != nil {
 		err = fmt.Errorf("failed to trigger provider: %w", err)
-		_, updateStatusErr := restoreClient.UpdateStatusFailed(ctx, restore)
+		_, updateStatusErr := cm.restoreClient.UpdateStatusFailed(ctx, restore)
 		if updateStatusErr != nil {
 			err = errors.Join(err, fmt.Errorf("failed to update restore status to '%s': %w", v1.RestoreStatusFailed, updateStatusErr))
 		}
+
+		return err
 	}
 
-	_, err = restoreClient.UpdateStatusCompleted(ctx, restore)
+	_, err = cm.restoreClient.UpdateStatusCompleted(ctx, restore)
 	if err != nil {
-		return fmt.Errorf("failed to set status [%s] in backup resource: %w", v1.RestoreStatusCompleted, err)
+		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusCompleted, restoreName, err)
 	}
 
 	return nil
@@ -87,10 +90,10 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 
 func (cm *defaultCreateManager) getBackupFromRestore(ctx context.Context, restore *v1.Restore) (*v1.Backup, error) {
 	backupName := restore.Spec.BackupName
-	backup, err := cm.clientSet.EcosystemV1Alpha1().Backups(restore.Namespace).Get(ctx, backupName, metav1.GetOptions{})
+	backup, err := cm.backupClient.Get(ctx, backupName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("found no backup with name [%s] for restore resource [%s]", backupName, restore.Name)
+			return nil, fmt.Errorf("found no backup with name [%s] for restore resource [%s]: %w", backupName, restore.Name, err)
 		}
 
 		return nil, &requeue.GenericRequeueableError{

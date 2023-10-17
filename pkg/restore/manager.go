@@ -6,9 +6,9 @@ type defaultManager struct {
 }
 
 // NewRestoreManager creates a new instance of defaultManager.
-func NewRestoreManager(clientSet ecosystemInterface, recorder eventRecorder, registry cesRegistry) *defaultManager {
+func NewRestoreManager(restoreClient ecosystemRestoreInterface, backupClient ecosystemBackupInterface, recorder eventRecorder, registry cesRegistry) *defaultManager {
 	return &defaultManager{
-		createManager: newCreateManager(clientSet, recorder, registry),
-		deleteManager: newDeleteManager(clientSet, recorder),
+		createManager: newCreateManager(restoreClient, backupClient, recorder, registry),
+		deleteManager: newDeleteManager(restoreClient, recorder),
 	}
 }

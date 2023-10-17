@@ -6,15 +6,15 @@ import (
 )
 
 type defaultDeleteManager struct {
-	clientSet ecosystemInterface
-	recorder  eventRecorder
+	restoreClient ecosystemRestoreInterface
+	recorder      eventRecorder
 }
 
-func newDeleteManager(clientSet ecosystemInterface, recorder eventRecorder) *defaultDeleteManager {
-	return &defaultDeleteManager{clientSet: clientSet, recorder: recorder}
+func newDeleteManager(restoreClient ecosystemRestoreInterface, recorder eventRecorder) *defaultDeleteManager {
+	return &defaultDeleteManager{restoreClient: restoreClient, recorder: recorder}
 }
 
 func (dm *defaultDeleteManager) delete(ctx context.Context, backup *v1.Restore) error {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }

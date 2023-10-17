@@ -5,6 +5,7 @@ import (
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"time"
@@ -71,4 +72,10 @@ type configurationContext interface {
 //goland:noinspection GoUnusedType
 type backupV1Alpha1Interface interface {
 	ecosystem.V1Alpha1Interface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type backupProvider interface {
+	provider.Provider
 }
