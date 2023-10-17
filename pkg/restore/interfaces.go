@@ -48,6 +48,17 @@ type requeueHandler interface {
 	Handle(ctx context.Context, contextMessage string, restore *v1.Restore, originalErr error, requeueStatus string) (ctrl.Result, error)
 }
 
+type maintenanceModeSwitch interface {
+	// ActivateMaintenanceMode activates the maintenance mode.
+	ActivateMaintenanceMode(title string, text string) error
+	// DeactivateMaintenanceMode deactivates the maintenance mode.
+	DeactivateMaintenanceMode() error
+}
+
+type cesRegistry interface {
+	registry.Registry
+}
+
 // used for mocks
 
 //nolint:unused
@@ -62,17 +73,8 @@ type ecosystemV1Alpha1Interface interface {
 	ecosystem.V1Alpha1Interface
 }
 
-type maintenanceModeSwitch interface {
-	// ActivateMaintenanceMode activates the maintenance mode.
-	ActivateMaintenanceMode(title string, text string) error
-	// DeactivateMaintenanceMode deactivates the maintenance mode.
-	DeactivateMaintenanceMode() error
-}
-
-type cesRegistry interface {
-	registry.Registry
-}
-
+//nolint:unused
+//goland:noinspection GoUnusedType
 type configurationContext interface {
 	registry.ConfigurationContext
 }

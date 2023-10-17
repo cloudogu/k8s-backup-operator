@@ -48,19 +48,6 @@ type deleteManager interface {
 	delete(ctx context.Context, backup *v1.Backup) error
 }
 
-// Provider encapsulates different backup provider like velero.
-type Provider interface {
-	// CreateBackup creates backup according to the backup configuration in v1.Backup.
-	CreateBackup(ctx context.Context, backup *v1.Backup) error
-	// DeleteBackup deletes backup from the cluster state and the backup storage.
-	DeleteBackup(ctx context.Context, backup *v1.Backup) error
-	// CheckReady validates if the provider is ready to receive backup requests.
-	CheckReady(ctx context.Context) error
-	// CreateRestore creates a restore according to the restore configuration in v1.Restore.
-	// TODO Split interface.
-	CreateRestore(ctx context.Context, restore *v1.Restore) error
-}
-
 type requeueHandler interface {
 	Handle(ctx context.Context, contextMessage string, backup *v1.Backup, originalErr error, requeueStatus string) (ctrl.Result, error)
 }
