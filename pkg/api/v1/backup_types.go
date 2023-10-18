@@ -41,6 +41,7 @@ type BackupSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Provider defines the backup provider which should be used for the backup.
+	// TODO make this immutable
 	Provider Provider `json:"provider,omitempty"`
 }
 

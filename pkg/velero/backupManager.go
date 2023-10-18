@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
-
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 
@@ -22,26 +21,19 @@ const defaultStorageLocation = "default"
 
 var deleteWaitTimeout = int64(300)
 
-type backupProvider struct {
-	readinessChecker
-	recorder        eventRecorder
+type defaultBackupManager struct {
 	veleroClientSet veleroClientSet
+	recorder        eventRecorder
 }
 
-func NewBackupProvider(recorder eventRecorder, namespace string) (*backupProvider, error) {
-	factory := veleroclient.NewFactory("k8s-backup-operator", map[string]interface{}{"namespace": namespace})
-	clientSet, err := factory.Client()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create velero clientset: %w", err)
-	}
-
-	checker := newReadinessChecker(clientSet, namespace)
-	return &backupProvider{readinessChecker: checker, recorder: recorder, veleroClientSet: clientSet}, nil
+// NewDefaultBackupManager creates a new instance of defaultBackupManager.
+func NewDefaultBackupManager(veleroClientSet veleroClientSet, recorder eventRecorder) *defaultBackupManager {
+	return &defaultBackupManager{veleroClientSet: veleroClientSet, recorder: recorder}
 }
 
 // CreateBackup triggers a velero backup and waits for its completion.
-func (p *backupProvider) CreateBackup(ctx context.Context, backup *v1.Backup) error {
-	p.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as backup provider")
+func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Backup) error {
+	bm.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as backup provider")
 
 	volumeFsBackup := false
 	veleroBackup := &velerov1.Backup{
@@ -53,15 +45,15 @@ func (p *backupProvider) CreateBackup(ctx context.Context, backup *v1.Backup) er
 		},
 	}
 
-	veleroBackupClient := p.veleroClientSet.VeleroV1().Backups(backup.Namespace)
+	veleroBackupClient := bm.veleroClientSet.VeleroV1().Backups(backup.Namespace)
 	_, err := veleroBackupClient.Create(ctx, veleroBackup, metav1.CreateOptions{})
 	if err != nil {
-		return p.handleFailedBackup(backup, fmt.Errorf("failed to apply velero backup '%s/%s' to cluster: %w", veleroBackup.Namespace, veleroBackup.Name, err))
+		return bm.handleFailedBackup(backup, fmt.Errorf("failed to apply velero backup '%s/%s' to cluster: %w", veleroBackup.Namespace, veleroBackup.Name, err))
 	}
 
 	watcher, err := veleroBackupClient.Watch(ctx, metav1.ListOptions{FieldSelector: backup.GetFieldSelectorWithName()})
 	if err != nil {
-		return p.handleFailedBackup(backup, fmt.Errorf("failed to create watch for velero backup '%s/%s': %w", veleroBackup.Namespace, veleroBackup.Name, err))
+		return bm.handleFailedBackup(backup, fmt.Errorf("failed to create watch for velero backup '%s/%s': %w", veleroBackup.Namespace, veleroBackup.Name, err))
 	}
 
 	veleroBackupChan := watcher.ResultChan()
@@ -69,15 +61,15 @@ func (p *backupProvider) CreateBackup(ctx context.Context, backup *v1.Backup) er
 
 	err = waitForBackupCompletionOrFailure(veleroBackupChan)
 	if err != nil {
-		return p.handleFailedBackup(backup, err)
+		return bm.handleFailedBackup(backup, err)
 	}
 
-	p.recorder.Eventf(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Successfully completed velero backup '%s/%s'", veleroBackup.Namespace, veleroBackup.Name)
+	bm.recorder.Eventf(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Successfully completed velero backup '%s/%s'", veleroBackup.Namespace, veleroBackup.Name)
 	return nil
 }
 
-func (p *backupProvider) handleFailedBackup(backup *v1.Backup, err error) error {
-	p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, err.Error())
+func (bm *defaultBackupManager) handleFailedBackup(backup *v1.Backup, err error) error {
+	bm.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, err.Error())
 	return err
 }
 
@@ -116,15 +108,15 @@ func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event) error
 
 // DeleteBackup deletes a velero backup with a delete backup request.
 // Potential errors from the request will be returned. Nil if no occur.
-func (p *backupProvider) DeleteBackup(ctx context.Context, backup *v1.Backup) error {
-	p.recorder.Event(backup, corev1.EventTypeNormal, v1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
+func (bm *defaultBackupManager) DeleteBackup(ctx context.Context, backup *v1.Backup) error {
+	bm.recorder.Event(backup, corev1.EventTypeNormal, v1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
 	requestCR := getDeleteBackupRequestCR(backup.Name, backup.Namespace)
-	_, err := p.veleroClientSet.VeleroV1().DeleteBackupRequests(backup.Namespace).Create(ctx, requestCR, metav1.CreateOptions{})
+	_, err := bm.veleroClientSet.VeleroV1().DeleteBackupRequests(backup.Namespace).Create(ctx, requestCR, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create backup delete request %s: %w", requestCR.Name, err)
 	}
 
-	watcher, err := p.veleroClientSet.VeleroV1().DeleteBackupRequests(backup.Namespace).Watch(
+	watcher, err := bm.veleroClientSet.VeleroV1().DeleteBackupRequests(backup.Namespace).Watch(
 		ctx, metav1.ListOptions{FieldSelector: backup.GetFieldSelectorWithName(), TimeoutSeconds: &deleteWaitTimeout})
 	if err != nil {
 		return fmt.Errorf("failed to create watch for delete backup request %s: %w", backup.Name, err)
@@ -140,19 +132,19 @@ func (p *backupProvider) DeleteBackup(ctx context.Context, backup *v1.Backup) er
 		}
 	}
 
-	requestCR, err = p.veleroClientSet.VeleroV1().DeleteBackupRequests(backup.Namespace).Get(ctx, backup.Name, metav1.GetOptions{})
+	requestCR, err = bm.veleroClientSet.VeleroV1().DeleteBackupRequests(backup.Namespace).Get(ctx, backup.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get delete backup request %s: %w", backup.Name, err)
 	}
 
 	if requestCR.Status.Phase != velerov1.DeleteBackupRequestPhaseProcessed {
-		p.cleanUpDeleteRequest(ctx, backup, requestCR)
+		bm.cleanUpDeleteRequest(ctx, backup, requestCR)
 		return fmt.Errorf("failed to delete backup %s: timout waiting for backup delete request %s", backup.Name, requestCR.Name)
 	}
 
 	backUpErrors := requestCR.Status.Errors
 	if len(backUpErrors) == 0 {
-		p.recorder.Event(backup, corev1.EventTypeNormal, v1.ProviderDeleteEventReason, "Provider delete request successful.")
+		bm.recorder.Event(backup, corev1.EventTypeNormal, v1.ProviderDeleteEventReason, "Provider delete request successful.")
 		return nil
 	}
 
@@ -160,20 +152,20 @@ func (p *backupProvider) DeleteBackup(ctx context.Context, backup *v1.Backup) er
 	for _, errStr := range backUpErrors {
 		multiErr = errors.Join(multiErr, fmt.Errorf("velero backup delete request error: %s", errStr))
 	}
-	p.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnProviderDeleteEventReason, multiErr.Error())
-	p.cleanUpDeleteRequest(ctx, backup, requestCR)
+	bm.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnProviderDeleteEventReason, multiErr.Error())
+	bm.cleanUpDeleteRequest(ctx, backup, requestCR)
 
-	return &genericRequeueableError{
-		errMsg: "failed to delete backup",
-		err:    multiErr,
+	return &requeue.GenericRequeueableError{
+		ErrMsg: "failed to delete backup",
+		Err:    multiErr,
 	}
 }
 
-func (p *backupProvider) cleanUpDeleteRequest(ctx context.Context, backup *v1.Backup, request *velerov1.DeleteBackupRequest) {
-	p.recorder.Event(backup, corev1.EventTypeWarning, v1.ProviderDeleteEventReason, "Cleanup velero delete request.")
-	err := p.veleroClientSet.VeleroV1().DeleteBackupRequests(request.Namespace).Delete(ctx, request.Name, metav1.DeleteOptions{})
+func (bm *defaultBackupManager) cleanUpDeleteRequest(ctx context.Context, backup *v1.Backup, request *velerov1.DeleteBackupRequest) {
+	bm.recorder.Event(backup, corev1.EventTypeWarning, v1.ProviderDeleteEventReason, "Cleanup velero delete request.")
+	err := bm.veleroClientSet.VeleroV1().DeleteBackupRequests(request.Namespace).Delete(ctx, request.Name, metav1.DeleteOptions{})
 	if err != nil {
-		p.recorder.Event(backup, corev1.EventTypeWarning, v1.ProviderDeleteEventReason, "Error cleanup velero delete request.")
+		bm.recorder.Event(backup, corev1.EventTypeWarning, v1.ProviderDeleteEventReason, "Error cleanup velero delete request.")
 		log.FromContext(ctx).Error(err, "velero backup delete error")
 	}
 }

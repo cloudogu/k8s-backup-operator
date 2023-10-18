@@ -1,18 +1,22 @@
 package restore
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewRestoreManager(t *testing.T) {
-	// given
-	clientMock := newMockEcosystemInterface(t)
-	recorderMock := newMockEventRecorder(t)
+	t.Run("success", func(t *testing.T) {
+		// given
+		registryMock := newMockCesRegistry(t)
+		globalConfigMock := newMockConfigurationContext(t)
+		registryMock.EXPECT().GlobalConfig().Return(globalConfigMock)
 
-	// when
-	actual := NewRestoreManager(clientMock, recorderMock)
+		// when
+		manager := NewRestoreManager(nil, nil, registryMock)
 
-	// then
-	assert.NotEmpty(t, actual)
+		// then
+		require.NotNil(t, manager)
+	})
 }

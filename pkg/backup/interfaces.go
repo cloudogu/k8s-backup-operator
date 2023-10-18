@@ -14,6 +14,10 @@ type ecosystemInterface interface {
 	ecosystem.Interface
 }
 
+type backupV1Alpha1Interface interface {
+	ecosystem.V1Alpha1Interface
+}
+
 type ecosystemBackupInterface interface {
 	ecosystem.BackupInterface
 }
@@ -56,6 +60,9 @@ type Provider interface {
 type ReadinessChecker interface {
 	// CheckReady validates if the provider is ready to receive backup requests.
 	CheckReady(ctx context.Context) error
+	// CreateRestore creates a restore according to the restore configuration in v1.Restore.
+	// TODO Split interface.
+	CreateRestore(ctx context.Context, restore *v1.Restore) error
 }
 
 type requeueHandler interface {
@@ -71,4 +78,8 @@ type requeuableError interface {
 
 type etcdRegistry interface {
 	registry.Registry
+}
+
+type configurationContext interface {
+	registry.ConfigurationContext
 }

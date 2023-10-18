@@ -2,7 +2,10 @@ package velero
 
 import (
 	"context"
-
+	
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/record"
 
@@ -10,13 +13,12 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 )
 
-type readinessChecker interface {
-	// CheckReady validates if the provider is ready to receive backup requests.
-	CheckReady(ctx context.Context) error
-}
-
 type eventRecorder interface {
 	record.EventRecorder
+}
+
+type ecosystemBackupInterface interface {
+	ecosystem.BackupInterface
 }
 
 type veleroClientSet interface {
@@ -53,4 +55,21 @@ type veleroDeleteBackupRequest interface {
 //goland:noinspection GoUnusedType
 type ecosystemWatch interface {
 	watch.Interface
+}
+
+type manager interface {
+	backupManager
+	restoreManager
+}
+
+type backupManager interface {
+	// CreateBackup creates backup according to the backup configuration in v1.Backup.
+	CreateBackup(ctx context.Context, backup *v1.Backup) error
+	// DeleteBackup deletes backup from the cluster state and the backup storage.
+	DeleteBackup(ctx context.Context, backup *v1.Backup) error
+}
+
+type restoreManager interface {
+	// CreateRestore creates a restore according to the restore configuration in v1.Restore.
+	CreateRestore(ctx context.Context, restore *v1.Restore) error
 }

@@ -13,6 +13,8 @@ const (
 	RestoreStatusDeleting   = "deleting"
 )
 
+const RestoreFinalizer = "cloudogu-restore-finalizer"
+
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // RestoreSpec defines the desired state of Restore
@@ -31,9 +33,9 @@ type RestoreStatus struct {
 	RequeueTimeNanos time.Duration `json:"requeueTimeNanos,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:metadata:labels=app=ces;app.kubernetes.io/name=k8s-backup-operator
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:metadata:labels=app=ces;app.kubernetes.io/name=k8s-backup-operator
 
 // Restore is the Schema for the restores API
 type Restore struct {
@@ -46,7 +48,7 @@ type Restore struct {
 	Status RestoreStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // RestoreList contains a list of Restore
 type RestoreList struct {

@@ -2,6 +2,7 @@ package restore
 
 import (
 	"context"
+	"github.com/cloudogu/cesapp-lib/registry"
 	"time"
 
 	"k8s.io/client-go/tools/record"
@@ -59,4 +60,19 @@ type ecosystemRestoreInterface interface {
 //goland:noinspection GoUnusedType
 type ecosystemV1Alpha1Interface interface {
 	ecosystem.V1Alpha1Interface
+}
+
+type maintenanceModeSwitch interface {
+	// ActivateMaintenanceMode activates the maintenance mode.
+	ActivateMaintenanceMode(title string, text string) error
+	// DeactivateMaintenanceMode deactivates the maintenance mode.
+	DeactivateMaintenanceMode() error
+}
+
+type cesRegistry interface {
+	registry.Registry
+}
+
+type configurationContext interface {
+	registry.ConfigurationContext
 }

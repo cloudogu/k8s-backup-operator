@@ -1,22 +1,22 @@
-package velero
+package requeue
 
 import (
 	"fmt"
 	"time"
 )
 
-type genericRequeueableError struct {
-	errMsg string
-	err    error
+type GenericRequeueableError struct {
+	ErrMsg string
+	Err    error
 }
 
 // Error returns the string representation of the wrapped error.
-func (gre *genericRequeueableError) Error() string {
-	return fmt.Sprintf("%s: %s", gre.errMsg, gre.err.Error())
+func (gre *GenericRequeueableError) Error() string {
+	return fmt.Sprintf("%s: %s", gre.ErrMsg, gre.Err.Error())
 }
 
 // GetRequeueTime returns the time until the component should be requeued.
-func (gre *genericRequeueableError) GetRequeueTime(requeueTimeNanos time.Duration) time.Duration {
+func (gre *GenericRequeueableError) GetRequeueTime(requeueTimeNanos time.Duration) time.Duration {
 	return getRequeueTime(requeueTimeNanos)
 }
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func Test_defaultReadinessChecker_CheckReady(t *testing.T) {
+func TestDefaultProvider_CheckReady(t *testing.T) {
 	t.Run("should fail to get bsl", func(t *testing.T) {
 		// given
 		mockBslInterface := newMockVeleroBackupStorageLocationInterface(t)
@@ -18,7 +18,7 @@ func Test_defaultReadinessChecker_CheckReady(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
-		sut := &defaultReadinessChecker{
+		sut := &defaultProvider{
 			veleroClientSet: mockVeleroClient,
 			namespace:       testNamespace,
 		}
@@ -46,7 +46,7 @@ func Test_defaultReadinessChecker_CheckReady(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
-		sut := &defaultReadinessChecker{
+		sut := &defaultProvider{
 			veleroClientSet: mockVeleroClient,
 			namespace:       testNamespace,
 		}
@@ -73,7 +73,7 @@ func Test_defaultReadinessChecker_CheckReady(t *testing.T) {
 		mockVeleroClient := newMockVeleroClientSet(t)
 		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
 
-		sut := &defaultReadinessChecker{
+		sut := &defaultProvider{
 			veleroClientSet: mockVeleroClient,
 			namespace:       testNamespace,
 		}
@@ -84,15 +84,4 @@ func Test_defaultReadinessChecker_CheckReady(t *testing.T) {
 		// then
 		require.NoError(t, err)
 	})
-}
-
-func Test_newReadinessChecker(t *testing.T) {
-	// given
-	clientSet := newMockVeleroClientSet(t)
-
-	// when
-	actual := newReadinessChecker(clientSet, testNamespace)
-
-	// then
-	assert.NotEmpty(t, actual)
 }
