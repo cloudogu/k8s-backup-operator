@@ -29,8 +29,9 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 			Name: restore.Name, Namespace: restore.Namespace,
 		},
 		Spec: velerov1.RestoreSpec{
-			// TODO Correct Policy?
-			BackupName: restore.Spec.BackupName, ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
+			BackupName:             restore.Spec.BackupName,
+			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
+			RestoreStatus:          &velerov1.RestoreStatusSpec{IncludedResources: []string{"*"}},
 		},
 	}
 
