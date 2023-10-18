@@ -15,15 +15,17 @@ type eventRecorder interface {
 	record.EventRecorder
 }
 
-type ecosystemBackupInterface interface {
-	ecosystem.BackupInterface
-}
-
 type veleroClientSet interface {
 	versioned.Interface
 }
 
 // The following interfaces are here to generate mocks.
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type ecosystemBackupInterface interface {
+	ecosystem.BackupInterface
+}
 
 //nolint:unused
 //goland:noinspection GoUnusedType
@@ -35,6 +37,12 @@ type veleroInterface interface {
 //goland:noinspection GoUnusedType
 type veleroBackupInterface interface {
 	velerov1.BackupInterface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type veleroRestoreInterface interface {
+	velerov1.RestoreInterface
 }
 
 //nolint:unused

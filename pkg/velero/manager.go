@@ -9,6 +9,6 @@ type defaultManager struct {
 func NewDefaultManager(veleroClientSet veleroClientSet, recorder eventRecorder) *defaultManager {
 	return &defaultManager{
 		backupManager:  NewDefaultBackupManager(veleroClientSet, recorder),
-		restoreManager: NewDefaultRestoreManager(),
+		restoreManager: NewDefaultRestoreManager(veleroClientSet, recorder),
 	}
 }

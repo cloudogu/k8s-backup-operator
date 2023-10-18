@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"github.com/cloudogu/k8s-backup-operator/pkg/velero"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
@@ -12,7 +13,7 @@ var NewVeleroProvider = func(recorder EventRecorder, namespace string) (Provider
 	return velero.NewDefaultProvider(namespace, recorder)
 }
 
-// GetProvider return the provider by the given name and calls a function on the provider object to check if it is ready.
+// GetProvider returns the provider by the given name and calls a function on the provider object to check if it is ready.
 func GetProvider(ctx context.Context, name k8sv1.Provider, namespace string, recorder EventRecorder) (Provider, error) {
 	var provider Provider
 	var err error
@@ -28,7 +29,10 @@ func GetProvider(ctx context.Context, name k8sv1.Provider, namespace string, rec
 
 	err = provider.CheckReady(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("provider %s is not ready: %w", name, err)
+		return nil, &requeue.GenericRequeueableError{
+			Err:    err,
+			ErrMsg: fmt.Sprintf("provider %s is not ready", name),
+		}
 	}
 
 	return provider, nil

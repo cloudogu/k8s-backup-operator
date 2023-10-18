@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 )
@@ -57,4 +58,8 @@ type RestoreList struct {
 
 func init() {
 	SchemeBuilder.Register(&Restore{}, &RestoreList{})
+}
+
+func (r *Restore) GetFieldSelectorWithName() string {
+	return fmt.Sprintf("metadata.name=%s", r.Name)
 }
