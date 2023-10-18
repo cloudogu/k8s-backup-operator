@@ -1,9 +1,9 @@
 package backup
 
 import (
-	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"testing"
 
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 
 	"github.com/stretchr/testify/assert"

@@ -317,7 +317,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 	})
 }
 
-func Test_backupManager_DeleteBackup(t *testing.T) {
+func Test_provider_DeleteBackup(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		backup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: testNamespace}}
