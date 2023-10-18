@@ -32,6 +32,14 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 			BackupName:             restore.Spec.BackupName,
 			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
 			RestoreStatus:          &velerov1.RestoreStatusSpec{IncludedResources: []string{"*"}},
+			LabelSelector: &metav1.LabelSelector{
+				// Filter backup-operator from restore.
+				MatchExpressions: []metav1.LabelSelectorRequirement{{
+					Key:      "app.kubernetes.io/part-of",
+					Operator: metav1.LabelSelectorOpNotIn,
+					Values:   []string{"k8s-backup-operator"},
+				}},
+			},
 		},
 	}
 
