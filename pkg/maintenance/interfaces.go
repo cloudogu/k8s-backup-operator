@@ -2,7 +2,7 @@ package maintenance
 
 import (
 	"github.com/cloudogu/cesapp-lib/registry"
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 )
 
 type maintenanceModeSwitch interface {
@@ -12,8 +12,8 @@ type maintenanceModeSwitch interface {
 	DeactivateMaintenanceMode() error
 }
 
-type ecosystemInterface interface {
-	ecosystem.Interface
+type statefulSetInterface interface {
+	appsv1.StatefulSetInterface
 }
 
 type globalConfig interface {

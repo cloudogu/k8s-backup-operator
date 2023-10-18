@@ -12,17 +12,15 @@ import (
 
 type looselyCoupledMaintenanceSwitch struct {
 	maintenanceModeSwitch
-	namespace string
-	clientSet ecosystemInterface
+	statefulSetClient statefulSetInterface
 }
 
 // NewWithLooseCoupling creates a switch that checks if the configuration registry (e.g., etcd) exists before switching.
 // If the registry does not exist, no switch is executed.
-func NewWithLooseCoupling(globalConfig globalConfig, namespace string, clientSet ecosystemInterface) *looselyCoupledMaintenanceSwitch {
+func NewWithLooseCoupling(globalConfig globalConfig, clientSet statefulSetInterface) *looselyCoupledMaintenanceSwitch {
 	return &looselyCoupledMaintenanceSwitch{
 		maintenanceModeSwitch: New(globalConfig),
-		namespace:             namespace,
-		clientSet:             clientSet,
+		statefulSetClient:     clientSet,
 	}
 }
 
@@ -39,7 +37,7 @@ func (lcms *looselyCoupledMaintenanceSwitch) ActivateMaintenanceMode(title strin
 }
 
 func (lcms *looselyCoupledMaintenanceSwitch) isEtcdReady() (bool, error) {
-	statefulSet, err := lcms.clientSet.AppsV1().StatefulSets(lcms.namespace).Get(context.Background(), "etcd", metav1.GetOptions{})
+	statefulSet, err := lcms.statefulSetClient.Get(context.Background(), "etcd", metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return false, nil
@@ -68,7 +66,7 @@ func (lcms *looselyCoupledMaintenanceSwitch) waitForReadyEtcd() error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancelFunc()
 
-	watch, err := lcms.clientSet.AppsV1().StatefulSets(lcms.namespace).Watch(context.Background(), metav1.ListOptions{
+	watch, err := lcms.statefulSetClient.Watch(context.Background(), metav1.ListOptions{
 		FieldSelector: "metadata.name=etcd",
 	})
 	if err != nil {
