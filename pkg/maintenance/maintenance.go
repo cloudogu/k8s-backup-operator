@@ -3,14 +3,14 @@ package maintenance
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/cloudogu/cesapp-lib/registry"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 )
 
 const registryKeyMaintenance = "maintenance"
 
 type maintenanceSwitch struct {
-	globalConfig registry.ConfigurationContext
+	globalConfig globalConfig
 }
 
 type maintenanceRegistryObject struct {
@@ -19,7 +19,7 @@ type maintenanceRegistryObject struct {
 }
 
 // New create a new instance of maintenanceSwitch.
-func New(globalConfig registry.ConfigurationContext) *maintenanceSwitch {
+func New(globalConfig globalConfig) *maintenanceSwitch {
 	return &maintenanceSwitch{globalConfig: globalConfig}
 }
 
