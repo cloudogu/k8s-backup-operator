@@ -24,8 +24,8 @@ type defaultCreateManager struct {
 	maintenanceModeSwitch maintenanceModeSwitch
 }
 
-func newCreateManager(restoreClient ecosystemRestoreInterface, recorder eventRecorder, registry cesRegistry) *defaultCreateManager {
-	maintenanceSwitch := maintenance.New(registry.GlobalConfig())
+func newCreateManager(restoreClient ecosystemRestoreInterface, recorder eventRecorder, registry cesRegistry, statefulSetInterface statefulSetInterface) *defaultCreateManager {
+	maintenanceSwitch := maintenance.NewWithLooseCoupling(registry.GlobalConfig(), statefulSetInterface)
 	return &defaultCreateManager{restoreClient: restoreClient, recorder: recorder, maintenanceModeSwitch: maintenanceSwitch}
 }
 

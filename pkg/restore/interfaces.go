@@ -2,15 +2,16 @@ package restore
 
 import (
 	"context"
-	"github.com/cloudogu/cesapp-lib/registry"
-	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"time"
 
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 
 type ecosystemInterface interface {
@@ -60,19 +61,15 @@ type cesRegistry interface {
 	registry.Registry
 }
 
-// used for mocks
-
-//nolint:unused
-//goland:noinspection GoUnusedType
 type ecosystemRestoreInterface interface {
 	ecosystem.RestoreInterface
 }
 
-//nolint:unused
-//goland:noinspection GoUnusedType
-type ecosystemBackupInterface interface {
-	ecosystem.BackupInterface
+type statefulSetInterface interface {
+	appsv1.StatefulSetInterface
 }
+
+// used for mocks
 
 //nolint:unused
 //goland:noinspection GoUnusedType

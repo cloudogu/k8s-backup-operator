@@ -3,12 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/cloudogu/cesapp-lib/core"
-	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
-	"github.com/cloudogu/k8s-backup-operator/pkg/restore"
 	"os"
-
-	reg "github.com/cloudogu/cesapp-lib/registry"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -24,9 +19,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/cloudogu/cesapp-lib/core"
+	reg "github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
+	"github.com/cloudogu/k8s-backup-operator/pkg/restore"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -151,7 +150,7 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		return fmt.Errorf("failed to create CES registry: %w", err)
 	}
 
-	restoreManager := restore.NewRestoreManager(ecosystemClientSet.EcosystemV1Alpha1().Restores(operatorConfig.Namespace), recorder, registry)
+	restoreManager := restore.NewRestoreManager(ecosystemClientSet.EcosystemV1Alpha1().Restores(operatorConfig.Namespace), recorder, registry, ecosystemClientSet.AppsV1().StatefulSets(operatorConfig.Namespace))
 	restoreRequeueHandler := restore.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
 	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, restoreRequeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
