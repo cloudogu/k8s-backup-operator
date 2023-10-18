@@ -27,7 +27,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
-		expectedVeleroRestore := &velerov1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: velerov1.RestoreSpec{BackupName: "backup", ExistingResourcePolicy: velerov1.PolicyTypeUpdate}}
+		expectedVeleroRestore := getExpectedVeleroRestore(restore)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")
@@ -65,25 +65,25 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 	})
 
 	t.Run("should return error on velero failure", func(t *testing.T) {
-		runVeleroStatusPahseFailureTest(t, velerov1.RestorePhaseFailed)
+		runVeleroStatusPhaseFailureTest(t, velerov1.RestorePhaseFailed)
 	})
 
 	t.Run("should return error on velero partially failure", func(t *testing.T) {
-		runVeleroStatusPahseFailureTest(t, velerov1.RestorePhasePartiallyFailed)
+		runVeleroStatusPhaseFailureTest(t, velerov1.RestorePhasePartiallyFailed)
 	})
 
 	t.Run("should return error on velero plugin operation partially failure", func(t *testing.T) {
-		runVeleroStatusPahseFailureTest(t, velerov1.RestorePhaseWaitingForPluginOperationsPartiallyFailed)
+		runVeleroStatusPhaseFailureTest(t, velerov1.RestorePhaseWaitingForPluginOperationsPartiallyFailed)
 	})
 
 	t.Run("should return error on velero validation failure", func(t *testing.T) {
-		runVeleroStatusPahseFailureTest(t, velerov1.RestorePhaseFailedValidation)
+		runVeleroStatusPhaseFailureTest(t, velerov1.RestorePhaseFailedValidation)
 	})
 
 	t.Run("should return error on create velero restore error", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
-		expectedVeleroRestore := &velerov1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: velerov1.RestoreSpec{BackupName: "backup", ExistingResourcePolicy: velerov1.PolicyTypeUpdate}}
+		expectedVeleroRestore := getExpectedVeleroRestore(restore)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")
@@ -109,7 +109,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 	t.Run("should return error on create velero restore wach error", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
-		expectedVeleroRestore := &velerov1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: velerov1.RestoreSpec{BackupName: "backup", ExistingResourcePolicy: velerov1.PolicyTypeUpdate}}
+		expectedVeleroRestore := getExpectedVeleroRestore(restore)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")
@@ -136,7 +136,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 	t.Run("should return error on wrong event object", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
-		expectedVeleroRestore := &velerov1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: velerov1.RestoreSpec{BackupName: "backup", ExistingResourcePolicy: velerov1.PolicyTypeUpdate}}
+		expectedVeleroRestore := getExpectedVeleroRestore(restore)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")
@@ -176,7 +176,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 	t.Run("should return error on delete event", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
-		expectedVeleroRestore := &velerov1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: velerov1.RestoreSpec{BackupName: "backup", ExistingResourcePolicy: velerov1.PolicyTypeUpdate}}
+		expectedVeleroRestore := getExpectedVeleroRestore(restore)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")
@@ -214,10 +214,25 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 	})
 }
 
-func runVeleroStatusPahseFailureTest(t *testing.T, phase velerov1.RestorePhase) {
+func getExpectedVeleroRestore(restore *v1.Restore) *velerov1.Restore {
+	return &velerov1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      restore.Name,
+			Namespace: restore.Namespace,
+		},
+		Spec: velerov1.RestoreSpec{
+			BackupName:             restore.Spec.BackupName,
+			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
+			RestoreStatus:          &velerov1.RestoreStatusSpec{IncludedResources: []string{"*"}},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{Key: "app.kubernetes.io/part-of", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"k8s-backup-operator"}}}}}}
+}
+
+func runVeleroStatusPhaseFailureTest(t *testing.T, phase velerov1.RestorePhase) {
 	// given
 	restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
-	expectedVeleroRestore := &velerov1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: velerov1.RestoreSpec{BackupName: "backup", ExistingResourcePolicy: velerov1.PolicyTypeUpdate}}
+	expectedVeleroRestore := getExpectedVeleroRestore(restore)
 
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")

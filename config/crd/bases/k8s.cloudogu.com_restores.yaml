@@ -40,6 +40,10 @@ spec:
               backupName:
                 description: BackupName references the backup that should be restored.
                 type: string
+              provider:
+                description: Provider defines the backup provider which should be
+                  used for the restore.
+                type: string
             type: object
           status:
             description: Status defines the observed state of Restore
