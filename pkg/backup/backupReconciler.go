@@ -61,7 +61,7 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	switch requiredOperation {
 	case operationCreate:
-		return ctrl.Result{}, r.manager.create(ctx, backup)
+		return r.performCreateOperation(ctx, backup)
 	case operationDelete:
 		return r.performDeleteOperation(ctx, backup)
 	case operationIgnore:
@@ -69,6 +69,10 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	default:
 		return ctrl.Result{}, fmt.Errorf("unknown operation: %s", requiredOperation)
 	}
+}
+
+func (r *backupReconciler) performCreateOperation(ctx context.Context, backup *k8sv1.Backup) (ctrl.Result, error) {
+	return r.performOperation(ctx, backup, k8sv1.CreateEventReason, k8sv1.BackupStatusNew, r.manager.create)
 }
 
 func (r *backupReconciler) performDeleteOperation(ctx context.Context, backup *k8sv1.Backup) (ctrl.Result, error) {

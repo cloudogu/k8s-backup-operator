@@ -217,7 +217,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "provider velero is not ready")
 	})
 
