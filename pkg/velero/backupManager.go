@@ -7,7 +7,6 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
