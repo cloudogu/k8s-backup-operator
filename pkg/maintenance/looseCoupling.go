@@ -28,7 +28,7 @@ func NewWithLooseCoupling(globalConfig globalConfig, clientSet statefulSetInterf
 // This loose coupling enables us to perform restores on an empty cluster.
 func (lcms *looselyCoupledMaintenanceSwitch) ActivateMaintenanceMode(title string, text string) error {
 	if etcdReady, err := lcms.isEtcdReady(); err != nil {
-		return err
+		return fmt.Errorf("failed to check if etcd is ready: %w", err)
 	} else if etcdReady {
 		return lcms.maintenanceModeSwitch.ActivateMaintenanceMode(title, text)
 	}
