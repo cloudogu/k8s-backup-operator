@@ -98,3 +98,14 @@ func waitForRestoreCompletionOrFailure(veleroRestoreChan <-chan watch.Event) err
 
 	return nil
 }
+
+func (rm *defaultRestoreManager) DeleteRestore(ctx context.Context, restore *v1.Restore) error {
+	rm.recorder.Event(restore, corev1.EventTypeNormal, v1.DeleteEventReason, "Using velero as restore provider")
+
+	err := rm.veleroClientSet.VeleroV1().Restores(restore.Namespace).Delete(ctx, restore.Name, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete velero restore [%s]: %w", restore.Name, err)
+	}
+
+	return nil
+}

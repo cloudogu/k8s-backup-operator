@@ -20,4 +20,6 @@ type Provider interface {
 	CheckReady(ctx context.Context) error
 	// CreateRestore creates a restore according to the restore configuration in v1.Restore.
 	CreateRestore(ctx context.Context, restore *v1.Restore) error
+	// DeleteRestore just deletes the provider restore object.
+	DeleteRestore(ctx context.Context, restore *v1.Restore) error
 }

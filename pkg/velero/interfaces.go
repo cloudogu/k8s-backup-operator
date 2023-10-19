@@ -2,10 +2,10 @@ package velero
 
 import (
 	"context"
-	
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
-	
+
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/record"
 
@@ -80,4 +80,6 @@ type backupManager interface {
 type restoreManager interface {
 	// CreateRestore creates a restore according to the restore configuration in v1.Restore.
 	CreateRestore(ctx context.Context, restore *v1.Restore) error
+	// DeleteRestore deletes the velero restore resource.
+	DeleteRestore(ctx context.Context, restore *v1.Restore) error
 }

@@ -24,7 +24,4 @@ version: 0.0.0-replaceme
 appVersion: "0.0.0-replaceme"
 
 annotations:
-  "k8s.cloudogu.com/ces-dependency/k8s-etcd": "3.5.x-0"
-  # the upper bound must be a pre-release as well due to a bug, see https://github.com/Masterminds/semver/issues/177
-  "k8s.cloudogu.com/ces-dependency/k8s-service-discovery": ">=0.14.3-0 <1.0-0"
   "k8s.cloudogu.com/ces-dependency/k8s-velero": "5.0.x-0"

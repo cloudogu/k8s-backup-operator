@@ -269,3 +269,53 @@ func runVeleroStatusPhaseFailureTest(t *testing.T, phase velerov1.RestorePhase) 
 	require.Error(t, err)
 	assert.ErrorContains(t, err, fmt.Sprintf("failed to complete velero restore [restore]: has status phase [%s]", phase))
 }
+
+func Test_defaultRestoreManager_DeleteRestore(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		// given
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.DeleteEventReason, "Using velero as restore provider")
+
+		veleroRestoreClientMock := newMockVeleroRestoreInterface(t)
+		veleroInterfaceMock := newMockVeleroInterface(t)
+		veleroInterfaceMock.EXPECT().Restores(testNamespace).Return(veleroRestoreClientMock)
+		veleroClientMock := newMockVeleroClientSet(t)
+		veleroClientMock.EXPECT().VeleroV1().Return(veleroInterfaceMock)
+		veleroRestoreClientMock.EXPECT().Delete(testCtx, restore.Name, metav1.DeleteOptions{}).Return(nil)
+
+		sut := &defaultRestoreManager{veleroClientSet: veleroClientMock, recorder: recorderMock}
+
+		// when
+		err := sut.DeleteRestore(testCtx, restore)
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should return error on delete error", func(t *testing.T) {
+		// given
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.DeleteEventReason, "Using velero as restore provider")
+
+		veleroRestoreClientMock := newMockVeleroRestoreInterface(t)
+		veleroInterfaceMock := newMockVeleroInterface(t)
+		veleroInterfaceMock.EXPECT().Restores(testNamespace).Return(veleroRestoreClientMock)
+		veleroClientMock := newMockVeleroClientSet(t)
+		veleroClientMock.EXPECT().VeleroV1().Return(veleroInterfaceMock)
+		veleroRestoreClientMock.EXPECT().Delete(testCtx, restore.Name, metav1.DeleteOptions{}).Return(assert.AnError)
+
+		sut := &defaultRestoreManager{veleroClientSet: veleroClientMock, recorder: recorderMock}
+
+		// when
+		err := sut.DeleteRestore(testCtx, restore)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to delete velero restore [restore]")
+		assert.Error(t, err, assert.AnError)
+	})
+}
