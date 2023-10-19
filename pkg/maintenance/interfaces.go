@@ -2,6 +2,7 @@ package maintenance
 
 import (
 	"github.com/cloudogu/cesapp-lib/registry"
+	"k8s.io/apimachinery/pkg/watch"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 )
 
@@ -18,4 +19,12 @@ type statefulSetInterface interface {
 
 type globalConfig interface {
 	registry.ConfigurationContext
+}
+
+// used for mocks
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type watcher interface {
+	watch.Interface
 }
