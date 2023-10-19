@@ -10,6 +10,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var waitForEtcdTimeout = 5 * time.Minute
+
 type looselyCoupledMaintenanceSwitch struct {
 	maintenanceModeSwitch
 	statefulSetClient statefulSetInterface
@@ -63,12 +65,10 @@ func (lcms *looselyCoupledMaintenanceSwitch) DeactivateMaintenanceMode() error {
 }
 
 func (lcms *looselyCoupledMaintenanceSwitch) waitForReadyEtcd() error {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), waitForEtcdTimeout)
 	defer cancelFunc()
 
-	watch, err := lcms.statefulSetClient.Watch(context.Background(), metav1.ListOptions{
-		FieldSelector: "metadata.name=etcd",
-	})
+	watch, err := lcms.statefulSetClient.Watch(ctx, metav1.ListOptions{FieldSelector: "metadata.name=etcd"})
 	if err != nil {
 		return fmt.Errorf("failed to create watch for StatefulSet etcd: %w", err)
 	}
