@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/part-of: k8s-backup-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: k8s-backup-operator
-  name: backup-sample
+  name: restore-sample
 spec:
   provider: velero
+  backupName: backup-sample
