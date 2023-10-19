@@ -29,7 +29,7 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 			Name: restore.Name, Namespace: restore.Namespace,
 		},
 		Spec: velerov1.RestoreSpec{
-			BackupName:             restore.Spec.BackupName,
+			BackupName:             restore.Name,
 			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
 			RestoreStatus:          &velerov1.RestoreStatusSpec{IncludedResources: []string{"*"}},
 			LabelSelector: &metav1.LabelSelector{

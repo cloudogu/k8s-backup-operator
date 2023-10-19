@@ -37,10 +37,6 @@ func NewBackupReconciler(clientSet ecosystemInterface, recorder eventRecorder, n
 	return &backupReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager, requeueHandler: handler}
 }
 
-// +kubebuilder:rbac:groups=k8s.cloudogu.com,resources=backups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=k8s.cloudogu.com,resources=backups/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=k8s.cloudogu.com,resources=backups/finalizers,verbs=update
-
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
