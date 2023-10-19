@@ -2,6 +2,7 @@ package cleanup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,14 +52,19 @@ func (c *defaultCleanupManager) deleteResourcesByLabelSelector(ctx context.Conte
 
 	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
-		return fmt.Errorf("failed to create selector from given label selector: %w", err)
+		return fmt.Errorf("failed to create selector from given label selector %s: %w", labelSelector, err)
 	}
 
+	var errs []error
 	for _, list := range lists {
 		err = c.deleteApiResourcesByLabelSelector(ctx, list, selector)
 		if err != nil {
-			return err
+			errs = append(errs, err)
 		}
+	}
+
+	if len(errs) != 0 {
+		return fmt.Errorf("failed to delete api resources with label selector %q: %w", selector, errors.Join(errs...))
 	}
 
 	return nil
@@ -73,6 +79,7 @@ func (c *defaultCleanupManager) deleteApiResourcesByLabelSelector(ctx context.Co
 		return nil
 	}
 
+	var errs []error
 	for _, resource := range list.APIResources {
 		if len(resource.Verbs) != 0 && slices.Contains(resource.Verbs, deleteVerb) {
 			resource.Group = gv.Group
@@ -80,10 +87,14 @@ func (c *defaultCleanupManager) deleteApiResourcesByLabelSelector(ctx context.Co
 
 			err := c.deleteByLabelSelector(ctx, resource, selector)
 			if err != nil {
-				return err
+				errs = append(errs, err)
 			}
 
 		}
+	}
+
+	if len(errs) != 0 {
+		return fmt.Errorf("failed delete for group version %s: %w", gv, errors.Join(errs...))
 	}
 
 	return nil
@@ -94,16 +105,17 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(gvk)
 
+	namespaceMsg := ""
 	listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: labelSelector}}
 	if resource.Namespaced {
 		listOptions.Namespace = c.namespace
+		namespaceMsg = fmt.Sprintf(" in namespace %s", c.namespace)
 	}
 	err := c.client.DeleteAllOf(ctx, u, &client.DeleteAllOfOptions{
 		ListOptions: listOptions,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to delete all resources of kind %s with label selector %s in namespace %s: %w",
-			gvk, labelSelector, c.namespace, err)
+		return fmt.Errorf("failed delete for kind %s%s: %w", resource.Kind, namespaceMsg, err)
 	}
 
 	return nil
