@@ -20,13 +20,25 @@ const (
 
 type defaultCreateManager struct {
 	restoreClient         ecosystemRestoreInterface
+	cleanup               cleanupManager
 	recorder              eventRecorder
 	maintenanceModeSwitch maintenanceModeSwitch
 }
 
-func newCreateManager(restoreClient ecosystemRestoreInterface, recorder eventRecorder, registry cesRegistry, statefulSetInterface statefulSetInterface) *defaultCreateManager {
+func newCreateManager(
+	restoreClient ecosystemRestoreInterface,
+	recorder eventRecorder,
+	registry cesRegistry,
+	statefulSetInterface statefulSetInterface,
+	cleanup cleanupManager,
+) *defaultCreateManager {
 	maintenanceSwitch := maintenance.NewWithLooseCoupling(registry.GlobalConfig(), statefulSetInterface)
-	return &defaultCreateManager{restoreClient: restoreClient, recorder: recorder, maintenanceModeSwitch: maintenanceSwitch}
+	return &defaultCreateManager{
+		restoreClient:         restoreClient,
+		recorder:              recorder,
+		maintenanceModeSwitch: maintenanceSwitch,
+		cleanup:               cleanup,
+	}
 }
 
 func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore) error {
@@ -60,6 +72,11 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 			logger.Error(fmt.Errorf("failed to deactivate maintenance mode: [%w]", errDefer), "restore error")
 		}
 	}()
+
+	err = cm.cleanup.Cleanup(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup before restore: %w", err)
+	}
 
 	err = provider.CreateRestore(ctx, restore)
 	if err != nil {

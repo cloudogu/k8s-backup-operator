@@ -193,6 +193,49 @@ func (_c *MockProvider_DeleteBackup_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// DeleteRestore provides a mock function with given fields: ctx, restore
+func (_m *MockProvider) DeleteRestore(ctx context.Context, restore *v1.Restore) error {
+	ret := _m.Called(ctx, restore)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Restore) error); ok {
+		r0 = rf(ctx, restore)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockProvider_DeleteRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteRestore'
+type MockProvider_DeleteRestore_Call struct {
+	*mock.Call
+}
+
+// DeleteRestore is a helper method to define mock.On call
+//   - ctx context.Context
+//   - restore *v1.Restore
+func (_e *MockProvider_Expecter) DeleteRestore(ctx interface{}, restore interface{}) *MockProvider_DeleteRestore_Call {
+	return &MockProvider_DeleteRestore_Call{Call: _e.mock.On("DeleteRestore", ctx, restore)}
+}
+
+func (_c *MockProvider_DeleteRestore_Call) Run(run func(ctx context.Context, restore *v1.Restore)) *MockProvider_DeleteRestore_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Restore))
+	})
+	return _c
+}
+
+func (_c *MockProvider_DeleteRestore_Call) Return(_a0 error) *MockProvider_DeleteRestore_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockProvider_DeleteRestore_Call) RunAndReturn(run func(context.Context, *v1.Restore) error) *MockProvider_DeleteRestore_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 type mockConstructorTestingTNewMockProvider interface {
 	mock.TestingT
 	Cleanup(func())

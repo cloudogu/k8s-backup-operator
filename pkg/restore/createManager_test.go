@@ -18,7 +18,7 @@ func Test_newCreateManager(t *testing.T) {
 		registryMock.EXPECT().GlobalConfig().Return(globalConfigMock)
 
 		// when
-		manager := newCreateManager(nil, nil, registryMock, nil)
+		manager := newCreateManager(nil, nil, registryMock, nil, nil)
 
 		// then
 		require.NotNil(t, manager)
@@ -52,7 +52,10 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		restoreClientMock.EXPECT().UpdateStatusCompleted(testCtx, restore).Return(restore, nil)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock}
+		cleanupMock := newMockCleanupManager(t)
+		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+
+		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -165,6 +168,43 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
+	t.Run("should return error on cleanup error", func(t *testing.T) {
+		// given
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
+
+		restoreClientMock := newMockEcosystemRestoreInterface(t)
+		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
+		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+
+		providerMock := newMockRestoreProvider(t)
+		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+		oldNewVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+			return providerMock, nil
+		}
+		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
+
+		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Restore in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+
+		cleanupMock := newMockCleanupManager(t)
+		cleanupMock.EXPECT().Cleanup(testCtx).Return(assert.AnError)
+
+		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock}
+
+		// when
+		err := sut.create(testCtx, restore)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to cleanup before restore")
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+
 	t.Run("should return error on provider error", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
@@ -190,7 +230,10 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Restore in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock}
+		cleanupMock := newMockCleanupManager(t)
+		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+
+		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -226,7 +269,10 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Restore in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock}
+		cleanupMock := newMockCleanupManager(t)
+		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+
+		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -262,7 +308,10 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Restore in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock}
+		cleanupMock := newMockCleanupManager(t)
+		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+
+		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock}
 
 		// when
 		err := sut.create(testCtx, restore)

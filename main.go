@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -150,7 +151,14 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		return fmt.Errorf("failed to create CES registry: %w", err)
 	}
 
-	restoreManager := restore.NewRestoreManager(ecosystemClientSet.EcosystemV1Alpha1().Restores(operatorConfig.Namespace), recorder, registry, ecosystemClientSet.AppsV1().StatefulSets(operatorConfig.Namespace))
+	cleanupManager := cleanup.NewManager(operatorConfig.Namespace, k8sManager.GetClient(), k8sClientSet)
+	restoreManager := restore.NewRestoreManager(
+		ecosystemClientSet.EcosystemV1Alpha1().Restores(operatorConfig.Namespace),
+		recorder,
+		registry,
+		ecosystemClientSet.AppsV1().StatefulSets(operatorConfig.Namespace),
+		cleanupManager,
+	)
 	restoreRequeueHandler := restore.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
 	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, restoreRequeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
