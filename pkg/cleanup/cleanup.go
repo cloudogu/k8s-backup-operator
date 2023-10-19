@@ -12,6 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const deleteVerb = "delete"
+
 var defaultCleanupSelector = &metav1.LabelSelector{
 	MatchExpressions: []metav1.LabelSelectorRequirement{
 		{
@@ -66,9 +68,16 @@ func (c *defaultCleanupManager) deleteApiResourcesByLabelSelector(ctx context.Co
 	if len(list.APIResources) == 0 {
 		return nil
 	}
+	gv, err := schema.ParseGroupVersion(list.GroupVersion)
+	if err != nil {
+		return nil
+	}
 
 	for _, resource := range list.APIResources {
-		if len(resource.Verbs) != 0 && slices.Contains(resource.Verbs, "delete") {
+		if len(resource.Verbs) != 0 && slices.Contains(resource.Verbs, deleteVerb) {
+			resource.Group = gv.Group
+			resource.Version = gv.Version
+
 			err := c.deleteByLabelSelector(ctx, resource, selector)
 			if err != nil {
 				return err
