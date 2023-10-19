@@ -15,12 +15,14 @@ import (
 var defaultCleanupSelector = &metav1.LabelSelector{
 	MatchExpressions: []metav1.LabelSelectorRequirement{
 		{
+			Key:      "app",
 			Operator: metav1.LabelSelectorOpIn,
-			Values:   []string{"app=ces"},
+			Values:   []string{"ces"},
 		},
 		{
+			Key:      "k8s.cloudogu.com/part-of",
 			Operator: metav1.LabelSelectorOpNotIn,
-			Values:   []string{"k8s.cloudogu.com/part-of=backup"},
+			Values:   []string{"backup"},
 		},
 	},
 }
