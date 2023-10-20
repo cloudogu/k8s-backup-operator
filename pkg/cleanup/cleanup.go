@@ -57,9 +57,9 @@ func (c *defaultCleanupManager) deleteResourcesByLabelSelector(ctx context.Conte
 
 	var errs []error
 	for _, list := range lists {
-		err = c.deleteApiResourcesByLabelSelector(ctx, list, selector)
+		deleteErrs := c.deleteApiResourcesByLabelSelector(ctx, list, selector)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, deleteErrs...)
 		}
 	}
 
@@ -70,7 +70,7 @@ func (c *defaultCleanupManager) deleteResourcesByLabelSelector(ctx context.Conte
 	return nil
 }
 
-func (c *defaultCleanupManager) deleteApiResourcesByLabelSelector(ctx context.Context, list *metav1.APIResourceList, selector labels.Selector) error {
+func (c *defaultCleanupManager) deleteApiResourcesByLabelSelector(ctx context.Context, list *metav1.APIResourceList, selector labels.Selector) []error {
 	if len(list.APIResources) == 0 {
 		return nil
 	}
@@ -85,40 +85,48 @@ func (c *defaultCleanupManager) deleteApiResourcesByLabelSelector(ctx context.Co
 			resource.Group = gv.Group
 			resource.Version = gv.Version
 
-			err := c.deleteByLabelSelector(ctx, resource, selector)
-			if err != nil {
-				errs = append(errs, err)
+			deleteErrs := c.deleteByLabelSelector(ctx, resource, selector)
+			if len(deleteErrs) != 0 {
+				errs = append(errs, deleteErrs...)
 			}
-
 		}
 	}
 
-	if len(errs) != 0 {
-		return fmt.Errorf("failed delete for group version %s: %w", gv, errors.Join(errs...))
-	}
-
-	return nil
+	return errs
 }
 
-func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resource metav1.APIResource, labelSelector labels.Selector) error {
+func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resource metav1.APIResource, labelSelector labels.Selector) []error {
 	gvk := GroupVersionKind(resource)
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(gvk)
 
-	namespaceMsg := ""
 	listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: labelSelector}}
 	if resource.Namespaced {
 		listOptions.Namespace = c.namespace
-		namespaceMsg = fmt.Sprintf(" in namespace %s", c.namespace)
-	}
-	err := c.client.DeleteAllOf(ctx, u, &client.DeleteAllOfOptions{
-		ListOptions: listOptions,
-	})
-	if err != nil {
-		return fmt.Errorf("failed delete for kind %s%s: %w", resource.Kind, namespaceMsg, err)
 	}
 
-	return nil
+	objectList := &unstructured.UnstructuredList{}
+	objectList.SetGroupVersionKind(gvk)
+	err := c.client.List(ctx, objectList, &listOptions)
+	if err != nil {
+		return []error{fmt.Errorf("failed to list objects of kind %s: %w", gvk, err)}
+	}
+
+	var errs []error
+	for _, item := range objectList.Items {
+		item.SetFinalizers(make([]string, 0))
+		err := c.client.Update(ctx, &item)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to remove finalizers for %s %s/%s: %w", gvk, item.GetNamespace(), item.GetName(), err))
+		}
+
+		err = c.client.Delete(ctx, &item)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete %s %s/%s: %w", gvk, item.GetNamespace(), item.GetName(), err))
+		}
+	}
+
+	return errs
 }
 
 func GroupVersionKind(resource metav1.APIResource) schema.GroupVersionKind {
