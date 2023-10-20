@@ -12,3 +12,5 @@ rules:
     verbs:
       - get
       - list
+      - delete
+      - update
