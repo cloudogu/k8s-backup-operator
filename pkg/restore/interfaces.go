@@ -3,6 +3,7 @@ package restore
 import (
 	"context"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
+	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"time"
 
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -68,6 +69,10 @@ type ecosystemRestoreInterface interface {
 
 type statefulSetInterface interface {
 	appsv1.StatefulSetInterface
+}
+
+type serviceInterface interface {
+	v12.ServiceInterface
 }
 
 type cleanupManager interface {

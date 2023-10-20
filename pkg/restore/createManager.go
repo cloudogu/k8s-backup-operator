@@ -30,9 +30,10 @@ func newCreateManager(
 	recorder eventRecorder,
 	registry cesRegistry,
 	statefulSetInterface statefulSetInterface,
+	serviceInterface serviceInterface,
 	cleanup cleanupManager,
 ) *defaultCreateManager {
-	maintenanceSwitch := maintenance.NewWithLooseCoupling(registry.GlobalConfig(), statefulSetInterface)
+	maintenanceSwitch := maintenance.NewWithLooseCoupling(registry.GlobalConfig(), statefulSetInterface, serviceInterface)
 	return &defaultCreateManager{
 		restoreClient:         restoreClient,
 		recorder:              recorder,

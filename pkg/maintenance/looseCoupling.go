@@ -15,14 +15,16 @@ var waitForEtcdTimeout = 5 * time.Minute
 type looselyCoupledMaintenanceSwitch struct {
 	maintenanceModeSwitch
 	statefulSetClient statefulSetInterface
+	serviceInterface  serviceInterface
 }
 
 // NewWithLooseCoupling creates a switch that checks if the configuration registry (e.g., etcd) exists before switching.
 // If the registry does not exist, no switch is executed.
-func NewWithLooseCoupling(globalConfig globalConfig, clientSet statefulSetInterface) *looselyCoupledMaintenanceSwitch {
+func NewWithLooseCoupling(globalConfig globalConfig, clientSet statefulSetInterface, serviceInterface serviceInterface) *looselyCoupledMaintenanceSwitch {
 	return &looselyCoupledMaintenanceSwitch{
 		maintenanceModeSwitch: New(globalConfig),
 		statefulSetClient:     clientSet,
+		serviceInterface:      serviceInterface,
 	}
 }
 
@@ -41,16 +43,28 @@ func (lcms *looselyCoupledMaintenanceSwitch) ActivateMaintenanceMode(title strin
 func (lcms *looselyCoupledMaintenanceSwitch) isEtcdReady() (bool, error) {
 	statefulSet, err := lcms.statefulSetClient.Get(context.Background(), "etcd", metav1.GetOptions{})
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to get StatefulSet etcd: %w", err)
+		return checkReadyWithResourceNotFoundError(err, "etcd", "statefulset")
+	}
+	_, headLessServiceErr := lcms.serviceInterface.Get(context.Background(), "etcd-headless", metav1.GetOptions{})
+	if err != nil {
+		return checkReadyWithResourceNotFoundError(headLessServiceErr, "etcd-headless", "service")
+	}
+	_, serviceErr := lcms.serviceInterface.Get(context.Background(), "etcd", metav1.GetOptions{})
+	if err != nil {
+		return checkReadyWithResourceNotFoundError(serviceErr, "etcd", "service")
 	}
 
 	if statefulSet.Status.ReadyReplicas >= 1 {
 		return true, nil
 	}
 	return false, nil
+}
+
+func checkReadyWithResourceNotFoundError(err error, resource string, resourceType string) (bool, error) {
+	if errors.IsNotFound(err) {
+		return false, nil
+	}
+	return false, fmt.Errorf("failed to get %s [%s]: %w", resourceType, resource, err)
 }
 
 // DeactivateMaintenanceMode waits until the etcd is ready and then deactivates the maintenance mode.

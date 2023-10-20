@@ -157,6 +157,7 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		recorder,
 		registry,
 		ecosystemClientSet.AppsV1().StatefulSets(operatorConfig.Namespace),
+		ecosystemClientSet.CoreV1().Services(operatorConfig.Namespace),
 		cleanupManager,
 	)
 	restoreRequeueHandler := restore.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)

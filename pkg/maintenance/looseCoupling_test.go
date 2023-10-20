@@ -17,7 +17,7 @@ import (
 
 func TestNewWithLooseCoupling(t *testing.T) {
 	// when
-	actual := NewWithLooseCoupling(nil, nil)
+	actual := NewWithLooseCoupling(nil, nil, nil)
 
 	// then
 	require.NotEmpty(t, actual)
