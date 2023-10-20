@@ -41,6 +41,48 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		// then
 		require.NoError(t, err)
 	})
+
+	t.Run("should not activate maintenance mode if etcd-headless service is not found", func(t *testing.T) {
+		// given
+		notFoundErr := errors.NewNotFound(schema.GroupResource{
+			Group:    "core/v1",
+			Resource: "Service",
+		}, "etcd")
+		statefulSetClient := newMockStatefulSetInterface(t)
+		statefulSetClient.EXPECT().Get(context.Background(), "etcd", metav1.GetOptions{}).Return(nil, nil)
+		serviceClient := newMockServiceInterface(t)
+		serviceClient.EXPECT().Get(context.Background(), "etcd-headless", metav1.GetOptions{}).Return(nil, notFoundErr)
+
+		sut := &looselyCoupledMaintenanceSwitch{statefulSetClient: statefulSetClient, serviceInterface: serviceClient}
+
+		// when
+		err := sut.ActivateMaintenanceMode("title", "text")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should not activate maintenance mode if etcd service is not found", func(t *testing.T) {
+		// given
+		notFoundErr := errors.NewNotFound(schema.GroupResource{
+			Group:    "core/v1",
+			Resource: "Service",
+		}, "etcd")
+		statefulSetClient := newMockStatefulSetInterface(t)
+		statefulSetClient.EXPECT().Get(context.Background(), "etcd", metav1.GetOptions{}).Return(nil, nil)
+		serviceClient := newMockServiceInterface(t)
+		serviceClient.EXPECT().Get(context.Background(), "etcd-headless", metav1.GetOptions{}).Return(nil, nil)
+		serviceClient.EXPECT().Get(context.Background(), "etcd", metav1.GetOptions{}).Return(nil, notFoundErr)
+
+		sut := &looselyCoupledMaintenanceSwitch{statefulSetClient: statefulSetClient, serviceInterface: serviceClient}
+
+		// when
+		err := sut.ActivateMaintenanceMode("title", "text")
+
+		// then
+		require.NoError(t, err)
+	})
+
 	t.Run("should fail if getting etcd returns any error other than 'not found'", func(t *testing.T) {
 		// given
 		statefulSetClient := newMockStatefulSetInterface(t)
@@ -55,7 +97,7 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to check if etcd is ready")
-		assert.ErrorContains(t, err, "failed to get StatefulSet etcd")
+		assert.ErrorContains(t, err, "failed to get statefulset [etcd]")
 	})
 	t.Run("should not activate maintenance mode if etcd has no ready replicas", func(t *testing.T) {
 		// given
@@ -65,8 +107,11 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		}
 		statefulSetClient := newMockStatefulSetInterface(t)
 		statefulSetClient.EXPECT().Get(context.Background(), "etcd", metav1.GetOptions{}).Return(etcd, nil)
+		serviceClient := newMockServiceInterface(t)
+		serviceClient.EXPECT().Get(context.Background(), "etcd-headless", metav1.GetOptions{}).Return(nil, nil)
+		serviceClient.EXPECT().Get(context.Background(), "etcd", metav1.GetOptions{}).Return(nil, nil)
 
-		sut := &looselyCoupledMaintenanceSwitch{statefulSetClient: statefulSetClient}
+		sut := &looselyCoupledMaintenanceSwitch{statefulSetClient: statefulSetClient, serviceInterface: serviceClient}
 
 		// when
 		err := sut.ActivateMaintenanceMode("title", "text")
@@ -85,10 +130,14 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		}
 		statefulSetClient := newMockStatefulSetInterface(t)
 		statefulSetClient.EXPECT().Get(context.Background(), "etcd", metav1.GetOptions{}).Return(etcd, nil)
+		serviceClient := newMockServiceInterface(t)
+		serviceClient.EXPECT().Get(context.Background(), "etcd-headless", metav1.GetOptions{}).Return(nil, nil)
+		serviceClient.EXPECT().Get(context.Background(), "etcd", metav1.GetOptions{}).Return(nil, nil)
 
 		sut := &looselyCoupledMaintenanceSwitch{
 			maintenanceModeSwitch: maintenance,
 			statefulSetClient:     statefulSetClient,
+			serviceInterface:      serviceClient,
 		}
 
 		// when
@@ -108,10 +157,14 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		}
 		statefulSetClient := newMockStatefulSetInterface(t)
 		statefulSetClient.EXPECT().Get(context.Background(), "etcd", metav1.GetOptions{}).Return(etcd, nil)
+		serviceClient := newMockServiceInterface(t)
+		serviceClient.EXPECT().Get(context.Background(), "etcd-headless", metav1.GetOptions{}).Return(nil, nil)
+		serviceClient.EXPECT().Get(context.Background(), "etcd", metav1.GetOptions{}).Return(nil, nil)
 
 		sut := &looselyCoupledMaintenanceSwitch{
 			maintenanceModeSwitch: maintenance,
 			statefulSetClient:     statefulSetClient,
+			serviceInterface:      serviceClient,
 		}
 
 		// when

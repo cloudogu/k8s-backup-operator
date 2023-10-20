@@ -46,11 +46,11 @@ func (lcms *looselyCoupledMaintenanceSwitch) isEtcdReady() (bool, error) {
 		return checkReadyWithResourceNotFoundError(err, "etcd", "statefulset")
 	}
 	_, headLessServiceErr := lcms.serviceInterface.Get(context.Background(), "etcd-headless", metav1.GetOptions{})
-	if err != nil {
+	if headLessServiceErr != nil {
 		return checkReadyWithResourceNotFoundError(headLessServiceErr, "etcd-headless", "service")
 	}
 	_, serviceErr := lcms.serviceInterface.Get(context.Background(), "etcd", metav1.GetOptions{})
-	if err != nil {
+	if serviceErr != nil {
 		return checkReadyWithResourceNotFoundError(serviceErr, "etcd", "service")
 	}
 

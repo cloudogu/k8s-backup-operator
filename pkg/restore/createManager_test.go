@@ -18,7 +18,7 @@ func Test_newCreateManager(t *testing.T) {
 		registryMock.EXPECT().GlobalConfig().Return(globalConfigMock)
 
 		// when
-		manager := newCreateManager(nil, nil, registryMock, nil, nil)
+		manager := newCreateManager(nil, nil, registryMock, nil, nil, nil)
 
 		// then
 		require.NotNil(t, manager)
