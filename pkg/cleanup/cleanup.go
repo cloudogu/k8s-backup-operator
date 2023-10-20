@@ -109,7 +109,7 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 	objectList.SetGroupVersionKind(gvk)
 	err := c.client.List(ctx, objectList, &listOptions)
 	if err != nil {
-		return []error{fmt.Errorf("failed to list objects of kind %s: %w", gvk, err)}
+		return []error{fmt.Errorf("failed to list objects in %s: %w", gvk, err)}
 	}
 
 	var errs []error
@@ -117,12 +117,12 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 		item.SetFinalizers(make([]string, 0))
 		err := c.client.Update(ctx, &item)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to remove finalizers for %s %s/%s: %w", gvk, item.GetNamespace(), item.GetName(), err))
+			errs = append(errs, fmt.Errorf("failed to remove finalizers for %s/%s (%s) : %w", item.GetNamespace(), item.GetName(), gvk, err))
 		}
 
 		err = c.client.Delete(ctx, &item)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete %s %s/%s: %w", gvk, item.GetNamespace(), item.GetName(), err))
+			errs = append(errs, fmt.Errorf("failed to delete %s/%s (%s): %w", item.GetNamespace(), item.GetName(), gvk, err))
 		}
 	}
 
