@@ -36,6 +36,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -107,6 +108,29 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
+	t.Run("should return error on failing add finalizer", func(t *testing.T) {
+		// given
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
+
+		restoreClientMock := newMockEcosystemRestoreInterface(t)
+		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
+		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(nil, assert.AnError)
+
+		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock}
+
+		// when
+		err := sut.create(testCtx, restore)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to add labels to restore resource [restore]")
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+
 	t.Run("should return error on failing getting restore provider", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
@@ -117,6 +141,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
 
 		oldNewVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
@@ -145,6 +170,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -178,6 +204,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -215,6 +242,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().UpdateStatusFailed(testCtx, restore).Return(restore, nil)
 
 		providerMock := newMockRestoreProvider(t)
@@ -254,6 +282,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().UpdateStatusFailed(testCtx, restore).Return(nil, assert.AnError)
 
 		providerMock := newMockRestoreProvider(t)
@@ -293,6 +322,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().UpdateStatusCompleted(testCtx, restore).Return(nil, assert.AnError)
 
 		providerMock := newMockRestoreProvider(t)

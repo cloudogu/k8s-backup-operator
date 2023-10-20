@@ -84,6 +84,61 @@ func (_c *MockRestoreInterface_AddFinalizer_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// AddLabels provides a mock function with given fields: ctx, restore
+func (_m *MockRestoreInterface) AddLabels(ctx context.Context, restore *v1.Restore) (*v1.Restore, error) {
+	ret := _m.Called(ctx, restore)
+
+	var r0 *v1.Restore
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Restore) (*v1.Restore, error)); ok {
+		return rf(ctx, restore)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Restore) *v1.Restore); ok {
+		r0 = rf(ctx, restore)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Restore)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Restore) error); ok {
+		r1 = rf(ctx, restore)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRestoreInterface_AddLabels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddLabels'
+type MockRestoreInterface_AddLabels_Call struct {
+	*mock.Call
+}
+
+// AddLabels is a helper method to define mock.On call
+//   - ctx context.Context
+//   - restore *v1.Restore
+func (_e *MockRestoreInterface_Expecter) AddLabels(ctx interface{}, restore interface{}) *MockRestoreInterface_AddLabels_Call {
+	return &MockRestoreInterface_AddLabels_Call{Call: _e.mock.On("AddLabels", ctx, restore)}
+}
+
+func (_c *MockRestoreInterface_AddLabels_Call) Run(run func(ctx context.Context, restore *v1.Restore)) *MockRestoreInterface_AddLabels_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Restore))
+	})
+	return _c
+}
+
+func (_c *MockRestoreInterface_AddLabels_Call) Return(_a0 *v1.Restore, _a1 error) *MockRestoreInterface_AddLabels_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRestoreInterface_AddLabels_Call) RunAndReturn(run func(context.Context, *v1.Restore) (*v1.Restore, error)) *MockRestoreInterface_AddLabels_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function with given fields: ctx, restore, opts
 func (_m *MockRestoreInterface) Create(ctx context.Context, restore *v1.Restore, opts metav1.CreateOptions) (*v1.Restore, error) {
 	ret := _m.Called(ctx, restore, opts)

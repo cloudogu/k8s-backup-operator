@@ -3,8 +3,8 @@ package backup
 import (
 	"testing"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,6 +48,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
@@ -106,6 +107,29 @@ func Test_backupCreateManager_create(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to set finalizer cloudogu-backup-finalizer to backup resource")
 	})
 
+	t.Run("should return error on adding app=ces label", func(t *testing.T) {
+		// given
+		backupName := "backup"
+		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
+		clientMock := newMockEcosystemBackupInterface(t)
+		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
+		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(nil, assert.AnError)
+
+		sut := &backupCreateManager{recorder: recorderMock, client: clientMock}
+
+		// when
+		err := sut.create(testCtx, backup)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to add labels to backup resource")
+	})
+
 	t.Run("should return error activate maintenance mode error", func(t *testing.T) {
 		// given
 		backupName := "backup"
@@ -115,6 +139,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(assert.AnError)
@@ -139,6 +164,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
@@ -170,6 +196,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
@@ -204,6 +231,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
@@ -238,6 +266,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
@@ -272,6 +301,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(nil, assert.AnError)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
@@ -308,6 +338,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(testCtx, backup).Return(nil, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
@@ -341,6 +372,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(testCtx, backup).Return(nil, assert.AnError)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)

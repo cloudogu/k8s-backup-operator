@@ -46,6 +46,11 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 		return fmt.Errorf("failed to set finalizer %s to backup resource: %w", v1.BackupFinalizer, err)
 	}
 
+	backup, err = bcm.client.AddLabels(ctx, backup)
+	if err != nil {
+		return fmt.Errorf("failed to add labels to backup resource: %w", err)
+	}
+
 	err = bcm.maintenanceModeSwitch.ActivateMaintenanceMode(maintenanceModeTitle, maintenanceModeText)
 	if err != nil {
 		return fmt.Errorf("failed to active maintenance mode: %w", err)

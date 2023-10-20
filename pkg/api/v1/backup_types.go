@@ -55,7 +55,7 @@ type BackupStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:metadata:labels=app=ces;app.kubernetes.io/name=k8s-backup-operator
+// +kubebuilder:metadata:labels=app=ces;app.kubernetes.io/name=k8s-backup-operator;k8s.cloudogu.com/part-of=backup
 
 // Backup is the Schema for the backups API
 type Backup struct {
