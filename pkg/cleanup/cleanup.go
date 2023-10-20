@@ -58,7 +58,7 @@ func (c *defaultCleanupManager) deleteResourcesByLabelSelector(ctx context.Conte
 	var errs []error
 	for _, list := range lists {
 		deleteErrs := c.deleteApiResourcesByLabelSelector(ctx, list, selector)
-		if err != nil {
+		if len(deleteErrs) != 0 {
 			errs = append(errs, deleteErrs...)
 		}
 	}
