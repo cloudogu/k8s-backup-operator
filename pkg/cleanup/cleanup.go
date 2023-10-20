@@ -101,6 +101,8 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 	u.SetGroupVersionKind(gvk)
 
 	listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: labelSelector}}
+	propagationPolicy := metav1.DeletePropagationBackground
+	deleteOptions := client.DeleteOptions{PropagationPolicy: &propagationPolicy}
 	if resource.Namespaced {
 		listOptions.Namespace = c.namespace
 	}
@@ -120,7 +122,7 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 			errs = append(errs, fmt.Errorf("failed to remove finalizers for %s/%s (%s) : %w", item.GetNamespace(), item.GetName(), gvk, err))
 		}
 
-		err = c.client.Delete(ctx, &item)
+		err = c.client.Delete(ctx, &item, &deleteOptions)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete %s/%s (%s): %w", item.GetNamespace(), item.GetName(), gvk, err))
 		}

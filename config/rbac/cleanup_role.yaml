@@ -10,13 +10,5 @@ rules:
     resources:
       - "*"
     verbs:
-      - delete
-      - deletecollection
-  - apiGroups:
-      - ""
-    resources:
-      - namespaces
-    verbs:
-      - delete
-      - deletecollection
-
+      - get
+      - list
