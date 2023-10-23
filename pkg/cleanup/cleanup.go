@@ -128,11 +128,11 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 	for _, item := range objectList.Items {
 		err := c.removeFinalizers(ctx, &item)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to remove finalizers for %s/%s (%s) : %w", item.GetNamespace(), item.GetName(), gvk, err))
+			errs = append(errs, fmt.Errorf("failed to remove finalizers for %s/%s (%s): %w", item.GetNamespace(), item.GetName(), gvk, err))
 		}
 
 		err = c.client.Delete(ctx, &item, &deleteOptions)
-		if err != nil {
+		if err != nil && !k8sErr.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete %s/%s (%s): %w", item.GetNamespace(), item.GetName(), gvk, err))
 		}
 	}
