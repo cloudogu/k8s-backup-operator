@@ -67,9 +67,7 @@ func (c *defaultCleanupManager) deleteResourcesByLabelSelector(ctx context.Conte
 	var errs []error
 	for _, list := range lists {
 		deleteErrs := c.deleteApiResourcesByLabelSelector(ctx, list, selector)
-		if len(deleteErrs) != 0 {
-			errs = append(errs, deleteErrs...)
-		}
+		errs = append(errs, deleteErrs...)
 	}
 
 	if len(errs) != 0 {
@@ -95,9 +93,7 @@ func (c *defaultCleanupManager) deleteApiResourcesByLabelSelector(ctx context.Co
 			resource.Version = gv.Version
 
 			deleteErrs := c.deleteByLabelSelector(ctx, resource, selector)
-			if len(deleteErrs) != 0 {
-				errs = append(errs, deleteErrs...)
-			}
+			errs = append(errs, deleteErrs...)
 		}
 	}
 
