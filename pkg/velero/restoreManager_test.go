@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -106,7 +107,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to create velero restore [restore]")
 	})
 
-	t.Run("should return error on create velero restore wach error", func(t *testing.T) {
+	t.Run("should return error on create velero restore watch error", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
 		expectedVeleroRestore := getExpectedVeleroRestore(restore)
@@ -133,46 +134,6 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to create velero restore watch")
 	})
 
-	t.Run("should return error on wrong event object", func(t *testing.T) {
-		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
-		expectedVeleroRestore := getExpectedVeleroRestore(restore)
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, "ErrCreation", "got event with wrong object type when watching velero restore")
-
-		veleroRestoreClientMock := newMockVeleroRestoreInterface(t)
-		veleroInterfaceMock := newMockVeleroInterface(t)
-		veleroInterfaceMock.EXPECT().Restores(testNamespace).Return(veleroRestoreClientMock)
-		veleroClientMock := newMockVeleroClientSet(t)
-		veleroClientMock.EXPECT().VeleroV1().Return(veleroInterfaceMock)
-		veleroRestoreClientMock.EXPECT().Create(testCtx, expectedVeleroRestore, metav1.CreateOptions{}).Return(expectedVeleroRestore, nil)
-
-		watchMock := newMockEcosystemWatch(t)
-		channel := make(chan watch.Event)
-		watchMock.EXPECT().ResultChan().Return(channel)
-		watchMock.EXPECT().Stop().Run(func() {
-			close(channel)
-		})
-		veleroRestoreClientMock.EXPECT().Watch(testCtx, metav1.ListOptions{FieldSelector: "metadata.name=restore"}).Return(watchMock, nil)
-
-		timer := time.NewTimer(time.Second)
-		go func() {
-			<-timer.C
-			channel <- watch.Event{Type: watch.Modified, Object: &v1.Restore{}}
-		}()
-
-		sut := &defaultRestoreManager{veleroClientSet: veleroClientMock, recorder: recorderMock}
-
-		// when
-		err := sut.CreateRestore(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "got event with wrong object type when watching velero restore")
-	})
-
 	t.Run("should return error on delete event", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
@@ -197,9 +158,10 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		})
 		veleroRestoreClientMock.EXPECT().Watch(testCtx, metav1.ListOptions{FieldSelector: "metadata.name=restore"}).Return(watchMock, nil)
 
-		timer := time.NewTimer(time.Second)
 		go func() {
-			<-timer.C
+			time.Sleep(time.Second)
+			channel <- watch.Event{Type: watch.Modified, Object: &appsv1.Deployment{}}
+			time.Sleep(time.Second)
 			channel <- watch.Event{Type: watch.Deleted, Object: expectedVeleroRestore}
 		}()
 
@@ -226,6 +188,7 @@ func getExpectedVeleroRestore(restore *v1.Restore) *velerov1.Restore {
 			RestoreStatus:          &velerov1.RestoreStatusSpec{IncludedResources: []string{"*"}},
 			LabelSelector: &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{Key: "app.kubernetes.io/name", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"k8s-backup-operator"}},
 					{Key: "app.kubernetes.io/part-of", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"k8s-backup-operator"}}}}}}
 }
 

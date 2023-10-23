@@ -223,6 +223,10 @@ func Test_looselyCoupledMaintenanceSwitch_DeactivateMaintenanceMode(t *testing.T
 	})
 	t.Run("should fail if watch event has unexpected object type", func(t *testing.T) {
 		// given
+		oldTimeout := waitForEtcdTimeout
+		defer func() { waitForEtcdTimeout = oldTimeout }()
+		waitForEtcdTimeout = 1 * time.Millisecond
+
 		watchChan := make(chan watch.Event)
 		go func() {
 			// goroutine is somehow necessary for event to be recognized
@@ -245,7 +249,7 @@ func Test_looselyCoupledMaintenanceSwitch_DeactivateMaintenanceMode(t *testing.T
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "unexpected type *v1.ConfigMap for watch on StatefulSet etcd")
+		assert.ErrorContains(t, err, "waiting for etcd to become ready timed out")
 		assert.ErrorContains(t, err, "failed to wait for ready etcd")
 	})
 	t.Run("should deactivate maintenance if StatefulSet has ready replicas", func(t *testing.T) {
