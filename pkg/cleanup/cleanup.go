@@ -105,8 +105,8 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(gvk)
 
-	// Skip component crd deletion because we need the provider and snapshot-controller components.
-	if gvk.Version == customResourceDefinitionVersion && gvk.Group == customResourceDefinitionGroup && gvk.Kind == customResourceDefinitionKind && resource.Name == componentCrdName {
+	// Skip crd deletion because we need the provider and snapshot-controller components.
+	if gvk.Kind == customResourceDefinitionKind {
 		return nil
 	}
 
