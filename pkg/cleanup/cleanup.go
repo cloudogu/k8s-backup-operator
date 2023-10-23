@@ -99,7 +99,7 @@ func (c *defaultCleanupManager) deleteApiResourcesByLabelSelector(ctx context.Co
 }
 
 func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resource metav1.APIResource, labelSelector labels.Selector) []error {
-	gvk := GroupVersionKind(resource)
+	gvk := groupVersionKind(resource)
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(gvk)
 
@@ -157,7 +157,7 @@ func (c *defaultCleanupManager) removeFinalizers(ctx context.Context, item clien
 	return err
 }
 
-func GroupVersionKind(resource metav1.APIResource) schema.GroupVersionKind {
+func groupVersionKind(resource metav1.APIResource) schema.GroupVersionKind {
 	return schema.GroupVersionKind{
 		Group:   resource.Group,
 		Version: resource.Version,
