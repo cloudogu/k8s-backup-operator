@@ -21,7 +21,7 @@ const (
 	customResourceDefinitionKind    = "CustomResourceDefinition"
 	customResourceDefinitionGroup   = "apiextensions.k8s.io"
 	customResourceDefinitionVersion = "v1"
-	componentCrdName                = "components"
+	componentCrdName                = "components.k8s.cloudogu.com"
 )
 
 var defaultCleanupSelector = &metav1.LabelSelector{
@@ -147,8 +147,8 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 func (c *defaultCleanupManager) removeFinalizers(ctx context.Context, item client.Object) error {
 	err := retry.OnConflict(func() error {
 		err := c.client.Get(ctx, types.NamespacedName{
-			Namespace: item.GetName(),
-			Name:      item.GetNamespace(),
+			Namespace: item.GetNamespace(),
+			Name:      item.GetName(),
 		}, item)
 		if err != nil {
 			if k8sErr.IsNotFound(err) {

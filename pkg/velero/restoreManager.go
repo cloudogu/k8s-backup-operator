@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type defaultRestoreManager struct {
@@ -24,6 +25,18 @@ func NewDefaultRestoreManager(veleroClientSet veleroClientSet, recorder eventRec
 func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.Restore) error {
 	rm.recorder.Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as restore provider")
 
+	hookSpec := velerov1.RestoreResourceHookSpec{
+		Name:          "Deactivate maintenance mode",
+		LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "ces", "statefulset.kubernetes.io/pod-name": "etcd-0"}},
+		PostHooks: []velerov1.RestoreResourceHook{{Exec: &velerov1.ExecRestoreHook{
+			Container:   "etcd",
+			Command:     []string{"ETCDCTL_API=2 etcdctl rm -r config/_global/maintenance"},
+			OnError:     "",
+			ExecTimeout: metav1.Duration{},
+			WaitTimeout: metav1.Duration{},
+		}}},
+	}
+
 	veleroRestore := &velerov1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: restore.Name, Namespace: restore.Namespace,
@@ -32,6 +45,7 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 			BackupName:             restore.Spec.BackupName,
 			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
 			RestoreStatus:          &velerov1.RestoreStatusSpec{IncludedResources: []string{"*"}},
+			Hooks:                  velerov1.RestoreHooks{Resources: []velerov1.RestoreResourceHookSpec{hookSpec}},
 			LabelSelector: &metav1.LabelSelector{
 				// Filter backup-operator from restore.
 				MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -62,7 +76,7 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 	resultChan := watcher.ResultChan()
 	defer watcher.Stop()
 
-	err = waitForRestoreCompletionOrFailure(resultChan)
+	err = waitForRestoreCompletionOrFailure(ctx, resultChan)
 	if err != nil {
 		return rm.handleFailedRestore(restore, err)
 	}
@@ -76,11 +90,13 @@ func (rm *defaultRestoreManager) handleFailedRestore(restore *v1.Restore, err er
 	return err
 }
 
-func waitForRestoreCompletionOrFailure(veleroRestoreChan <-chan watch.Event) error {
+func waitForRestoreCompletionOrFailure(ctx context.Context, veleroRestoreChan <-chan watch.Event) error {
+	logger := log.FromContext(ctx)
 	for veleroChange := range veleroRestoreChan {
 		changedRestore, ok := veleroChange.Object.(*velerov1.Restore)
 		if !ok {
-			return fmt.Errorf("got event with wrong object type when watching velero restore")
+			logger.Error(fmt.Errorf("got event with wrong object type when watching velero restore type: %T object: %#v", veleroChange.Object, veleroChange.Object), "wrong event type")
+			continue
 		}
 
 		switch veleroChange.Type {

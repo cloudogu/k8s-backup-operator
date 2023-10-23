@@ -3,6 +3,7 @@ package maintenance
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -70,7 +71,7 @@ func checkReadyWithResourceNotFoundError(err error, resource string, resourceTyp
 // DeactivateMaintenanceMode waits until the etcd is ready and then deactivates the maintenance mode.
 // While this is not directly loose coupling, we trust that an instance of etcd will be restored.
 func (lcms *looselyCoupledMaintenanceSwitch) DeactivateMaintenanceMode() error {
-	err := lcms.waitForReadyEtcd()
+	err := lcms.waitForReadyEtcd(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to wait for ready etcd: %w", err)
 	}
@@ -78,9 +79,10 @@ func (lcms *looselyCoupledMaintenanceSwitch) DeactivateMaintenanceMode() error {
 	return lcms.maintenanceModeSwitch.DeactivateMaintenanceMode()
 }
 
-func (lcms *looselyCoupledMaintenanceSwitch) waitForReadyEtcd() error {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), waitForEtcdTimeout)
+func (lcms *looselyCoupledMaintenanceSwitch) waitForReadyEtcd(ctx context.Context) error {
+	waitCtx, cancelFunc := context.WithTimeout(context.Background(), waitForEtcdTimeout)
 	defer cancelFunc()
+	logger := log.FromContext(ctx)
 
 	watch, err := lcms.statefulSetClient.Watch(ctx, metav1.ListOptions{FieldSelector: "metadata.name=etcd"})
 	if err != nil {
@@ -99,8 +101,8 @@ func (lcms *looselyCoupledMaintenanceSwitch) waitForReadyEtcd() error {
 			case event := <-watch.ResultChan():
 				statefulSet, ok := event.Object.(*appsv1.StatefulSet)
 				if !ok {
-					result <- fmt.Errorf("unexpected type %T for watch on StatefulSet etcd; object: %#v", event.Object, event.Object)
-					return
+					logger.Error(fmt.Errorf("unexpected type %T for watch on StatefulSet etcd; object: %#v", event.Object, event.Object), "wrong object type")
+					continue
 				}
 
 				if statefulSet.Status.ReadyReplicas >= 1 {
@@ -109,7 +111,7 @@ func (lcms *looselyCoupledMaintenanceSwitch) waitForReadyEtcd() error {
 				}
 			}
 		}
-	}(ctx)
+	}(waitCtx)
 
 	return <-result
 }
