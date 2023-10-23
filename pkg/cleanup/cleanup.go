@@ -119,21 +119,7 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 
 	var errs []error
 	for _, item := range objectList.Items {
-		err := retry.OnConflict(func() error {
-			err := c.client.Get(ctx, types.NamespacedName{
-				Namespace: item.GetName(),
-				Name:      item.GetNamespace(),
-			}, &item)
-			if err != nil {
-				if k8sErr.IsNotFound(err) {
-					return nil
-				}
-				return err
-			}
-
-			item.SetFinalizers(make([]string, 0))
-			return c.client.Update(ctx, &item)
-		})
+		err := c.removeFinalizers(ctx, &item)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to remove finalizers for %s/%s (%s) : %w", item.GetNamespace(), item.GetName(), gvk, err))
 		}
@@ -145,6 +131,25 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 	}
 
 	return errs
+}
+
+func (c *defaultCleanupManager) removeFinalizers(ctx context.Context, item client.Object) error {
+	err := retry.OnConflict(func() error {
+		err := c.client.Get(ctx, types.NamespacedName{
+			Namespace: item.GetName(),
+			Name:      item.GetNamespace(),
+		}, item)
+		if err != nil {
+			if k8sErr.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+
+		item.SetFinalizers(make([]string, 0))
+		return c.client.Update(ctx, item)
+	})
+	return err
 }
 
 func GroupVersionKind(resource metav1.APIResource) schema.GroupVersionKind {
