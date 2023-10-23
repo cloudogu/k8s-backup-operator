@@ -13,7 +13,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const deleteVerb = "delete"
+const (
+	deleteVerb                      = "delete"
+	customResourceDefinitionKind    = "CustomResourceDefinition"
+	customResourceDefinitionGroup   = "apiextensions.k8s.io"
+	customResourceDefinitionVersion = "v1"
+	componentCrdName                = "components"
+)
 
 var defaultCleanupSelector = &metav1.LabelSelector{
 	MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -99,6 +105,11 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 	gvk := GroupVersionKind(resource)
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(gvk)
+
+	// Skip component crd deletion because we need the provider and snapshot-controller components.
+	if gvk.Version == customResourceDefinitionVersion && gvk.Group == customResourceDefinitionGroup && gvk.Kind == customResourceDefinitionKind && resource.Name == componentCrdName {
+		return nil
+	}
 
 	listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: labelSelector}}
 	propagationPolicy := metav1.DeletePropagationBackground
