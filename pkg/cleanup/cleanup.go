@@ -17,11 +17,9 @@ import (
 )
 
 const (
-	deleteVerb                      = "delete"
-	customResourceDefinitionKind    = "CustomResourceDefinition"
-	customResourceDefinitionGroup   = "apiextensions.k8s.io"
-	customResourceDefinitionVersion = "v1"
-	componentCrdName                = "components.k8s.cloudogu.com"
+	deleteVerb                   = "delete"
+	customResourceDefinitionKind = "CustomResourceDefinition"
+	podKind                      = "Pod"
 )
 
 var defaultCleanupSelector = &metav1.LabelSelector{
@@ -106,7 +104,7 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 	u.SetGroupVersionKind(gvk)
 
 	// Skip crd deletion because we need the provider and snapshot-controller components.
-	if gvk.Kind == customResourceDefinitionKind {
+	if gvk.Kind == customResourceDefinitionKind || gvk.Kind == podKind {
 		return nil
 	}
 

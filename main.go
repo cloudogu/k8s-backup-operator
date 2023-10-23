@@ -91,8 +91,8 @@ func configureManager(k8sManager controllerManager, operatorConfig *config.Opera
 }
 
 func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
-	leaseDuration := time.Second * 30
-	renewDeadline := time.Second * 20
+	leaseDuration := time.Second * 60
+	renewDeadline := time.Second * 40
 	controllerOpts := ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
