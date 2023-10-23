@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"os"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -90,6 +91,8 @@ func configureManager(k8sManager controllerManager, operatorConfig *config.Opera
 }
 
 func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
+	leaseDuration := time.Second * 30
+	renewDeadline := time.Second * 20
 	controllerOpts := ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
@@ -97,6 +100,8 @@ func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
 		}},
 		WebhookServer:    webhook.NewServer(webhook.Options{Port: 9443}),
 		LeaderElectionID: "e3f6c1a7.cloudogu.com",
+		LeaseDuration:    &leaseDuration,
+		RenewDeadline:    &renewDeadline,
 	}
 	var zapOpts zap.Options
 	controllerOpts, zapOpts = parseFlags(controllerOpts)
