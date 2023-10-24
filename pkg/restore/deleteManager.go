@@ -23,7 +23,7 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to update status [%s] on restore [%s]: %w", v1.RestoreStatusDeleting, restore.Name, err)
 	}
 
-	restoreDeleteProvider, err := provider.GetProvider(ctx, restore.Spec.Provider, restore.Namespace, dm.recorder)
+	restoreDeleteProvider, err := provider.GetProvider(ctx, restore, restore.Spec.Provider, restore.Namespace, dm.recorder)
 	if err != nil {
 		return fmt.Errorf("failed to get provider [%s]: %w", restore.Spec.Provider, err)
 	}

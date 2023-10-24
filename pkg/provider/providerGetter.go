@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"github.com/cloudogu/k8s-backup-operator/pkg/velero"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
@@ -14,10 +16,13 @@ var NewVeleroProvider = func(recorder EventRecorder, namespace string) (Provider
 }
 
 // GetProvider returns the provider by the given name and calls a function on the provider object to check if it is ready.
-func GetProvider(ctx context.Context, name k8sv1.Provider, namespace string, recorder EventRecorder) (Provider, error) {
+func GetProvider(ctx context.Context, object runtime.Object, name k8sv1.Provider, namespace string, recorder EventRecorder) (Provider, error) {
 	var provider Provider
 	var err error
 	switch name {
+	case "":
+		recorder.Event(object, v1.EventTypeNormal, k8sv1.ProviderSelectEventReason, "No provider given. Select velero as default provider.")
+		fallthrough
 	case k8sv1.ProviderVelero:
 		provider, err = NewVeleroProvider(recorder, namespace)
 		if err != nil {

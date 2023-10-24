@@ -64,6 +64,41 @@ func Test_backupCreateManager_create(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("should select velero provider as default with empty provider", func(t *testing.T) {
+		// given
+		backupName := "backup"
+		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: ""}}
+
+		providerMock := newMockBackupProvider(t)
+		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+			return providerMock, nil
+		}
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, v1.ProviderSelectEventReason, "No provider given. Select velero as default provider.")
+		clientMock := newMockEcosystemBackupInterface(t)
+		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
+		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
+		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
+		clientMock.EXPECT().UpdateStatusCompleted(testCtx, backup).Return(backup, nil)
+		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+
+		// when
+		err := sut.create(testCtx, backup)
+
+		// then
+		require.NoError(t, err)
+	})
+
 	t.Run("should return error on update status in progress error", func(t *testing.T) {
 		// given
 		backupName := "backup"

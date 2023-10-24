@@ -83,7 +83,7 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 }
 
 func (bcm *backupCreateManager) triggerBackup(ctx context.Context, backup *v1.Backup) error {
-	backupProvider, err := provider.GetProvider(ctx, backup.Spec.Provider, backup.Namespace, bcm.recorder)
+	backupProvider, err := provider.GetProvider(ctx, backup, backup.Spec.Provider, backup.Namespace, bcm.recorder)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}

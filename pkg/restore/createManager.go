@@ -62,7 +62,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to add labels to restore resource [%s]: %w", restoreName, err)
 	}
 
-	provider, err := restoreprovider.GetProvider(ctx, restore.Spec.Provider, restore.Namespace, cm.recorder)
+	provider, err := restoreprovider.GetProvider(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder)
 	if err != nil {
 		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
 	}

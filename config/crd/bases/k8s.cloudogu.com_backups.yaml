@@ -40,7 +40,7 @@ spec:
             properties:
               provider:
                 description: Provider defines the backup provider which should be
-                  used for the backup. TODO make this immutable
+                  used for the backup.
                 type: string
             type: object
           status:
