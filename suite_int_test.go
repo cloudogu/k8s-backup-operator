@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"os"
 	"path/filepath"
 	"testing"
@@ -71,7 +72,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	ginkgo.By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -111,6 +112,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	mockRegistry := newMockEtcdRegistry(t)
 	globalConfigMock := newMockEtcdContext(t)
 	mockRegistry.EXPECT().GlobalConfig().Return(globalConfigMock)
+
 	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(namespace), recorderMock, mockRegistry)
 	gomega.Expect(backupManager).NotTo(gomega.BeNil())
 	backupRequeueHandler := backup.NewBackupRequeueHandler(ecosystemClientSet, recorderMock, namespace)
@@ -122,7 +124,19 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = backupReconciler.SetupWithManager(k8sManager)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	restoreReconciler := restore.NewRestoreReconciler(ecosystemClientSet, recorderMock, namespace)
+	cleanupMock := cleanup.NewManager(namespace, k8sManager.GetClient(), clientSet)
+	restoreRequeueHandler := restore.NewRequeueHandler(ecosystemClientSet, recorderMock, namespace)
+	gomega.Expect(restoreRequeueHandler).NotTo(gomega.BeNil())
+	restoreManager := restore.NewRestoreManager(
+		ecosystemClientSet.EcosystemV1Alpha1().Restores(namespace),
+		recorderMock,
+		mockRegistry,
+		ecosystemClientSet.AppsV1().StatefulSets(namespace),
+		ecosystemClientSet.CoreV1().Services(namespace),
+		cleanupMock,
+	)
+	gomega.Expect(restoreManager).NotTo(gomega.BeNil())
+	restoreReconciler := restore.NewRestoreReconciler(ecosystemClientSet, recorderMock, namespace, restoreManager, restoreRequeueHandler)
 	gomega.Expect(restoreReconciler).NotTo(gomega.BeNil())
 
 	err = restoreReconciler.SetupWithManager(k8sManager)

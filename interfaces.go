@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/cloudogu/cesapp-lib/registry"
+	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -33,4 +34,10 @@ type etcdContext interface {
 //goland:noinspection GoUnusedType
 type k8sClient interface {
 	client.Client
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type cleanupManager interface {
+	cleanup.Manager
 }
