@@ -31,11 +31,11 @@ func NewWithLooseCoupling(globalConfig globalConfig, clientSet statefulSetInterf
 
 // ActivateMaintenanceMode activates the maintenance mode if the etcd exists and is ready.
 // This loose coupling enables us to perform restores on an empty cluster.
-func (lcms *looselyCoupledMaintenanceSwitch) ActivateMaintenanceMode(title string, text string) error {
+func (lcms *looselyCoupledMaintenanceSwitch) ActivateMaintenanceMode(ctx context.Context, title string, text string) error {
 	if etcdReady, err := lcms.isEtcdReady(); err != nil {
 		return fmt.Errorf("failed to check if etcd is ready: %w", err)
 	} else if etcdReady {
-		return lcms.maintenanceModeSwitch.ActivateMaintenanceMode(title, text)
+		return lcms.maintenanceModeSwitch.ActivateMaintenanceMode(ctx, title, text)
 	}
 
 	return nil
@@ -70,17 +70,17 @@ func checkReadyWithResourceNotFoundError(err error, resource string, resourceTyp
 
 // DeactivateMaintenanceMode waits until the etcd is ready and then deactivates the maintenance mode.
 // While this is not directly loose coupling, we trust that an instance of etcd will be restored.
-func (lcms *looselyCoupledMaintenanceSwitch) DeactivateMaintenanceMode() error {
-	err := lcms.waitForReadyEtcd(context.Background())
+func (lcms *looselyCoupledMaintenanceSwitch) DeactivateMaintenanceMode(ctx context.Context) error {
+	err := lcms.waitForReadyEtcd(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to wait for ready etcd: %w", err)
 	}
 
-	return lcms.maintenanceModeSwitch.DeactivateMaintenanceMode()
+	return lcms.maintenanceModeSwitch.DeactivateMaintenanceMode(ctx)
 }
 
 func (lcms *looselyCoupledMaintenanceSwitch) waitForReadyEtcd(ctx context.Context) error {
-	waitCtx, cancelFunc := context.WithTimeout(context.Background(), waitForEtcdTimeout)
+	waitCtx, cancelFunc := context.WithTimeout(ctx, waitForEtcdTimeout)
 	defer cancelFunc()
 	logger := log.FromContext(ctx)
 

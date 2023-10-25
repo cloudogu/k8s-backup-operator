@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+var testCtx = context.TODO()
+
 func TestNewWithLooseCoupling(t *testing.T) {
 	// when
 	actual := NewWithLooseCoupling(nil, nil, nil)
@@ -36,7 +38,7 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		sut := &looselyCoupledMaintenanceSwitch{statefulSetClient: statefulSetClient}
 
 		// when
-		err := sut.ActivateMaintenanceMode("title", "text")
+		err := sut.ActivateMaintenanceMode(testCtx, "title", "text")
 
 		// then
 		require.NoError(t, err)
@@ -56,7 +58,7 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		sut := &looselyCoupledMaintenanceSwitch{statefulSetClient: statefulSetClient, serviceInterface: serviceClient}
 
 		// when
-		err := sut.ActivateMaintenanceMode("title", "text")
+		err := sut.ActivateMaintenanceMode(testCtx, "title", "text")
 
 		// then
 		require.NoError(t, err)
@@ -77,7 +79,7 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		sut := &looselyCoupledMaintenanceSwitch{statefulSetClient: statefulSetClient, serviceInterface: serviceClient}
 
 		// when
-		err := sut.ActivateMaintenanceMode("title", "text")
+		err := sut.ActivateMaintenanceMode(testCtx, "title", "text")
 
 		// then
 		require.NoError(t, err)
@@ -91,7 +93,7 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		sut := &looselyCoupledMaintenanceSwitch{statefulSetClient: statefulSetClient}
 
 		// when
-		err := sut.ActivateMaintenanceMode("title", "text")
+		err := sut.ActivateMaintenanceMode(testCtx, "title", "text")
 
 		// then
 		require.Error(t, err)
@@ -114,7 +116,7 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		sut := &looselyCoupledMaintenanceSwitch{statefulSetClient: statefulSetClient, serviceInterface: serviceClient}
 
 		// when
-		err := sut.ActivateMaintenanceMode("title", "text")
+		err := sut.ActivateMaintenanceMode(testCtx, "title", "text")
 
 		// then
 		require.NoError(t, err)
@@ -122,7 +124,7 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 	t.Run("should activate maintenance mode if etcd has a ready replica", func(t *testing.T) {
 		// given
 		maintenance := newMockMaintenanceModeSwitch(t)
-		maintenance.EXPECT().ActivateMaintenanceMode("title", "text").Return(nil)
+		maintenance.EXPECT().ActivateMaintenanceMode(testCtx, "title", "text").Return(nil)
 
 		etcd := &appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "etcd", Namespace: "ecosystem"},
@@ -141,7 +143,7 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		}
 
 		// when
-		err := sut.ActivateMaintenanceMode("title", "text")
+		err := sut.ActivateMaintenanceMode(testCtx, "title", "text")
 
 		// then
 		require.NoError(t, err)
@@ -149,7 +151,7 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 	t.Run("should fail if activating the maintenance mode fails", func(t *testing.T) {
 		// given
 		maintenance := newMockMaintenanceModeSwitch(t)
-		maintenance.EXPECT().ActivateMaintenanceMode("title", "text").Return(assert.AnError)
+		maintenance.EXPECT().ActivateMaintenanceMode(testCtx, "title", "text").Return(assert.AnError)
 
 		etcd := &appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "etcd", Namespace: "ecosystem"},
@@ -168,7 +170,7 @@ func Test_looselyCoupledMaintenanceSwitch_ActivateMaintenanceMode(t *testing.T) 
 		}
 
 		// when
-		err := sut.ActivateMaintenanceMode("title", "text")
+		err := sut.ActivateMaintenanceMode(testCtx, "title", "text")
 
 		// then
 		require.Error(t, err)
@@ -187,7 +189,7 @@ func Test_looselyCoupledMaintenanceSwitch_DeactivateMaintenanceMode(t *testing.T
 		}
 
 		// when
-		err := sut.DeactivateMaintenanceMode()
+		err := sut.DeactivateMaintenanceMode(testCtx)
 
 		// then
 		require.Error(t, err)
@@ -214,7 +216,7 @@ func Test_looselyCoupledMaintenanceSwitch_DeactivateMaintenanceMode(t *testing.T
 		}
 
 		// when
-		err := sut.DeactivateMaintenanceMode()
+		err := sut.DeactivateMaintenanceMode(testCtx)
 
 		// then
 		require.Error(t, err)
@@ -245,7 +247,7 @@ func Test_looselyCoupledMaintenanceSwitch_DeactivateMaintenanceMode(t *testing.T
 		}
 
 		// when
-		err := sut.DeactivateMaintenanceMode()
+		err := sut.DeactivateMaintenanceMode(testCtx)
 
 		// then
 		require.Error(t, err)
@@ -270,7 +272,7 @@ func Test_looselyCoupledMaintenanceSwitch_DeactivateMaintenanceMode(t *testing.T
 		statefulSetClient.EXPECT().Watch(mock.Anything, metav1.ListOptions{FieldSelector: "metadata.name=etcd"}).Return(watchMock, nil)
 
 		maintenance := newMockMaintenanceModeSwitch(t)
-		maintenance.EXPECT().DeactivateMaintenanceMode().Return(nil)
+		maintenance.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
 		sut := &looselyCoupledMaintenanceSwitch{
 			maintenanceModeSwitch: maintenance,
@@ -278,7 +280,7 @@ func Test_looselyCoupledMaintenanceSwitch_DeactivateMaintenanceMode(t *testing.T
 		}
 
 		// when
-		err := sut.DeactivateMaintenanceMode()
+		err := sut.DeactivateMaintenanceMode(testCtx)
 
 		// then
 		require.NoError(t, err)
@@ -301,7 +303,7 @@ func Test_looselyCoupledMaintenanceSwitch_DeactivateMaintenanceMode(t *testing.T
 		statefulSetClient.EXPECT().Watch(mock.Anything, metav1.ListOptions{FieldSelector: "metadata.name=etcd"}).Return(watchMock, nil)
 
 		maintenance := newMockMaintenanceModeSwitch(t)
-		maintenance.EXPECT().DeactivateMaintenanceMode().Return(assert.AnError)
+		maintenance.EXPECT().DeactivateMaintenanceMode(testCtx).Return(assert.AnError)
 
 		sut := &looselyCoupledMaintenanceSwitch{
 			maintenanceModeSwitch: maintenance,
@@ -309,7 +311,7 @@ func Test_looselyCoupledMaintenanceSwitch_DeactivateMaintenanceMode(t *testing.T
 		}
 
 		// when
-		err := sut.DeactivateMaintenanceMode()
+		err := sut.DeactivateMaintenanceMode(testCtx)
 
 		// then
 		require.Error(t, err)

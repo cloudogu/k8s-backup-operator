@@ -1,6 +1,7 @@
 package maintenance
 
 import (
+	"context"
 	"github.com/cloudogu/cesapp-lib/registry"
 	"k8s.io/apimachinery/pkg/watch"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -9,9 +10,9 @@ import (
 
 type maintenanceModeSwitch interface {
 	// ActivateMaintenanceMode activates the maintenance mode.
-	ActivateMaintenanceMode(title string, text string) error
+	ActivateMaintenanceMode(ctx context.Context, title string, text string) error
 	// DeactivateMaintenanceMode deactivates the maintenance mode.
-	DeactivateMaintenanceMode() error
+	DeactivateMaintenanceMode(ctx context.Context) error
 }
 
 type statefulSetInterface interface {

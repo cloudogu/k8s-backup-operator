@@ -28,8 +28,8 @@ type eventRecorder interface {
 }
 
 type MaintenanceModeSwitch interface {
-	ActivateMaintenanceMode(title string, text string) error
-	DeactivateMaintenanceMode() error
+	ActivateMaintenanceMode(ctx context.Context, title string, text string) error
+	DeactivateMaintenanceMode(ctx context.Context) error
 }
 
 type backupControllerManager interface {

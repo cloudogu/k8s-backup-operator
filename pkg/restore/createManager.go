@@ -67,13 +67,13 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
 	}
 
-	err = cm.maintenanceModeSwitch.ActivateMaintenanceMode(maintenanceModeTitle, maintenanceModeText)
+	err = cm.maintenanceModeSwitch.ActivateMaintenanceMode(ctx, maintenanceModeTitle, maintenanceModeText)
 	if err != nil {
 		return fmt.Errorf("failed to activate maintenance mode: %w", err)
 	}
 
 	defer func() {
-		errDefer := cm.maintenanceModeSwitch.DeactivateMaintenanceMode()
+		errDefer := cm.maintenanceModeSwitch.DeactivateMaintenanceMode(ctx)
 		if errDefer != nil {
 			logger.Error(fmt.Errorf("failed to deactivate maintenance mode: [%w]", errDefer), "restore error")
 		}

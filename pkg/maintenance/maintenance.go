@@ -1,6 +1,7 @@
 package maintenance
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -24,7 +25,7 @@ func New(globalConfig globalConfig) *maintenanceSwitch {
 }
 
 // ActivateMaintenanceMode activates the maintenance mode with given title and text by writing in the global config.
-func (ms *maintenanceSwitch) ActivateMaintenanceMode(title string, text string) error {
+func (ms *maintenanceSwitch) ActivateMaintenanceMode(_ context.Context, title string, text string) error {
 	isActive, err := ms.isActive()
 	if err != nil {
 		return err
@@ -41,7 +42,7 @@ func (ms *maintenanceSwitch) ActivateMaintenanceMode(title string, text string) 
 }
 
 // DeactivateMaintenanceMode deactivates the maintenance mode by deleting the maintenance key in the global config.
-func (ms *maintenanceSwitch) DeactivateMaintenanceMode() error {
+func (ms *maintenanceSwitch) DeactivateMaintenanceMode(_ context.Context) error {
 	return ms.globalConfig.Delete(registryKeyMaintenance)
 }
 

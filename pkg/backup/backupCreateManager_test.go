@@ -52,8 +52,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -87,8 +87,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -177,7 +177,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().AddLabels(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(assert.AnError)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(assert.AnError)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -203,8 +203,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -235,8 +235,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -270,8 +270,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -305,8 +305,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -340,8 +340,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(nil, assert.AnError)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -377,8 +377,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(testCtx, backup).Return(nil, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(assert.AnError)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(assert.AnError)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 
@@ -411,8 +411,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(testCtx, backup).Return(nil, assert.AnError)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode("Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode().Return(nil)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
 		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
 

@@ -54,9 +54,9 @@ type requeueHandler interface {
 
 type maintenanceModeSwitch interface {
 	// ActivateMaintenanceMode activates the maintenance mode.
-	ActivateMaintenanceMode(title string, text string) error
+	ActivateMaintenanceMode(ctx context.Context, title string, text string) error
 	// DeactivateMaintenanceMode deactivates the maintenance mode.
-	DeactivateMaintenanceMode() error
+	DeactivateMaintenanceMode(ctx context.Context) error
 }
 
 type cesRegistry interface {

@@ -26,7 +26,7 @@ func Test_maintenanceSwitch_ActivateMaintenanceMode(t *testing.T) {
 		sut := maintenanceSwitch{globalConfig: globalConfigMock}
 
 		// when
-		err := sut.ActivateMaintenanceMode("title", "text")
+		err := sut.ActivateMaintenanceMode(testCtx, "title", "text")
 
 		// then
 		require.NoError(t, err)
@@ -39,7 +39,7 @@ func Test_maintenanceSwitch_ActivateMaintenanceMode(t *testing.T) {
 		sut := maintenanceSwitch{globalConfig: globalConfigMock}
 
 		// when
-		err := sut.ActivateMaintenanceMode("title", "text")
+		err := sut.ActivateMaintenanceMode(testCtx, "title", "text")
 
 		// then
 		require.Error(t, err)
@@ -54,7 +54,7 @@ func Test_maintenanceSwitch_ActivateMaintenanceMode(t *testing.T) {
 		sut := maintenanceSwitch{globalConfig: globalConfigMock}
 
 		// when
-		err := sut.ActivateMaintenanceMode("title", "text")
+		err := sut.ActivateMaintenanceMode(testCtx, "title", "text")
 
 		// then
 		require.Error(t, err)
@@ -71,7 +71,7 @@ func Test_maintenanceSwitch_DeactivateMaintenanceMode(t *testing.T) {
 		sut := maintenanceSwitch{globalConfig: globalConfigMock}
 
 		// when
-		err := sut.DeactivateMaintenanceMode()
+		err := sut.DeactivateMaintenanceMode(testCtx)
 
 		// then
 		require.NoError(t, err)
