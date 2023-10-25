@@ -6,6 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"strings"
 
@@ -43,7 +44,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	restore, err := r.clientSet.EcosystemV1Alpha1().Restores(r.namespace).Get(ctx, req.Name, metav1.GetOptions{})
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get restore resource %s/%s: %w", r.namespace, req.Name, err)
+		logger.Info(fmt.Sprintf("failed to get restore resource %s/%s: %s", r.namespace, req.Name, err))
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	logger.Info(fmt.Sprintf("found restore resource %s", req.NamespacedName))
