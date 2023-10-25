@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"os"
 	"path/filepath"
 	"testing"
@@ -115,18 +116,16 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(namespace), recorderMock, mockRegistry)
 	gomega.Expect(backupManager).NotTo(gomega.BeNil())
-	backupRequeueHandler := backup.NewBackupRequeueHandler(ecosystemClientSet, recorderMock, namespace)
-	gomega.Expect(backupRequeueHandler).NotTo(gomega.BeNil())
+	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorderMock, namespace)
+	gomega.Expect(requeueHandler).NotTo(gomega.BeNil())
 
-	backupReconciler := backup.NewBackupReconciler(ecosystemClientSet, recorderMock, namespace, backupManager, backupRequeueHandler)
+	backupReconciler := backup.NewBackupReconciler(ecosystemClientSet, recorderMock, namespace, backupManager, requeueHandler)
 	gomega.Expect(backupReconciler).NotTo(gomega.BeNil())
 
 	err = backupReconciler.SetupWithManager(k8sManager)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	cleanupMock := cleanup.NewManager(namespace, k8sManager.GetClient(), clientSet)
-	restoreRequeueHandler := restore.NewRequeueHandler(ecosystemClientSet, recorderMock, namespace)
-	gomega.Expect(restoreRequeueHandler).NotTo(gomega.BeNil())
 	restoreManager := restore.NewRestoreManager(
 		ecosystemClientSet.EcosystemV1Alpha1().Restores(namespace),
 		recorderMock,
@@ -136,7 +135,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		cleanupMock,
 	)
 	gomega.Expect(restoreManager).NotTo(gomega.BeNil())
-	restoreReconciler := restore.NewRestoreReconciler(ecosystemClientSet, recorderMock, namespace, restoreManager, restoreRequeueHandler)
+	restoreReconciler := restore.NewRestoreReconciler(ecosystemClientSet, recorderMock, namespace, restoreManager, requeueHandler)
 	gomega.Expect(restoreReconciler).NotTo(gomega.BeNil())
 
 	err = restoreReconciler.SetupWithManager(k8sManager)
