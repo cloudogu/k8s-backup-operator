@@ -66,3 +66,18 @@ func init() {
 func (r *Restore) GetFieldSelectorWithName() string {
 	return fmt.Sprintf("metadata.name=%s", r.Name)
 }
+
+// GetStatus return the requeueable status.
+func (r *Restore) GetStatus() RequeueableStatus {
+	return r.Status
+}
+
+// GetStatus return the status from the status object.
+func (rs RestoreStatus) GetStatus() string {
+	return rs.Status
+}
+
+// GetRequeueTimeNanos returns the requeue time in nano seconds.
+func (rs RestoreStatus) GetRequeueTimeNanos() time.Duration {
+	return rs.RequeueTimeNanos
+}

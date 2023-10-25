@@ -3,10 +3,8 @@ package restore
 import (
 	"context"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
-	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"time"
-
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -41,15 +39,8 @@ type deleteManager interface {
 	delete(ctx context.Context, restore *v1.Restore) error
 }
 
-// requeuableError indicates that the current error requires the operator to requeue the component.
-type requeuableError interface {
-	error
-	// GetRequeueTime returns the time to wait before the next reconciliation.
-	GetRequeueTime(requeueTimeNanos time.Duration) time.Duration
-}
-
 type requeueHandler interface {
-	Handle(ctx context.Context, contextMessage string, restore *v1.Restore, originalErr error, requeueStatus string) (ctrl.Result, error)
+	Handle(ctx context.Context, contextMessage string, restore v1.RequeuableObject, originalErr error, requeueStatus string) (ctrl.Result, error)
 }
 
 type maintenanceModeSwitch interface {

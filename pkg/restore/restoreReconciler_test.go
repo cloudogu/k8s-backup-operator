@@ -2,6 +2,7 @@ package restore
 
 import (
 	"context"
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -81,7 +82,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			managerMock.EXPECT().delete(testCtx, restore).Return(assert.AnError)
 			recorderMock := newMockEventRecorder(t)
 			recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, v1.DeleteEventReason, "Delete failed. Reason: assert.AnError general error for testing").Return()
-			recorderMock.EXPECT().Eventf(restore, corev1.EventTypeWarning, RequeueEventReason, "Failed to requeue the %s.", "delete")
+			recorderMock.EXPECT().Eventf(restore, corev1.EventTypeWarning, requeue.RequeueEventReason, "Failed to requeue the %s.", "delete")
 			requeueHandlerMock := newMockRequeueHandler(t)
 			requeueHandlerMock.EXPECT().Handle(testCtx, "Delete of restore test-restore failed", restore, assert.AnError, v1.RestoreStatusNew).Return(reconcile.Result{}, assert.AnError)
 
@@ -257,7 +258,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			managerMock.EXPECT().create(testCtx, restore).Return(assert.AnError)
 			recorderMock := newMockEventRecorder(t)
 			recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, v1.CreateEventReason, "Creation failed. Reason: assert.AnError general error for testing").Return()
-			recorderMock.EXPECT().Eventf(restore, corev1.EventTypeWarning, RequeueEventReason, "Failed to requeue the %s.", "creation")
+			recorderMock.EXPECT().Eventf(restore, corev1.EventTypeWarning, requeue.RequeueEventReason, "Failed to requeue the %s.", "creation")
 			requeueHandlerMock := newMockRequeueHandler(t)
 			requeueHandlerMock.EXPECT().Handle(testCtx, "Creation of restore test-restore failed", restore, assert.AnError, v1.RestoreStatusNew).Return(reconcile.Result{}, assert.AnError)
 

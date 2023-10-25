@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"context"
 	"testing"
 
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
@@ -12,6 +13,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+var testCtx = context.TODO()
 
 func TestNewBackupCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {

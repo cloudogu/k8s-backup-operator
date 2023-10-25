@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"os"
 	"time"
 
@@ -159,6 +160,7 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		return fmt.Errorf("failed to create CES registry: %w", err)
 	}
 
+	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
 	cleanupManager := cleanup.NewManager(operatorConfig.Namespace, k8sManager.GetClient(), k8sClientSet)
 	restoreManager := restore.NewRestoreManager(
 		ecosystemClientSet.EcosystemV1Alpha1().Restores(operatorConfig.Namespace),
@@ -168,14 +170,12 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		ecosystemClientSet.CoreV1().Services(operatorConfig.Namespace),
 		cleanupManager,
 	)
-	restoreRequeueHandler := restore.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
-	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, restoreRequeueHandler)).SetupWithManager(k8sManager); err != nil {
+	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
 	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(operatorConfig.Namespace), recorder, registry)
-	backupRequeueHandler := backup.NewBackupRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
-	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, backupRequeueHandler)).SetupWithManager(k8sManager); err != nil {
+	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
 	// +kubebuilder:scaffold:builder

@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 
@@ -103,7 +104,7 @@ func (r *backupReconciler) performOperation(
 
 	result, handleErr := r.requeueHandler.Handle(ctx, contextMessageOnError, backup, operationError, requeueStatus)
 	if handleErr != nil {
-		r.recorder.Eventf(backup, corev1.EventTypeWarning, RequeueEventReason,
+		r.recorder.Eventf(backup, corev1.EventTypeWarning, requeue.RequeueEventReason,
 			"Failed to requeue the %s.", strings.ToLower(eventReason))
 		return ctrl.Result{}, fmt.Errorf("failed to handle requeue: %w", handleErr)
 	}

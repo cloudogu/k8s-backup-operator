@@ -3,6 +3,7 @@ package v1
 import (
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"time"
 )
 
@@ -81,6 +82,39 @@ func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
 }
 
+// GetFieldSelectorWithName returns the field selector with the metadata.name property.
 func (b *Backup) GetFieldSelectorWithName() string {
 	return fmt.Sprintf("metadata.name=%s", b.Name)
+}
+
+// RequeuableObject provides provides functionalities used for an abstract requeueHandler
+type RequeuableObject interface {
+	runtime.Object
+	// GetStatus returns the status from the object.
+	GetStatus() RequeueableStatus
+	// GetName returns the name from the object.
+	GetName() string
+}
+
+// RequeueableStatus provides functionalities used for an abstract requeueHandler
+type RequeueableStatus interface {
+	// GetRequeueTimeNanos returns the requeue time in nano seconds.
+	GetRequeueTimeNanos() time.Duration
+	// GetStatus return the status from the object.
+	GetStatus() string
+}
+
+// GetStatus return the requeueable status.
+func (b *Backup) GetStatus() RequeueableStatus {
+	return b.Status
+}
+
+// GetStatus return the status from the status object.
+func (bs BackupStatus) GetStatus() string {
+	return bs.Status
+}
+
+// GetRequeueTimeNanos returns the requeue time in nano seconds.
+func (bs BackupStatus) GetRequeueTimeNanos() time.Duration {
+	return bs.RequeueTimeNanos
 }

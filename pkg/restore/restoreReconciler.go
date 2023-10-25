@@ -3,6 +3,7 @@ package restore
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -114,7 +115,7 @@ func (r *restoreReconciler) performOperation(
 
 	result, handleErr := r.requeueHandler.Handle(ctx, contextMessageOnError, restore, operationError, requeueStatus)
 	if handleErr != nil {
-		r.recorder.Eventf(restore, corev1.EventTypeWarning, RequeueEventReason,
+		r.recorder.Eventf(restore, corev1.EventTypeWarning, requeue.RequeueEventReason,
 			"Failed to requeue the %s.", strings.ToLower(eventReason))
 		return ctrl.Result{}, fmt.Errorf("failed to handle requeue: %w", handleErr)
 	}
