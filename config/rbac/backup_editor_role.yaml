@@ -26,13 +26,6 @@ rules:
   - apiGroups:
       - k8s.cloudogu.com
     resources:
-      - backups/status
-    verbs:
-      - get
-      - update
-  - apiGroups:
-      - k8s.cloudogu.com
-    resources:
       - backups/finalizers
     verbs:
       - update
