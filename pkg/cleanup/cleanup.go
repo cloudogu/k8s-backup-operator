@@ -43,10 +43,12 @@ type defaultCleanupManager struct {
 	discoveryClient discoveryInterface
 }
 
+// NewManager creates a new instance of defaultCleanupManager.
 func NewManager(namespace string, client k8sClient, discoveryClient discoveryInterface) Manager {
 	return &defaultCleanupManager{namespace: namespace, client: client, discoveryClient: discoveryClient}
 }
 
+// Cleanup delete all components with labels app=ces and not k8s.cloudogu.com/part-of=backup.
 func (c *defaultCleanupManager) Cleanup(ctx context.Context) error {
 	return c.deleteResourcesByLabelSelector(ctx, defaultCleanupSelector)
 }

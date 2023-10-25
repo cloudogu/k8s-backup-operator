@@ -41,6 +41,11 @@ var (
 	Version = "0.0.0"
 )
 
+var (
+	leaseDuration = time.Second * 60
+	renewDeadline = time.Second * 40
+)
+
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(k8sv1.AddToScheme(scheme))
@@ -91,8 +96,6 @@ func configureManager(k8sManager controllerManager, operatorConfig *config.Opera
 }
 
 func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
-	leaseDuration := time.Second * 60
-	renewDeadline := time.Second * 40
 	controllerOpts := ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{

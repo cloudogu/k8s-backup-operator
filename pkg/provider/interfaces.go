@@ -6,6 +6,7 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
+// EventRecorder provides functionality to commit events to kubernetes resources.
 type EventRecorder interface {
 	record.EventRecorder
 }

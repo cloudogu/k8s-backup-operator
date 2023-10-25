@@ -109,6 +109,7 @@ func waitForRestoreCompletionOrFailure(ctx context.Context, veleroRestoreChan <-
 	return nil
 }
 
+// DeleteRestore deletes a restore.
 func (rm *defaultRestoreManager) DeleteRestore(ctx context.Context, restore *v1.Restore) error {
 	logger := log.FromContext(ctx)
 	rm.recorder.Event(restore, corev1.EventTypeNormal, v1.DeleteEventReason, "Using velero as restore provider")

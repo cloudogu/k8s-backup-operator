@@ -62,6 +62,7 @@ func init() {
 	SchemeBuilder.Register(&Restore{}, &RestoreList{})
 }
 
+// GetFieldSelectorWithName return the field selector with the metadata.name field.
 func (r *Restore) GetFieldSelectorWithName() string {
 	return fmt.Sprintf("metadata.name=%s", r.Name)
 }
