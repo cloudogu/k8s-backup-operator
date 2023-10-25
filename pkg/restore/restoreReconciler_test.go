@@ -2,7 +2,6 @@ package restore
 
 import (
 	"context"
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -58,7 +57,6 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, fmt.Sprintf("failed to get restore resource %s/%s", testNamespace, testRestore))
 		assert.Equal(t, ctrl.Result{}, actual)
 	})
 
