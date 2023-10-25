@@ -7,6 +7,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -48,7 +49,7 @@ func NewManager(namespace string, client k8sClient, discoveryClient discoveryInt
 	return &defaultCleanupManager{namespace: namespace, client: client, discoveryClient: discoveryClient}
 }
 
-// Cleanup delete all components with labels app=ces and not k8s.cloudogu.com/part-of=backup.
+// Cleanup deletes all components with labels app=ces and not k8s.cloudogu.com/part-of=backup.
 func (c *defaultCleanupManager) Cleanup(ctx context.Context) error {
 	return c.deleteResourcesByLabelSelector(ctx, defaultCleanupSelector)
 }
@@ -83,6 +84,7 @@ func (c *defaultCleanupManager) deleteApiResourcesByLabelSelector(ctx context.Co
 	}
 	gv, err := schema.ParseGroupVersion(list.GroupVersion)
 	if err != nil {
+		log.FromContext(ctx).Error(err, fmt.Sprintf("failed to delete api resources with group version: %s", list.GroupVersion))
 		return nil
 	}
 
