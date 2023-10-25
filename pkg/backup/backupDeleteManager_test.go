@@ -1,12 +1,15 @@
 package backup
 
 import (
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	"testing"
+
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func TestNewBackupDeleteManager(t *testing.T) {
@@ -21,14 +24,14 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(nil)
-		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
-		defer func() { newVeleroProvider = oldVeleroProvider }()
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().UpdateStatusDeleting(testCtx, backup).Return(backup, nil)
@@ -77,7 +80,7 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to delete backup: failed to get backup provider: unknown backup provider unknown")
+		assert.ErrorContains(t, err, "failed to delete backup: failed to get backup provider: unknown provider unknown")
 	})
 
 	t.Run("should return error on backup deletion error", func(t *testing.T) {
@@ -85,14 +88,14 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(assert.AnError)
-		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
-		defer func() { newVeleroProvider = oldVeleroProvider }()
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().UpdateStatusDeleting(testCtx, backup).Return(backup, nil)
@@ -113,14 +116,14 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		backupName := "backup"
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
-		providerMock := NewMockProvider(t)
+		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(nil)
-		oldVeleroProvider := newVeleroProvider
-		newVeleroProvider = func(client ecosystem.BackupInterface, recorder eventRecorder, namespace string) (Provider, error) {
+		oldVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
-		defer func() { newVeleroProvider = oldVeleroProvider }()
+		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().UpdateStatusDeleting(testCtx, backup).Return(backup, nil)

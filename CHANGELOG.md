@@ -6,9 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.4.0] - 2023-10-25
+### Added
+- [#7] Functionality to restore a backup to the namespace where the backup-operator is deployed
+    - Before the restore is applied, resources in this namespace which are irrelevant to the backup process are removed to provide a clean slate
+    - Currently, only the velero provider is supported
+
 ## [v0.3.0] - 2023-10-06
 ### Added
-- [#3] Add functionality to create a backup from the namespace where the backup-operator is deployed. Velero is used as a first provider.
+- [#3] Functionality to create a backup from the namespace where the backup-operator is deployed
+  - Velero is used as a first provider.
 
 ## [v0.2.0] - 2023-10-05
 ### Added

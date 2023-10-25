@@ -13,6 +13,7 @@ RUN go mod download
 
 # Copy the go source
 COPY main.go main.go
+COPY interfaces.go interfaces.go
 COPY pkg/ pkg/
 
 # Copy .git files as the build process builds the current commit id into the binary via ldflags.
@@ -33,7 +34,7 @@ RUN make compile-generic
 FROM gcr.io/distroless/static:nonroot
 LABEL maintainer="hello@cloudogu.com" \
       NAME="k8s-backup-operator" \
-      VERSION="0.3.0"
+      VERSION="0.4.0"
 
 WORKDIR /
 COPY --from=builder /workspace/target/k8s-backup-operator .
