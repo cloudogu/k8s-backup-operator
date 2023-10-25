@@ -6,6 +6,7 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -109,9 +110,15 @@ func waitForRestoreCompletionOrFailure(ctx context.Context, veleroRestoreChan <-
 }
 
 func (rm *defaultRestoreManager) DeleteRestore(ctx context.Context, restore *v1.Restore) error {
+	logger := log.FromContext(ctx)
 	rm.recorder.Event(restore, corev1.EventTypeNormal, v1.DeleteEventReason, "Using velero as restore provider")
 
 	err := rm.veleroClientSet.VeleroV1().Restores(restore.Namespace).Delete(ctx, restore.Name, metav1.DeleteOptions{})
+	if errors.IsNotFound(err) {
+		logger.Info(fmt.Sprintf("velero restore resource [%s] not found: ignore", restore.Name))
+		return nil
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to delete velero restore [%s]: %w", restore.Name, err)
 	}
