@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 
 type backupDeleteManager struct {
@@ -36,7 +37,7 @@ func (bdm *backupDeleteManager) delete(ctx context.Context, backup *k8sv1.Backup
 }
 
 func (bdm *backupDeleteManager) triggerBackupDelete(ctx context.Context, backup *k8sv1.Backup) error {
-	backupProvider, err := getBackupProvider(ctx, backup, bdm.client, bdm.recorder)
+	backupProvider, err := provider.GetProvider(ctx, backup, backup.Spec.Provider, backup.Namespace, bdm.recorder)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}

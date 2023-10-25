@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 
 	"github.com/cloudogu/cesapp-lib/registry"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
@@ -45,13 +46,18 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 		return fmt.Errorf("failed to set finalizer %s to backup resource: %w", v1.BackupFinalizer, err)
 	}
 
-	err = bcm.maintenanceModeSwitch.ActivateMaintenanceMode(maintenanceModeTitle, maintenanceModeText)
+	backup, err = bcm.client.AddLabels(ctx, backup)
+	if err != nil {
+		return fmt.Errorf("failed to add labels to backup resource: %w", err)
+	}
+
+	err = bcm.maintenanceModeSwitch.ActivateMaintenanceMode(ctx, maintenanceModeTitle, maintenanceModeText)
 	if err != nil {
 		return fmt.Errorf("failed to active maintenance mode: %w", err)
 	}
 
 	defer func() {
-		errDefer := bcm.maintenanceModeSwitch.DeactivateMaintenanceMode()
+		errDefer := bcm.maintenanceModeSwitch.DeactivateMaintenanceMode(ctx)
 		if errDefer != nil {
 			logger.Error(fmt.Errorf("failed to deactivate maintenance mode: [%w]", errDefer), "backup error")
 		}
@@ -77,7 +83,7 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 }
 
 func (bcm *backupCreateManager) triggerBackup(ctx context.Context, backup *v1.Backup) error {
-	backupProvider, err := getBackupProvider(ctx, backup, bcm.client, bcm.recorder)
+	backupProvider, err := provider.GetProvider(ctx, backup, backup.Spec.Provider, backup.Namespace, bcm.recorder)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}

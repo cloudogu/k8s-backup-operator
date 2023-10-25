@@ -7,6 +7,8 @@ resources:
 - service_account.yaml
 - role.yaml
 - role_binding.yaml
+- cleanup_role.yaml
+- cleanup_role_binding.yaml
 - leader_election_role.yaml
 - leader_election_role_binding.yaml
 # Comment the following 4 lines if you want to disable
@@ -18,3 +20,9 @@ resources:
 - auth_proxy_client_clusterrole.yaml
 - velero_role.yaml
 - velero_role_binding.yaml
+- backup_editor_role.yaml
+- backup_editor_role_binding.yaml
+- backup_viewer_role.yaml
+- restore_editor_role.yaml
+- restore_editor_role_binding.yaml
+- restore_viewer_role.yaml

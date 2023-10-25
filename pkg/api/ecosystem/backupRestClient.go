@@ -16,6 +16,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const (
+	appLabelKey            = "app"
+	appLabelValueCes       = "ces"
+	partOfLabelKey         = "k8s.cloudogu.com/part-of"
+	partOfLabelValueBackup = "backup"
+)
+
 type BackupInterface interface {
 	// Create takes the representation of a backup and creates it.  Returns the server's representation of the backup, and an error, if there is any.
 	Create(ctx context.Context, backup *v1.Backup, opts metav1.CreateOptions) (*v1.Backup, error)
@@ -58,6 +65,9 @@ type BackupInterface interface {
 
 	// AddFinalizer adds the given finalizer to the backup.
 	AddFinalizer(ctx context.Context, backup *v1.Backup, finalizer string) (*v1.Backup, error)
+
+	// AddLabels adds the app=ces and k8s.cloudogu.com/part-of=backup labels to the backup.
+	AddLabels(ctx context.Context, backup *v1.Backup) (*v1.Backup, error)
 
 	// RemoveFinalizer removes the given finalizer to the backup.
 	RemoveFinalizer(ctx context.Context, backup *v1.Backup, finalizer string) (*v1.Backup, error)
@@ -117,6 +127,22 @@ func (d *backupClient) AddFinalizer(ctx context.Context, backup *v1.Backup, fina
 	return result, nil
 }
 
+// AddLabels adds the app=ces and k8s.cloudogu.com/part-of=backup labels to the backup.
+func (d *backupClient) AddLabels(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
+	if backup.Labels == nil {
+		backup.Labels = make(map[string]string)
+	}
+	backup.Labels[appLabelKey] = appLabelValueCes
+	backup.Labels[partOfLabelKey] = partOfLabelValueBackup
+
+	result, err := d.Update(ctx, backup, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add label app=ces and k8s.cloudogu.com/part-of=backup to backup: %w", err)
+	}
+
+	return result, nil
+}
+
 // RemoveFinalizer removes the given finalizer to the backup.
 func (d *backupClient) RemoveFinalizer(ctx context.Context, backup *v1.Backup, finalizer string) (*v1.Backup, error) {
 	controllerutil.RemoveFinalizer(backup, finalizer)
@@ -125,7 +151,7 @@ func (d *backupClient) RemoveFinalizer(ctx context.Context, backup *v1.Backup, f
 		return nil, fmt.Errorf("failed to remove finalizer %s from backup: %w", finalizer, err)
 	}
 
-	return result, err
+	return result, nil
 }
 
 // Get takes name of the backup, and returns the corresponding backup object, and an error if there is any.

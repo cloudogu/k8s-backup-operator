@@ -7,6 +7,7 @@ metadata:
   labels:
     app: ces
     app.kubernetes.io/name: k8s-backup-operator
+    k8s.cloudogu.com/part-of: backup
   name: restores.k8s.cloudogu.com
 spec:
   group: k8s.cloudogu.com
@@ -37,15 +38,24 @@ spec:
           spec:
             description: Spec defines the desired state of Restore
             properties:
-              foo:
-                description: Foo is an example field of Restore. Edit restore_types.go
-                  to remove/update
+              backupName:
+                description: BackupName references the backup that should be restored.
+                type: string
+              provider:
+                description: Provider defines the backup provider which should be
+                  used for the restore.
                 type: string
             type: object
           status:
             description: Status defines the observed state of Restore
             properties:
+              requeueTimeNanos:
+                description: RequeueTimeNanos contains the time in nanoseconds to
+                  wait until the next requeue.
+                format: int64
+                type: integer
               status:
+                description: Status represents the state of the backup.
                 type: string
             type: object
         type: object

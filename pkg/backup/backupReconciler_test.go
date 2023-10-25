@@ -51,8 +51,13 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 
 		managerMock := newMockBackupControllerManager(t)
 		managerMock.EXPECT().create(context.TODO(), backup).Return(nil)
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, v12.EventTypeNormal, "Creation", "Creation successful")
 
-		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock}
+		requeueHandlerMock := newMockRequeueHandler(t)
+		requeueHandlerMock.EXPECT().Handle(context.TODO(), "Creation failed with backup backup", backup, nil, "").Return(ctrl.Result{}, nil)
+
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
 
 		// when
 		actual, err := sut.Reconcile(context.TODO(), request)

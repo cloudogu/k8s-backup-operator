@@ -111,9 +111,11 @@ func Test_startOperator(t *testing.T) {
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
+		k8sClientMock := newMockK8sClient(t)
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
+		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(runtime.NewScheme())
 
@@ -152,9 +154,11 @@ func Test_startOperator(t *testing.T) {
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
+		k8sClientMock := newMockK8sClient(t)
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
+		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
@@ -198,9 +202,11 @@ func Test_startOperator(t *testing.T) {
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
+		k8sClientMock := newMockK8sClient(t)
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
+		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
@@ -249,9 +255,11 @@ func Test_startOperator(t *testing.T) {
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
+		k8sClientMock := newMockK8sClient(t)
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
+		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
@@ -304,9 +312,11 @@ func Test_startOperator(t *testing.T) {
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
+		k8sClientMock := newMockK8sClient(t)
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
+		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))

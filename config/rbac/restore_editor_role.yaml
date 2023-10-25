@@ -3,7 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   labels:
-    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/name: role
     app.kubernetes.io/instance: restore-editor-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: k8s-backup-operator
@@ -11,21 +11,29 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: restore-editor-role
 rules:
-- apiGroups:
-  - k8s.cloudogu.com
-  resources:
-  - restores
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - k8s.cloudogu.com
-  resources:
-  - restores/status
-  verbs:
-  - get
+  - apiGroups:
+      - k8s.cloudogu.com
+    resources:
+      - restores
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - k8s.cloudogu.com
+    resources:
+      - restore/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - k8s.cloudogu.com
+    resources:
+      - restores/status
+    verbs:
+      - get
+      - patch
+      - update

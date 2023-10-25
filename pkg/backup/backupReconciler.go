@@ -3,12 +3,13 @@ package backup
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -38,10 +39,6 @@ func NewBackupReconciler(clientSet ecosystemInterface, recorder eventRecorder, n
 	return &backupReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager, requeueHandler: handler}
 }
 
-// +kubebuilder:rbac:groups=k8s.cloudogu.com,resources=backups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=k8s.cloudogu.com,resources=backups/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=k8s.cloudogu.com,resources=backups/finalizers,verbs=update
-
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
@@ -51,8 +48,9 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	logger := log.FromContext(ctx)
 
 	backup, err := r.clientSet.EcosystemV1Alpha1().Backups(r.namespace).Get(ctx, req.Name, metav1.GetOptions{})
-	if client.IgnoreNotFound(err) != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get backup resource %s/%s: %w", r.namespace, req.Name, err)
+	if err != nil {
+		logger.Info(fmt.Sprintf("failed to get backup resource %s/%s: %s", r.namespace, req.Name, err))
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	logger.Info(fmt.Sprintf("found backup resource %s", req.NamespacedName))
@@ -62,7 +60,7 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	switch requiredOperation {
 	case operationCreate:
-		return ctrl.Result{}, r.manager.create(ctx, backup)
+		return r.performCreateOperation(ctx, backup)
 	case operationDelete:
 		return r.performDeleteOperation(ctx, backup)
 	case operationIgnore:
@@ -72,8 +70,12 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 }
 
+func (r *backupReconciler) performCreateOperation(ctx context.Context, backup *k8sv1.Backup) (ctrl.Result, error) {
+	return r.performOperation(ctx, backup, k8sv1.CreateEventReason, k8sv1.BackupStatusNew, r.manager.create)
+}
+
 func (r *backupReconciler) performDeleteOperation(ctx context.Context, backup *k8sv1.Backup) (ctrl.Result, error) {
-	return r.performOperation(ctx, backup, k8sv1.DeleteEventReason, k8sv1.BackupStatusCompleted, r.manager.delete)
+	return r.performOperation(ctx, backup, k8sv1.DeleteEventReason, backup.Status.Status, r.manager.delete)
 }
 
 // performOperation executes the given operationFn and requeues if necessary.
@@ -98,12 +100,11 @@ func (r *backupReconciler) performOperation(
 		logger.Error(operationError, message)
 	}
 
-	// on self-upgrade of the backup-operator this event might not get send, because the operator is already shutting down
 	r.recorder.Event(backup, eventType, eventReason, message)
 
 	result, handleErr := r.requeueHandler.Handle(ctx, contextMessageOnError, backup, operationError, requeueStatus)
 	if handleErr != nil {
-		r.recorder.Eventf(backup, corev1.EventTypeWarning, RequeueEventReason,
+		r.recorder.Eventf(backup, corev1.EventTypeWarning, requeue.RequeueEventReason,
 			"Failed to requeue the %s.", strings.ToLower(eventReason))
 		return ctrl.Result{}, fmt.Errorf("failed to handle requeue: %w", handleErr)
 	}
@@ -112,19 +113,18 @@ func (r *backupReconciler) performOperation(
 }
 
 func evaluateRequiredOperation(backup *k8sv1.Backup) operation {
-	if backup.Status.Status == k8sv1.BackupStatusFailed {
-		return operationIgnore
-	}
-
 	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.IsZero() {
 		return operationDelete
 	}
 
-	if backup.Status.Status == k8sv1.BackupStatusNew {
+	switch backup.Status.Status {
+	case k8sv1.BackupStatusFailed:
+		return operationIgnore
+	case k8sv1.BackupStatusNew:
 		return operationCreate
+	default:
+		return operationIgnore
 	}
-
-	return operationIgnore
 }
 
 // SetupWithManager sets up the controller with the Manager.
