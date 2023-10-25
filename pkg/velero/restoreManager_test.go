@@ -8,7 +8,9 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"testing"
 	"time"
@@ -247,6 +249,32 @@ func Test_defaultRestoreManager_DeleteRestore(t *testing.T) {
 		veleroClientMock := newMockVeleroClientSet(t)
 		veleroClientMock.EXPECT().VeleroV1().Return(veleroInterfaceMock)
 		veleroRestoreClientMock.EXPECT().Delete(testCtx, restore.Name, metav1.DeleteOptions{}).Return(nil)
+
+		sut := &defaultRestoreManager{veleroClientSet: veleroClientMock, recorder: recorderMock}
+
+		// when
+		err := sut.DeleteRestore(testCtx, restore)
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should ignore if velero restore resource is not found", func(t *testing.T) {
+		// given
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.DeleteEventReason, "Using velero as restore provider")
+
+		veleroRestoreClientMock := newMockVeleroRestoreInterface(t)
+		veleroInterfaceMock := newMockVeleroInterface(t)
+		veleroInterfaceMock.EXPECT().Restores(testNamespace).Return(veleroRestoreClientMock)
+		veleroClientMock := newMockVeleroClientSet(t)
+		veleroClientMock.EXPECT().VeleroV1().Return(veleroInterfaceMock)
+		veleroRestoreClientMock.EXPECT().Delete(testCtx, restore.Name, metav1.DeleteOptions{}).Return(errors.NewNotFound(schema.GroupResource{
+			Group:    "velero.io",
+			Resource: "restore",
+		}, "restore"))
 
 		sut := &defaultRestoreManager{veleroClientSet: veleroClientMock, recorder: recorderMock}
 

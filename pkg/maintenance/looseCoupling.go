@@ -32,7 +32,7 @@ func NewWithLooseCoupling(globalConfig globalConfig, clientSet statefulSetInterf
 // ActivateMaintenanceMode activates the maintenance mode if the etcd exists and is ready.
 // This loose coupling enables us to perform restores on an empty cluster.
 func (lcms *looselyCoupledMaintenanceSwitch) ActivateMaintenanceMode(ctx context.Context, title string, text string) error {
-	if etcdReady, err := lcms.isEtcdReady(); err != nil {
+	if etcdReady, err := lcms.isEtcdReady(ctx); err != nil {
 		return fmt.Errorf("failed to check if etcd is ready: %w", err)
 	} else if etcdReady {
 		return lcms.maintenanceModeSwitch.ActivateMaintenanceMode(ctx, title, text)
@@ -41,16 +41,16 @@ func (lcms *looselyCoupledMaintenanceSwitch) ActivateMaintenanceMode(ctx context
 	return nil
 }
 
-func (lcms *looselyCoupledMaintenanceSwitch) isEtcdReady() (bool, error) {
-	statefulSet, err := lcms.statefulSetClient.Get(context.Background(), "etcd", metav1.GetOptions{})
+func (lcms *looselyCoupledMaintenanceSwitch) isEtcdReady(ctx context.Context) (bool, error) {
+	statefulSet, err := lcms.statefulSetClient.Get(ctx, "etcd", metav1.GetOptions{})
 	if err != nil {
 		return checkReadyWithResourceNotFoundError(err, "etcd", "statefulset")
 	}
-	_, headLessServiceErr := lcms.serviceInterface.Get(context.Background(), "etcd-headless", metav1.GetOptions{})
+	_, headLessServiceErr := lcms.serviceInterface.Get(ctx, "etcd-headless", metav1.GetOptions{})
 	if headLessServiceErr != nil {
 		return checkReadyWithResourceNotFoundError(headLessServiceErr, "etcd-headless", "service")
 	}
-	_, serviceErr := lcms.serviceInterface.Get(context.Background(), "etcd", metav1.GetOptions{})
+	_, serviceErr := lcms.serviceInterface.Get(ctx, "etcd", metav1.GetOptions{})
 	if serviceErr != nil {
 		return checkReadyWithResourceNotFoundError(serviceErr, "etcd", "service")
 	}
