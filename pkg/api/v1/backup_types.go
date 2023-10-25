@@ -88,6 +88,7 @@ func (b *Backup) GetFieldSelectorWithName() string {
 }
 
 // RequeuableObject provides provides functionalities used for an abstract requeueHandler
+// +kubebuilder:object:generate=false
 type RequeuableObject interface {
 	runtime.Object
 	// GetStatus returns the status from the object.
@@ -97,6 +98,7 @@ type RequeuableObject interface {
 }
 
 // RequeueableStatus provides functionalities used for an abstract requeueHandler
+// +kubebuilder:object:generate=false
 type RequeueableStatus interface {
 	// GetRequeueTimeNanos returns the requeue time in nano seconds.
 	GetRequeueTimeNanos() time.Duration
