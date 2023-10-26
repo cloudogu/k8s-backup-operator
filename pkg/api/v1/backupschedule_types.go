@@ -5,12 +5,14 @@ This file was generated with "make generate".
 package v1
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
+	BackupScheduleStatusNew      = ""
 	BackupScheduleStatusFailed   = "failed"
 	BackupScheduleStatusDeleting = "deleting"
 	BackupScheduleStatusUpdating = "updating"
@@ -22,11 +24,10 @@ const (
 
 // BackupScheduleSpec defines the desired state of BackupSchedule
 type BackupScheduleSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of BackupSchedule. Edit backupschedule_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Schedule is a cron expression defining when to run the backup.
+	Schedule string `json:"schedule,omitempty"`
 }
 
 // BackupScheduleStatus defines the observed state of BackupSchedule
@@ -57,6 +58,10 @@ type BackupSchedule struct {
 
 	Spec   BackupScheduleSpec   `json:"spec,omitempty"`
 	Status BackupScheduleStatus `json:"status,omitempty"`
+}
+
+func (bs *BackupSchedule) CronJobName() string {
+	return fmt.Sprintf("backup-schedule-%s", bs.Name)
 }
 
 // GetStatus return the requeueable status.

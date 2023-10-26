@@ -180,7 +180,7 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
 
-	if err = backupschedule.NewBackupScheduleReconciler(ecosystemClientSet, recorder, requeueHandler).SetupWithManager(k8sManager); err != nil {
+	if err = backupschedule.NewBackupScheduleReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backupSchedule controller: %w", err)
 	}
 	// +kubebuilder:scaffold:builder

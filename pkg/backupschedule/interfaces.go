@@ -21,3 +21,21 @@ type eventRecorder interface {
 type requeueHandler interface {
 	Handle(ctx context.Context, contextMessage string, restore v1.RequeuableObject, originalErr error, requeueStatus string) (ctrl.Result, error)
 }
+
+type backupScheduleManager interface {
+	createManager
+	updateManager
+	deleteManager
+}
+
+type createManager interface {
+	create(ctx context.Context, backupSchedule *v1.BackupSchedule) error
+}
+
+type updateManager interface {
+	update(ctx context.Context, backupSchedule *v1.BackupSchedule) error
+}
+
+type deleteManager interface {
+	delete(ctx context.Context, backupSchedule *v1.BackupSchedule) error
+}
