@@ -6,6 +6,7 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -22,8 +23,20 @@ type BackupScheduleSpec struct {
 
 // BackupScheduleStatus defines the observed state of BackupSchedule
 type BackupScheduleStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Status represents the state of the backup.
+	Status string `json:"status,omitempty"`
+	// RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.
+	RequeueTimeNanos time.Duration `json:"requeueTimeNanos,omitempty"`
+}
+
+// GetRequeueTimeNanos returns the requeue time in nano seconds.
+func (bss BackupScheduleStatus) GetRequeueTimeNanos() time.Duration {
+	return bss.RequeueTimeNanos
+}
+
+// GetStatus return the status from the object.
+func (bss BackupScheduleStatus) GetStatus() string {
+	return bss.Status
 }
 
 //+kubebuilder:object:root=true
@@ -36,6 +49,11 @@ type BackupSchedule struct {
 
 	Spec   BackupScheduleSpec   `json:"spec,omitempty"`
 	Status BackupScheduleStatus `json:"status,omitempty"`
+}
+
+// GetStatus return the requeueable status.
+func (bs *BackupSchedule) GetStatus() RequeueableStatus {
+	return bs.Status
 }
 
 //+kubebuilder:object:root=true
