@@ -39,6 +39,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	@$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/k8s.cloudogu.com_backups.yaml pkg/api/v1/
 	@cp config/crd/bases/k8s.cloudogu.com_restores.yaml pkg/api/v1/
+	@cp config/crd/bases/k8s.cloudogu.com_backupschedules.yaml pkg/api/v1/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -55,6 +56,8 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@$(KUSTOMIZE) build config/crd | kubectl delete --wait=false --ignore-not-found=true -f -
 	@kubectl patch crd/backups.k8s.cloudogu.com -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+	@kubectl patch crd/restores.k8s.cloudogu.com -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+	@kubectl patch crd/backupschedules.k8s.cloudogu.com -p '{"metadata":{"finalizers":[]}}' --type=merge || true
 
 .PHONY: template-stage
 template-stage:

@@ -26,4 +26,13 @@ resources:
   kind: Backup
   path: github.com/cloudogu/k8s-backup-operator/pkg/api/v1
   version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cloudogu.com
+  group: k8s
+  kind: BackupSchedule
+  path: github.com/cloudogu/k8s-backup-operator/api/v1
+  version: v1
 version: "3"
