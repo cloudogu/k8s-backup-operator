@@ -2,6 +2,7 @@
 commonLabels:
   app: ces
   app.kubernetes.io/name: k8s-backup-operator
+  k8s.cloudogu.com/part-of: backup
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named

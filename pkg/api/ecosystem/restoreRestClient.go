@@ -32,6 +32,9 @@ type RestoreInterface interface {
 	// UpdateStatusCompleted sets the status of the restore to "completed".
 	UpdateStatusCompleted(ctx context.Context, restore *v1.Restore) (*v1.Restore, error)
 
+	// UpdateStatusFailed sets the status of the restore to "failed".
+	UpdateStatusFailed(ctx context.Context, restore *v1.Restore) (*v1.Restore, error)
+
 	// UpdateStatusDeleting sets the status of the restore to "deleting".
 	UpdateStatusDeleting(ctx context.Context, restore *v1.Restore) (*v1.Restore, error)
 
@@ -56,6 +59,9 @@ type RestoreInterface interface {
 	// AddFinalizer adds the given finalizer to the restore.
 	AddFinalizer(ctx context.Context, restore *v1.Restore, finalizer string) (*v1.Restore, error)
 
+	// AddLabels adds the app=ces and k8s.cloudogu.com/part-of=backup labels to the restore.
+	AddLabels(ctx context.Context, restore *v1.Restore) (*v1.Restore, error)
+
 	// RemoveFinalizer removes the given finalizer to the restore.
 	RemoveFinalizer(ctx context.Context, restore *v1.Restore, finalizer string) (*v1.Restore, error)
 }
@@ -73,6 +79,11 @@ func (d *restoreClient) UpdateStatusInProgress(ctx context.Context, restore *v1.
 // UpdateStatusCompleted sets the status of the restore to "completed".
 func (d *restoreClient) UpdateStatusCompleted(ctx context.Context, restore *v1.Restore) (*v1.Restore, error) {
 	return d.updateStatusWithRetry(ctx, restore, v1.RestoreStatusCompleted)
+}
+
+// UpdateStatusFailed sets the status of the restore to "failed".
+func (d *restoreClient) UpdateStatusFailed(ctx context.Context, restore *v1.Restore) (*v1.Restore, error) {
+	return d.updateStatusWithRetry(ctx, restore, v1.RestoreStatusFailed)
 }
 
 // UpdateStatusDeleting sets the status of the restore to "deleting".
@@ -104,6 +115,22 @@ func (d *restoreClient) AddFinalizer(ctx context.Context, restore *v1.Restore, f
 	result, err := d.Update(ctx, restore, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to add finalizer %s to restore: %w", finalizer, err)
+	}
+
+	return result, nil
+}
+
+// AddLabels adds the app=ces and k8s.cloudogu.com/part-of=backup labels to the restore.
+func (d *restoreClient) AddLabels(ctx context.Context, restore *v1.Restore) (*v1.Restore, error) {
+	if restore.Labels == nil {
+		restore.Labels = make(map[string]string)
+	}
+	restore.Labels[appLabelKey] = appLabelValueCes
+	restore.Labels[partOfLabelKey] = partOfLabelValueBackup
+
+	result, err := d.Update(ctx, restore, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add label app=ces and k8s.cloudogu.com/part-of=backup to restore: %w", err)
 	}
 
 	return result, nil

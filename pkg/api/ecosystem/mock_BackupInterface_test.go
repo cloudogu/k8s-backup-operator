@@ -84,6 +84,61 @@ func (_c *MockBackupInterface_AddFinalizer_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// AddLabels provides a mock function with given fields: ctx, backup
+func (_m *MockBackupInterface) AddLabels(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
+	ret := _m.Called(ctx, backup)
+
+	var r0 *v1.Backup
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, error)); ok {
+		return rf(ctx, backup)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
+		r0 = rf(ctx, backup)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Backup)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
+		r1 = rf(ctx, backup)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockBackupInterface_AddLabels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddLabels'
+type MockBackupInterface_AddLabels_Call struct {
+	*mock.Call
+}
+
+// AddLabels is a helper method to define mock.On call
+//   - ctx context.Context
+//   - backup *v1.Backup
+func (_e *MockBackupInterface_Expecter) AddLabels(ctx interface{}, backup interface{}) *MockBackupInterface_AddLabels_Call {
+	return &MockBackupInterface_AddLabels_Call{Call: _e.mock.On("AddLabels", ctx, backup)}
+}
+
+func (_c *MockBackupInterface_AddLabels_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *MockBackupInterface_AddLabels_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Backup))
+	})
+	return _c
+}
+
+func (_c *MockBackupInterface_AddLabels_Call) Return(_a0 *v1.Backup, _a1 error) *MockBackupInterface_AddLabels_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockBackupInterface_AddLabels_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, error)) *MockBackupInterface_AddLabels_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function with given fields: ctx, backup, opts
 func (_m *MockBackupInterface) Create(ctx context.Context, backup *v1.Backup, opts metav1.CreateOptions) (*v1.Backup, error) {
 	ret := _m.Called(ctx, backup, opts)
