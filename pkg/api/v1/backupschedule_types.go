@@ -5,11 +5,19 @@ This file was generated with "make generate".
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+const (
+	BackupScheduleStatusFailed   = "failed"
+	BackupScheduleStatusDeleting = "deleting"
+	BackupScheduleStatusUpdating = "updating"
+	BackupScheduleStatusCreating = "creating"
+	BackupScheduleStatusCreated  = "created"
+)
+
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // BackupScheduleSpec defines the desired state of BackupSchedule
