@@ -34,7 +34,6 @@ func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.B
 		}
 
 		cronJob.Spec.Schedule = backupSchedule.Spec.Schedule
-		cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = backupSchedule.CronJobCommand()
 
 		_, err = cronJobClient.Update(ctx, cronJob, metav1.UpdateOptions{})
 		if err != nil {
