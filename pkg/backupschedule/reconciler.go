@@ -32,12 +32,18 @@ type backupScheduleReconciler struct {
 	clientSet      ecosystemInterface
 	recorder       eventRecorder
 	namespace      string
-	manager        backupScheduleManager
+	manager        Manager
 	requeueHandler requeueHandler
 }
 
 func NewBackupScheduleReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, requeueHandler requeueHandler) *backupScheduleReconciler {
-	return &backupScheduleReconciler{clientSet: clientSet, recorder: recorder, requeueHandler: requeueHandler, namespace: namespace}
+	return &backupScheduleReconciler{
+		clientSet:      clientSet,
+		recorder:       recorder,
+		requeueHandler: requeueHandler,
+		manager:        NewManager(clientSet, recorder, namespace),
+		namespace:      namespace,
+	}
 }
 
 //+kubebuilder:rbac:groups=k8s.cloudogu.com,resources=backupschedules,verbs=get;list;watch;create;update;patch;delete
@@ -82,6 +88,8 @@ func (r *backupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 func (r *backupScheduleReconciler) evaluateRequiredOperation(ctx context.Context, backupSchedule *k8sv1.BackupSchedule) (operation, error) {
+	logger := log.FromContext(ctx)
+
 	if backupSchedule.DeletionTimestamp != nil && !backupSchedule.DeletionTimestamp.IsZero() {
 		return operationDelete, nil
 	}
@@ -98,6 +106,7 @@ func (r *backupScheduleReconciler) evaluateRequiredOperation(ctx context.Context
 			var err error
 			cronJob, err = r.clientSet.BatchV1().CronJobs(r.namespace).Get(ctx, backupSchedule.CronJobName(), metav1.GetOptions{})
 			if errors.IsNotFound(err) {
+				logger.Error(err, "backup schedule has status 'created' but its cron job does not exist. creating cron job...")
 				op = operationCreate
 				return nil
 			}

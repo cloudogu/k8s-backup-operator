@@ -22,7 +22,7 @@ type requeueHandler interface {
 	Handle(ctx context.Context, contextMessage string, restore v1.RequeuableObject, originalErr error, requeueStatus string) (ctrl.Result, error)
 }
 
-type backupScheduleManager interface {
+type Manager interface {
 	createManager
 	updateManager
 	deleteManager

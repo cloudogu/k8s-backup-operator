@@ -20,6 +20,8 @@ const (
 	BackupScheduleStatusCreated  = "created"
 )
 
+const BackupScheduleFinalizer = "cloudogu-backup-schedule-finalizer"
+
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // BackupScheduleSpec defines the desired state of BackupSchedule
@@ -28,6 +30,8 @@ type BackupScheduleSpec struct {
 
 	// Schedule is a cron expression defining when to run the backup.
 	Schedule string `json:"schedule,omitempty"`
+	// Provider defines the backup provider which should be used for the scheduled backups.
+	Provider Provider `json:"provider,omitempty"`
 }
 
 // BackupScheduleStatus defines the observed state of BackupSchedule
