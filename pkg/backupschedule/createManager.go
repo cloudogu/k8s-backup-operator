@@ -71,7 +71,7 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 							Name:            schedule.CronJobName(),
 							Image:           "busybox:latest",
 							ImagePullPolicy: corev1.PullIfNotPresent,
-							Command:         []string{"echo 'cronJob Created'"},
+							Command:         schedule.CronJobCommand(),
 						}},
 						RestartPolicy: corev1.RestartPolicyOnFailure,
 					},
