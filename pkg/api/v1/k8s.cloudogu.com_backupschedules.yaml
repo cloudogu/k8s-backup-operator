@@ -34,13 +34,30 @@ spec:
           spec:
             description: BackupScheduleSpec defines the desired state of BackupSchedule
             properties:
-              foo:
-                description: Foo is an example field of BackupSchedule. Edit backupschedule_types.go
-                  to remove/update
+              provider:
+                description: Provider defines the backup provider which should be
+                  used for the scheduled backups.
+                type: string
+              schedule:
+                description: Schedule is a cron expression defining when to run the
+                  backup.
                 type: string
             type: object
           status:
             description: BackupScheduleStatus defines the observed state of BackupSchedule
+            properties:
+              backupNumber:
+                description: BackupNumber counts the amount of backups created by
+                  this schedule.
+                type: integer
+              requeueTimeNanos:
+                description: RequeueTimeNanos contains the time in nanoseconds to
+                  wait until the next requeue.
+                format: int64
+                type: integer
+              status:
+                description: Status represents the state of the backup.
+                type: string
             type: object
         type: object
     served: true
