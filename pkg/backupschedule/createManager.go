@@ -3,13 +3,13 @@ package backupschedule
 import (
 	"context"
 	"fmt"
-	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 )
 
 type defaultCreateManager struct {
@@ -61,6 +61,10 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      schedule.CronJobName(),
 			Namespace: cm.namespace,
+			Labels: map[string]string{
+				"app":                      "ces",
+				"k8s.cloudogu.com/part-of": "backup",
+			},
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule: schedule.Spec.Schedule,
@@ -69,9 +73,11 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{{
 							Name:            schedule.CronJobName(),
-							Image:           "busybox:latest",
+							Image:           "busybox:latest", // TODO use real image
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command:         schedule.CronJobCommand(),
+							Env: []corev1.EnvVar{{Name: "NAMESPACE",
+								ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}}},
 						}},
 						RestartPolicy: corev1.RestartPolicyOnFailure,
 					},
@@ -87,5 +93,6 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 	if err != nil {
 		return fmt.Errorf("failed to create CronJob %s: %w", schedule.CronJobName(), err)
 	}
+
 	return nil
 }
