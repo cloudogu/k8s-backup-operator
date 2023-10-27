@@ -40,6 +40,8 @@ type BackupScheduleStatus struct {
 	Status string `json:"status,omitempty"`
 	// RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.
 	RequeueTimeNanos time.Duration `json:"requeueTimeNanos,omitempty"`
+	// BackupNumber counts the amount of backups created by this schedule.
+	BackupNumber int `json:"backupNumber,omitempty"`
 }
 
 // GetRequeueTimeNanos returns the requeue time in nano seconds.
