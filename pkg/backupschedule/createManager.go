@@ -3,6 +3,7 @@ package backupschedule
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -56,14 +57,35 @@ func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.B
 }
 
 func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.BackupSchedule) error {
-	_ = &batchv1.CronJob{
+	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      schedule.CronJobName(),
 			Namespace: cm.namespace,
 		},
-		Spec: batchv1.CronJobSpec{},
+		Spec: batchv1.CronJobSpec{
+			Schedule: schedule.Spec.Schedule,
+			JobTemplate: batchv1.JobTemplateSpec{Spec: batchv1.JobSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name:            schedule.CronJobName(),
+							Image:           "busybox:latest",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Command:         []string{"echo 'cronJob Created'"},
+						}},
+						RestartPolicy: corev1.RestartPolicyOnFailure,
+					},
+				},
+			}},
+		},
 	}
 
-	// TODO create cron job
+	err := retry.OnError(5, retry.AlwaysRetryFunc, func() error {
+		_, err := cm.clientSet.BatchV1().CronJobs(cm.namespace).Create(ctx, cronJob, metav1.CreateOptions{})
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create CronJob %s: %w", schedule.CronJobName(), err)
+	}
 	return nil
 }
