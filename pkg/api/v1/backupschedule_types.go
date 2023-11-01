@@ -70,9 +70,8 @@ func (bs *BackupSchedule) CronJobName() string {
 	return fmt.Sprintf("backup-schedule-%s", bs.Name)
 }
 
-func (bs *BackupSchedule) CronJobCommand() []string {
-	// TODO trigger creation of Backup-resource
-	return []string{"createScheduledBackup", bs.Name, string(bs.Spec.Provider)}
+func (bs *BackupSchedule) CronJobArgs() []string {
+	return []string{bs.Name, string(bs.Spec.Provider)}
 }
 
 // GetStatus return the requeueable status.

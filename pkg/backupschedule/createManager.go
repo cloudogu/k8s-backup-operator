@@ -70,12 +70,20 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 			Schedule: schedule.Spec.Schedule,
 			JobTemplate: batchv1.JobTemplateSpec{Spec: batchv1.JobSpec{
 				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "scheduled-backup-creator",
+						Namespace: cm.namespace,
+						Labels: map[string]string{
+							"app":                      "ces",
+							"k8s.cloudogu.com/part-of": "backup",
+						},
+					},
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{{
 							Name:            schedule.CronJobName(),
 							Image:           "busybox:latest", // TODO use real image
 							ImagePullPolicy: corev1.PullIfNotPresent,
-							Command:         schedule.CronJobCommand(),
+							Args:            schedule.CronJobArgs(),
 							Env: []corev1.EnvVar{{Name: "NAMESPACE",
 								ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}}},
 						}},

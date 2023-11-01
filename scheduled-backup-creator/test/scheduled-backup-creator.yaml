@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-create-backup-script
+  labels:
+    app: ces
+    app.kubernetes.io/name: scheduled-backup-creator
+data:
+#  entrypoint.sh: "#!/bin/bash\nsleep infinity"
+  entrypoint.sh: "#!/bin/bash\nTIMESTAMP=$(date +\"%y%m%d%H%M%S\")\nCR_DEFINITION_TEXT=\"\napiVersion: k8s.cloudogu.com/v1\nkind: Backup\nmetadata:\n  labels:\n    app.kubernetes.io/name: backup\n    app.kubernetes.io/instance: backup-sample\n    app.kubernetes.io/part-of: k8s-backup-operator\n    app.kubernetes.io/managed-by: kustomize\n    app.kubernetes.io/created-by: k8s-backup-operator\n  name: ${SCHEDULE_NAME}-${TIMESTAMP}\n  namespace: ${NAMESPACE}\nspec:\n  provider: ${PROVIDER}\n\"\necho \"${CR_DEFINITION_TEXT}\" | kubectl apply -f -"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: scheduled-backup-creator
+  labels:
+    app: ces
+    app.kubernetes.io/name: scheduled-backup-creator
+rules:
+  - apiGroups:
+      - "*"
+    resources:
+      - clusterroles
+      - clusterrolebindings
+    verbs:
+      - delete
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: scheduled-backup-creator
+  labels:
+    app: ces
+    app.kubernetes.io/name: scheduled-backup-creator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: scheduled-backup-creator
+subjects:
+  - kind: ServiceAccount
+    name: scheduled-backup-creator
+    namespace: '{{ .Namespace }}'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: scheduled-backup-creator
+  labels:
+    app: ces
+    app.kubernetes.io/name: scheduled-backup-creator
+rules:
+  - apiGroups:
+      - "*"
+    resources:
+      - backups
+    verbs:
+      - delete
+      - get
+      - list
+      - create
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scheduled-backup-creator
+  labels:
+    app: ces
+    app.kubernetes.io/name: scheduled-backup-creator
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: scheduled-backup-creator
+  labels:
+    app: ces
+    app.kubernetes.io/name: scheduled-backup-creator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: scheduled-backup-creator
+subjects:
+  - kind: ServiceAccount
+    name: scheduled-backup-creator
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: scheduled-backup-creator
+  labels:
+    app: "ces"
+    k8s.cloudogu.com/part-of: "backup"
+spec:
+  containers:
+    - name: backup-scheduled-01
+      image: bitnami/kubectl:latest
+      imagePullPolicy: Always
+      command:
+        - /bin/entrypoint.sh
+      #      args: ["myBackupTest", "velero"]
+      env:
+        - name: NAMESPACE
+          value: "ecosystem"
+        - name: SCHEDULE_NAME
+          value: "mybackuptest"
+        - name: PROVIDER
+          value: "velero"
+      volumeMounts:
+        - name: create-backup-script
+          mountPath: /bin/entrypoint.sh
+          readOnly: true
+          subPath: entrypoint.sh
+  restartPolicy: Never
+  serviceAccountName: scheduled-backup-creator
+  volumes:
+    - name: create-backup-script
+      configMap:
+        defaultMode: 0550
+        name: k8s-create-backup-script
