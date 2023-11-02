@@ -57,6 +57,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.B
 }
 
 func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.BackupSchedule) error {
+	mode := int32(0550)
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      schedule.CronJobName(),
@@ -81,13 +82,31 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{{
 							Name:            schedule.CronJobName(),
-							Image:           "busybox:latest", // TODO use real image
+							Image:           "bitnami/kubectl:1.27.7",
 							ImagePullPolicy: corev1.PullIfNotPresent,
-							Args:            schedule.CronJobArgs(),
-							Env: []corev1.EnvVar{{Name: "NAMESPACE",
-								ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}}},
+							Command:         []string{"/bin/entrypoint.sh"},
+							Env: []corev1.EnvVar{
+								{Name: "NAMESPACE",
+									ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}},
+								{Name: "SCHEDULED_BACKUP_NAME", Value: schedule.Name},
+								{Name: "PROVIDER", Value: string(schedule.Spec.Provider)}},
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:        "k8s-backup-operator-create-backup-script",
+								ReadOnly:    true,
+								MountPath:   "/bin/entrypoint.sh",
+								SubPathExpr: "entrypoint.sh",
+							},
+							},
 						}},
-						RestartPolicy: corev1.RestartPolicyOnFailure,
+						RestartPolicy:      corev1.RestartPolicyOnFailure,
+						ServiceAccountName: "k8s-backup-operator-scheduled-backup-creator-manager",
+						Volumes: []corev1.Volume{{
+							Name: "k8s-backup-operator-create-backup-script",
+							VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+								LocalObjectReference: corev1.LocalObjectReference{Name: "k8s-create-backup-script"},
+								DefaultMode:          &mode,
+							}},
+						}},
 					},
 				},
 			}},

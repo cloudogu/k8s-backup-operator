@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-create-backup-script
+  labels:
+    app: ces
+    app.kubernetes.io/name: scheduled-backup-creator
+data:
+  entrypoint.sh: "#!/bin/bash\nTIMESTAMP=$(date +\"%y%m%d%H%M%S\")\nCR_DEFINITION_TEXT=\"\napiVersion: k8s.cloudogu.com/v1\nkind: Backup\nmetadata:\n  labels:\n    app.kubernetes.io/name: backup\n    app.kubernetes.io/instance: backup-sample\n    app.kubernetes.io/part-of: k8s-backup-operator\n    app.kubernetes.io/managed-by: kustomize\n    app.kubernetes.io/created-by: k8s-backup-operator\n  name: ${SCHEDULED_BACKUP_NAME}-${TIMESTAMP}\n  namespace: ${NAMESPACE}\nspec:\n  provider: ${PROVIDER}\n\"\necho \"${CR_DEFINITION_TEXT}\" | kubectl apply -f -"
