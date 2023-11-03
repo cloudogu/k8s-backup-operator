@@ -351,6 +351,6 @@ func createScheme(t *testing.T) *runtime.Scheme {
 	gv, err := schema.ParseGroupVersion("k8s.cloudogu.com/v1")
 	assert.NoError(t, err)
 
-	scheme.AddKnownTypes(gv, &v1.Backup{}, &v1.Restore{})
+	scheme.AddKnownTypes(gv, &v1.Backup{}, &v1.Restore{}, &v1.BackupSchedule{})
 	return scheme
 }
