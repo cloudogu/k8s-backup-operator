@@ -6,6 +6,7 @@ package v1
 
 import (
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,13 +67,70 @@ type BackupSchedule struct {
 	Status BackupScheduleStatus `json:"status,omitempty"`
 }
 
+// GetStatus return the requeueable status.
+func (bs *BackupSchedule) GetStatus() RequeueableStatus {
+	return bs.Status
+}
+
+func (bs *BackupSchedule) CronJobPodTemplate(namespace string) corev1.PodTemplateSpec {
+	return corev1.PodTemplateSpec{
+		ObjectMeta: bs.CronJobPodMeta(namespace),
+		Spec:       bs.CronJobPodSpec(),
+	}
+}
+
+func (bs *BackupSchedule) CronJobPodMeta(namespace string) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      "scheduled-backup-creator",
+		Namespace: namespace,
+		Labels: map[string]string{
+			"app":                      "ces",
+			"k8s.cloudogu.com/part-of": "backup",
+		},
+	}
+}
+
+func (bs *BackupSchedule) CronJobPodSpec() corev1.PodSpec {
+	mode := int32(0550)
+	volumeName := "k8s-backup-operator-create-backup-script"
+	scriptPath := "/bin/entrypoint.sh"
+	return corev1.PodSpec{
+		Containers: []corev1.Container{{
+			Name:            bs.CronJobName(),
+			Image:           "bitnami/kubectl:1.27.7",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Command:         []string{scriptPath},
+			Env:             bs.cronJobEnvVars(),
+			VolumeMounts: []corev1.VolumeMount{{
+				Name:      volumeName,
+				ReadOnly:  true,
+				MountPath: scriptPath,
+				SubPath:   "entrypoint.sh",
+			},
+			},
+		}},
+		RestartPolicy:      corev1.RestartPolicyOnFailure,
+		ServiceAccountName: "k8s-backup-operator-scheduled-backup-creator-manager",
+		Volumes: []corev1.Volume{{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "k8s-create-backup-script"},
+				DefaultMode:          &mode,
+			}},
+		}},
+	}
+}
+
 func (bs *BackupSchedule) CronJobName() string {
 	return fmt.Sprintf("backup-schedule-%s", bs.Name)
 }
 
-// GetStatus return the requeueable status.
-func (bs *BackupSchedule) GetStatus() RequeueableStatus {
-	return bs.Status
+func (bs *BackupSchedule) cronJobEnvVars() []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{Name: "NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}},
+		{Name: "SCHEDULED_BACKUP_NAME", Value: bs.Name},
+		{Name: "PROVIDER", Value: string(bs.Spec.Provider)}}
 }
 
 //+kubebuilder:object:root=true

@@ -57,7 +57,6 @@ func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.B
 }
 
 func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.BackupSchedule) error {
-	mode := int32(0550)
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      schedule.CronJobName(),
@@ -69,47 +68,11 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule: schedule.Spec.Schedule,
-			JobTemplate: batchv1.JobTemplateSpec{Spec: batchv1.JobSpec{
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "scheduled-backup-creator",
-						Namespace: cm.namespace,
-						Labels: map[string]string{
-							"app":                      "ces",
-							"k8s.cloudogu.com/part-of": "backup",
-						},
-					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{{
-							Name:            schedule.CronJobName(),
-							Image:           "bitnami/kubectl:1.27.7",
-							ImagePullPolicy: corev1.PullIfNotPresent,
-							Command:         []string{"/bin/entrypoint.sh"},
-							Env: []corev1.EnvVar{
-								{Name: "NAMESPACE",
-									ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}},
-								{Name: "SCHEDULED_BACKUP_NAME", Value: schedule.Name},
-								{Name: "PROVIDER", Value: string(schedule.Spec.Provider)}},
-							VolumeMounts: []corev1.VolumeMount{{
-								Name:        "k8s-backup-operator-create-backup-script",
-								ReadOnly:    true,
-								MountPath:   "/bin/entrypoint.sh",
-								SubPathExpr: "entrypoint.sh",
-							},
-							},
-						}},
-						RestartPolicy:      corev1.RestartPolicyOnFailure,
-						ServiceAccountName: "k8s-backup-operator-scheduled-backup-creator-manager",
-						Volumes: []corev1.Volume{{
-							Name: "k8s-backup-operator-create-backup-script",
-							VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{Name: "k8s-create-backup-script"},
-								DefaultMode:          &mode,
-							}},
-						}},
-					},
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: schedule.CronJobPodTemplate(cm.namespace),
 				},
-			}},
+			},
 		},
 	}
 
