@@ -2,6 +2,7 @@ package backupschedule
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -45,7 +46,13 @@ func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.B
 
 	err = cm.createCronJob(ctx, backupSchedule)
 	if err != nil {
-		return fmt.Errorf("failed to create cron job for backup schedule [%s]: %w", backupScheduleName, err)
+		err = fmt.Errorf("failed to create cron job for backup schedule [%s]: %w", backupScheduleName, err)
+		_, updateStatusErr := backupScheduleClient.UpdateStatusFailed(ctx, backupSchedule)
+		if updateStatusErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to update backup schedule status to 'Failed': %w", updateStatusErr))
+		}
+
+		return err
 	}
 
 	_, err = backupScheduleClient.UpdateStatusCreated(ctx, backupSchedule)
