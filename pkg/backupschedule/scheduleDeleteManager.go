@@ -25,7 +25,7 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, backupSchedule *v1.B
 	dm.recorder.Event(backupSchedule, corev1.EventTypeNormal, v1.DeleteEventReason, "Deleting backup schedule")
 
 	schedulesClient := dm.clientSet.EcosystemV1Alpha1().BackupSchedules(dm.namespace)
-	_, err := schedulesClient.UpdateStatusDeleting(ctx, backupSchedule)
+	backupSchedule, err := schedulesClient.UpdateStatusDeleting(ctx, backupSchedule)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleStatusDeleting, backupSchedule.Name, err)
 	}
