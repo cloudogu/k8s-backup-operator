@@ -68,7 +68,7 @@ func (r *backupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	requiredOperation, err := r.evaluateRequiredOperation(ctx, backupSchedule)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to evaluate required operation for backup schedule %s", backupSchedule.Name)
+		return ctrl.Result{}, fmt.Errorf("failed to evaluate required operation for backup schedule %s: %w", backupSchedule.Name, err)
 	}
 
 	logger.Info(fmt.Sprintf("required operation for backup schedule %s is %s", req.NamespacedName, requiredOperation))
@@ -102,23 +102,25 @@ func (r *backupScheduleReconciler) evaluateRequiredOperation(ctx context.Context
 	case k8sv1.BackupScheduleStatusCreated:
 		var cronJob *batchv1.CronJob
 		op := operationIgnore
-		err := retry.OnError(5, retry.AlwaysRetryFunc, func() error {
+		err := retry.OnError(createMaxTries, retry.AlwaysRetryFunc, func() error {
 			var err error
 			cronJob, err = r.clientSet.BatchV1().CronJobs(r.namespace).Get(ctx, backupSchedule.CronJobName(), metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				logger.Error(err, "backup schedule has status 'created' but its cron job does not exist. creating cron job...")
 				op = operationCreate
 				return nil
+			} else if err != nil {
+				return err
 			}
 
-			return err
+			if cronJob.Spec.Schedule != backupSchedule.Spec.Schedule {
+				op = operationUpdate
+			}
+
+			return nil
 		})
 		if err != nil {
-			return "", fmt.Errorf("failed to find cron job for backup schedule %s", backupSchedule.Name)
-		}
-
-		if cronJob.Spec.Schedule != backupSchedule.Spec.Schedule {
-			return operationUpdate, nil
+			return "", fmt.Errorf("failed to find cron job for backup schedule %s: %w", backupSchedule.Name, err)
 		}
 
 		return op, nil
@@ -151,7 +153,7 @@ func (r *backupScheduleReconciler) performOperation(
 	logger := log.FromContext(ctx)
 
 	operationError := operationFn(ctx, backupSchedule)
-	contextMessageOnError := fmt.Sprintf("%s of restore %s failed", eventReason, backupSchedule.Name)
+	contextMessageOnError := fmt.Sprintf("%s of backup schedule %s failed", eventReason, backupSchedule.Name)
 	eventType := corev1.EventTypeNormal
 	message := fmt.Sprintf("%s successful", eventReason)
 	if operationError != nil {
@@ -174,7 +176,7 @@ func (r *backupScheduleReconciler) performOperation(
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *backupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *backupScheduleReconciler) SetupWithManager(mgr controllerManager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&k8sv1.BackupSchedule{}).
 		Complete(r)

@@ -24,23 +24,23 @@ func (_m *mockRequeueHandler) EXPECT() *mockRequeueHandler_Expecter {
 	return &mockRequeueHandler_Expecter{mock: &_m.Mock}
 }
 
-// Handle provides a mock function with given fields: ctx, contextMessage, restore, originalErr, requeueStatus
-func (_m *mockRequeueHandler) Handle(ctx context.Context, contextMessage string, restore v1.RequeuableObject, originalErr error, requeueStatus string) (reconcile.Result, error) {
-	ret := _m.Called(ctx, contextMessage, restore, originalErr, requeueStatus)
+// Handle provides a mock function with given fields: ctx, contextMessage, backupSchedule, originalErr, requeueStatus
+func (_m *mockRequeueHandler) Handle(ctx context.Context, contextMessage string, backupSchedule v1.RequeuableObject, originalErr error, requeueStatus string) (reconcile.Result, error) {
+	ret := _m.Called(ctx, contextMessage, backupSchedule, originalErr, requeueStatus)
 
 	var r0 reconcile.Result
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, v1.RequeuableObject, error, string) (reconcile.Result, error)); ok {
-		return rf(ctx, contextMessage, restore, originalErr, requeueStatus)
+		return rf(ctx, contextMessage, backupSchedule, originalErr, requeueStatus)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, v1.RequeuableObject, error, string) reconcile.Result); ok {
-		r0 = rf(ctx, contextMessage, restore, originalErr, requeueStatus)
+		r0 = rf(ctx, contextMessage, backupSchedule, originalErr, requeueStatus)
 	} else {
 		r0 = ret.Get(0).(reconcile.Result)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, v1.RequeuableObject, error, string) error); ok {
-		r1 = rf(ctx, contextMessage, restore, originalErr, requeueStatus)
+		r1 = rf(ctx, contextMessage, backupSchedule, originalErr, requeueStatus)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -56,14 +56,14 @@ type mockRequeueHandler_Handle_Call struct {
 // Handle is a helper method to define mock.On call
 //   - ctx context.Context
 //   - contextMessage string
-//   - restore v1.RequeuableObject
+//   - backupSchedule v1.RequeuableObject
 //   - originalErr error
 //   - requeueStatus string
-func (_e *mockRequeueHandler_Expecter) Handle(ctx interface{}, contextMessage interface{}, restore interface{}, originalErr interface{}, requeueStatus interface{}) *mockRequeueHandler_Handle_Call {
-	return &mockRequeueHandler_Handle_Call{Call: _e.mock.On("Handle", ctx, contextMessage, restore, originalErr, requeueStatus)}
+func (_e *mockRequeueHandler_Expecter) Handle(ctx interface{}, contextMessage interface{}, backupSchedule interface{}, originalErr interface{}, requeueStatus interface{}) *mockRequeueHandler_Handle_Call {
+	return &mockRequeueHandler_Handle_Call{Call: _e.mock.On("Handle", ctx, contextMessage, backupSchedule, originalErr, requeueStatus)}
 }
 
-func (_c *mockRequeueHandler_Handle_Call) Run(run func(ctx context.Context, contextMessage string, restore v1.RequeuableObject, originalErr error, requeueStatus string)) *mockRequeueHandler_Handle_Call {
+func (_c *mockRequeueHandler_Handle_Call) Run(run func(ctx context.Context, contextMessage string, backupSchedule v1.RequeuableObject, originalErr error, requeueStatus string)) *mockRequeueHandler_Handle_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(v1.RequeuableObject), args[3].(error), args[4].(string))
 	})
