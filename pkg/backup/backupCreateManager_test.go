@@ -16,7 +16,7 @@ import (
 
 var testCtx = context.TODO()
 
-func TestNewBackupCreateManager(t *testing.T) {
+func TestNewScheduleCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		registryMock := newMockEtcdRegistry(t)
@@ -31,7 +31,7 @@ func TestNewBackupCreateManager(t *testing.T) {
 	})
 }
 
-func Test_backupCreateManager_create(t *testing.T) {
+func Test_scheduleCreateManager_create(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		backupName := "backup"

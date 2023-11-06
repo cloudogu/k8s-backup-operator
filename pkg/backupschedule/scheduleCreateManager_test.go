@@ -36,7 +36,19 @@ type cronJobInterface interface {
 	typedbatchv1.CronJobInterface
 }
 
-func Test_createManager_create(t *testing.T) {
+func TestNewScheduleCreateManager(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		// given
+
+		// when
+		manager := newScheduleCreateManager(nil, nil, "test")
+
+		// then
+		require.NotNil(t, manager)
+	})
+}
+
+func Test_scheduleCreateManager_create(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		backupScheduleName := "backupSchedule"
