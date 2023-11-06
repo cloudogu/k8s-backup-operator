@@ -314,7 +314,7 @@ func Test_backupScheduleReconciler_Reconcile(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, ctrl.Result{}, actual)
 	})
-	t.Run("should fail to execute and handle operation", func(t *testing.T) {
+	t.Run("should fail on create and fail to handle requeue", func(t *testing.T) {
 		// given
 		backupSchedule := &k8sv1.BackupSchedule{
 			ObjectMeta: metav1.ObjectMeta{
