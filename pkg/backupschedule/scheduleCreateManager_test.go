@@ -49,9 +49,9 @@ func TestNewScheduleCreateManager(t *testing.T) {
 }
 
 func Test_scheduleCreateManager_create(t *testing.T) {
-	originalMaxTries := createMaxTries
-	defer func() { createMaxTries = originalMaxTries }()
-	createMaxTries = 1
+	originalMaxTries := maxTries
+	defer func() { maxTries = originalMaxTries }()
+	maxTries = 1
 
 	t.Run("success", func(t *testing.T) {
 		// given

@@ -22,9 +22,9 @@ func TestNewScheduleDeleteManager(t *testing.T) {
 }
 
 func Test_scheduleDeleteManager_delete(t *testing.T) {
-	originalMaxTries := deleteMaxTries
-	defer func() { deleteMaxTries = originalMaxTries }()
-	deleteMaxTries = 1
+	originalMaxTries := maxTries
+	defer func() { maxTries = originalMaxTries }()
+	maxTries = 1
 
 	t.Run("success", func(t *testing.T) {
 		// given

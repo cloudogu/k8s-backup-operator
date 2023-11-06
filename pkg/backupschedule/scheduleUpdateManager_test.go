@@ -24,9 +24,9 @@ func TestNewScheduleUpdateManager(t *testing.T) {
 }
 
 func Test_scheduleUpdateManager_update(t *testing.T) {
-	originalMaxTries := updateMaxTries
-	defer func() { updateMaxTries = originalMaxTries }()
-	updateMaxTries = 1
+	originalMaxTries := maxTries
+	defer func() { maxTries = originalMaxTries }()
+	maxTries = 1
 
 	t.Run("success", func(t *testing.T) {
 		// given

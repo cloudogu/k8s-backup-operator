@@ -75,9 +75,9 @@ func createScheme(t *testing.T) *runtime.Scheme {
 }
 
 func Test_backupScheduleReconciler_Reconcile(t *testing.T) {
-	originalMaxTries := createMaxTries
-	defer func() { createMaxTries = originalMaxTries }()
-	createMaxTries = 1
+	originalMaxTries := maxTries
+	defer func() { maxTries = originalMaxTries }()
+	maxTries = 1
 
 	now := metav1.NewTime(time.Now())
 	t.Run("should ignore not found when getting backup schedule", func(t *testing.T) {

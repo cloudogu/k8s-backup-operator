@@ -102,7 +102,7 @@ func (r *backupScheduleReconciler) evaluateRequiredOperation(ctx context.Context
 	case k8sv1.BackupScheduleStatusCreated:
 		var cronJob *batchv1.CronJob
 		op := operationIgnore
-		err := retry.OnError(createMaxTries, retry.AlwaysRetryFunc, func() error {
+		err := retry.OnError(maxTries, retry.AlwaysRetryFunc, func() error {
 			var err error
 			cronJob, err = r.clientSet.BatchV1().CronJobs(r.namespace).Get(ctx, backupSchedule.CronJobName(), metav1.GetOptions{})
 			if errors.IsNotFound(err) {

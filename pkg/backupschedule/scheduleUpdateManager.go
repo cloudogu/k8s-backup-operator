@@ -11,10 +11,6 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
 
-// updateMaxTries controls the maximum number of waiting intervals between tries when getting an error that is recoverable
-// during cron job update.
-var updateMaxTries = 5
-
 type defaultUpdateManager struct {
 	clientSet ecosystemInterface
 	recorder  eventRecorder
@@ -35,7 +31,7 @@ func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.B
 	}
 
 	cronJobClient := um.clientSet.BatchV1().CronJobs(um.namespace)
-	err = retry.OnError(updateMaxTries, retry.AlwaysRetryFunc, func() error {
+	err = retry.OnError(maxTries, retry.AlwaysRetryFunc, func() error {
 		cronJob, err := cronJobClient.Get(ctx, backupSchedule.CronJobName(), metav1.GetOptions{})
 		if err != nil {
 			return err
