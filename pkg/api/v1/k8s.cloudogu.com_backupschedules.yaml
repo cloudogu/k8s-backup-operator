@@ -46,10 +46,6 @@ spec:
           status:
             description: BackupScheduleStatus defines the observed state of BackupSchedule
             properties:
-              backupNumber:
-                description: BackupNumber counts the amount of backups created by
-                  this schedule.
-                type: integer
               requeueTimeNanos:
                 description: RequeueTimeNanos contains the time in nanoseconds to
                   wait until the next requeue.
