@@ -6,4 +6,22 @@ metadata:
     app: ces
     app.kubernetes.io/name: scheduled-backup-creator
 data:
-  entrypoint.sh: "#!/bin/bash\nTIMESTAMP=$(date +\"%y%m%d%H%M%S\")\nCR_DEFINITION_TEXT=\"\napiVersion: k8s.cloudogu.com/v1\nkind: Backup\nmetadata:\n  labels:\n    app.kubernetes.io/name: backup\n    app.kubernetes.io/instance: backup-sample\n    app.kubernetes.io/part-of: k8s-backup-operator\n    app.kubernetes.io/managed-by: kustomize\n    app.kubernetes.io/created-by: k8s-backup-operator\n  name: ${SCHEDULED_BACKUP_NAME}-${TIMESTAMP}\n  namespace: ${NAMESPACE}\nspec:\n  provider: ${PROVIDER}\n\"\necho \"${CR_DEFINITION_TEXT}\" | kubectl apply -f -"
+  entrypoint.sh: |
+    #!/bin/bash
+    TIMESTAMP=$(date +"%y%m%d%H%M%S")
+    CR_DEFINITION_TEXT="
+    apiVersion: k8s.cloudogu.com/v1
+    kind: Backup
+    metadata:
+      labels:
+        app.kubernetes.io/name: backup
+        app.kubernetes.io/instance: backup-sample
+        app.kubernetes.io/part-of: k8s-backup-operator
+        app.kubernetes.io/managed-by: kustomize
+        app.kubernetes.io/created-by: k8s-backup-operator
+      name: ${SCHEDULED_BACKUP_NAME}-${TIMESTAMP}
+      namespace: ${NAMESPACE}
+    spec:
+      provider: ${PROVIDER}
+    "
+    echo "${CR_DEFINITION_TEXT}" | kubectl apply -f -
