@@ -2,12 +2,18 @@ package backupschedule
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
+
+// updateMaxTries controls the maximum number of waiting intervals between tries when getting an error that is recoverable
+// during cron job update.
+var updateMaxTries = 5
 
 type defaultUpdateManager struct {
 	clientSet ecosystemInterface
@@ -15,11 +21,13 @@ type defaultUpdateManager struct {
 	namespace string
 }
 
-func newUpdateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultUpdateManager {
+func newScheduleUpdateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultUpdateManager {
 	return &defaultUpdateManager{clientSet: clientSet, recorder: recorder, namespace: namespace}
 }
 
 func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.BackupSchedule) error {
+	um.recorder.Event(backupSchedule, corev1.EventTypeNormal, v1.UpdateEventReason, "Updating backup schedule")
+
 	schedulesClient := um.clientSet.EcosystemV1Alpha1().BackupSchedules(um.namespace)
 	_, err := schedulesClient.UpdateStatusUpdating(ctx, backupSchedule)
 	if err != nil {
@@ -27,7 +35,7 @@ func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.B
 	}
 
 	cronJobClient := um.clientSet.BatchV1().CronJobs(um.namespace)
-	err = retry.OnError(5, retry.AlwaysRetryFunc, func() error {
+	err = retry.OnError(updateMaxTries, retry.AlwaysRetryFunc, func() error {
 		cronJob, err := cronJobClient.Get(ctx, backupSchedule.CronJobName(), metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -42,7 +50,13 @@ func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.B
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to update CronJob %s: %w", backupSchedule.CronJobName(), err)
+		err = fmt.Errorf("failed to update cron job for backup schedule [%s]: %w", backupSchedule.Name, err)
+		_, updateStatusErr := schedulesClient.UpdateStatusFailed(ctx, backupSchedule)
+		if updateStatusErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to update backup schedule status to 'Failed': %w", updateStatusErr))
+		}
+
+		return err
 	}
 
 	_, err = schedulesClient.UpdateStatusCreated(ctx, backupSchedule)

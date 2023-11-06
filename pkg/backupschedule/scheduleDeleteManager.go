@@ -11,6 +11,10 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
 
+// deleteMaxTries controls the maximum number of waiting intervals between tries when getting an error that is recoverable
+// during cron job deletion.
+var deleteMaxTries = 5
+
 type defaultDeleteManager struct {
 	clientSet ecosystemInterface
 	recorder  eventRecorder
@@ -30,7 +34,7 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, backupSchedule *v1.B
 		return fmt.Errorf("failed to set status [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleStatusDeleting, backupSchedule.Name, err)
 	}
 
-	err = retry.OnError(5, retry.AlwaysRetryFunc, func() error {
+	err = retry.OnError(deleteMaxTries, retry.AlwaysRetryFunc, func() error {
 		return dm.clientSet.BatchV1().CronJobs(dm.namespace).Delete(ctx, backupSchedule.CronJobName(), metav1.DeleteOptions{})
 	})
 	if err != nil {

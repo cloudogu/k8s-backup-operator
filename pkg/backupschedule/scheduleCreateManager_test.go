@@ -49,6 +49,10 @@ func TestNewScheduleCreateManager(t *testing.T) {
 }
 
 func Test_scheduleCreateManager_create(t *testing.T) {
+	originalMaxTries := createMaxTries
+	defer func() { createMaxTries = originalMaxTries }()
+	createMaxTries = 1
+
 	t.Run("success", func(t *testing.T) {
 		// given
 		backupScheduleName := "backupSchedule"
@@ -259,7 +263,7 @@ func Test_scheduleCreateManager_create(t *testing.T) {
 		cronJobMock := newMockCronJobInterface(t)
 		batchV1Mock.EXPECT().CronJobs(testNamespace).Return(cronJobMock)
 		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
-		cronJobMock.EXPECT().Create(testCtx, mock.Anything, metav1.CreateOptions{}).Return(nil, assert.AnError).Times(5)
+		cronJobMock.EXPECT().Create(testCtx, mock.Anything, metav1.CreateOptions{}).Return(nil, assert.AnError)
 
 		sut := &defaultCreateManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace}
 
@@ -301,7 +305,7 @@ func Test_scheduleCreateManager_create(t *testing.T) {
 		cronJobMock := newMockCronJobInterface(t)
 		batchV1Mock.EXPECT().CronJobs(testNamespace).Return(cronJobMock)
 		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
-		cronJobMock.EXPECT().Create(testCtx, mock.Anything, metav1.CreateOptions{}).Return(nil, assert.AnError).Times(5)
+		cronJobMock.EXPECT().Create(testCtx, mock.Anything, metav1.CreateOptions{}).Return(nil, assert.AnError)
 
 		sut := &defaultCreateManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace}
 

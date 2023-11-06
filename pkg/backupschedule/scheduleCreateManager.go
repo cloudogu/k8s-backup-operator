@@ -13,6 +13,10 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 )
 
+// createMaxTries controls the maximum number of waiting intervals between tries when getting an error that is recoverable
+// during cron job creation.
+var createMaxTries = 5
+
 type defaultCreateManager struct {
 	clientSet ecosystemInterface
 	recorder  eventRecorder
@@ -83,7 +87,7 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 		},
 	}
 
-	err := retry.OnError(5, retry.AlwaysRetryFunc, func() error {
+	err := retry.OnError(createMaxTries, retry.AlwaysRetryFunc, func() error {
 		_, err := cm.clientSet.BatchV1().CronJobs(cm.namespace).Create(ctx, cronJob, metav1.CreateOptions{})
 		return err
 	})

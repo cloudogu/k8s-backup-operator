@@ -22,6 +22,10 @@ func TestNewScheduleDeleteManager(t *testing.T) {
 }
 
 func Test_scheduleDeleteManager_delete(t *testing.T) {
+	originalMaxTries := deleteMaxTries
+	defer func() { deleteMaxTries = originalMaxTries }()
+	deleteMaxTries = 1
+
 	t.Run("success", func(t *testing.T) {
 		// given
 		backupScheduleName := "backupSchedule"
@@ -49,7 +53,7 @@ func Test_scheduleDeleteManager_delete(t *testing.T) {
 		cronJobMock := newMockCronJobInterface(t)
 		batchV1Mock.EXPECT().CronJobs(testNamespace).Return(cronJobMock)
 		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
-		cronJobMock.EXPECT().Delete(testCtx, "backup-schedule-"+backupScheduleName, metav1.DeleteOptions{}).Return(nil)
+		cronJobMock.EXPECT().Delete(testCtx, backupSchedule.CronJobName(), metav1.DeleteOptions{}).Return(nil)
 
 		sut := &defaultDeleteManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace}
 
@@ -120,7 +124,7 @@ func Test_scheduleDeleteManager_delete(t *testing.T) {
 		cronJobMock := newMockCronJobInterface(t)
 		batchV1Mock.EXPECT().CronJobs(testNamespace).Return(cronJobMock)
 		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
-		cronJobMock.EXPECT().Delete(testCtx, "backup-schedule-"+backupScheduleName, metav1.DeleteOptions{}).Return(assert.AnError).Times(5)
+		cronJobMock.EXPECT().Delete(testCtx, backupSchedule.CronJobName(), metav1.DeleteOptions{}).Return(assert.AnError)
 
 		sut := &defaultDeleteManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace}
 
@@ -160,7 +164,7 @@ func Test_scheduleDeleteManager_delete(t *testing.T) {
 		cronJobMock := newMockCronJobInterface(t)
 		batchV1Mock.EXPECT().CronJobs(testNamespace).Return(cronJobMock)
 		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
-		cronJobMock.EXPECT().Delete(testCtx, "backup-schedule-"+backupScheduleName, metav1.DeleteOptions{}).Return(assert.AnError).Times(5)
+		cronJobMock.EXPECT().Delete(testCtx, backupSchedule.CronJobName(), metav1.DeleteOptions{}).Return(assert.AnError)
 
 		sut := &defaultDeleteManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace}
 
@@ -201,7 +205,7 @@ func Test_scheduleDeleteManager_delete(t *testing.T) {
 		cronJobMock := newMockCronJobInterface(t)
 		batchV1Mock.EXPECT().CronJobs(testNamespace).Return(cronJobMock)
 		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
-		cronJobMock.EXPECT().Delete(testCtx, "backup-schedule-"+backupScheduleName, metav1.DeleteOptions{}).Return(nil)
+		cronJobMock.EXPECT().Delete(testCtx, backupSchedule.CronJobName(), metav1.DeleteOptions{}).Return(nil)
 
 		sut := &defaultDeleteManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace}
 

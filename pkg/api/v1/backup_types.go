@@ -24,6 +24,7 @@ const (
 const (
 	CreateEventReason        = "Creation"
 	DeleteEventReason        = "Delete"
+	UpdateEventReason        = "Update"
 	ErrorOnCreateEventReason = "ErrCreation"
 )
 

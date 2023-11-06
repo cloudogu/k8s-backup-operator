@@ -132,7 +132,7 @@ func (r *backupScheduleReconciler) performCreateOperation(ctx context.Context, b
 }
 
 func (r *backupScheduleReconciler) performUpdateOperation(ctx context.Context, backupSchedule *k8sv1.BackupSchedule) (ctrl.Result, error) {
-	return r.performOperation(ctx, backupSchedule, k8sv1.CreateEventReason, k8sv1.BackupScheduleStatusCreated, r.manager.update)
+	return r.performOperation(ctx, backupSchedule, k8sv1.UpdateEventReason, k8sv1.BackupScheduleStatusCreated, r.manager.update)
 }
 
 func (r *backupScheduleReconciler) performDeleteOperation(ctx context.Context, backupSchedule *k8sv1.BackupSchedule) (ctrl.Result, error) {
