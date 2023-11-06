@@ -113,7 +113,7 @@ func (r *backupScheduleReconciler) evaluateRequiredOperation(ctx context.Context
 				return err
 			}
 
-			if cronJob.Spec.Schedule != backupSchedule.Spec.Schedule {
+			if cronJob.Spec.Schedule != backupSchedule.Spec.Schedule || getCronJobProvider(cronJob) != string(backupSchedule.Spec.Provider) {
 				op = operationUpdate
 			}
 
@@ -127,6 +127,17 @@ func (r *backupScheduleReconciler) evaluateRequiredOperation(ctx context.Context
 	default:
 		return operationIgnore, nil
 	}
+}
+
+func getCronJobProvider(cronJob *batchv1.CronJob) string {
+	envList := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env
+
+	for _, env := range envList {
+		if env.Name == k8sv1.ProviderEnvVar {
+			return env.Value
+		}
+	}
+	return ""
 }
 
 func (r *backupScheduleReconciler) performCreateOperation(ctx context.Context, backupSchedule *k8sv1.BackupSchedule) (ctrl.Result, error) {

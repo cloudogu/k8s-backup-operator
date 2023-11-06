@@ -23,6 +23,8 @@ const (
 
 const BackupScheduleFinalizer = "cloudogu-backup-schedule-finalizer"
 
+const ProviderEnvVar = "PROVIDER"
+
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // BackupScheduleSpec defines the desired state of BackupSchedule
@@ -128,7 +130,7 @@ func (bs *BackupSchedule) cronJobEnvVars() []corev1.EnvVar {
 		{Name: "NAMESPACE",
 			ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}},
 		{Name: "SCHEDULED_BACKUP_NAME", Value: bs.Name},
-		{Name: "PROVIDER", Value: string(bs.Spec.Provider)}}
+		{Name: ProviderEnvVar, Value: string(bs.Spec.Provider)}}
 }
 
 //+kubebuilder:object:root=true
