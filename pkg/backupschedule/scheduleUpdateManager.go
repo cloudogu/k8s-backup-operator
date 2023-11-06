@@ -23,6 +23,7 @@ func newScheduleUpdateManager(clientSet ecosystemInterface, recorder eventRecord
 
 func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.BackupSchedule) error {
 	um.recorder.Event(backupSchedule, corev1.EventTypeNormal, v1.UpdateEventReason, "Updating backup schedule")
+	backupScheduleName := backupSchedule.Name
 
 	schedulesClient := um.clientSet.EcosystemV1Alpha1().BackupSchedules(um.namespace)
 	backupSchedule, err := schedulesClient.UpdateStatusUpdating(ctx, backupSchedule)
@@ -46,7 +47,7 @@ func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.B
 		return nil
 	})
 	if err != nil {
-		err = fmt.Errorf("failed to update cron job for backup schedule [%s]: %w", backupSchedule.Name, err)
+		err = fmt.Errorf("failed to update cron job for backup schedule [%s]: %w", backupScheduleName, err)
 		_, updateStatusErr := schedulesClient.UpdateStatusFailed(ctx, backupSchedule)
 		if updateStatusErr != nil {
 			err = errors.Join(err, fmt.Errorf("failed to update backup schedule status to 'Failed': %w", updateStatusErr))
@@ -57,7 +58,7 @@ func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.B
 
 	_, err = schedulesClient.UpdateStatusCreated(ctx, backupSchedule)
 	if err != nil {
-		return fmt.Errorf("failed to set status [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleStatusCreated, backupSchedule.Name, err)
+		return fmt.Errorf("failed to set status [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleStatusCreated, backupScheduleName, err)
 	}
 	return nil
 }

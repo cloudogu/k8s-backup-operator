@@ -23,18 +23,19 @@ func newScheduleDeleteManager(clientSet ecosystemInterface, recorder eventRecord
 
 func (dm *defaultDeleteManager) delete(ctx context.Context, backupSchedule *v1.BackupSchedule) error {
 	dm.recorder.Event(backupSchedule, corev1.EventTypeNormal, v1.DeleteEventReason, "Deleting backup schedule")
+	backupScheduleName := backupSchedule.Name
 
 	schedulesClient := dm.clientSet.EcosystemV1Alpha1().BackupSchedules(dm.namespace)
 	backupSchedule, err := schedulesClient.UpdateStatusDeleting(ctx, backupSchedule)
 	if err != nil {
-		return fmt.Errorf("failed to set status [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleStatusDeleting, backupSchedule.Name, err)
+		return fmt.Errorf("failed to set status [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleStatusDeleting, backupScheduleName, err)
 	}
 
 	err = retry.OnError(maxTries, retry.AlwaysRetryFunc, func() error {
 		return dm.clientSet.BatchV1().CronJobs(dm.namespace).Delete(ctx, backupSchedule.CronJobName(), metav1.DeleteOptions{})
 	})
 	if err != nil {
-		err = fmt.Errorf("failed to delete cron job for backup schedule [%s]: %w", backupSchedule.Name, err)
+		err = fmt.Errorf("failed to delete cron job for backup schedule [%s]: %w", backupScheduleName, err)
 		_, updateStatusErr := schedulesClient.UpdateStatusFailed(ctx, backupSchedule)
 		if updateStatusErr != nil {
 			err = errors.Join(err, fmt.Errorf("failed to update backup schedule status to 'Failed': %w", updateStatusErr))
@@ -45,7 +46,7 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, backupSchedule *v1.B
 
 	_, err = schedulesClient.RemoveFinalizer(ctx, backupSchedule, v1.BackupScheduleFinalizer)
 	if err != nil {
-		return fmt.Errorf("failed to remove finalizer [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleFinalizer, backupSchedule.Name, err)
+		return fmt.Errorf("failed to remove finalizer [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleFinalizer, backupScheduleName, err)
 	}
 
 	return nil
