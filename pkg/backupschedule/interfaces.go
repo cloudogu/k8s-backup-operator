@@ -18,7 +18,7 @@ type eventRecorder interface {
 }
 
 type requeueHandler interface {
-	Handle(ctx context.Context, contextMessage string, restore v1.RequeuableObject, originalErr error, requeueStatus string) (ctrl.Result, error)
+	Handle(ctx context.Context, contextMessage string, backupSchedule v1.RequeuableObject, originalErr error, requeueStatus string) (ctrl.Result, error)
 }
 
 type Manager interface {
@@ -37,4 +37,8 @@ type updateManager interface {
 
 type deleteManager interface {
 	delete(ctx context.Context, backupSchedule *v1.BackupSchedule) error
+}
+
+type controllerManager interface {
+	ctrl.Manager
 }
