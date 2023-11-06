@@ -73,12 +73,12 @@ func (bs *BackupSchedule) GetStatus() RequeueableStatus {
 
 func (bs *BackupSchedule) CronJobPodTemplate(namespace string) corev1.PodTemplateSpec {
 	return corev1.PodTemplateSpec{
-		ObjectMeta: bs.CronJobPodMeta(namespace),
-		Spec:       bs.CronJobPodSpec(),
+		ObjectMeta: bs.cronJobPodMeta(namespace),
+		Spec:       bs.cronJobPodSpec(),
 	}
 }
 
-func (bs *BackupSchedule) CronJobPodMeta(namespace string) metav1.ObjectMeta {
+func (bs *BackupSchedule) cronJobPodMeta(namespace string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      "scheduled-backup-creator",
 		Namespace: namespace,
@@ -89,7 +89,7 @@ func (bs *BackupSchedule) CronJobPodMeta(namespace string) metav1.ObjectMeta {
 	}
 }
 
-func (bs *BackupSchedule) CronJobPodSpec() corev1.PodSpec {
+func (bs *BackupSchedule) cronJobPodSpec() corev1.PodSpec {
 	mode := int32(0550)
 	volumeName := "k8s-backup-operator-create-backup-script"
 	scriptPath := "/bin/entrypoint.sh"
