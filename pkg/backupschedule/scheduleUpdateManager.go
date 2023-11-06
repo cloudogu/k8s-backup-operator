@@ -28,7 +28,7 @@ func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.B
 	schedulesClient := um.clientSet.EcosystemV1Alpha1().BackupSchedules(um.namespace)
 	backupSchedule, err := schedulesClient.UpdateStatusUpdating(ctx, backupSchedule)
 	if err != nil {
-		return fmt.Errorf("failed to set status [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleStatusUpdating, backupSchedule.Name, err)
+		return fmt.Errorf("failed to set status [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleStatusUpdating, backupScheduleName, err)
 	}
 
 	cronJobClient := um.clientSet.BatchV1().CronJobs(um.namespace)
