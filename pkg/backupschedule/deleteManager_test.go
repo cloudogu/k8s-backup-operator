@@ -9,19 +9,19 @@ import (
 	"testing"
 )
 
-func TestNewScheduleDeleteManager(t *testing.T) {
+func TestNewDeleteManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 
 		// when
-		manager := newScheduleDeleteManager(nil, nil, "test")
+		manager := newDeleteManager(nil, nil, "test")
 
 		// then
 		require.NotNil(t, manager)
 	})
 }
 
-func Test_scheduleDeleteManager_delete(t *testing.T) {
+func Test_defaultDeleteManager_delete(t *testing.T) {
 	originalMaxTries := maxTries
 	defer func() { maxTries = originalMaxTries }()
 	maxTries = 1

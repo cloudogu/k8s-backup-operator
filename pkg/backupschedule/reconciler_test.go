@@ -21,11 +21,11 @@ import (
 const testNamespace = "test-ns"
 const testBackupSchedule = "test-backup-schedule"
 
-func TestNewBackupScheduleReconciler(t *testing.T) {
+func TestNewReconciler(t *testing.T) {
 	// given
 
 	// when
-	actual := NewBackupScheduleReconciler(nil, nil, testNamespace, nil)
+	actual := NewReconciler(nil, nil, testNamespace, nil)
 
 	// then
 	assert.NotEmpty(t, actual)

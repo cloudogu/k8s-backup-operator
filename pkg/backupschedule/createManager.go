@@ -19,7 +19,7 @@ type defaultCreateManager struct {
 	namespace string
 }
 
-func newScheduleCreateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultCreateManager {
+func newCreateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultCreateManager {
 	return &defaultCreateManager{clientSet: clientSet, recorder: recorder, namespace: namespace}
 }
 

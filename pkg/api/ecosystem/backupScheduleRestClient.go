@@ -273,7 +273,8 @@ func (d *backupScheduleClient) DeleteCollection(ctx context.Context, opts metav1
 // Patch applies the patch and returns the patched backup schedule.
 func (d *backupScheduleClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.BackupSchedule, err error) {
 	result = &v1.BackupSchedule{}
-	err = d.client.Patch(pt).
+	patch := d.client.Patch(pt)
+	err = patch.
 		Namespace(d.ns).
 		Resource("backupschedules").
 		Name(name).

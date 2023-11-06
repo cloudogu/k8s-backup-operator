@@ -17,7 +17,7 @@ type defaultDeleteManager struct {
 	namespace string
 }
 
-func newScheduleDeleteManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultDeleteManager {
+func newDeleteManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultDeleteManager {
 	return &defaultDeleteManager{clientSet: clientSet, recorder: recorder, namespace: namespace}
 }
 

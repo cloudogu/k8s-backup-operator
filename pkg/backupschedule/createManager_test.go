@@ -36,19 +36,19 @@ type cronJobInterface interface {
 	typedbatchv1.CronJobInterface
 }
 
-func TestNewScheduleCreateManager(t *testing.T) {
+func TestNewCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 
 		// when
-		manager := newScheduleCreateManager(nil, nil, "test")
+		manager := newCreateManager(nil, nil, "test")
 
 		// then
 		require.NotNil(t, manager)
 	})
 }
 
-func Test_scheduleCreateManager_create(t *testing.T) {
+func Test_defaultCreateManager_create(t *testing.T) {
 	originalMaxTries := maxTries
 	defer func() { maxTries = originalMaxTries }()
 	maxTries = 1

@@ -11,19 +11,19 @@ import (
 	"testing"
 )
 
-func TestNewScheduleUpdateManager(t *testing.T) {
+func TestNewUpdateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 
 		// when
-		manager := newScheduleUpdateManager(nil, nil, "test")
+		manager := newUpdateManager(nil, nil, "test")
 
 		// then
 		require.NotNil(t, manager)
 	})
 }
 
-func Test_scheduleUpdateManager_update(t *testing.T) {
+func Test_defaultUpdateManager_update(t *testing.T) {
 	originalMaxTries := maxTries
 	defer func() { maxTries = originalMaxTries }()
 	maxTries = 1

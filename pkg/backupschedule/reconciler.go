@@ -36,7 +36,7 @@ type backupScheduleReconciler struct {
 	requeueHandler requeueHandler
 }
 
-func NewBackupScheduleReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, requeueHandler requeueHandler) *backupScheduleReconciler {
+func NewReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, requeueHandler requeueHandler) *backupScheduleReconciler {
 	return &backupScheduleReconciler{
 		clientSet:      clientSet,
 		recorder:       recorder,

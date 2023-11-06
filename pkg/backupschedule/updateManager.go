@@ -17,7 +17,7 @@ type defaultUpdateManager struct {
 	namespace string
 }
 
-func newScheduleUpdateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultUpdateManager {
+func newUpdateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultUpdateManager {
 	return &defaultUpdateManager{clientSet: clientSet, recorder: recorder, namespace: namespace}
 }
 
