@@ -71,14 +71,14 @@ func (bs *BackupSchedule) GetStatus() RequeueableStatus {
 	return bs.Status
 }
 
-func (bs *BackupSchedule) CronJobPodTemplate(namespace string) corev1.PodTemplateSpec {
+func (bs *BackupSchedule) CronJobPodTemplate() corev1.PodTemplateSpec {
 	return corev1.PodTemplateSpec{
-		ObjectMeta: bs.cronJobPodMeta(namespace),
+		ObjectMeta: cronJobPodMeta(bs.Namespace),
 		Spec:       bs.cronJobPodSpec(),
 	}
 }
 
-func (bs *BackupSchedule) cronJobPodMeta(namespace string) metav1.ObjectMeta {
+func cronJobPodMeta(namespace string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      "scheduled-backup-creator",
 		Namespace: namespace,
@@ -105,8 +105,7 @@ func (bs *BackupSchedule) cronJobPodSpec() corev1.PodSpec {
 				ReadOnly:  true,
 				MountPath: scriptPath,
 				SubPath:   "entrypoint.sh",
-			},
-			},
+			}},
 		}},
 		RestartPolicy:      corev1.RestartPolicyOnFailure,
 		ServiceAccountName: "k8s-backup-operator-scheduled-backup-creator-manager",
