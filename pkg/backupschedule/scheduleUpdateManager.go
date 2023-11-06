@@ -25,7 +25,7 @@ func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.B
 	um.recorder.Event(backupSchedule, corev1.EventTypeNormal, v1.UpdateEventReason, "Updating backup schedule")
 
 	schedulesClient := um.clientSet.EcosystemV1Alpha1().BackupSchedules(um.namespace)
-	_, err := schedulesClient.UpdateStatusUpdating(ctx, backupSchedule)
+	backupSchedule, err := schedulesClient.UpdateStatusUpdating(ctx, backupSchedule)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleStatusUpdating, backupSchedule.Name, err)
 	}
