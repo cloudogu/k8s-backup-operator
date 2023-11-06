@@ -77,7 +77,7 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 			Schedule: schedule.Spec.Schedule,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
-					Template: schedule.CronJobPodTemplate(cm.namespace),
+					Template: schedule.CronJobPodTemplate(),
 				},
 			},
 		},
