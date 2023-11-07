@@ -82,7 +82,50 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		cronJobMock := newMockCronJobInterface(t)
 		batchV1Mock.EXPECT().CronJobs(testNamespace).Return(cronJobMock)
 		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
-		cronJobMock.EXPECT().Create(testCtx, mock.Anything, metav1.CreateOptions{}).Return(&batchv1.CronJob{}, nil)
+
+		mode := int32(0550)
+		expectedCreatedCronJob := &batchv1.CronJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "backup-schedule-backupSchedule", Namespace: testNamespace,
+				Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+			},
+			Spec: batchv1.CronJobSpec{
+				Schedule: "0 0 * * *",
+				JobTemplate: batchv1.JobTemplateSpec{
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "scheduled-backup-creator", Namespace: testNamespace,
+								Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+							},
+							Spec: corev1.PodSpec{
+								Volumes: []corev1.Volume{{
+									Name: "k8s-backup-operator-create-backup-script",
+									VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+										LocalObjectReference: corev1.LocalObjectReference{Name: "k8s-create-backup-script"}, DefaultMode: &mode,
+									}},
+								}},
+								Containers: []corev1.Container{{
+									Name:    "backup-schedule-backupSchedule",
+									Image:   "bitnami/kubectl:1.27.7",
+									Command: []string{"/bin/entrypoint.sh"},
+									Env: []corev1.EnvVar{
+										{Name: "NAMESPACE", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}},
+										{Name: "SCHEDULED_BACKUP_NAME", Value: "backupSchedule"},
+										{Name: "PROVIDER", Value: "velero"},
+									},
+									VolumeMounts:    []corev1.VolumeMount{{Name: "k8s-backup-operator-create-backup-script", ReadOnly: true, MountPath: "/bin/entrypoint.sh", SubPath: "entrypoint.sh"}},
+									ImagePullPolicy: corev1.PullIfNotPresent,
+								}},
+								RestartPolicy:      corev1.RestartPolicyOnFailure,
+								ServiceAccountName: "k8s-backup-operator-scheduled-backup-creator-manager",
+							},
+						},
+					},
+				},
+			},
+		}
+		cronJobMock.EXPECT().Create(testCtx, expectedCreatedCronJob, metav1.CreateOptions{}).Return(&batchv1.CronJob{}, nil)
 
 		sut := &defaultCreateManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace}
 
