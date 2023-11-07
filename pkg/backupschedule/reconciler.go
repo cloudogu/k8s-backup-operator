@@ -130,6 +130,7 @@ func (r *backupScheduleReconciler) evaluateRequiredOperation(ctx context.Context
 }
 
 func getCronJobProvider(cronJob *batchv1.CronJob) string {
+	// TODO: Index out of range abfangen?
 	envList := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env
 
 	for _, env := range envList {

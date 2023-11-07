@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -472,6 +473,7 @@ func Test_backupScheduleReconciler_Reconcile(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to evaluate required operation for backup schedule test-backup-schedule")
 		assert.Equal(t, ctrl.Result{}, actual)
 	})
+
 	t.Run("should update if status created and backup schedule does not equal cronjob schedule", func(t *testing.T) {
 		// given
 		backupSchedule := &k8sv1.BackupSchedule{
@@ -493,6 +495,97 @@ func Test_backupScheduleReconciler_Reconcile(t *testing.T) {
 			},
 			Spec: batchv1.CronJobSpec{
 				Schedule: "* * * * *",
+				JobTemplate: batchv1.JobTemplateSpec{
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{{
+									Name: testBackupSchedule,
+									Env: []corev1.EnvVar{
+										{Name: k8sv1.ProviderEnvVar, Value: "velero"}},
+								}},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		cronJobClient := newMockCronJobInterface(t)
+		cronJobClient.EXPECT().Get(testCtx, backupSchedule.CronJobName(), metav1.GetOptions{}).Return(cronJob, nil)
+		batchClient := newMockBatchV1Interface(t)
+		batchClient.EXPECT().CronJobs(testNamespace).Return(cronJobClient)
+
+		backupScheduleClient := newMockEcosystemBackupScheduleInterface(t)
+		backupScheduleClient.EXPECT().Get(testCtx, testBackupSchedule, metav1.GetOptions{}).Return(backupSchedule, nil)
+		ecosystemClient := newMockEcosystemV1Alpha1Interface(t)
+		ecosystemClient.EXPECT().BackupSchedules(testNamespace).Return(backupScheduleClient)
+
+		clientSet := newMockEcosystemInterface(t)
+		clientSet.EXPECT().EcosystemV1Alpha1().Return(ecosystemClient)
+		clientSet.EXPECT().BatchV1().Return(batchClient)
+
+		manager := NewMockManager(t)
+		manager.EXPECT().update(testCtx, backupSchedule).Return(nil)
+		recorder := newMockEventRecorder(t)
+		recorder.EXPECT().Event(backupSchedule, "Normal", "Update", "Update successful")
+		requeueHandler := newMockRequeueHandler(t)
+		requeueHandler.EXPECT().Handle(testCtx, "Update of backup schedule test-backup-schedule failed", backupSchedule, nil, "created").Return(ctrl.Result{}, nil)
+
+		sut := &backupScheduleReconciler{
+			clientSet:      clientSet,
+			namespace:      testNamespace,
+			manager:        manager,
+			recorder:       recorder,
+			requeueHandler: requeueHandler,
+		}
+		request := ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: testNamespace,
+			Name:      testBackupSchedule,
+		}}
+
+		// when
+		actual, err := sut.Reconcile(testCtx, request)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, actual)
+	})
+
+	t.Run("should update if status created and backup provider does not equal cronjob provider", func(t *testing.T) {
+		// given
+		backupSchedule := &k8sv1.BackupSchedule{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testBackupSchedule,
+				Namespace: testNamespace,
+			},
+			Spec: k8sv1.BackupScheduleSpec{
+				Schedule: "0 0 * * *",
+				Provider: "veleroV2",
+			},
+			Status: k8sv1.BackupScheduleStatus{Status: k8sv1.BackupScheduleStatusCreated},
+		}
+
+		cronJob := &batchv1.CronJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      backupSchedule.CronJobName(),
+				Namespace: testNamespace,
+			},
+			Spec: batchv1.CronJobSpec{
+				Schedule: "0 0 * * *",
+				JobTemplate: batchv1.JobTemplateSpec{
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{{
+									Name: testBackupSchedule,
+									Env: []corev1.EnvVar{
+										{Name: k8sv1.ProviderEnvVar, Value: "velero"}},
+								}},
+							},
+						},
+					},
+				},
 			},
 		}
 
