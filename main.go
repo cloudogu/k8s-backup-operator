@@ -180,7 +180,7 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 	additionalImageUpdater := newAdditionalImageUpdater(ecosystemClientSet, operatorConfig.Namespace, kubectlImage)
 	err = additionalImageUpdater.Update(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to patch kubectl image in backup schedules: %w", err)
+		return fmt.Errorf("failed to update additional images in existing resources: %w", err)
 	}
 
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)

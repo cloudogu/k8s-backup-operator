@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/cloudogu/cesapp-lib/registry"
+	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,6 +18,18 @@ type controllerManager interface {
 }
 
 // used for mocks
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type additionalImageGetter interface {
+	additionalimages.Getter
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type additionalImageUpdater interface {
+	additionalimages.Updater
+}
 
 //nolint:unused
 //goland:noinspection GoUnusedType
