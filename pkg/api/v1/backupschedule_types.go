@@ -6,9 +6,9 @@ package v1
 
 import (
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,6 +44,8 @@ type BackupScheduleStatus struct {
 	Status string `json:"status,omitempty"`
 	// RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.
 	RequeueTimeNanos time.Duration `json:"requeueTimeNanos,omitempty"`
+	// CurrentKubectlImage is the image currently used to create scheduled backups.
+	CurrentKubectlImage string `json:"currentKubectlImage"`
 }
 
 // GetRequeueTimeNanos returns the requeue time in nano seconds.

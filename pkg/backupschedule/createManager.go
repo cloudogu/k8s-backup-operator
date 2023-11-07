@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 )
@@ -56,12 +57,23 @@ func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.B
 		return err
 	}
 
+	backupSchedule, err = cm.setCurrentKubectlImage(ctx, backupScheduleClient, backupSchedule)
+	if err != nil {
+		return fmt.Errorf("failed to set currently used kubectl image in status of backup schedule resource [%s]: %w", backupScheduleName, err)
+	}
+
 	_, err = backupScheduleClient.UpdateStatusCreated(ctx, backupSchedule)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in backup schedule resource [%s]: %w", v1.BackupScheduleStatusCreated, backupScheduleName, err)
 	}
 
 	return nil
+}
+
+func (cm *defaultCreateManager) setCurrentKubectlImage(ctx context.Context, client ecosystem.BackupScheduleInterface, schedule *v1.BackupSchedule) (*v1.BackupSchedule, error) {
+	schedule.Status.CurrentKubectlImage = cm.kubectlImage
+
+	return client.UpdateStatus(ctx, schedule, metav1.UpdateOptions{})
 }
 
 func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.BackupSchedule) error {
