@@ -10,9 +10,9 @@ type defaultManager struct {
 	deleteManager
 }
 
-func NewManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultManager {
+func NewManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string, kubectlImage string) *defaultManager {
 	return &defaultManager{
-		createManager: newCreateManager(clientSet, recorder, namespace),
+		createManager: newCreateManager(clientSet, recorder, namespace, kubectlImage),
 		updateManager: newUpdateManager(clientSet, recorder, namespace),
 		deleteManager: newDeleteManager(clientSet, recorder, namespace),
 	}

@@ -41,7 +41,7 @@ func TestNewCreateManager(t *testing.T) {
 		// given
 
 		// when
-		manager := newCreateManager(nil, nil, "test")
+		manager := newCreateManager(nil, nil, "test", "")
 
 		// then
 		require.NotNil(t, manager)

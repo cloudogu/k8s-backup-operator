@@ -97,7 +97,7 @@ func TestBackupSchedule_CronJobPodTemplate(t *testing.T) {
 	}
 
 	// when
-	actual := sut.CronJobPodTemplate()
+	actual := sut.CronJobPodTemplate("")
 
 	// then
 	assert.Equal(t, expected, actual)

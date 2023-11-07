@@ -26,7 +26,7 @@ func TestNewReconciler(t *testing.T) {
 	// given
 
 	// when
-	actual := NewReconciler(nil, nil, testNamespace, nil)
+	actual := NewReconciler(nil, nil, testNamespace, nil, "")
 
 	// then
 	assert.NotEmpty(t, actual)

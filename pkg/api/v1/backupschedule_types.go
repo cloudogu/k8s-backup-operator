@@ -73,10 +73,10 @@ func (bs *BackupSchedule) GetStatus() RequeueableStatus {
 	return bs.Status
 }
 
-func (bs *BackupSchedule) CronJobPodTemplate() corev1.PodTemplateSpec {
+func (bs *BackupSchedule) CronJobPodTemplate(kubectlImage string) corev1.PodTemplateSpec {
 	return corev1.PodTemplateSpec{
 		ObjectMeta: cronJobPodMeta(bs.Namespace),
-		Spec:       bs.cronJobPodSpec(),
+		Spec:       bs.cronJobPodSpec(kubectlImage),
 	}
 }
 
@@ -91,14 +91,14 @@ func cronJobPodMeta(namespace string) metav1.ObjectMeta {
 	}
 }
 
-func (bs *BackupSchedule) cronJobPodSpec() corev1.PodSpec {
+func (bs *BackupSchedule) cronJobPodSpec(kubectlImage string) corev1.PodSpec {
 	mode := int32(0550)
 	volumeName := "k8s-backup-operator-create-backup-script"
 	scriptPath := "/bin/entrypoint.sh"
 	return corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Name:            bs.CronJobName(),
-			Image:           "bitnami/kubectl:1.27.7",
+			Image:           kubectlImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command:         []string{scriptPath},
 			Env:             bs.cronJobEnvVars(),

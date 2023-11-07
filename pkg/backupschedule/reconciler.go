@@ -36,12 +36,12 @@ type backupScheduleReconciler struct {
 	requeueHandler requeueHandler
 }
 
-func NewReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, requeueHandler requeueHandler) *backupScheduleReconciler {
+func NewReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, requeueHandler requeueHandler, kubectlImage string) *backupScheduleReconciler {
 	return &backupScheduleReconciler{
 		clientSet:      clientSet,
 		recorder:       recorder,
 		requeueHandler: requeueHandler,
-		manager:        NewManager(clientSet, recorder, namespace),
+		manager:        NewManager(clientSet, recorder, namespace, kubectlImage),
 		namespace:      namespace,
 	}
 }

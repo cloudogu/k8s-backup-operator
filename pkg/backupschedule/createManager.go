@@ -14,13 +14,14 @@ import (
 )
 
 type defaultCreateManager struct {
-	clientSet ecosystemInterface
-	recorder  eventRecorder
-	namespace string
+	clientSet    ecosystemInterface
+	recorder     eventRecorder
+	namespace    string
+	kubectlImage string
 }
 
-func newCreateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultCreateManager {
-	return &defaultCreateManager{clientSet: clientSet, recorder: recorder, namespace: namespace}
+func newCreateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string, kubectlImage string) *defaultCreateManager {
+	return &defaultCreateManager{clientSet: clientSet, recorder: recorder, namespace: namespace, kubectlImage: kubectlImage}
 }
 
 func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.BackupSchedule) error {
@@ -77,7 +78,7 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 			Schedule: schedule.Spec.Schedule,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
-					Template: schedule.CronJobPodTemplate(),
+					Template: schedule.CronJobPodTemplate(cm.kubectlImage),
 				},
 			},
 		},

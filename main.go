@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/backupschedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
@@ -143,6 +145,8 @@ var parseFlags = func(ctrlOpts ctrl.Options) (ctrl.Options, zap.Options) {
 func configureReconcilers(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
 	var recorder eventRecorder = k8sManager.GetEventRecorderFor("k8s-backup-operator")
 
+	ctx := context.Background()
+
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create k8s clientset: %w", err)
@@ -159,6 +163,12 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create CES registry: %w", err)
+	}
+
+	imageGetter := additionalimages.NewGetter(k8sClientSet, operatorConfig.Namespace)
+	kubectlImage, err := imageGetter.ImageForKey(ctx, config.KubectlImageConfigmapNameKey)
+	if err != nil {
+		return fmt.Errorf("failed to get kubectl image: %w", err)
 	}
 
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
@@ -180,7 +190,7 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
 
-	if err = backupschedule.NewReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler).SetupWithManager(k8sManager); err != nil {
+	if err = backupschedule.NewReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler, kubectlImage).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backupSchedule controller: %w", err)
 	}
 	// +kubebuilder:scaffold:builder
