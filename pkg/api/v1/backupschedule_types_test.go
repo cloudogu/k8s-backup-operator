@@ -54,7 +54,12 @@ func TestBackupSchedule_CronJobPodTemplate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "scheduled-backup-creator",
 			Namespace: testNamespace,
-			Labels:    map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+			Labels: map[string]string{
+				"app":                          "ces",
+				"k8s.cloudogu.com/part-of":     "backup",
+				"app.kubernetes.io/created-by": "k8s-backup-operator",
+				"app.kubernetes.io/part-of":    "k8s-backup-operator",
+			},
 		},
 		Spec: corev1.PodSpec{
 			Volumes: []corev1.Volume{{
@@ -97,7 +102,7 @@ func TestBackupSchedule_CronJobPodTemplate(t *testing.T) {
 	}
 
 	// when
-	actual := sut.CronJobPodTemplate("")
+	actual := sut.CronJobPodTemplate("bitnami/kubectl:1.27.7")
 
 	// then
 	assert.Equal(t, expected, actual)

@@ -87,7 +87,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		expectedCreatedCronJob := &batchv1.CronJob{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "backup-schedule-backupSchedule", Namespace: testNamespace,
-				Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+				Labels: map[string]string{
+					"app":                          "ces",
+					"k8s.cloudogu.com/part-of":     "backup",
+					"app.kubernetes.io/created-by": "k8s-backup-operator",
+					"app.kubernetes.io/part-of":    "k8s-backup-operator",
+				},
 			},
 			Spec: batchv1.CronJobSpec{
 				Schedule: "0 0 * * *",
@@ -96,7 +101,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "scheduled-backup-creator", Namespace: testNamespace,
-								Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+								Labels: map[string]string{
+									"app":                          "ces",
+									"k8s.cloudogu.com/part-of":     "backup",
+									"app.kubernetes.io/created-by": "k8s-backup-operator",
+									"app.kubernetes.io/part-of":    "k8s-backup-operator",
+								},
 							},
 							Spec: corev1.PodSpec{
 								Volumes: []corev1.Volume{{
@@ -127,7 +137,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		}
 		cronJobMock.EXPECT().Create(testCtx, expectedCreatedCronJob, metav1.CreateOptions{}).Return(&batchv1.CronJob{}, nil)
 
-		sut := &defaultCreateManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace}
+		sut := &defaultCreateManager{
+			recorder:     recorderMock,
+			clientSet:    clientMock,
+			namespace:    testNamespace,
+			kubectlImage: "bitnami/kubectl:1.27.7",
+		}
 
 		// when
 		err := sut.create(testCtx, backupSchedule)

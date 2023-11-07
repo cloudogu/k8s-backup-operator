@@ -70,8 +70,10 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 			Name:      schedule.CronJobName(),
 			Namespace: cm.namespace,
 			Labels: map[string]string{
-				"app":                      "ces",
-				"k8s.cloudogu.com/part-of": "backup",
+				"app":                          "ces",
+				"k8s.cloudogu.com/part-of":     "backup",
+				"app.kubernetes.io/created-by": "k8s-backup-operator",
+				"app.kubernetes.io/part-of":    "k8s-backup-operator",
 			},
 		},
 		Spec: batchv1.CronJobSpec{

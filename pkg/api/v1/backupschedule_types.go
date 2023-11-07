@@ -85,8 +85,10 @@ func cronJobPodMeta(namespace string) metav1.ObjectMeta {
 		Name:      "scheduled-backup-creator",
 		Namespace: namespace,
 		Labels: map[string]string{
-			"app":                      "ces",
-			"k8s.cloudogu.com/part-of": "backup",
+			"app":                          "ces",
+			"k8s.cloudogu.com/part-of":     "backup",
+			"app.kubernetes.io/created-by": "k8s-backup-operator",
+			"app.kubernetes.io/part-of":    "k8s-backup-operator",
 		},
 	}
 }

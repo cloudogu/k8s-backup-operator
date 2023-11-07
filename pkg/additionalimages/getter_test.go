@@ -12,7 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/cloudogu/k8s-dogu-operator/controllers/config"
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 )
 
 const testNamespace = "test-namespace"
@@ -26,11 +26,11 @@ func Test_additionalImageGetter_ImageForKey(t *testing.T) {
 		sut := NewGetter(fakeClient, testNamespace)
 
 		// when
-		_, err := sut.ImageForKey(testCtx, config.ChownInitImageConfigmapNameKey)
+		_, err := sut.ImageForKey(testCtx, config.KubectlImageConfigmapNameKey)
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "error while getting configmap 'k8s-dogu-operator-additional-images':")
+		assert.ErrorContains(t, err, "error while getting configmap 'k8s-backup-operator-additional-images':")
 	})
 	t.Run("should fail on missing configmap key", func(t *testing.T) {
 		// given
@@ -44,11 +44,11 @@ func Test_additionalImageGetter_ImageForKey(t *testing.T) {
 		sut := NewGetter(fakeClient, testNamespace)
 
 		// when
-		_, err := sut.ImageForKey(testCtx, config.ChownInitImageConfigmapNameKey)
+		_, err := sut.ImageForKey(testCtx, config.KubectlImageConfigmapNameKey)
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "configmap 'k8s-dogu-operator-additional-images' must not contain empty chown init image name")
+		assert.ErrorContains(t, err, "configmap 'k8s-backup-operator-additional-images' must not contain empty chown init image name")
 	})
 	t.Run("should fail on invalid image tag", func(t *testing.T) {
 		// given
@@ -57,17 +57,17 @@ func Test_additionalImageGetter_ImageForKey(t *testing.T) {
 				Name:      config.OperatorAdditionalImagesConfigmapName,
 				Namespace: testNamespace,
 			},
-			Data: map[string]string{config.ChownInitImageConfigmapNameKey: "busybox:::::123"},
+			Data: map[string]string{config.KubectlImageConfigmapNameKey: "busybox:::::123"},
 		}
 		fakeClient := fake.NewSimpleClientset(invalidCM)
 		sut := NewGetter(fakeClient, testNamespace)
 
 		// when
-		_, err := sut.ImageForKey(testCtx, config.ChownInitImageConfigmapNameKey)
+		_, err := sut.ImageForKey(testCtx, config.KubectlImageConfigmapNameKey)
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "configmap 'k8s-dogu-operator-additional-images' contains an invalid image tag: image tag 'busybox:::::123' seems invalid")
+		assert.ErrorContains(t, err, "configmap 'k8s-backup-operator-additional-images' contains an invalid image tag: image tag 'busybox:::::123' seems invalid")
 	})
 	t.Run("should succeed on valid configmap", func(t *testing.T) {
 		// given
@@ -76,17 +76,17 @@ func Test_additionalImageGetter_ImageForKey(t *testing.T) {
 				Name:      config.OperatorAdditionalImagesConfigmapName,
 				Namespace: testNamespace,
 			},
-			Data: map[string]string{config.ChownInitImageConfigmapNameKey: "busybox:123"},
+			Data: map[string]string{config.KubectlImageConfigmapNameKey: "kubectl:123"},
 		}
 		fakeClient := fake.NewSimpleClientset(validCM)
 		sut := NewGetter(fakeClient, testNamespace)
 
 		// when
-		actual, err := sut.ImageForKey(testCtx, config.ChownInitImageConfigmapNameKey)
+		actual, err := sut.ImageForKey(testCtx, config.KubectlImageConfigmapNameKey)
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, "busybox:123", actual)
+		assert.Equal(t, "kubectl:123", actual)
 	})
 }
 
