@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/dlclark/regexp2"
+
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 )
 
 // imageTagValidator defines a regexp string that validates a container reference. These include:
@@ -19,17 +20,17 @@ import (
 var imageTagValidationString = "^(?:(?=[^:\\/]{1,253})(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(?:\\.(?!-)[a-zA-Z0-9-]{1,63}(?<!-))*(?::[0-9]{1,5})?/)?((?![._-])(?:[a-z0-9._-]*)(?<![._-])(?:/(?![._-])[a-z0-9._-]*(?<![._-]))*)(?::(?![.-])[a-zA-Z0-9_.-]{1,128})?$"
 var imageTagValidationRegexp, _ = regexp2.Compile(imageTagValidationString, regexp2.None)
 
-type Getter struct {
+type getter struct {
 	configmapClient kubernetes.Interface
 	namespace       string
 }
 
-func NewGetter(client kubernetes.Interface, namespace string) *Getter {
-	return &Getter{configmapClient: client, namespace: namespace}
+func NewGetter(client kubernetes.Interface, namespace string) Getter {
+	return &getter{configmapClient: client, namespace: namespace}
 }
 
 // ImageForKey returns a container image reference as found in OperatorAdditionalImagesConfigmapName.
-func (adig *Getter) ImageForKey(ctx context.Context, key string) (string, error) {
+func (adig *getter) ImageForKey(ctx context.Context, key string) (string, error) {
 	configMap, err := adig.configmapClient.CoreV1().
 		ConfigMaps(adig.namespace).
 		Get(ctx, config.OperatorAdditionalImagesConfigmapName, metav1.GetOptions{})

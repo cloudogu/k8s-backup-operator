@@ -4,10 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
-	"github.com/cloudogu/k8s-backup-operator/pkg/backupschedule"
-	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
-	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"os"
 	"time"
 
@@ -27,10 +23,15 @@ import (
 
 	"github.com/cloudogu/cesapp-lib/core"
 	reg "github.com/cloudogu/cesapp-lib/registry"
+
+	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
+	"github.com/cloudogu/k8s-backup-operator/pkg/backupschedule"
+	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"github.com/cloudogu/k8s-backup-operator/pkg/restore"
 	// +kubebuilder:scaffold:imports
 )
@@ -48,6 +49,11 @@ var (
 var (
 	leaseDuration = time.Second * 60
 	renewDeadline = time.Second * 40
+)
+
+var (
+	newAdditionalImageGetter  = additionalimages.NewGetter
+	newAdditionalImageUpdater = additionalimages.NewUpdater
 )
 
 func init() {
@@ -165,10 +171,16 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		return fmt.Errorf("failed to create CES registry: %w", err)
 	}
 
-	imageGetter := additionalimages.NewGetter(k8sClientSet, operatorConfig.Namespace)
+	imageGetter := newAdditionalImageGetter(k8sClientSet, operatorConfig.Namespace)
 	kubectlImage, err := imageGetter.ImageForKey(ctx, config.KubectlImageConfigmapNameKey)
 	if err != nil {
 		return fmt.Errorf("failed to get kubectl image: %w", err)
+	}
+
+	additionalImageUpdater := newAdditionalImageUpdater(ecosystemClientSet, operatorConfig.Namespace, kubectlImage)
+	err = additionalImageUpdater.Update(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to patch kubectl image in backup schedules: %w", err)
 	}
 
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
