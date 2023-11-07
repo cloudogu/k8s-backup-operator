@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
@@ -53,7 +54,9 @@ func (bsp *updater) Update(ctx context.Context) error {
 func (bsp *updater) patchCronJob(ctx context.Context, schedule *v1.BackupSchedule) error {
 	cronJobClient := bsp.clientSet.BatchV1().CronJobs(bsp.namespace)
 	cronJob, err := cronJobClient.Get(ctx, schedule.CronJobName(), metav1.GetOptions{})
-	if err != nil {
+	if k8sErr.IsNotFound(err) {
+		return nil
+	} else if err != nil {
 		return fmt.Errorf("failed to get cron job %s: %w", schedule.CronJobName(), err)
 	}
 
