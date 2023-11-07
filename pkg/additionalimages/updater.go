@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
 
@@ -17,7 +17,7 @@ type updater struct {
 	kubectlImage string
 }
 
-func NewUpdater(clientSet ecosystemClientSet, namespace string, kubectlImage string) Updater {
+func NewUpdater(clientSet ecosystem.Interface, namespace string, kubectlImage string) Updater {
 	return &updater{clientSet: clientSet, namespace: namespace, kubectlImage: kubectlImage}
 }
 
@@ -25,14 +25,18 @@ func NewUpdater(clientSet ecosystemClientSet, namespace string, kubectlImage str
 // E.g., the kubectl image used in the CronJob of a BackupSchedule.
 func (bsp *updater) Update(ctx context.Context) error {
 	backupScheduleClient := bsp.clientSet.EcosystemV1Alpha1().BackupSchedules(bsp.namespace)
-	imageNotUpToDate := fields.OneTermNotEqualSelector("status.currentKubectlImage", bsp.kubectlImage)
-	scheduleList, err := backupScheduleClient.List(ctx, metav1.ListOptions{FieldSelector: imageNotUpToDate.String()})
+	scheduleList, err := backupScheduleClient.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list backup schedules whose images are not up to date: %w", err)
 	}
 
 	var errs []error
 	for _, backupSchedule := range scheduleList.Items {
+		if backupSchedule.Status.CurrentKubectlImage == bsp.kubectlImage {
+			// image is up-to-date, nothing to do
+			continue
+		}
+
 		err = bsp.patchCronJob(ctx, &backupSchedule)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to update additional images in cron job %s: %w", backupSchedule.CronJobName(), err))
