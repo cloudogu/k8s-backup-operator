@@ -76,6 +76,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		backupScheduleClientMock.EXPECT().UpdateStatusCreating(testCtx, backupSchedule).Return(backupSchedule, nil)
 		backupScheduleClientMock.EXPECT().AddFinalizer(testCtx, backupSchedule, backupv1.BackupScheduleFinalizer).Return(backupSchedule, nil)
 		backupScheduleClientMock.EXPECT().AddLabels(testCtx, backupSchedule).Return(backupSchedule, nil)
+		backupScheduleClientMock.EXPECT().UpdateStatus(testCtx, backupSchedule, metav1.UpdateOptions{}).Return(backupSchedule, nil)
 		backupScheduleClientMock.EXPECT().UpdateStatusCreated(testCtx, backupSchedule).Return(backupSchedule, nil)
 
 		batchV1Mock := newMockBatchV1Interface(t)
@@ -149,6 +150,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
+		assert.Equal(t, "bitnami/kubectl:1.27.7", backupSchedule.Status.CurrentKubectlImage)
 	})
 
 	t.Run("should return error on update status creating error", func(t *testing.T) {
@@ -250,6 +252,48 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to add labels to backup schedule resource")
 	})
 
+	t.Run("should return error on update status error", func(t *testing.T) {
+		// given
+		backupScheduleName := "backupSchedule"
+		testNamespace := "ecosystem"
+		backupSchedule := &backupv1.BackupSchedule{
+			ObjectMeta: metav1.ObjectMeta{Name: backupScheduleName, Namespace: testNamespace},
+			Spec: backupv1.BackupScheduleSpec{
+				Schedule: "0 0 * * *",
+				Provider: "velero",
+			},
+		}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backupSchedule, corev1.EventTypeNormal, backupv1.CreateEventReason, "Creating backup schedule")
+
+		backupScheduleClientMock := newMockEcosystemBackupScheduleInterface(t)
+		v1Alpha1Mock := newMockEcosystemV1Alpha1InterfaceInterface(t)
+		v1Alpha1Mock.EXPECT().BackupSchedules(testNamespace).Return(backupScheduleClientMock)
+		clientMock := newMockEcosystemInterface(t)
+		clientMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		backupScheduleClientMock.EXPECT().UpdateStatusCreating(testCtx, backupSchedule).Return(backupSchedule, nil)
+		backupScheduleClientMock.EXPECT().AddFinalizer(testCtx, backupSchedule, backupv1.BackupScheduleFinalizer).Return(backupSchedule, nil)
+		backupScheduleClientMock.EXPECT().AddLabels(testCtx, backupSchedule).Return(backupSchedule, nil)
+		backupScheduleClientMock.EXPECT().UpdateStatus(testCtx, backupSchedule, metav1.UpdateOptions{}).Return(nil, assert.AnError)
+
+		batchV1Mock := newMockBatchV1Interface(t)
+		cronJobMock := newMockCronJobInterface(t)
+		batchV1Mock.EXPECT().CronJobs(testNamespace).Return(cronJobMock)
+		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
+		cronJobMock.EXPECT().Create(testCtx, mock.Anything, metav1.CreateOptions{}).Return(&batchv1.CronJob{}, nil)
+
+		sut := &defaultCreateManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace}
+
+		// when
+		err := sut.create(testCtx, backupSchedule)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to set currently used kubectl image in status of backup schedule resource")
+	})
+
 	t.Run("should return error on set status created error", func(t *testing.T) {
 		// given
 		backupScheduleName := "backupSchedule"
@@ -273,6 +317,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		backupScheduleClientMock.EXPECT().UpdateStatusCreating(testCtx, backupSchedule).Return(backupSchedule, nil)
 		backupScheduleClientMock.EXPECT().AddFinalizer(testCtx, backupSchedule, backupv1.BackupScheduleFinalizer).Return(backupSchedule, nil)
 		backupScheduleClientMock.EXPECT().AddLabels(testCtx, backupSchedule).Return(backupSchedule, nil)
+		backupScheduleClientMock.EXPECT().UpdateStatus(testCtx, backupSchedule, metav1.UpdateOptions{}).Return(backupSchedule, nil)
 		backupScheduleClientMock.EXPECT().UpdateStatusCreated(testCtx, backupSchedule).Return(nil, assert.AnError)
 
 		batchV1Mock := newMockBatchV1Interface(t)
