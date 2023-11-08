@@ -97,7 +97,7 @@ func (bsu *updater) patchCronJob(ctx context.Context, schedule *v1.BackupSchedul
 	}
 
 	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image = bsu.kubectlImage
-	cronJob, err = cronJobClient.Update(ctx, cronJob, metav1.UpdateOptions{})
+	_, err = cronJobClient.Update(ctx, cronJob, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update kubectl image in cron job %s: %w", schedule.CronJobName(), err)
 	}
