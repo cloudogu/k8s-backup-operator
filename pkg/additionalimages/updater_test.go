@@ -71,7 +71,11 @@ func Test_updater_Update(t *testing.T) {
 				assert.Equal(t, kubectlImage, backupSchedule.Status.CurrentKubectlImage)
 			}).Return(&backupv1.BackupSchedule{}, nil).Times(2)
 
-		sut := NewUpdater(clientMock, testNamespace, kubectlImage)
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Eventf(&scheduleOldImage, corev1.EventTypeNormal, imageUpdateEventReason, "Updated kubectl image in CronJob to %s.", kubectlImage)
+		recorderMock.EXPECT().Eventf(&scheduleNoImage, corev1.EventTypeNormal, imageUpdateEventReason, "Updated kubectl image in CronJob to %s.", kubectlImage)
+
+		sut := NewUpdater(clientMock, testNamespace, kubectlImage, recorderMock)
 
 		// when
 		err := sut.Update(testCtx)
