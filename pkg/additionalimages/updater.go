@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	corev1 "k8s.io/api/core/v1"
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
@@ -34,7 +34,15 @@ func (bsu *updater) Update(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Updating additional images")
 
-	return bsu.updateKubectlImages(ctx)
+	logger.Info("Updating kubectl images")
+	err := bsu.updateKubectlImages(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update kubectl images: %w", err)
+	}
+
+	logger.Info("Successfully updated additional images")
+
+	return nil
 }
 
 func (bsu *updater) updateKubectlImages(ctx context.Context) error {
@@ -47,6 +55,7 @@ func (bsu *updater) updateKubectlImages(ctx context.Context) error {
 		return fmt.Errorf("failed to list backup schedules whose images are not up to date: %w", err)
 	}
 
+	updatedImages := 0
 	var errs []error
 	for _, backupSchedule := range scheduleList.Items {
 		if backupSchedule.Status.CurrentKubectlImage == bsu.kubectlImage {
@@ -61,10 +70,15 @@ func (bsu *updater) updateKubectlImages(ctx context.Context) error {
 		}
 
 		err = bsu.updateCurrentImage(ctx, &backupSchedule, backupScheduleClient)
-		errs = append(errs, err)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		updatedImages += 1
 	}
 
-	logger.Info("Successfully updated kubectl images")
+	logger.Info(fmt.Sprintf("Updated %d kubectl images, encountered %d errors", updatedImages, len(errs)))
 	return errors.Join(errs...)
 }
 
