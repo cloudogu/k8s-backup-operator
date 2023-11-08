@@ -2,6 +2,7 @@ package backupschedule
 
 import (
 	"context"
+	typedbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -41,4 +42,28 @@ type deleteManager interface {
 
 type controllerManager interface {
 	ctrl.Manager
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type ecosystemBackupScheduleInterface interface {
+	ecosystem.BackupScheduleInterface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type ecosystemV1Alpha1Interface interface {
+	ecosystem.V1Alpha1Interface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type batchV1Interface interface {
+	typedbatchv1.BatchV1Interface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type cronJobInterface interface {
+	typedbatchv1.CronJobInterface
 }

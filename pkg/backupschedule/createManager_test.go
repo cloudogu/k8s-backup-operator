@@ -2,7 +2,6 @@ package backupschedule
 
 import (
 	"context"
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	backupv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -10,31 +9,10 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	typedbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	"testing"
 )
 
 var testCtx = context.TODO()
-
-//goland:noinspection GoUnusedType
-type ecosystemBackupScheduleInterface interface {
-	ecosystem.BackupScheduleInterface
-}
-
-//goland:noinspection GoUnusedType
-type ecosystemV1Alpha1Interface interface {
-	ecosystem.V1Alpha1Interface
-}
-
-//goland:noinspection GoUnusedType
-type batchV1Interface interface {
-	typedbatchv1.BatchV1Interface
-}
-
-//goland:noinspection GoUnusedType
-type cronJobInterface interface {
-	typedbatchv1.CronJobInterface
-}
 
 func TestNewCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
