@@ -5,6 +5,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -135,7 +136,7 @@ func Test_startOperator(t *testing.T) {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string) additionalimages.Updater {
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
 
@@ -183,7 +184,7 @@ func Test_startOperator(t *testing.T) {
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
 		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(assert.AnError)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string) additionalimages.Updater {
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
 
@@ -235,7 +236,7 @@ func Test_startOperator(t *testing.T) {
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
 		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(nil)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string) additionalimages.Updater {
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
 
@@ -297,7 +298,7 @@ func Test_startOperator(t *testing.T) {
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
 		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(nil)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string) additionalimages.Updater {
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
 
@@ -361,7 +362,7 @@ func Test_startOperator(t *testing.T) {
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
 		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(nil)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string) additionalimages.Updater {
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
 
@@ -433,7 +434,7 @@ func Test_startOperator(t *testing.T) {
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
 		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(nil)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string) additionalimages.Updater {
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
 
@@ -505,7 +506,7 @@ func Test_startOperator(t *testing.T) {
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
 		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(nil)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string) additionalimages.Updater {
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
 

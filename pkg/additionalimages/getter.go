@@ -3,6 +3,7 @@ package additionalimages
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -31,6 +32,9 @@ func NewGetter(client kubernetes.Interface, namespace string) Getter {
 
 // ImageForKey returns a container image reference as found in OperatorAdditionalImagesConfigmapName.
 func (adig *getter) ImageForKey(ctx context.Context, key string) (string, error) {
+	logger := log.FromContext(ctx)
+	logger.Info(fmt.Sprintf("Reading image for key %s from configmap %s", key, config.OperatorAdditionalImagesConfigmapName))
+
 	configMap, err := adig.configmapClient.CoreV1().
 		ConfigMaps(adig.namespace).
 		Get(ctx, config.OperatorAdditionalImagesConfigmapName, metav1.GetOptions{})
@@ -48,6 +52,7 @@ func (adig *getter) ImageForKey(ctx context.Context, key string) (string, error)
 		return "", fmt.Errorf("configmap '%s' contains an invalid image tag: %w", config.OperatorAdditionalImagesConfigmapName, err)
 	}
 
+	logger.Info(fmt.Sprintf("Got image %s for key %s", imageTag, key))
 	return imageTag, nil
 }
 

@@ -2,6 +2,7 @@ package additionalimages
 
 import (
 	"context"
+	"k8s.io/client-go/tools/record"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 )
@@ -12,6 +13,10 @@ type ecosystemClientSet interface {
 
 type backupScheduleClient interface {
 	ecosystem.BackupScheduleInterface
+}
+
+type eventRecorder interface {
+	record.EventRecorder
 }
 
 type Getter interface {
