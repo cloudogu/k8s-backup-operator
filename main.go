@@ -177,7 +177,7 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 		return fmt.Errorf("failed to get kubectl image: %w", err)
 	}
 
-	additionalImageUpdater := newAdditionalImageUpdater(ecosystemClientSet, operatorConfig.Namespace, kubectlImage)
+	additionalImageUpdater := newAdditionalImageUpdater(ecosystemClientSet, operatorConfig.Namespace, kubectlImage, recorder)
 	err = additionalImageUpdater.Update(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update additional images in existing resources: %w", err)

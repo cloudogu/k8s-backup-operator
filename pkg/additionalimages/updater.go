@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,15 +19,28 @@ type updater struct {
 	clientSet    ecosystemClientSet
 	namespace    string
 	kubectlImage string
+	recorder     eventRecorder
 }
 
-func NewUpdater(clientSet ecosystem.Interface, namespace string, kubectlImage string) Updater {
-	return &updater{clientSet: clientSet, namespace: namespace, kubectlImage: kubectlImage}
+const imageUpdateEventReason = "ImageUpdate"
+
+func NewUpdater(clientSet ecosystem.Interface, namespace string, kubectlImage string, recorder record.EventRecorder) Updater {
+	return &updater{clientSet: clientSet, namespace: namespace, kubectlImage: kubectlImage, recorder: recorder}
 }
 
 // Update sets the newest additional images wherever they are needed.
 // E.g., the kubectl image used in the CronJob of a BackupSchedule.
 func (bsu *updater) Update(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+	logger.Info("Updating additional images")
+
+	return bsu.updateKubectlImages(ctx)
+}
+
+func (bsu *updater) updateKubectlImages(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+	logger.Info("Updating kubectl images")
+
 	backupScheduleClient := bsu.clientSet.EcosystemV1Alpha1().BackupSchedules(bsu.namespace)
 	scheduleList, err := backupScheduleClient.List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -48,13 +64,19 @@ func (bsu *updater) Update(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 
+	logger.Info("Successfully updated kubectl images")
 	return errors.Join(errs...)
 }
 
 func (bsu *updater) patchCronJob(ctx context.Context, schedule *v1.BackupSchedule) error {
+	logger := log.FromContext(ctx)
+
 	cronJobClient := bsu.clientSet.BatchV1().CronJobs(bsu.namespace)
 	cronJob, err := cronJobClient.Get(ctx, schedule.CronJobName(), metav1.GetOptions{})
 	if k8sErr.IsNotFound(err) {
+		message := fmt.Sprintf("Cron job %s for backup schedule %s does not exist. Skipping kubectl image update.", schedule.CronJobName(), schedule.Name)
+		logger.Error(err, message)
+		bsu.recorder.Event(schedule, corev1.EventTypeWarning, imageUpdateEventReason, message)
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to get cron job %s: %w", schedule.CronJobName(), err)
@@ -66,6 +88,7 @@ func (bsu *updater) patchCronJob(ctx context.Context, schedule *v1.BackupSchedul
 		return fmt.Errorf("failed to update kubectl image in cron job %s: %w", schedule.CronJobName(), err)
 	}
 
+	bsu.recorder.Eventf(schedule, corev1.EventTypeNormal, imageUpdateEventReason, "Updated kubectl image in CronJob to %s.", bsu.kubectlImage)
 	return nil
 }
 

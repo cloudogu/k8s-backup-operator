@@ -3,6 +3,7 @@ package additionalimages
 import (
 	"context"
 	typedbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
+	"k8s.io/client-go/tools/record"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 )
@@ -13,6 +14,10 @@ type ecosystemClientSet interface {
 
 type backupScheduleClient interface {
 	ecosystem.BackupScheduleInterface
+}
+
+type eventRecorder interface {
+	record.EventRecorder
 }
 
 type Getter interface {
