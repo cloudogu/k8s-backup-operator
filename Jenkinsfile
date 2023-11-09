@@ -22,6 +22,7 @@ project = "github.com/${repositoryOwner}/${repositoryName}"
 registry = "registry.cloudogu.com"
 registry_namespace = "k8s"
 helmTemplateDir = "target/helm/${repositoryName}/templates"
+helmCrdTemplateDir = "target/helm/${repositoryName}-crd/templates"
 
 // Configuration of branches
 productionReleaseBranch = "main"
@@ -70,6 +71,9 @@ node('docker') {
                                 String controllerVersion = makefile.getVersion()
                                 make 'helm-package-release'
                                 sh ".bin/helm template ${repositoryName} target/helm/${repositoryName}-${controllerVersion}.tgz --output-dir=target/helm"
+
+                                make 'crd-helm-package'
+                                sh ".bin/helm template ${repositoryName}-crd target/helm-crd/${repositoryName}-crd-${controllerVersion}.tgz --output-dir=target/helm"
                             }
                         }
 
@@ -114,6 +118,7 @@ node('docker') {
             }
 
             stage('Deploy Manager') {
+                k3d.kubectl("apply -f ${helmCrdTemplateDir}")
                 k3d.kubectl("apply -f ${helmTemplateDir}")
             }
 
