@@ -24,6 +24,7 @@ const (
 const (
 	CreateEventReason        = "Creation"
 	DeleteEventReason        = "Delete"
+	UpdateEventReason        = "Update"
 	ErrorOnCreateEventReason = "ErrCreation"
 )
 
@@ -47,6 +48,7 @@ type BackupSpec struct {
 }
 
 // BackupStatus defines the observed state of Backup
+// +kubebuilder:object:generate=false
 type BackupStatus struct {
 	// Status represents the state of the backup.
 	Status string `json:"status,omitempty"`

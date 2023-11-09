@@ -15,6 +15,13 @@ const (
 	namespaceEnvVar  = "NAMESPACE"
 )
 
+const (
+	// OperatorAdditionalImagesConfigmapName contains the configmap name which consists of auxiliary yet necessary container images.
+	OperatorAdditionalImagesConfigmapName = "k8s-backup-operator-additional-images"
+	// KubectlImageConfigmapNameKey contains the key to retrieve the kubectl container image from the OperatorAdditionalImagesConfigmapName configmap.
+	KubectlImageConfigmapNameKey = "kubectlImage"
+)
+
 var log = ctrl.Log.WithName("config")
 
 // OperatorConfig contains all configurable values for the dogu operator.

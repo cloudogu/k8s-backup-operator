@@ -20,6 +20,50 @@ func (_m *mockEcosystemV1Alpha1Interface) EXPECT() *mockEcosystemV1Alpha1Interfa
 	return &mockEcosystemV1Alpha1Interface_Expecter{mock: &_m.Mock}
 }
 
+// BackupSchedules provides a mock function with given fields: namespace
+func (_m *mockEcosystemV1Alpha1Interface) BackupSchedules(namespace string) ecosystem.BackupScheduleInterface {
+	ret := _m.Called(namespace)
+
+	var r0 ecosystem.BackupScheduleInterface
+	if rf, ok := ret.Get(0).(func(string) ecosystem.BackupScheduleInterface); ok {
+		r0 = rf(namespace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ecosystem.BackupScheduleInterface)
+		}
+	}
+
+	return r0
+}
+
+// mockEcosystemV1Alpha1Interface_BackupSchedules_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BackupSchedules'
+type mockEcosystemV1Alpha1Interface_BackupSchedules_Call struct {
+	*mock.Call
+}
+
+// BackupSchedules is a helper method to define mock.On call
+//   - namespace string
+func (_e *mockEcosystemV1Alpha1Interface_Expecter) BackupSchedules(namespace interface{}) *mockEcosystemV1Alpha1Interface_BackupSchedules_Call {
+	return &mockEcosystemV1Alpha1Interface_BackupSchedules_Call{Call: _e.mock.On("BackupSchedules", namespace)}
+}
+
+func (_c *mockEcosystemV1Alpha1Interface_BackupSchedules_Call) Run(run func(namespace string)) *mockEcosystemV1Alpha1Interface_BackupSchedules_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *mockEcosystemV1Alpha1Interface_BackupSchedules_Call) Return(_a0 ecosystem.BackupScheduleInterface) *mockEcosystemV1Alpha1Interface_BackupSchedules_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockEcosystemV1Alpha1Interface_BackupSchedules_Call) RunAndReturn(run func(string) ecosystem.BackupScheduleInterface) *mockEcosystemV1Alpha1Interface_BackupSchedules_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Backups provides a mock function with given fields: namespace
 func (_m *mockEcosystemV1Alpha1Interface) Backups(namespace string) ecosystem.BackupInterface {
 	ret := _m.Called(namespace)

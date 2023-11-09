@@ -1,12 +1,12 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-backup-operator
-VERSION=0.4.0
+VERSION=0.5.0
 ## Image URL to use all building/pushing image targets
 IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.21
 MAKEFILES_VERSION=8.7.0
-LINT_VERSION=v1.52.1
+LINT_VERSION=v1.55.2
 STAGE?=production
 
 ADDITIONAL_CLEAN=dist-clean
@@ -39,6 +39,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	@$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/k8s.cloudogu.com_backups.yaml pkg/api/v1/
 	@cp config/crd/bases/k8s.cloudogu.com_restores.yaml pkg/api/v1/
+	@cp config/crd/bases/k8s.cloudogu.com_backupschedules.yaml pkg/api/v1/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -55,6 +56,8 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@$(KUSTOMIZE) build config/crd | kubectl delete --wait=false --ignore-not-found=true -f -
 	@kubectl patch crd/backups.k8s.cloudogu.com -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+	@kubectl patch crd/restores.k8s.cloudogu.com -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+	@kubectl patch crd/backupschedules.k8s.cloudogu.com -p '{"metadata":{"finalizers":[]}}' --type=merge || true
 
 .PHONY: template-stage
 template-stage:

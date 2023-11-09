@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.5.0] - 2023-11-09
+### Added
+- [#8] Functionality to schedule backups via a `BackupSchedule` Resource
+
 ## [v0.4.0] - 2023-10-25
 ### Added
 - [#7] Functionality to restore a backup to the namespace where the backup-operator is deployed
