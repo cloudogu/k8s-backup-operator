@@ -21,6 +21,7 @@ repositoryName = "k8s-backup-operator"
 project = "github.com/${repositoryOwner}/${repositoryName}"
 registry = "registry.cloudogu.com"
 registry_namespace = "k8s"
+helmTemplateDir = "target/helm/${repositoryName}/templates"
 
 // Configuration of branches
 productionReleaseBranch = "main"
@@ -64,6 +65,12 @@ node('docker') {
                                 make 'k8s-create-temporary-resource'
                                 archiveArtifacts 'target/*.yaml'
                             }
+
+                            stage('Generate Helm Resources') {
+                                String controllerVersion = makefile.getVersion()
+                                make 'helm-package-release'
+                                sh ".bin/helm template ${repositoryName} target/helm/${repositoryName}-${controllerVersion}.tgz --output-dir=target/helm"
+                            }
                         }
 
         stage("Lint k8s Resources") {
@@ -88,7 +95,7 @@ node('docker') {
                 imageName = k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", controllerVersion)
             }
 
-            GString sourceDeploymentYaml = "target/${repositoryName}_${controllerVersion}.yaml"
+            GString sourceDeploymentYaml = "${helmTemplateDir}/${repositoryName}_${controllerVersion}.yaml"
             stage('Update development resources') {
                 docker.image('mikefarah/yq:4.22.1')
                         .mountJenkinsUser()
@@ -107,7 +114,7 @@ node('docker') {
             }
 
             stage('Deploy Manager') {
-                k3d.kubectl("apply -f ${sourceDeploymentYaml}")
+                k3d.kubectl("apply -f ${helmTemplateDir}")
             }
 
             stage('Wait for Ready Rollout') {
