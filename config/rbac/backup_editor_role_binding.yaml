@@ -16,3 +16,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: controller-manager
+  - kind: ServiceAccount
+    name: scheduled-backup-creator-manager

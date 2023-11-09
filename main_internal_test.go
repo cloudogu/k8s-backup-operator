@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -98,15 +102,114 @@ func Test_startOperator(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "unable to start manager")
 	})
+	t.Run("should fail to get kubectl image", func(t *testing.T) {
+		// given
+		t.Setenv("NAMESPACE", "ecosystem")
+
+		oldNewManagerFunc := ctrl.NewManager
+		oldGetConfigFunc := ctrl.GetConfigOrDie
+		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
+		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
+		defer func() {
+			ctrl.NewManager = oldNewManagerFunc
+			ctrl.GetConfigOrDie = oldGetConfigFunc
+			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
+			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
+		}()
+
+		restConfig := &rest.Config{}
+		recorderMock := newMockEventRecorder(t)
+		ctrlManMock := newMockControllerManager(t)
+		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
+
+		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
+			return ctrlManMock, nil
+		}
+		ctrl.GetConfigOrDie = func() *rest.Config {
+			return restConfig
+		}
+
+		additionalImageGetterMock := newMockAdditionalImageGetter(t)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "kubectlImage").Return("", assert.AnError)
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+			return additionalImageGetterMock
+		}
+		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
+			return additionalImageUpdaterMock
+		}
+
+		// when
+		err := startOperator()
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to get kubectl image")
+		assert.ErrorContains(t, err, "unable to configure manager: unable to configure reconciler")
+	})
+	t.Run("should fail update additional images", func(t *testing.T) {
+		// given
+		t.Setenv("NAMESPACE", "ecosystem")
+
+		oldNewManagerFunc := ctrl.NewManager
+		oldGetConfigFunc := ctrl.GetConfigOrDie
+		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
+		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
+		defer func() {
+			ctrl.NewManager = oldNewManagerFunc
+			ctrl.GetConfigOrDie = oldGetConfigFunc
+			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
+			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
+		}()
+
+		restConfig := &rest.Config{}
+		recorderMock := newMockEventRecorder(t)
+		ctrlManMock := newMockControllerManager(t)
+		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
+
+		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
+			return ctrlManMock, nil
+		}
+		ctrl.GetConfigOrDie = func() *rest.Config {
+			return restConfig
+		}
+
+		additionalImageGetterMock := newMockAdditionalImageGetter(t)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "kubectlImage").Return("bitnami/kubectl:1.27.7", nil)
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+			return additionalImageGetterMock
+		}
+		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(assert.AnError)
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
+			return additionalImageUpdaterMock
+		}
+
+		// when
+		err := startOperator()
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to update additional images in existing resources")
+		assert.ErrorContains(t, err, "unable to configure manager: unable to configure reconciler")
+	})
 	t.Run("should fail to configure reconciler", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
+		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
+		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
+			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
+			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		restConfig := &rest.Config{}
@@ -126,6 +229,17 @@ func Test_startOperator(t *testing.T) {
 			return restConfig
 		}
 
+		additionalImageGetterMock := newMockAdditionalImageGetter(t)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "kubectlImage").Return("bitnami/kubectl:1.27.7", nil)
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+			return additionalImageGetterMock
+		}
+		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(nil)
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
+			return additionalImageUpdaterMock
+		}
+
 		// when
 		err := startOperator()
 
@@ -140,10 +254,14 @@ func Test_startOperator(t *testing.T) {
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
 		oldLog := setupLog
+		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
+		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			setupLog = oldLog
+			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
+			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		logMock := newMockLogSink(t)
@@ -173,6 +291,17 @@ func Test_startOperator(t *testing.T) {
 			return restConfig
 		}
 
+		additionalImageGetterMock := newMockAdditionalImageGetter(t)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "kubectlImage").Return("bitnami/kubectl:1.27.7", nil)
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+			return additionalImageGetterMock
+		}
+		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(nil)
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
+			return additionalImageUpdaterMock
+		}
+
 		// when
 		err := startOperator()
 
@@ -188,10 +317,14 @@ func Test_startOperator(t *testing.T) {
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
 		oldLog := setupLog
+		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
+		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			setupLog = oldLog
+			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
+			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		logMock := newMockLogSink(t)
@@ -222,6 +355,17 @@ func Test_startOperator(t *testing.T) {
 			return restConfig
 		}
 
+		additionalImageGetterMock := newMockAdditionalImageGetter(t)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "kubectlImage").Return("bitnami/kubectl:1.27.7", nil)
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+			return additionalImageGetterMock
+		}
+		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(nil)
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
+			return additionalImageUpdaterMock
+		}
+
 		// when
 		err := startOperator()
 
@@ -238,11 +382,15 @@ func Test_startOperator(t *testing.T) {
 		oldGetConfigFunc := ctrl.GetConfigOrDie
 		oldLog := setupLog
 		oldSignalHandlerFunc := ctrl.SetupSignalHandler
+		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
+		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			setupLog = oldLog
 			ctrl.SetupSignalHandler = oldSignalHandlerFunc
+			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
+			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		logMock := newMockLogSink(t)
@@ -279,6 +427,17 @@ func Test_startOperator(t *testing.T) {
 			return testCtx
 		}
 
+		additionalImageGetterMock := newMockAdditionalImageGetter(t)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "kubectlImage").Return("bitnami/kubectl:1.27.7", nil)
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+			return additionalImageGetterMock
+		}
+		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(nil)
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
+			return additionalImageUpdaterMock
+		}
+
 		// when
 		err := startOperator()
 
@@ -295,11 +454,15 @@ func Test_startOperator(t *testing.T) {
 		oldGetConfigFunc := ctrl.GetConfigOrDie
 		oldLog := setupLog
 		oldSignalHandlerFunc := ctrl.SetupSignalHandler
+		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
+		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			setupLog = oldLog
 			ctrl.SetupSignalHandler = oldSignalHandlerFunc
+			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
+			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		logMock := newMockLogSink(t)
@@ -336,6 +499,17 @@ func Test_startOperator(t *testing.T) {
 			return testCtx
 		}
 
+		additionalImageGetterMock := newMockAdditionalImageGetter(t)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "kubectlImage").Return("bitnami/kubectl:1.27.7", nil)
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+			return additionalImageGetterMock
+		}
+		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx).Return(nil)
+		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ string, _ record.EventRecorder) additionalimages.Updater {
+			return additionalImageUpdaterMock
+		}
+
 		// when
 		err := startOperator()
 
@@ -351,6 +525,6 @@ func createScheme(t *testing.T) *runtime.Scheme {
 	gv, err := schema.ParseGroupVersion("k8s.cloudogu.com/v1")
 	assert.NoError(t, err)
 
-	scheme.AddKnownTypes(gv, &v1.Backup{}, &v1.Restore{})
+	scheme.AddKnownTypes(gv, &v1.Backup{}, &v1.Restore{}, &v1.BackupSchedule{})
 	return scheme
 }

@@ -21,6 +21,7 @@ type Interface interface {
 type V1Alpha1Interface interface {
 	BackupsGetter
 	RestoresGetter
+	BackupSchedulesGetter
 }
 
 type BackupsGetter interface {
@@ -31,6 +32,11 @@ type BackupsGetter interface {
 type RestoresGetter interface {
 	// Restores returns a client for restores in the given namespace.
 	Restores(namespace string) RestoreInterface
+}
+
+type BackupSchedulesGetter interface {
+	// BackupSchedules returns a client for backup schedules in the given namespace.
+	BackupSchedules(namespace string) BackupScheduleInterface
 }
 
 // NewClientSet creates a new instance of the client set for this operator.
@@ -102,6 +108,14 @@ func (brc *V1Alpha1Client) Backups(namespace string) BackupInterface {
 // Restores returns a client for restores in the given namespace.
 func (brc *V1Alpha1Client) Restores(namespace string) RestoreInterface {
 	return &restoreClient{
+		client: brc.restClient,
+		ns:     namespace,
+	}
+}
+
+// BackupSchedules returns a client for backup schedules in the given namespace.
+func (brc *V1Alpha1Client) BackupSchedules(namespace string) BackupScheduleInterface {
+	return &backupScheduleClient{
 		client: brc.restClient,
 		ns:     namespace,
 	}

@@ -17,6 +17,50 @@ func (_m *MockV1Alpha1Interface) EXPECT() *MockV1Alpha1Interface_Expecter {
 	return &MockV1Alpha1Interface_Expecter{mock: &_m.Mock}
 }
 
+// BackupSchedules provides a mock function with given fields: namespace
+func (_m *MockV1Alpha1Interface) BackupSchedules(namespace string) BackupScheduleInterface {
+	ret := _m.Called(namespace)
+
+	var r0 BackupScheduleInterface
+	if rf, ok := ret.Get(0).(func(string) BackupScheduleInterface); ok {
+		r0 = rf(namespace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(BackupScheduleInterface)
+		}
+	}
+
+	return r0
+}
+
+// MockV1Alpha1Interface_BackupSchedules_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BackupSchedules'
+type MockV1Alpha1Interface_BackupSchedules_Call struct {
+	*mock.Call
+}
+
+// BackupSchedules is a helper method to define mock.On call
+//   - namespace string
+func (_e *MockV1Alpha1Interface_Expecter) BackupSchedules(namespace interface{}) *MockV1Alpha1Interface_BackupSchedules_Call {
+	return &MockV1Alpha1Interface_BackupSchedules_Call{Call: _e.mock.On("BackupSchedules", namespace)}
+}
+
+func (_c *MockV1Alpha1Interface_BackupSchedules_Call) Run(run func(namespace string)) *MockV1Alpha1Interface_BackupSchedules_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *MockV1Alpha1Interface_BackupSchedules_Call) Return(_a0 BackupScheduleInterface) *MockV1Alpha1Interface_BackupSchedules_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockV1Alpha1Interface_BackupSchedules_Call) RunAndReturn(run func(string) BackupScheduleInterface) *MockV1Alpha1Interface_BackupSchedules_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Backups provides a mock function with given fields: namespace
 func (_m *MockV1Alpha1Interface) Backups(namespace string) BackupInterface {
 	ret := _m.Called(namespace)

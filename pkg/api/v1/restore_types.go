@@ -27,6 +27,7 @@ type RestoreSpec struct {
 }
 
 // RestoreStatus defines the observed state of Restore
+// +kubebuilder:object:generate=false
 type RestoreStatus struct {
 	// Status represents the state of the backup.
 	Status string `json:"status,omitempty"`

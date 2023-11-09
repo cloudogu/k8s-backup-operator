@@ -1,10 +1,9 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
-	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"os"
 	"time"
 
@@ -24,10 +23,15 @@ import (
 
 	"github.com/cloudogu/cesapp-lib/core"
 	reg "github.com/cloudogu/cesapp-lib/registry"
+
+	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
+	"github.com/cloudogu/k8s-backup-operator/pkg/backupschedule"
+	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
+	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"github.com/cloudogu/k8s-backup-operator/pkg/restore"
 	// +kubebuilder:scaffold:imports
 )
@@ -45,6 +49,11 @@ var (
 var (
 	leaseDuration = time.Second * 60
 	renewDeadline = time.Second * 40
+)
+
+var (
+	newAdditionalImageGetter  = additionalimages.NewGetter
+	newAdditionalImageUpdater = additionalimages.NewUpdater
 )
 
 func init() {
@@ -142,6 +151,8 @@ var parseFlags = func(ctrlOpts ctrl.Options) (ctrl.Options, zap.Options) {
 func configureReconcilers(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
 	var recorder eventRecorder = k8sManager.GetEventRecorderFor("k8s-backup-operator")
 
+	ctx := context.Background()
+
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create k8s clientset: %w", err)
@@ -158,6 +169,18 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create CES registry: %w", err)
+	}
+
+	imageGetter := newAdditionalImageGetter(k8sClientSet, operatorConfig.Namespace)
+	kubectlImage, err := imageGetter.ImageForKey(ctx, config.KubectlImageConfigmapNameKey)
+	if err != nil {
+		return fmt.Errorf("failed to get kubectl image: %w", err)
+	}
+
+	additionalImageUpdater := newAdditionalImageUpdater(ecosystemClientSet, operatorConfig.Namespace, kubectlImage, recorder)
+	err = additionalImageUpdater.Update(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update additional images in existing resources: %w", err)
 	}
 
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
@@ -177,6 +200,10 @@ func configureReconcilers(k8sManager controllerManager, operatorConfig *config.O
 	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(operatorConfig.Namespace), recorder, registry)
 	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
+	}
+
+	if err = backupschedule.NewReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler, kubectlImage).SetupWithManager(k8sManager); err != nil {
+		return fmt.Errorf("unable to create backupSchedule controller: %w", err)
 	}
 	// +kubebuilder:scaffold:builder
 
