@@ -28,7 +28,7 @@ import (
 
 var testCtx = context.Background()
 
-// WARNING: We can test parseFlags only one single time.
+// WARNING: We can test parseManagerFlags only one single time.
 // If it is called more than once, it will panic.
 // For all other tests it has to be overwritten.
 func Test_parseFlags(t *testing.T) {
@@ -44,7 +44,7 @@ func Test_parseFlags(t *testing.T) {
 	}
 
 	// when
-	newCtrlOpts, _ := parseFlags(ctrlOpts)
+	newCtrlOpts, _ := parseManagerFlags(ctrlOpts)
 
 	// then
 	require.NotEmpty(t, newCtrlOpts)
@@ -59,9 +59,9 @@ func Test_parseFlags(t *testing.T) {
 }
 
 func Test_startOperator(t *testing.T) {
-	oldParseFlagsFunc := parseFlags
-	defer func() { parseFlags = oldParseFlagsFunc }()
-	parseFlags = func(options ctrl.Options) (ctrl.Options, zap.Options) {
+	oldParseFlagsFunc := parseManagerFlags
+	defer func() { parseManagerFlags = oldParseFlagsFunc }()
+	parseManagerFlags = func(options ctrl.Options) (ctrl.Options, zap.Options) {
 		return options, zap.Options{Development: true}
 	}
 

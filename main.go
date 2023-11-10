@@ -31,6 +31,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/backupschedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
+	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"github.com/cloudogu/k8s-backup-operator/pkg/restore"
 	// +kubebuilder:scaffold:imports
@@ -52,8 +53,9 @@ var (
 )
 
 var (
-	newAdditionalImageGetter  = additionalimages.NewGetter
-	newAdditionalImageUpdater = additionalimages.NewUpdater
+	newAdditionalImageGetter    = additionalimages.NewGetter
+	newAdditionalImageUpdater   = additionalimages.NewUpdater
+	newGarbageCollectionManager = garbagecollection.NewManager
 )
 
 func init() {
@@ -64,21 +66,68 @@ func init() {
 }
 
 func main() {
-	err := startOperator()
-	if err != nil {
-		setupLog.Error(err, "failed to start operator")
+	operatorCmd := flag.NewFlagSet("operator", flag.ExitOnError)
+	garbageCollectorCmd := flag.NewFlagSet("gc", flag.ExitOnError)
+
+	if len(os.Args) < 2 {
+		fmt.Printf("expected one of the following subcommands:\n"+
+			"  %s - start in operator-mode, reconciling this operators custom resources\n"+
+			"  %s - start in garbage-collection mode, deleting backups according to the configured retention strategy\n",
+			operatorCmd.Name(),
+			garbageCollectorCmd.Name())
 		os.Exit(1)
+	}
+
+	switch os.Args[1] {
+	case operatorCmd.Name():
+		err := startOperator(operatorCmd, os.Args[2:])
+		if err != nil {
+			setupLog.Error(err, "failed to start operator")
+			os.Exit(1)
+		}
+	case garbageCollectorCmd.Name():
+		err := startGarbageCollector(garbageCollectorCmd, os.Args[2:])
+		if err != nil {
+			setupLog.Error(err, "failed to start garbage-collector")
+			os.Exit(1)
+		}
 	}
 }
 
-func startOperator() error {
+func startGarbageCollector(_ *flag.FlagSet, _ []string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	restConfig := ctrl.GetConfigOrDie()
+	namespace, err := config.GetNamespace()
+	if err != nil {
+		return fmt.Errorf("unable to get current namespace: %w", err)
+	}
+
+	k8sClientSet, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return fmt.Errorf("unable to create k8s clientset: %w", err)
+	}
+
+	ecosystemClientSet, err := ecosystem.NewClientSet(restConfig, k8sClientSet)
+	if err != nil {
+		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
+	}
+
+	gcManager := newGarbageCollectionManager(ecosystemClientSet, namespace)
+	return gcManager.CollectGarbage(ctx)
+}
+
+func startOperator(flags *flag.FlagSet, args []string) error {
 	operatorConfig, err := config.NewOperatorConfig(Version)
 	if err != nil {
 		return fmt.Errorf("unable to create operator config: %w", err)
 	}
 
-	options := getK8sManagerOptions(operatorConfig)
-	k8sManager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
+	options := getK8sManagerOptions(flags, args, operatorConfig)
+	restConfig := ctrl.GetConfigOrDie()
+
+	k8sManager, err := ctrl.NewManager(restConfig, options)
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
@@ -105,7 +154,7 @@ func configureManager(k8sManager controllerManager, operatorConfig *config.Opera
 	return nil
 }
 
-func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
+func getK8sManagerOptions(flags *flag.FlagSet, args []string, operatorConfig *config.OperatorConfig) ctrl.Options {
 	controllerOpts := ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
@@ -116,30 +165,30 @@ func getK8sManagerOptions(operatorConfig *config.OperatorConfig) ctrl.Options {
 		LeaseDuration:    &leaseDuration,
 		RenewDeadline:    &renewDeadline,
 	}
-	var zapOpts zap.Options
-	controllerOpts, zapOpts = parseFlags(controllerOpts)
+	controllerOpts, zapOpts := parseManagerFlags(flags, args, controllerOpts)
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
 
 	return controllerOpts
 }
 
-// parseFlags is a closure because it panics when its called twice in tests.
+// parseManagerFlags is a closure because it panics when its called twice in tests.
 // Therefore, we must overwrite it for all but one single test.
-var parseFlags = func(ctrlOpts ctrl.Options) (ctrl.Options, zap.Options) {
+var parseManagerFlags = func(flags *flag.FlagSet, args []string, ctrlOpts ctrl.Options) (ctrl.Options, zap.Options) {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
+	flags.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	flags.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flags.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	zapOpts := zap.Options{
 		Development: config.IsStageDevelopment(),
 	}
-	zapOpts.BindFlags(flag.CommandLine)
-	flag.Parse()
+	zapOpts.BindFlags(flags)
+	// Ignore errors; flags is set to exit on errors
+	_ = flags.Parse(args)
 
 	ctrlOpts.Metrics = server.Options{BindAddress: metricsAddr}
 	ctrlOpts.HealthProbeBindAddress = probeAddr
@@ -151,7 +200,8 @@ var parseFlags = func(ctrlOpts ctrl.Options) (ctrl.Options, zap.Options) {
 func configureReconcilers(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
 	var recorder eventRecorder = k8sManager.GetEventRecorderFor("k8s-backup-operator")
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {

@@ -48,7 +48,7 @@ func NewOperatorConfig(version string) (*OperatorConfig, error) {
 	}
 	log.Info(fmt.Sprintf("Version: [%s]", version))
 
-	namespace, err := getNamespace()
+	namespace, err := GetNamespace()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read namespace: %w", err)
 	}
@@ -72,7 +72,7 @@ func configureStage() {
 	}
 }
 
-func getNamespace() (string, error) {
+func GetNamespace() (string, error) {
 	namespace, err := getEnvVar(namespaceEnvVar)
 	if err != nil {
 		return "", fmt.Errorf("failed to get env var [%s]: %w", namespaceEnvVar, err)
