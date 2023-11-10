@@ -38,6 +38,11 @@ import (
 )
 
 var (
+	operatorCmd         = flag.NewFlagSet("operator", flag.ExitOnError)
+	garbageCollectorCmd = flag.NewFlagSet("gc", flag.ExitOnError)
+)
+
+var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
@@ -66,8 +71,8 @@ func init() {
 }
 
 func main() {
-	operatorCmd := flag.NewFlagSet("operator", flag.ExitOnError)
-	garbageCollectorCmd := flag.NewFlagSet("gc", flag.ExitOnError)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	if len(os.Args) < 2 {
 		fmt.Printf("expected one of the following subcommands:\n"+
@@ -80,13 +85,13 @@ func main() {
 
 	switch os.Args[1] {
 	case operatorCmd.Name():
-		err := startOperator(operatorCmd, os.Args[2:])
+		err := startOperator(ctx, operatorCmd, os.Args[2:])
 		if err != nil {
 			setupLog.Error(err, "failed to start operator")
 			os.Exit(1)
 		}
 	case garbageCollectorCmd.Name():
-		err := startGarbageCollector(garbageCollectorCmd, os.Args[2:])
+		err := startGarbageCollector(ctx, garbageCollectorCmd, os.Args[2:])
 		if err != nil {
 			setupLog.Error(err, "failed to start garbage-collector")
 			os.Exit(1)
@@ -94,10 +99,7 @@ func main() {
 	}
 }
 
-func startGarbageCollector(_ *flag.FlagSet, _ []string) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+func startGarbageCollector(ctx context.Context, _ *flag.FlagSet, _ []string) error {
 	restConfig := ctrl.GetConfigOrDie()
 	namespace, err := config.GetNamespace()
 	if err != nil {
@@ -118,7 +120,7 @@ func startGarbageCollector(_ *flag.FlagSet, _ []string) error {
 	return gcManager.CollectGarbage(ctx)
 }
 
-func startOperator(flags *flag.FlagSet, args []string) error {
+func startOperator(ctx context.Context, flags *flag.FlagSet, args []string) error {
 	operatorConfig, err := config.NewOperatorConfig(Version)
 	if err != nil {
 		return fmt.Errorf("unable to create operator config: %w", err)
@@ -132,7 +134,7 @@ func startOperator(flags *flag.FlagSet, args []string) error {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
-	err = configureManager(k8sManager, operatorConfig)
+	err = configureManager(ctx, k8sManager, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("unable to configure manager: %w", err)
 	}
@@ -140,8 +142,8 @@ func startOperator(flags *flag.FlagSet, args []string) error {
 	return startK8sManager(k8sManager)
 }
 
-func configureManager(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
-	err := configureReconcilers(k8sManager, operatorConfig)
+func configureManager(ctx context.Context, k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
+	err := configureReconcilers(ctx, k8sManager, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("unable to configure reconciler: %w", err)
 	}
@@ -172,9 +174,7 @@ func getK8sManagerOptions(flags *flag.FlagSet, args []string, operatorConfig *co
 	return controllerOpts
 }
 
-// parseManagerFlags is a closure because it panics when its called twice in tests.
-// Therefore, we must overwrite it for all but one single test.
-var parseManagerFlags = func(flags *flag.FlagSet, args []string, ctrlOpts ctrl.Options) (ctrl.Options, zap.Options) {
+func parseManagerFlags(flags *flag.FlagSet, args []string, ctrlOpts ctrl.Options) (ctrl.Options, zap.Options) {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -197,11 +197,8 @@ var parseManagerFlags = func(flags *flag.FlagSet, args []string, ctrlOpts ctrl.O
 	return ctrlOpts, zapOpts
 }
 
-func configureReconcilers(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
+func configureReconcilers(ctx context.Context, k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
 	var recorder eventRecorder = k8sManager.GetEventRecorderFor("k8s-backup-operator")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {

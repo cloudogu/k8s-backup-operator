@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	"k8s.io/client-go/kubernetes"
@@ -14,7 +15,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/config"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -28,49 +28,79 @@ import (
 
 var testCtx = context.Background()
 
-// WARNING: We can test parseManagerFlags only one single time.
-// If it is called more than once, it will panic.
-// For all other tests it has to be overwritten.
 func Test_parseFlags(t *testing.T) {
-	// given
-	ctrlOpts := ctrl.Options{
-		Scheme: scheme,
-		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
-			"ecosystem": {},
-		}},
-		WebhookServer:        webhook.NewServer(webhook.Options{Port: 9443}),
-		LeaderElectionID:     "e3f6c1a7.cloudogu.com",
-		LivenessEndpointName: "/lifez",
-	}
+	t.Run("should use defaults for flags", func(t *testing.T) {
+		// given
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+		ctrlOpts := ctrl.Options{
+			Scheme: scheme,
+			Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
+				"ecosystem": {},
+			}},
+			WebhookServer:        webhook.NewServer(webhook.Options{Port: 9443}),
+			LeaderElectionID:     "e3f6c1a7.cloudogu.com",
+			LivenessEndpointName: "/lifez",
+		}
 
-	// when
-	newCtrlOpts, _ := parseManagerFlags(ctrlOpts)
+		// when
+		newCtrlOpts, _ := parseManagerFlags(flags, []string{}, ctrlOpts)
 
-	// then
-	require.NotEmpty(t, newCtrlOpts)
-	assert.Equal(t, ":8080", newCtrlOpts.Metrics.BindAddress)
-	assert.Equal(t, ":8081", newCtrlOpts.HealthProbeBindAddress)
-	assert.False(t, newCtrlOpts.LeaderElection)
-	assert.Same(t, ctrlOpts.Scheme, newCtrlOpts.Scheme)
-	assert.Equal(t, ctrlOpts.Cache, newCtrlOpts.Cache)
-	assert.Equal(t, ctrlOpts.WebhookServer, newCtrlOpts.WebhookServer)
-	assert.Equal(t, ctrlOpts.LeaderElectionID, newCtrlOpts.LeaderElectionID)
-	assert.Equal(t, ctrlOpts.LivenessEndpointName, newCtrlOpts.LivenessEndpointName)
+		// then
+		require.NotEmpty(t, newCtrlOpts)
+		assert.Equal(t, ":8080", newCtrlOpts.Metrics.BindAddress)
+		assert.Equal(t, ":8081", newCtrlOpts.HealthProbeBindAddress)
+		assert.False(t, newCtrlOpts.LeaderElection)
+		assert.Same(t, ctrlOpts.Scheme, newCtrlOpts.Scheme)
+		assert.Equal(t, ctrlOpts.Cache, newCtrlOpts.Cache)
+		assert.Equal(t, ctrlOpts.WebhookServer, newCtrlOpts.WebhookServer)
+		assert.Equal(t, ctrlOpts.LeaderElectionID, newCtrlOpts.LeaderElectionID)
+		assert.Equal(t, ctrlOpts.LivenessEndpointName, newCtrlOpts.LivenessEndpointName)
+	})
+	t.Run("should use values from flags", func(t *testing.T) {
+		// given
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+		args := []string{
+			"--metrics-bind-address", ":9090",
+			"--health-probe-bind-address", ":9091",
+			"--leader-elect",
+		}
+		ctrlOpts := ctrl.Options{
+			Scheme: scheme,
+			Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
+				"ecosystem": {},
+			}},
+			WebhookServer:        webhook.NewServer(webhook.Options{Port: 9443}),
+			LeaderElectionID:     "e3f6c1a7.cloudogu.com",
+			LivenessEndpointName: "/lifez",
+		}
+
+		// when
+		newCtrlOpts, _ := parseManagerFlags(flags, args, ctrlOpts)
+
+		// then
+		require.NotEmpty(t, newCtrlOpts)
+		assert.Equal(t, ":9090", newCtrlOpts.Metrics.BindAddress)
+		assert.Equal(t, ":9091", newCtrlOpts.HealthProbeBindAddress)
+		assert.True(t, newCtrlOpts.LeaderElection)
+		assert.Same(t, ctrlOpts.Scheme, newCtrlOpts.Scheme)
+		assert.Equal(t, ctrlOpts.Cache, newCtrlOpts.Cache)
+		assert.Equal(t, ctrlOpts.WebhookServer, newCtrlOpts.WebhookServer)
+		assert.Equal(t, ctrlOpts.LeaderElectionID, newCtrlOpts.LeaderElectionID)
+		assert.Equal(t, ctrlOpts.LivenessEndpointName, newCtrlOpts.LivenessEndpointName)
+	})
 }
 
 func Test_startOperator(t *testing.T) {
-	oldParseFlagsFunc := parseManagerFlags
-	defer func() { parseManagerFlags = oldParseFlagsFunc }()
-	parseManagerFlags = func(options ctrl.Options) (ctrl.Options, zap.Options) {
-		return options, zap.Options{Development: true}
-	}
-
 	t.Run("should fail to create operator config", func(t *testing.T) {
-		// when
+		// given
 		oldVersion := Version
 		Version = "invalid"
 		defer func() { Version = oldVersion }()
-		err := startOperator()
+
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+
+		// when
+		err := startOperator(testCtx, flags, []string{})
 
 		// then
 		require.Error(t, err)
@@ -94,8 +124,10 @@ func Test_startOperator(t *testing.T) {
 			return &rest.Config{}
 		}
 
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+
 		// when
-		err := startOperator()
+		err := startOperator(testCtx, flags, []string{})
 
 		// then
 		require.Error(t, err)
@@ -105,6 +137,7 @@ func Test_startOperator(t *testing.T) {
 	t.Run("should fail to get kubectl image", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
+		t.Setenv("STAGE", "development")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -140,8 +173,10 @@ func Test_startOperator(t *testing.T) {
 			return additionalImageUpdaterMock
 		}
 
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+
 		// when
-		err := startOperator()
+		err := startOperator(testCtx, flags, []string{})
 
 		// then
 		require.Error(t, err)
@@ -152,6 +187,7 @@ func Test_startOperator(t *testing.T) {
 	t.Run("should fail update additional images", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
+		t.Setenv("STAGE", "development")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -188,8 +224,10 @@ func Test_startOperator(t *testing.T) {
 			return additionalImageUpdaterMock
 		}
 
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+
 		// when
-		err := startOperator()
+		err := startOperator(testCtx, flags, []string{})
 
 		// then
 		require.Error(t, err)
@@ -200,6 +238,7 @@ func Test_startOperator(t *testing.T) {
 	t.Run("should fail to configure reconciler", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
+		t.Setenv("STAGE", "development")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -240,8 +279,10 @@ func Test_startOperator(t *testing.T) {
 			return additionalImageUpdaterMock
 		}
 
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+
 		// when
-		err := startOperator()
+		err := startOperator(testCtx, flags, []string{})
 
 		// then
 		require.Error(t, err)
@@ -250,6 +291,7 @@ func Test_startOperator(t *testing.T) {
 	t.Run("should fail to add health check to controller manager", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
+		t.Setenv("STAGE", "development")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -302,8 +344,10 @@ func Test_startOperator(t *testing.T) {
 			return additionalImageUpdaterMock
 		}
 
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+
 		// when
-		err := startOperator()
+		err := startOperator(testCtx, flags, []string{})
 
 		// then
 		require.Error(t, err)
@@ -313,6 +357,7 @@ func Test_startOperator(t *testing.T) {
 	t.Run("should fail to add readiness check to controller manager", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
+		t.Setenv("STAGE", "development")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -366,8 +411,10 @@ func Test_startOperator(t *testing.T) {
 			return additionalImageUpdaterMock
 		}
 
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+
 		// when
-		err := startOperator()
+		err := startOperator(testCtx, flags, []string{})
 
 		// then
 		require.Error(t, err)
@@ -377,6 +424,7 @@ func Test_startOperator(t *testing.T) {
 	t.Run("should fail to start controller manager", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
+		t.Setenv("STAGE", "development")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -438,8 +486,10 @@ func Test_startOperator(t *testing.T) {
 			return additionalImageUpdaterMock
 		}
 
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+
 		// when
-		err := startOperator()
+		err := startOperator(testCtx, flags, []string{})
 
 		// then
 		require.Error(t, err)
@@ -449,6 +499,7 @@ func Test_startOperator(t *testing.T) {
 	t.Run("should succeed to start controller manager", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
+		t.Setenv("STAGE", "development")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -510,8 +561,10 @@ func Test_startOperator(t *testing.T) {
 			return additionalImageUpdaterMock
 		}
 
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+
 		// when
-		err := startOperator()
+		err := startOperator(testCtx, flags, []string{})
 
 		// then
 		require.NoError(t, err)
