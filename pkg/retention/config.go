@@ -18,7 +18,7 @@ const (
 )
 
 type Config struct {
-	Strategy Strategy
+	Strategy StrategyId
 }
 
 type ConfigGetter struct {
@@ -54,14 +54,14 @@ func configFromConfigMap(configMap *corev1.ConfigMap, logger logr.Logger) (Confi
 			return Config{}, err
 		}
 
-		config.Strategy = Strategy(strategy)
+		config.Strategy = StrategyId(strategy)
 	}
 
 	return config, nil
 }
 
 func validateStrategy(strategy string) error {
-	switch Strategy(strategy) {
+	switch StrategyId(strategy) {
 	case KeepAllStrategy,
 		RemoveAllButKeepLatestStrategy,
 		KeepLastSevenDaysStrategy,

@@ -1,41 +1,41 @@
 package retention
 
-type Strategy string
+type StrategyId string
 
 const (
 	// KeepAllStrategy retention policy:
-	// The following table gives an overview of the behavior within this Strategy:
+	// The following table gives an overview of the behavior within this strategy:
 	//
 	// | retained backups | time period |
 	// |------------------|-------------|
 	// | ALL              | ∞           |
 	//
 	// The maximum of saved backups is ∞.
-	KeepAllStrategy Strategy = "keepAll"
+	KeepAllStrategy StrategyId = "keepAll"
 
 	// RemoveAllButKeepLatestStrategy retention policy:
-	// The following table gives an overview of the behavior within this Strategy:
+	// The following table gives an overview of the behavior within this strategy:
 	//
 	// | retained backups | time period |
 	// |------------------|-------------|
 	// | 1                | ∞           |
 	//
 	// The maximum of saved backups is 1.
-	RemoveAllButKeepLatestStrategy Strategy = "removeAllButKeepLatest"
+	RemoveAllButKeepLatestStrategy StrategyId = "removeAllButKeepLatest"
 
 	// KeepLastSevenDaysStrategy retention policy:
-	// The following table gives an overview of the behavior within this Strategy:
+	// The following table gives an overview of the behavior within this strategy:
 	//
 	// | retained backups | time period |
 	// |------------------|-------------|
 	// | ALL              | 1-7 days    |
 	//
 	// The maximum of saved backups is 7 (without consideration of manual backups).
-	KeepLastSevenDaysStrategy Strategy = "keepLastSevenDays"
+	KeepLastSevenDaysStrategy StrategyId = "keepLastSevenDays"
 
 	// KeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy retention policy:
 	//
-	// The following table gives an overview of the behaviour within this Strategy:
+	// The following table gives an overview of the behaviour within this strategy:
 	//
 	// | retained backups |  time period    |
 	// | ALL              |  0 - 7 days     |
@@ -46,5 +46,5 @@ const (
 	//
 	// The maximum of saved backups is 11 (without consideration of manual backups)
 	// Between interval borders the oldest backup is moving.
-	KeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy Strategy = "keep7Days1Month1Quarter1Year"
+	KeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy StrategyId = "keep7Days1Month1Quarter1Year"
 )
