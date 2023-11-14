@@ -51,10 +51,7 @@ func (m *manager) CollectGarbage(ctx context.Context) error {
 		return fmt.Errorf("failed to list backups: %w", err)
 	}
 
-	toRemove, _, err := retentionStrategy.FilterForRemoval(backupList.Items)
-	if err != nil {
-		return fmt.Errorf("failed to filter backups for removal: %w", err)
-	}
+	toRemove, _ := retentionStrategy.FilterForRemoval(backupList.Items)
 
 	var errs []error
 	for _, backup := range toRemove {

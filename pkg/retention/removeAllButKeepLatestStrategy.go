@@ -8,9 +8,9 @@ import (
 
 type removeAllButKeepLatestStrategy struct{}
 
-func (kls *removeAllButKeepLatestStrategy) FilterForRemoval(allBackups []v1.Backup) (RemovedBackups, RetainedBackups, error) {
+func (kls *removeAllButKeepLatestStrategy) FilterForRemoval(allBackups []v1.Backup) (RemovedBackups, RetainedBackups) {
 	if len(allBackups) == 0 {
-		return RemovedBackups{}, RetainedBackups{}, nil
+		return RemovedBackups{}, RetainedBackups{}
 	}
 
 	var latestBackupIndex int
@@ -26,7 +26,7 @@ func (kls *removeAllButKeepLatestStrategy) FilterForRemoval(allBackups []v1.Back
 	copy(backupCopy, allBackups)
 	removed := slices.Delete(backupCopy, latestBackupIndex, latestBackupIndex+1)
 	retained := RetainedBackups{allBackups[latestBackupIndex]}
-	return removed, retained, nil
+	return removed, retained
 }
 
 func (kls *removeAllButKeepLatestStrategy) GetName() StrategyId {

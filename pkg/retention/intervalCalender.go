@@ -30,7 +30,7 @@ func (ic intervalCalendar) addTimeIntervals(timeIntervals []timeInterval) interv
 	return ic
 }
 
-func (ic intervalCalendar) validateConfig() *invalidCalendarConfigError {
+func (ic intervalCalendar) validateConfig() error {
 	var current = 0
 	for _, interval := range ic.timeIntervals {
 		if current != interval.start {

@@ -18,9 +18,8 @@ func TestKeepLastSevenDaysBackupStrategy_emptyInput(t *testing.T) {
 
 	strategy := &keepLastSevenDaysStrategy{testClock}
 
-	removed, retained, err := strategy.FilterForRemoval(backups)
+	removed, retained := strategy.FilterForRemoval(backups)
 
-	assert.Nil(t, err)
 	assert.Empty(t, removed)
 	assert.Empty(t, retained)
 }
@@ -43,9 +42,8 @@ func TestKeepLastSevenDaysBackupStrategy_keepBackupsWithinSevenDays(t *testing.T
 
 	strategy := &keepLastSevenDaysStrategy{testClock}
 
-	removed, retained, err := strategy.FilterForRemoval(backups)
+	removed, retained := strategy.FilterForRemoval(backups)
 
-	assert.Nil(t, err)
 	assert.Empty(t, removed)
 	expectedRetained := RetainedBackups{backup1, backup2, backup3, backup4, backup5}
 	assert.Equal(t, expectedRetained, retained)
@@ -77,9 +75,8 @@ func TestKeepLastSevenDaysBackupStrategy_removeBackupsOlderThanSevenDays(t *test
 
 	strategy := &keepLastSevenDaysStrategy{testClock}
 
-	removed, retained, err := strategy.FilterForRemoval(backups)
+	removed, retained := strategy.FilterForRemoval(backups)
 
-	assert.Nil(t, err)
 	expectedRemoved := RemovedBackups{remove1, remove2, remove3, remove4}
 	assert.Equal(t, expectedRemoved, removed)
 	expectedRetained := RetainedBackups{backup1, backup2, backup3, backup4, backup5}
@@ -116,9 +113,8 @@ func TestKeepLastSevenDaysBackupStrategy_removeBackupsOlderThanSevenDays_reverse
 
 	strategy := &keepLastSevenDaysStrategy{testClock}
 
-	removed, retained, err := strategy.FilterForRemoval(backups)
+	removed, retained := strategy.FilterForRemoval(backups)
 
-	assert.Nil(t, err)
 	expectedRemoved := RemovedBackups{backup9, backup8, backup7, backup6}
 	assert.Equal(t, expectedRemoved, removed)
 	expectedRetained := RetainedBackups{backup5, backup4, backup3, backup2, backup1}
@@ -160,9 +156,8 @@ func TestLastSevenDays_daylightSavings(t *testing.T) {
 
 	strategy := &keepLastSevenDaysStrategy{testClock}
 
-	removed, retained, err := strategy.FilterForRemoval(backups)
+	removed, retained := strategy.FilterForRemoval(backups)
 
-	assert.Nil(t, err)
 	expectedRemoved := RemovedBackups{remove5, remove4, remove3, remove2, remove1}
 	assert.Equal(t, expectedRemoved, removed)
 	expectedRetained := RetainedBackups{keep7, keep6Plus, keep5, keep4, keep3, keep2, keep1}
@@ -198,9 +193,8 @@ func TestKeepLastSevenDaysBackupStrategy_removeBackupsOlderThanSevenDays_multipl
 
 	strategy := &keepLastSevenDaysStrategy{testClock}
 
-	removed, retained, err := strategy.FilterForRemoval(backups)
+	removed, retained := strategy.FilterForRemoval(backups)
 
-	assert.Nil(t, err)
 	expectedRemoved := RemovedBackups{remove1, remove2, remove3, remove4}
 	assert.Equal(t, expectedRemoved, removed)
 	expectedRetained := RetainedBackups{keep1, keep2, keep3, keep4, keep5, keep6}
@@ -220,9 +214,24 @@ func TestKeepLastSevenDaysBackupStrategy_timeFormatWithNanoseconds(t *testing.T)
 
 	strategy := &keepLastSevenDaysStrategy{testClock}
 
-	removed, retained, err := strategy.FilterForRemoval(backups)
+	removed, retained := strategy.FilterForRemoval(backups)
 
-	assert.Nil(t, err)
 	assert.Equal(t, RemovedBackups{backup2}, removed)
 	assert.Equal(t, RetainedBackups{backup1}, retained)
+}
+
+func Test_keepLastSevenDaysStrategy_GetName(t *testing.T) {
+	// given
+	sut := &keepLastSevenDaysStrategy{}
+
+	// when
+	name := sut.GetName()
+
+	// then
+	assert.Equal(t, StrategyId("keepLastSevenDays"), name)
+}
+
+func Test_newKeepLastSevenDaysStrategy(t *testing.T) {
+	strategy := newKeepLastSevenDaysStrategy()
+	assert.NotEmpty(t, strategy)
 }

@@ -1,7 +1,6 @@
 package retention
 
 import (
-	"fmt"
 	"slices"
 
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
@@ -23,27 +22,23 @@ func (ibs *intervalBasedStrategy) GetName() StrategyId {
 	return ibs.name
 }
 
-func (ibs *intervalBasedStrategy) FilterForRemoval(allBackups []v1.Backup) (RemovedBackups, RetainedBackups, error) {
+func (ibs *intervalBasedStrategy) FilterForRemoval(allBackups []v1.Backup) (RemovedBackups, RetainedBackups) {
 	var intervalBackupMappings = make(map[timeInterval][]v1.Backup)
 	var removedBackups []v1.Backup
 	var retainedBackups []v1.Backup
-	var err error
 
 	for _, currentBackup := range allBackups {
 		// create mapping of intervals and backups and add all backups that don't fit in any interval to removal
-		intervalBackupMappings, removedBackups, err = ibs.mapBackupsToIntervals(intervalBackupMappings, removedBackups, currentBackup)
-		if err != nil {
-			return RemovedBackups{}, RetainedBackups{}, fmt.Errorf("an error occurred during timestamp conversion: %w", err)
-		}
+		intervalBackupMappings, removedBackups = ibs.mapBackupsToIntervals(intervalBackupMappings, removedBackups, currentBackup)
 	}
 
 	// filterByRetentionMode checks the interval retention modes and updates the lists as defined (see timeInterval)
 	removedBackups, retainedBackups = filterByRetentionMode(intervalBackupMappings, removedBackups, retainedBackups)
 
-	return removedBackups, retainedBackups, nil
+	return removedBackups, retainedBackups
 }
 
-func (ibs *intervalBasedStrategy) mapBackupsToIntervals(intervalBackupMappings map[timeInterval][]v1.Backup, removedBackups RemovedBackups, currentBackup v1.Backup) (map[timeInterval][]v1.Backup, RemovedBackups, error) {
+func (ibs *intervalBasedStrategy) mapBackupsToIntervals(intervalBackupMappings map[timeInterval][]v1.Backup, removedBackups RemovedBackups, currentBackup v1.Backup) (map[timeInterval][]v1.Backup, RemovedBackups) {
 	now := ibs.clock.Now()
 	// Use backup start time instead of end time so broken backups are handled as well
 	currentBackupTimestamp := currentBackup.Status.StartTimestamp.Time
@@ -63,7 +58,7 @@ func (ibs *intervalBasedStrategy) mapBackupsToIntervals(intervalBackupMappings m
 	if !found {
 		removedBackups = append(removedBackups, currentBackup)
 	}
-	return intervalBackupMappings, removedBackups, nil
+	return intervalBackupMappings, removedBackups
 }
 
 // check the interval retention mode (ALL = keep all; OLDEST = keep the oldest)

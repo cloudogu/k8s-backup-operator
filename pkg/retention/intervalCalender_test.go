@@ -2,6 +2,7 @@ package retention
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -31,8 +32,9 @@ func TestIntervalCalendarInvalidConfig(t *testing.T) {
 	)
 	err := testCalendar.validateConfig()
 
-	assert.Error(t, err)
-	assert.Equal(t, err.intervalName, "B")
+	require.Error(t, err)
+	require.IsType(t, &invalidCalendarConfigError{}, err)
+	assert.Equal(t, err.(*invalidCalendarConfigError).intervalName, "B")
 	assert.Equal(t, err.Error(), "gaps or overlaps between interval borders are not allowed: Please check the interval B")
 
 	var (
@@ -44,8 +46,9 @@ func TestIntervalCalendarInvalidConfig(t *testing.T) {
 	)
 	err = testCalendar2.validateConfig()
 
-	assert.Error(t, err)
-	assert.Equal(t, err.intervalName, "C")
+	require.Error(t, err)
+	require.IsType(t, &invalidCalendarConfigError{}, err)
+	assert.Equal(t, err.(*invalidCalendarConfigError).intervalName, "C")
 	assert.Equal(t, err.Error(), "gaps or overlaps between interval borders are not allowed: Please check the interval C")
 }
 

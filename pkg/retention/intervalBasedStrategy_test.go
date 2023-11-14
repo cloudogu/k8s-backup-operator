@@ -59,8 +59,8 @@ func TestKeepLastSevenDaysBackupExtendedStrategy(t *testing.T) {
 
 	strategy := newIntervalBasedStrategy(KeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy, calendarRetentionStrategyKeep7Days1Month1Quarter1Year, testClock)
 
-	removed, retained, err := strategy.FilterForRemoval(backups)
-	assert.Nil(t, err)
+	removed, retained := strategy.FilterForRemoval(backups)
+
 	expectedRemoved := RemovedBackups{backup361Days, backup95Days, backup89Days, backup8Days}
 	assert.ElementsMatch(t, expectedRemoved, removed)
 	expectedRetained := RetainedBackups{backupToday, backup7Days, backup30Days, backup90Days, backup179Days, backup360Days}
@@ -73,9 +73,19 @@ func TestKeepLastSevenDaysBackupExtendedStrategyWithEmptyBackups(t *testing.T) {
 
 	strategy := newIntervalBasedStrategy(KeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy, calendarRetentionStrategyKeep7Days1Month1Quarter1Year, testClock)
 
-	removed, retained, err := strategy.FilterForRemoval(backups)
+	removed, retained := strategy.FilterForRemoval(backups)
 
-	assert.Nil(t, err)
 	assert.Empty(t, removed)
 	assert.Empty(t, retained)
+}
+
+func Test_retainOldestBackup(t *testing.T) {
+	t.Run("should remove and retain nothing for empty list", func(t *testing.T) {
+		// when
+		remove, retain := retainOldestBackup(nil)
+
+		// then
+		assert.Equal(t, RemovedBackups{}, remove)
+		assert.Equal(t, RetainedBackups{}, retain)
+	})
 }

@@ -13,7 +13,7 @@ type keepLastSevenDaysStrategy struct {
 	clock timeProvider
 }
 
-func (klsds *keepLastSevenDaysStrategy) FilterForRemoval(allBackups []v1.Backup) (RemovedBackups, RetainedBackups, error) {
+func (klsds *keepLastSevenDaysStrategy) FilterForRemoval(allBackups []v1.Backup) (RemovedBackups, RetainedBackups) {
 	var removedBackups []v1.Backup
 	var retainedBackups []v1.Backup
 
@@ -29,7 +29,7 @@ func (klsds *keepLastSevenDaysStrategy) FilterForRemoval(allBackups []v1.Backup)
 		}
 	}
 
-	return removedBackups, retainedBackups, nil
+	return removedBackups, retainedBackups
 }
 
 func (klsds *keepLastSevenDaysStrategy) GetName() StrategyId {

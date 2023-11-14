@@ -17,12 +17,7 @@ func (sg *StrategyGetter) Get(name StrategyId) (Strategy, error) {
 	case KeepLastSevenDaysStrategy:
 		return newKeepLastSevenDaysStrategy(), nil
 	case KeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy:
-		strategy, err := newKeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy()
-		if err != nil {
-			return nil, fmt.Errorf("error creating strategy %q: %w", KeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy, err)
-		}
-
-		return strategy, nil
+		return newKeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy(), nil
 	default:
 		return nil, fmt.Errorf("no matching strategy for name %q", name)
 	}

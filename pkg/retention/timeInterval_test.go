@@ -61,3 +61,68 @@ func TestRetentionPolicyIntervalCalculation(t *testing.T) {
 
 	}
 }
+
+func Test_newTimeInterval(t *testing.T) {
+	type args struct {
+		name          string
+		start         int
+		end           int
+		retentionMode string
+	}
+	tests := []struct {
+		name string
+		args args
+		want timeInterval
+	}{
+		{
+			name: "should create interval with keep all mode",
+			args: args{
+				name:          "keep all in the last 20 to 40 days",
+				start:         20,
+				end:           40,
+				retentionMode: "ALL",
+			},
+			want: timeInterval{
+				name:          "keep all in the last 20 to 40 days",
+				start:         20,
+				end:           40,
+				retentionMode: "ALL",
+			},
+		},
+		{
+			name: "should create interval with keep oldest mode",
+			args: args{
+				name:          "keep all in the last 31 to 55 days",
+				start:         31,
+				end:           55,
+				retentionMode: "OLDEST",
+			},
+			want: timeInterval{
+				name:          "keep all in the last 31 to 55 days",
+				start:         31,
+				end:           55,
+				retentionMode: "OLDEST",
+			},
+		},
+		{
+			name: "should create interval with keep default mode on unknown mode",
+			args: args{
+				name:          "keep all in the last 0 to 21 days",
+				start:         0,
+				end:           21,
+				retentionMode: "unknown",
+			},
+			want: timeInterval{
+				name:          "keep all in the last 0 to 21 days",
+				start:         0,
+				end:           21,
+				retentionMode: "ALL",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, newTimeInterval(tt.args.name, tt.args.start, tt.args.end, tt.args.retentionMode), "newTimeInterval(%v, %v, %v, %v)", tt.args.name, tt.args.start, tt.args.end, tt.args.retentionMode)
+		})
+	}
+}

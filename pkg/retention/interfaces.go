@@ -17,7 +17,7 @@ import (
 // the next day.
 type Strategy interface {
 	// FilterForRemoval filters all backups which should or should not be removed by a RetentionManager.
-	FilterForRemoval(allBackups []k8sv1.Backup) (RemovedBackups, RetainedBackups, error)
+	FilterForRemoval(allBackups []k8sv1.Backup) (RemovedBackups, RetainedBackups)
 
 	// GetName returns a name of the Strategy implementation.
 	// The name should roughly describe how the strategy works.
