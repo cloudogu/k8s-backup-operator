@@ -89,7 +89,7 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 		return err
 	}
 
-	backup, err = bcm.client.UpdateStatusCompleted(ctx, backup)
+	_, err = bcm.client.UpdateStatusCompleted(ctx, backup)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in backup resource: %w", v1.BackupStatusCompleted, err)
 	}

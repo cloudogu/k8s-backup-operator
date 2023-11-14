@@ -46,11 +46,7 @@ func (ibs *intervalBasedStrategy) mapBackupsToIntervals(intervalBackupMappings m
 	var found = false
 	for _, interval := range ibs.intervalCalendar.timeIntervals {
 		if interval.isTimestampInInterval(currentBackupTimestamp, now) {
-			if _, ok := intervalBackupMappings[interval]; ok {
-				intervalBackupMappings[interval] = append(intervalBackupMappings[interval], currentBackup)
-			} else {
-				intervalBackupMappings[interval] = []v1.Backup{currentBackup}
-			}
+			intervalBackupMappings[interval] = append(intervalBackupMappings[interval], currentBackup)
 			found = true
 		}
 	}
