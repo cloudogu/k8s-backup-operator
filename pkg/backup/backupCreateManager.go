@@ -49,12 +49,12 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 		return fmt.Errorf("failed to update start time in status of backup resource: %w", err)
 	}
 
-	defer func() {
+	defer func(backup *v1.Backup) {
 		errDefer := bcm.updateCompletionTimestamp(ctx, backup)
 		if errDefer != nil {
 			logger.Error(fmt.Errorf("failed to update completion time in status of backup resource: %w", err), "backup error")
 		}
-	}()
+	}(backup)
 
 	backup, err = bcm.client.AddFinalizer(ctx, backup, v1.BackupFinalizer)
 	if err != nil {
