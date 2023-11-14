@@ -38,7 +38,8 @@ func (m *manager) CollectGarbage(ctx context.Context) error {
 		return fmt.Errorf("failed to get retention config: %w", err)
 	}
 
-	retentionStrategy, err := m.strategyGetter.Get(retentionConfig.Strategy)
+	var retentionStrategy strategy
+	retentionStrategy, err = m.strategyGetter.Get(retentionConfig.Strategy)
 	if err != nil {
 		return fmt.Errorf("failed to get retention strategy: %w", err)
 	}
