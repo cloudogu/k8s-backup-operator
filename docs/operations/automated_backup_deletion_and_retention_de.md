@@ -18,7 +18,7 @@ spec:
   deployNamespace: ecosystem
   valuesYamlOverwrite: |
     retention:
-      # Die Strategie mit welcher Backups gelöscht werden. Standardmäßig is es keepAll.
+      # Die Strategie mit welcher Backups gelöscht werden. Standardmäßig ist es keepAll.
       strategy: keepLastSevenDays
       # Dieses Cron-Pattern definiert, wie oft Backups gelöscht werden sollen.
       # Standardeinstellung ist "0 * * * *", also jede volle Stunde.
