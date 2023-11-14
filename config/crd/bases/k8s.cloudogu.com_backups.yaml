@@ -46,11 +46,21 @@ spec:
           status:
             description: Status defines the observed state of Backup
             properties:
+              completionTimestamp:
+                description: CompletionTimestamp marks the date/time when the backup
+                  finished being processed, regardless of any errors.
+                format: date-time
+                type: string
               requeueTimeNanos:
                 description: RequeueTimeNanos contains the time in nanoseconds to
                   wait until the next requeue.
                 format: int64
                 type: integer
+              startTimestamp:
+                description: StartTimestamp marks the date/time when the backup started
+                  being processed.
+                format: date-time
+                type: string
               status:
                 description: Status represents the state of the backup.
                 type: string
