@@ -16,6 +16,7 @@ spec:
     spec:
       template:
         spec:
+          serviceAccountName: "garbage-collection-manager"
           restartPolicy: OnFailure
           securityContext:
             runAsNonRoot: true
