@@ -4,8 +4,7 @@ Backups können automatisch gelöscht werden.
 Standardmäßig werden keine Backups gelöscht.
 
 Um zu steuern, welche Backups gelöscht werden, kann eine von mehreren Aufbewahrungsstrategien aktiviert werden.
-Die Strategie kann in der `k8s-backup-operator-retention` ConfigMap konfiguriert werden:
-Automatisches Löschen und die Aufbewahrung können über die Values der Komponente konfiguriert werden.
+Automatisches Löschen und die Aufbewahrung können über die Values der Komponente konfiguriert werden.:
 
 ```yaml backup-operator-component.yaml
 apiVersion: k8s.cloudogu.com/v1
