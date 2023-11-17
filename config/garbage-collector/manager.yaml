@@ -22,6 +22,10 @@ spec:
             runAsNonRoot: true
             seccompProfile:
               type: RuntimeDefault
+          volumes:
+            - name: retention-config
+              configMap:
+                name: k8s-backup-operator-retention
           containers:
           - args:
             - gc
@@ -37,6 +41,10 @@ spec:
             image: controller:latest
             imagePullPolicy: IfNotPresent
             name: garbage-collector
+            volumeMounts:
+              - mountPath: /config/retention
+                name: retention-config
+                readOnly: true
             securityContext:
               allowPrivilegeEscalation: false
               capabilities:

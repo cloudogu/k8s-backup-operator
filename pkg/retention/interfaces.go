@@ -1,9 +1,9 @@
 package retention
 
 import (
-	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"time"
+
+	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
 
 // Strategy filters a set over all backups into sets of backups that should be removed by the RetentionManager
@@ -24,10 +24,6 @@ type Strategy interface {
 	// As the name may be used to be selected by the user,
 	// the name must only consist of latin characters and ciphers.
 	GetName() StrategyId
-}
-
-type configMapClient interface {
-	corev1.ConfigMapInterface
 }
 
 type timeProvider interface {

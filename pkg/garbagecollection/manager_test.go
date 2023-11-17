@@ -15,11 +15,7 @@ const testNamespace = "test-ns"
 var testCtx = context.Background()
 
 func TestNewManager(t *testing.T) {
-	cmClientMock := newMockConfigMapClient(t)
-	coreV1Mock := newMockCoreV1(t)
-	coreV1Mock.EXPECT().ConfigMaps(testNamespace).Return(cmClientMock)
 	clientSetMock := newMockEcosystemClientSet(t)
-	clientSetMock.EXPECT().CoreV1().Return(coreV1Mock)
 
 	manager := NewManager(clientSetMock, testNamespace)
 	assert.NotEmpty(t, manager)

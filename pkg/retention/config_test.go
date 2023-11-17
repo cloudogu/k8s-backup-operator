@@ -2,21 +2,19 @@ package retention
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 var testCtx = context.Background()
 
 func TestNewConfigGetter(t *testing.T) {
-	// given
-	cmClient := newMockConfigMapClient(t)
-
 	// when
-	getter := NewConfigGetter(cmClient)
+	getter := NewConfigGetter()
 
 	// then
 	assert.NotEmpty(t, getter)
@@ -25,9 +23,10 @@ func TestNewConfigGetter(t *testing.T) {
 func TestConfigGetter_GetConfig(t *testing.T) {
 	t.Run("should fail to get configmap", func(t *testing.T) {
 		// given
-		cmClient := newMockConfigMapClient(t)
-		cmClient.EXPECT().Get(testCtx, "k8s-backup-operator-retention", metav1.GetOptions{}).Return(nil, assert.AnError)
-		sut := &ConfigGetter{cmClient}
+		tempDir := t.TempDir()
+		nonexistant := filepath.Join(tempDir, "nonexistant")
+
+		sut := &ConfigGetter{configFilePath: nonexistant}
 
 		// when
 		actual, err := sut.GetConfig(testCtx)
@@ -35,16 +34,13 @@ func TestConfigGetter_GetConfig(t *testing.T) {
 		// then
 		assert.Empty(t, actual)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to get retention config from config map \"k8s-backup-operator-retention\"")
+		assert.ErrorContains(t, err, "failed to find retention configuration")
 	})
 	t.Run("should use default strategy if configmap does not contain strategy", func(t *testing.T) {
 		// given
-		configMap := &corev1.ConfigMap{Data: make(map[string]string)}
+		tempDir := t.TempDir()
 
-		cmClient := newMockConfigMapClient(t)
-		cmClient.EXPECT().Get(testCtx, "k8s-backup-operator-retention", metav1.GetOptions{}).Return(configMap, nil)
-		sut := &ConfigGetter{cmClient}
+		sut := &ConfigGetter{configFilePath: tempDir}
 
 		// when
 		actual, err := sut.GetConfig(testCtx)
@@ -56,11 +52,12 @@ func TestConfigGetter_GetConfig(t *testing.T) {
 	})
 	t.Run("should fail on invalid strategy", func(t *testing.T) {
 		// given
-		configMap := &corev1.ConfigMap{Data: map[string]string{"strategy": "invalid"}}
+		tempDir := t.TempDir()
+		strategyFile := filepath.Join(tempDir, "strategy")
+		err := os.WriteFile(strategyFile, []byte("invalid"), 0644)
+		require.NoError(t, err)
 
-		cmClient := newMockConfigMapClient(t)
-		cmClient.EXPECT().Get(testCtx, "k8s-backup-operator-retention", metav1.GetOptions{}).Return(configMap, nil)
-		sut := &ConfigGetter{cmClient}
+		sut := &ConfigGetter{configFilePath: tempDir}
 
 		// when
 		actual, err := sut.GetConfig(testCtx)
@@ -72,11 +69,12 @@ func TestConfigGetter_GetConfig(t *testing.T) {
 	})
 	t.Run("should succeed on valid strategy", func(t *testing.T) {
 		// given
-		configMap := &corev1.ConfigMap{Data: map[string]string{"strategy": "keepLastSevenDays"}}
+		tempDir := t.TempDir()
+		strategyFile := filepath.Join(tempDir, "strategy")
+		err := os.WriteFile(strategyFile, []byte("keepLastSevenDays"), 0644)
+		require.NoError(t, err)
 
-		cmClient := newMockConfigMapClient(t)
-		cmClient.EXPECT().Get(testCtx, "k8s-backup-operator-retention", metav1.GetOptions{}).Return(configMap, nil)
-		sut := &ConfigGetter{cmClient}
+		sut := &ConfigGetter{configFilePath: tempDir}
 
 		// when
 		actual, err := sut.GetConfig(testCtx)

@@ -2,19 +2,19 @@ package retention
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/go-logr/logr"
 )
 
 const (
-	retentionConfigmapName = "k8s-backup-operator-retention"
-	strategyKey            = "strategy"
-	DefaultStrategy        = KeepAllStrategy
+	configmapName         = "k8s-backup-operator-retention"
+	defaultConfigFilePath = "/config/retention"
+	strategyKey           = "strategy"
+	DefaultStrategy       = KeepAllStrategy
 )
 
 type Config struct {
@@ -22,34 +22,35 @@ type Config struct {
 }
 
 type ConfigGetter struct {
-	client configMapClient
+	configFilePath string
 }
 
-func NewConfigGetter(client configMapClient) *ConfigGetter {
-	return &ConfigGetter{client: client}
+func NewConfigGetter() *ConfigGetter {
+	return &ConfigGetter{configFilePath: defaultConfigFilePath}
 }
 
 func (sg *ConfigGetter) GetConfig(ctx context.Context) (Config, error) {
 	logger := log.FromContext(ctx, "GetConfig")
 
-	configMap, err := sg.client.Get(ctx, retentionConfigmapName, metav1.GetOptions{})
-	if err != nil {
-		return Config{}, fmt.Errorf("failed to get retention config from config map %q: %w", retentionConfigmapName, err)
+	if _, err := os.Stat(sg.configFilePath); errors.Is(err, os.ErrNotExist) {
+		return Config{}, fmt.Errorf("failed to find retention configuration: %w", err)
 	}
 
-	return configFromConfigMap(configMap, logger)
-}
-
-func configFromConfigMap(configMap *corev1.ConfigMap, logger logr.Logger) (Config, error) {
 	config := Config{}
-
-	strategy, exists := configMap.Data[strategyKey]
-	if !exists {
-		logger.Info(fmt.Sprintf("could not find key %q in config map %q", strategyKey, retentionConfigmapName))
+	strategyPath := filepath.Join(sg.configFilePath, strategyKey)
+	if _, err := os.Stat(strategyPath); errors.Is(err, os.ErrNotExist) {
+		logger.Info(fmt.Sprintf("could not find key %q in config map %q", strategyKey, configmapName))
 		logger.Info(fmt.Sprintf("using default strategy %q", DefaultStrategy))
 		config.Strategy = DefaultStrategy
 	} else {
-		err := validateStrategy(strategy)
+		strategyBytes, err := os.ReadFile(strategyPath)
+		if err != nil {
+			return Config{}, fmt.Errorf("failed to read strategy: %w", err)
+		}
+
+		strategy := string(strategyBytes)
+
+		err = validateStrategy(strategy)
 		if err != nil {
 			return Config{}, err
 		}

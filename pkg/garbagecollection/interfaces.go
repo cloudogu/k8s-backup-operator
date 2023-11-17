@@ -2,7 +2,6 @@ package garbagecollection
 
 import (
 	"context"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retention"
@@ -40,16 +39,4 @@ type ecosystemV1Alpha1 interface {
 //goland:noinspection GoUnusedType
 type backupClient interface {
 	ecosystem.BackupInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type coreV1 interface {
-	corev1.CoreV1Interface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type configMapClient interface {
-	corev1.ConfigMapInterface
 }

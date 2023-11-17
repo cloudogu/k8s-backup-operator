@@ -21,11 +21,10 @@ type manager struct {
 }
 
 func NewManager(clientSet ecosystem.Interface, namespace string) Manager {
-	configMapClient := clientSet.CoreV1().ConfigMaps(namespace)
 	return &manager{
 		clientSet:      clientSet,
 		namespace:      namespace,
-		configGetter:   retention.NewConfigGetter(configMapClient),
+		configGetter:   retention.NewConfigGetter(),
 		strategyGetter: retention.NewStrategyGetter(),
 	}
 }
