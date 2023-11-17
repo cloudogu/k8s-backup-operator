@@ -92,8 +92,8 @@ func Test_manager_CollectGarbage(t *testing.T) {
 	})
 	t.Run("should fail to delete one backup", func(t *testing.T) {
 		// given
-		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}
-		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}
+		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
+		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backups := &v1.BackupList{Items: []v1.Backup{backup1, backup2}}
 
 		configGetterMock := newMockConfigGetter(t)
@@ -131,8 +131,8 @@ func Test_manager_CollectGarbage(t *testing.T) {
 	})
 	t.Run("should fail to delete two backups", func(t *testing.T) {
 		// given
-		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}
-		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}
+		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
+		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backups := &v1.BackupList{Items: []v1.Backup{backup1, backup2}}
 
 		configGetterMock := newMockConfigGetter(t)
@@ -171,8 +171,8 @@ func Test_manager_CollectGarbage(t *testing.T) {
 	})
 	t.Run("should only delete backups filtered for deletion", func(t *testing.T) {
 		// given
-		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}
-		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}
+		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
+		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backups := &v1.BackupList{Items: []v1.Backup{backup1, backup2}}
 
 		configGetterMock := newMockConfigGetter(t)
@@ -205,10 +205,46 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		// then
 		require.NoError(t, err)
 	})
+	t.Run("should only delete completed backups", func(t *testing.T) {
+		// given
+		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
+		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}, Status: v1.BackupStatus{Status: v1.BackupStatusFailed}}
+		backups := &v1.BackupList{Items: []v1.Backup{backup1, backup2}}
+
+		configGetterMock := newMockConfigGetter(t)
+		configGetterMock.EXPECT().GetConfig(testCtx).Return(retention.Config{Strategy: retention.KeepAllStrategy}, nil)
+
+		strategyMock := newMockStrategy(t)
+		strategyMock.EXPECT().GetName().Return(retention.KeepAllStrategy)
+		strategyMock.EXPECT().FilterForRemoval([]v1.Backup{backup1}).Return([]v1.Backup{backup1}, retention.RetainedBackups{})
+		strategyGetterMock := newMockStrategyGetter(t)
+		strategyGetterMock.EXPECT().Get(retention.KeepAllStrategy).Return(strategyMock, nil)
+
+		backupClientMock := newMockBackupClient(t)
+		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(backups, nil)
+		backupClientMock.EXPECT().Delete(testCtx, "backup-1", metav1.DeleteOptions{}).Return(nil)
+		v1alpha1Mock := newMockEcosystemV1Alpha1(t)
+		v1alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
+		clientSetMock := newMockEcosystemClientSet(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+
+		sut := &manager{
+			clientSet:      clientSetMock,
+			namespace:      testNamespace,
+			configGetter:   configGetterMock,
+			strategyGetter: strategyGetterMock,
+		}
+
+		// when
+		err := sut.CollectGarbage(testCtx)
+
+		// then
+		require.NoError(t, err)
+	})
 	t.Run("should succeed", func(t *testing.T) {
 		// given
-		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}
-		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}
+		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
+		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backups := &v1.BackupList{Items: []v1.Backup{backup1, backup2}}
 
 		configGetterMock := newMockConfigGetter(t)

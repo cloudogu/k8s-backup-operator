@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retention"
 )
 
@@ -51,7 +52,9 @@ func (m *manager) CollectGarbage(ctx context.Context) error {
 		return fmt.Errorf("failed to list backups: %w", err)
 	}
 
-	toRemove, _ := retentionStrategy.FilterForRemoval(backupList.Items)
+	completedBackups := filterCompleted(backupList.Items)
+
+	toRemove, _ := retentionStrategy.FilterForRemoval(completedBackups)
 
 	var errs []error
 	for _, backup := range toRemove {
@@ -62,4 +65,14 @@ func (m *manager) CollectGarbage(ctx context.Context) error {
 	}
 
 	return errors.Join(errs...)
+}
+
+func filterCompleted(backups []v1.Backup) (completed []v1.Backup) {
+	for _, backup := range backups {
+		if backup.Status.Status == v1.BackupStatusCompleted {
+			completed = append(completed, backup)
+		}
+	}
+
+	return completed
 }
