@@ -87,7 +87,7 @@ func retainOldestBackup(backups []v1.Backup) (RemovedBackups, RetainedBackups) {
 		}
 	}
 
-	// we
+	// We'll have to create a copy here, since `slices.Delete` modifies the original slice.
 	backupCopy := make([]v1.Backup, len(backups))
 	copy(backupCopy, backups)
 

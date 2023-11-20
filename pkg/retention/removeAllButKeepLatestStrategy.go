@@ -22,6 +22,7 @@ func (kls *removeAllButKeepLatestStrategy) FilterForRemoval(allBackups []v1.Back
 		}
 	}
 
+	// We'll have to create a copy here, since `slices.Delete` modifies the original slice.
 	backupCopy := make([]v1.Backup, len(allBackups))
 	copy(backupCopy, allBackups)
 	removed := slices.Delete(backupCopy, latestBackupIndex, latestBackupIndex+1)
