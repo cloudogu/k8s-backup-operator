@@ -14,19 +14,18 @@ import (
 )
 
 type manager struct {
-	clientSet ecosystemClientSet
-	namespace string
-
-	configGetter   configGetter
+	clientSet      ecosystemClientSet
+	namespace      string
+	strategyName   retention.StrategyId
 	strategyGetter strategyGetter
 }
 
 // NewManager creates an instance of a Manager capable of deleting old backups.
-func NewManager(clientSet ecosystem.Interface, namespace string) Manager {
+func NewManager(clientSet ecosystem.Interface, namespace string, strategyName string) Manager {
 	return &manager{
 		clientSet:      clientSet,
 		namespace:      namespace,
-		configGetter:   retention.NewConfigGetter(),
+		strategyName:   retention.StrategyId(strategyName),
 		strategyGetter: retention.NewStrategyGetter(),
 	}
 }
@@ -35,13 +34,8 @@ func NewManager(clientSet ecosystem.Interface, namespace string) Manager {
 func (m *manager) CollectGarbage(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 
-	retentionConfig, err := m.configGetter.GetConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get retention config: %w", err)
-	}
-
 	var retentionStrategy strategy
-	retentionStrategy, err = m.strategyGetter.Get(retentionConfig.Strategy)
+	retentionStrategy, err := m.strategyGetter.Get(m.strategyName)
 	if err != nil {
 		return fmt.Errorf("failed to get retention strategy: %w", err)
 	}

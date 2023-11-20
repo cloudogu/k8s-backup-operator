@@ -17,36 +17,18 @@ var testCtx = context.Background()
 func TestNewManager(t *testing.T) {
 	clientSetMock := newMockEcosystemClientSet(t)
 
-	manager := NewManager(clientSetMock, testNamespace)
+	manager := NewManager(clientSetMock, testNamespace, "keepAll")
 	assert.NotEmpty(t, manager)
 }
 
 func Test_manager_CollectGarbage(t *testing.T) {
-	t.Run("should fail to get retention config", func(t *testing.T) {
-		// given
-		configGetterMock := newMockConfigGetter(t)
-		configGetterMock.EXPECT().GetConfig(testCtx).Return(retention.Config{}, assert.AnError)
-
-		sut := &manager{configGetter: configGetterMock}
-
-		// when
-		err := sut.CollectGarbage(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to get retention config")
-	})
 	t.Run("should fail to get retention strategy", func(t *testing.T) {
 		// given
-		configGetterMock := newMockConfigGetter(t)
-		configGetterMock.EXPECT().GetConfig(testCtx).Return(retention.Config{Strategy: retention.KeepAllStrategy}, nil)
-
 		strategyGetterMock := newMockStrategyGetter(t)
 		strategyGetterMock.EXPECT().Get(retention.KeepAllStrategy).Return(nil, assert.AnError)
 
 		sut := &manager{
-			configGetter:   configGetterMock,
+			strategyName:   retention.StrategyId("keepAll"),
 			strategyGetter: strategyGetterMock,
 		}
 
@@ -60,9 +42,6 @@ func Test_manager_CollectGarbage(t *testing.T) {
 	})
 	t.Run("should fail to list backups", func(t *testing.T) {
 		// given
-		configGetterMock := newMockConfigGetter(t)
-		configGetterMock.EXPECT().GetConfig(testCtx).Return(retention.Config{Strategy: retention.KeepAllStrategy}, nil)
-
 		strategyMock := newMockStrategy(t)
 		strategyMock.EXPECT().GetName().Return(retention.KeepAllStrategy)
 		strategyGetterMock := newMockStrategyGetter(t)
@@ -78,7 +57,7 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		sut := &manager{
 			clientSet:      clientSetMock,
 			namespace:      testNamespace,
-			configGetter:   configGetterMock,
+			strategyName:   retention.StrategyId("keepAll"),
 			strategyGetter: strategyGetterMock,
 		}
 
@@ -95,9 +74,6 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backups := &v1.BackupList{Items: []v1.Backup{backup1, backup2}}
-
-		configGetterMock := newMockConfigGetter(t)
-		configGetterMock.EXPECT().GetConfig(testCtx).Return(retention.Config{Strategy: retention.KeepAllStrategy}, nil)
 
 		strategyMock := newMockStrategy(t)
 		strategyMock.EXPECT().GetName().Return(retention.KeepAllStrategy)
@@ -117,7 +93,7 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		sut := &manager{
 			clientSet:      clientSetMock,
 			namespace:      testNamespace,
-			configGetter:   configGetterMock,
+			strategyName:   retention.StrategyId("keepAll"),
 			strategyGetter: strategyGetterMock,
 		}
 
@@ -134,9 +110,6 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backups := &v1.BackupList{Items: []v1.Backup{backup1, backup2}}
-
-		configGetterMock := newMockConfigGetter(t)
-		configGetterMock.EXPECT().GetConfig(testCtx).Return(retention.Config{Strategy: retention.KeepAllStrategy}, nil)
 
 		strategyMock := newMockStrategy(t)
 		strategyMock.EXPECT().GetName().Return(retention.KeepAllStrategy)
@@ -156,7 +129,7 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		sut := &manager{
 			clientSet:      clientSetMock,
 			namespace:      testNamespace,
-			configGetter:   configGetterMock,
+			strategyName:   retention.StrategyId("keepAll"),
 			strategyGetter: strategyGetterMock,
 		}
 
@@ -175,9 +148,6 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backups := &v1.BackupList{Items: []v1.Backup{backup1, backup2}}
 
-		configGetterMock := newMockConfigGetter(t)
-		configGetterMock.EXPECT().GetConfig(testCtx).Return(retention.Config{Strategy: retention.KeepAllStrategy}, nil)
-
 		strategyMock := newMockStrategy(t)
 		strategyMock.EXPECT().GetName().Return(retention.KeepAllStrategy)
 		strategyMock.EXPECT().FilterForRemoval(backups.Items).Return(retention.RemovedBackups{backup2}, retention.RetainedBackups{backup1})
@@ -195,7 +165,7 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		sut := &manager{
 			clientSet:      clientSetMock,
 			namespace:      testNamespace,
-			configGetter:   configGetterMock,
+			strategyName:   retention.StrategyId("keepAll"),
 			strategyGetter: strategyGetterMock,
 		}
 
@@ -210,9 +180,6 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}, Status: v1.BackupStatus{Status: v1.BackupStatusFailed}}
 		backups := &v1.BackupList{Items: []v1.Backup{backup1, backup2}}
-
-		configGetterMock := newMockConfigGetter(t)
-		configGetterMock.EXPECT().GetConfig(testCtx).Return(retention.Config{Strategy: retention.KeepAllStrategy}, nil)
 
 		strategyMock := newMockStrategy(t)
 		strategyMock.EXPECT().GetName().Return(retention.KeepAllStrategy)
@@ -231,7 +198,7 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		sut := &manager{
 			clientSet:      clientSetMock,
 			namespace:      testNamespace,
-			configGetter:   configGetterMock,
+			strategyName:   retention.StrategyId("keepAll"),
 			strategyGetter: strategyGetterMock,
 		}
 
@@ -246,9 +213,6 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		backup1 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backup2 := v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}
 		backups := &v1.BackupList{Items: []v1.Backup{backup1, backup2}}
-
-		configGetterMock := newMockConfigGetter(t)
-		configGetterMock.EXPECT().GetConfig(testCtx).Return(retention.Config{Strategy: retention.KeepAllStrategy}, nil)
 
 		strategyMock := newMockStrategy(t)
 		strategyMock.EXPECT().GetName().Return(retention.KeepAllStrategy)
@@ -268,7 +232,7 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		sut := &manager{
 			clientSet:      clientSetMock,
 			namespace:      testNamespace,
-			configGetter:   configGetterMock,
+			strategyName:   retention.StrategyId("keepAll"),
 			strategyGetter: strategyGetterMock,
 		}
 

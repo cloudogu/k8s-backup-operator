@@ -99,7 +99,7 @@ func main() {
 	}
 }
 
-func startGarbageCollector(ctx context.Context, _ *flag.FlagSet, _ []string) error {
+func startGarbageCollector(ctx context.Context, flags *flag.FlagSet, args []string) error {
 	restConfig := ctrl.GetConfigOrDie()
 	namespace, err := config.GetNamespace()
 	if err != nil {
@@ -116,8 +116,19 @@ func startGarbageCollector(ctx context.Context, _ *flag.FlagSet, _ []string) err
 		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
 	}
 
-	gcManager := newGarbageCollectionManager(ecosystemClientSet, namespace)
+	retentionStrategy := parseStrategyName(flags, args)
+
+	gcManager := newGarbageCollectionManager(ecosystemClientSet, namespace, retentionStrategy)
 	return gcManager.CollectGarbage(ctx)
+}
+
+func parseStrategyName(flags *flag.FlagSet, args []string) string {
+	var strategyName string
+	flags.StringVar(&strategyName, "strategy", "keepAll", "The retention strategy to decide which backups to delete and which to keep.")
+
+	// Ignore errors; flags is set to exit on errors
+	_ = flags.Parse(args)
+	return strategyName
 }
 
 func startOperator(ctx context.Context, flags *flag.FlagSet, args []string) error {

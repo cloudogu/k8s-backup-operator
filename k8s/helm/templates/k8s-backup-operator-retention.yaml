@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: k8s-backup-operator-retention
-  labels:
-    app: ces
-    app.kubernetes.io/name: k8s-backup-operator-retention
-data:
-  strategy: "{{ .Values.retention.strategy }}"
