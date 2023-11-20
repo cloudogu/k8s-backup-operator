@@ -23,14 +23,17 @@ type Config struct {
 	Strategy StrategyId
 }
 
+// ConfigGetter is capable of retrieving the retention configuration.
 type ConfigGetter struct {
 	configFilePath string
 }
 
+// NewConfigGetter creates something capable of retrieving the retention configuration.
 func NewConfigGetter() *ConfigGetter {
 	return &ConfigGetter{configFilePath: defaultConfigFilePath}
 }
 
+// GetConfig retrieves the retention configuration from a mounted configmap.
 func (sg *ConfigGetter) GetConfig(ctx context.Context) (Config, error) {
 	logger := log.FromContext(ctx, "GetConfig")
 

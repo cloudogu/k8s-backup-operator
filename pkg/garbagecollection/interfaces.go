@@ -8,6 +8,7 @@ import (
 )
 
 type Manager interface {
+	// CollectGarbage deletes backups according to the configured retention strategy.
 	CollectGarbage(ctx context.Context) error
 }
 
@@ -16,10 +17,12 @@ type ecosystemClientSet interface {
 }
 
 type configGetter interface {
+	// GetConfig retrieves the retention configuration.
 	GetConfig(ctx context.Context) (retention.Config, error)
 }
 
 type strategyGetter interface {
+	// Get returns the Strategy identified by the given name.
 	Get(name retention.StrategyId) (retention.Strategy, error)
 }
 

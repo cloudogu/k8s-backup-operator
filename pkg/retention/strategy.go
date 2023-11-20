@@ -1,5 +1,6 @@
 package retention
 
+// StrategyId is an enum identifying a retention strategy.
 type StrategyId string
 
 const (

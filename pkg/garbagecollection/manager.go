@@ -21,6 +21,7 @@ type manager struct {
 	strategyGetter strategyGetter
 }
 
+// NewManager creates an instance of a Manager capable of deleting old backups.
 func NewManager(clientSet ecosystem.Interface, namespace string) Manager {
 	return &manager{
 		clientSet:      clientSet,
@@ -30,6 +31,7 @@ func NewManager(clientSet ecosystem.Interface, namespace string) Manager {
 	}
 }
 
+// CollectGarbage deletes backups according to the configured retention strategy.
 func (m *manager) CollectGarbage(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 
