@@ -17,6 +17,8 @@ const (
 	DefaultStrategy       = KeepAllStrategy
 )
 
+var defaultConfig = Config{Strategy: DefaultStrategy}
+
 type Config struct {
 	Strategy StrategyId
 }
@@ -36,29 +38,26 @@ func (sg *ConfigGetter) GetConfig(ctx context.Context) (Config, error) {
 		return Config{}, fmt.Errorf("failed to find retention configuration: %w", err)
 	}
 
-	config := Config{}
 	strategyPath := filepath.Join(sg.configFilePath, strategyKey)
 	if _, err := os.Stat(strategyPath); errors.Is(err, os.ErrNotExist) {
 		logger.Info(fmt.Sprintf("could not find key %q in config map %q", strategyKey, configmapName))
 		logger.Info(fmt.Sprintf("using default strategy %q", DefaultStrategy))
-		config.Strategy = DefaultStrategy
-	} else {
-		strategyBytes, err := os.ReadFile(strategyPath)
-		if err != nil {
-			return Config{}, fmt.Errorf("failed to read strategy: %w", err)
-		}
-
-		strategy := string(strategyBytes)
-
-		err = validateStrategy(strategy)
-		if err != nil {
-			return Config{}, err
-		}
-
-		config.Strategy = StrategyId(strategy)
+		return defaultConfig, nil
 	}
 
-	return config, nil
+	strategyBytes, err := os.ReadFile(strategyPath)
+	if err != nil {
+		return Config{}, fmt.Errorf("failed to read strategy: %w", err)
+	}
+
+	strategy := string(strategyBytes)
+
+	err = validateStrategy(strategy)
+	if err != nil {
+		return Config{}, err
+	}
+
+	return Config{Strategy: StrategyId(strategy)}, nil
 }
 
 func validateStrategy(strategy string) error {
