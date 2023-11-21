@@ -20,11 +20,8 @@ and an access key `longhorn-test-key` with the secret key `longhorn-test-secret-
 (Longhorn and Velero are already preconfigured accordingly, so they do not need to be adjusted).
 
 Furthermore, [k8s-snapshot-controller][snapshot-ctrl-repo] and [k8s-velero][velero-repo] have to be installed as components.
-To do this, check out the repositories and execute the following commands inside:
+To do this, check out the repositories and execute the following command inside:
 ```shell
-# only in the snapshot-controller:
-make crd-component-apply
-# for snapshot-controller and velero:
 make component-apply
 ```
 
