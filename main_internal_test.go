@@ -295,13 +295,11 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldLog := setupLog
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			setupLog = oldLog
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
@@ -310,7 +308,6 @@ func Test_startOperator(t *testing.T) {
 		logMock.EXPECT().Init(mock.Anything).Return()
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything).Return(logMock)
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logMock)
-		setupLog = logr.New(logMock)
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
@@ -361,13 +358,11 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldLog := setupLog
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			setupLog = oldLog
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
@@ -376,7 +371,6 @@ func Test_startOperator(t *testing.T) {
 		logMock.EXPECT().Init(mock.Anything).Return()
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything).Return(logMock)
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logMock)
-		setupLog = logr.New(logMock)
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
@@ -428,14 +422,12 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldLog := setupLog
 		oldSignalHandlerFunc := ctrl.SetupSignalHandler
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			setupLog = oldLog
 			ctrl.SetupSignalHandler = oldSignalHandlerFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
@@ -445,9 +437,6 @@ func Test_startOperator(t *testing.T) {
 		logMock.EXPECT().Init(mock.Anything).Return()
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything).Return(logMock)
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logMock)
-		logMock.EXPECT().Enabled(0).Return(true)
-		logMock.EXPECT().Info(0, "starting manager").Return()
-		setupLog = logr.New(logMock)
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
@@ -503,14 +492,12 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldLog := setupLog
 		oldSignalHandlerFunc := ctrl.SetupSignalHandler
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			setupLog = oldLog
 			ctrl.SetupSignalHandler = oldSignalHandlerFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
@@ -520,9 +507,6 @@ func Test_startOperator(t *testing.T) {
 		logMock.EXPECT().Init(mock.Anything).Return()
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything).Return(logMock)
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logMock)
-		logMock.EXPECT().Enabled(0).Return(true)
-		logMock.EXPECT().Info(0, "starting manager").Return()
-		setupLog = logr.New(logMock)
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
