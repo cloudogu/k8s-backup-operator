@@ -32,7 +32,7 @@ func NewManager(clientSet ecosystem.Interface, namespace string, strategyName st
 
 // CollectGarbage deletes backups according to the configured retention strategy.
 func (m *manager) CollectGarbage(ctx context.Context) error {
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithName("garbage-collection")
 
 	var retentionStrategy strategy
 	retentionStrategy, err := m.strategyGetter.Get(m.strategyName)
@@ -60,7 +60,13 @@ func (m *manager) CollectGarbage(ctx context.Context) error {
 		}
 	}
 
-	return errors.Join(errs...)
+	err = errors.Join(errs...)
+	if err != nil {
+		return err
+	}
+
+	logger.Info(fmt.Sprintf("garbage collection completed: deleted %d backups", len(toRemove)))
+	return nil
 }
 
 func filterCompleted(backups []v1.Backup) (completed []v1.Backup) {
