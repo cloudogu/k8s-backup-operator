@@ -26,5 +26,8 @@ resources:
 - restore_editor_role.yaml
 - restore_editor_role_binding.yaml
 - restore_viewer_role.yaml
+- backupschedule_viewer_role.yaml
+- backupschedule_editor_role_binding.yaml
+- backupschedule_editor_role.yaml
 - cronjob_editor_role.yaml
 - cronjob_editor_role_binding.yaml

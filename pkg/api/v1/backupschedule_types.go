@@ -45,7 +45,7 @@ type BackupScheduleStatus struct {
 	// RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.
 	RequeueTimeNanos time.Duration `json:"requeueTimeNanos,omitempty"`
 	// CurrentKubectlImage is the image currently used to create scheduled backups.
-	CurrentKubectlImage string `json:"currentKubectlImage"`
+	CurrentKubectlImage string `json:"currentKubectlImage,omitempty"`
 }
 
 // GetRequeueTimeNanos returns the requeue time in nano seconds.
