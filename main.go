@@ -11,6 +11,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -43,8 +44,7 @@ var (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme = runtime.NewScheme()
 )
 
 var (
@@ -74,6 +74,8 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	logger := log.FromContext(ctx).WithName("main")
+
 	if len(os.Args) < 2 {
 		fmt.Printf("expected one of the following subcommands:\n"+
 			"  %s - start in operator-mode, reconciling this operators custom resources\n"+
@@ -87,13 +89,13 @@ func main() {
 	case operatorCmd.Name():
 		err := startOperator(ctx, operatorCmd, os.Args[2:])
 		if err != nil {
-			setupLog.Error(err, "failed to start operator")
+			logger.Error(err, "failed to start operator")
 			os.Exit(1)
 		}
 	case garbageCollectorCmd.Name():
 		err := startGarbageCollector(ctx, garbageCollectorCmd, os.Args[2:])
 		if err != nil {
-			setupLog.Error(err, "failed to start garbage-collector")
+			logger.Error(err, "failed to start garbage-collector")
 			os.Exit(1)
 		}
 	}
@@ -150,7 +152,7 @@ func startOperator(ctx context.Context, flags *flag.FlagSet, args []string) erro
 		return fmt.Errorf("unable to configure manager: %w", err)
 	}
 
-	return startK8sManager(k8sManager)
+	return startK8sManager(ctx, k8sManager)
 }
 
 func configureManager(ctx context.Context, k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
@@ -279,8 +281,9 @@ func addChecks(k8sManager controllerManager) error {
 	return nil
 }
 
-func startK8sManager(k8sManager controllerManager) error {
-	setupLog.Info("starting manager")
+func startK8sManager(ctx context.Context, k8sManager controllerManager) error {
+	logger := log.FromContext(ctx).WithName("k8s-manager-start")
+	logger.Info("starting manager")
 	if err := k8sManager.Start(ctrl.SetupSignalHandler()); err != nil {
 		return fmt.Errorf("problem running manager: %w", err)
 	}
