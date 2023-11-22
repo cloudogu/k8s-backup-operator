@@ -30,7 +30,7 @@ spec:
           containers:
           - args:
             - gc
-            - --strategy="{{ .Values.retention.strategy }}"
+            - --strategy={{ .Values.retention.strategy }}
             env:
               - name: STAGE
                 value: "production"
