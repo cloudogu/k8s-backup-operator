@@ -18,3 +18,5 @@ subjects:
     name: controller-manager
   - kind: ServiceAccount
     name: scheduled-backup-creator-manager
+  - kind: ServiceAccount
+    name: garbage-collection-manager

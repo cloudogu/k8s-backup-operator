@@ -1,6 +1,6 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-backup-operator
-VERSION=0.5.0
+VERSION=0.6.0
 ## Image URL to use all building/pushing image targets
 IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
@@ -24,7 +24,7 @@ include build/make/mocks.mk
 
 PRE_COMPILE=generate
 K8S_RESOURCE_TEMP_FOLDER ?= $(TARGET_DIR)
-K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource template-dev-only-image-pull-policy
+K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource template-dev-only-image-pull-policy template-cronjob-image
 
 include build/make/k8s-controller.mk
 
@@ -63,16 +63,29 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 template-stage:
 	@echo "Setting STAGE env in deployment to ${STAGE}!"
 	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").env[]|select(.name==\"STAGE\").value)=\"${STAGE}\"" $(K8S_RESOURCE_TEMP_YAML)
+	@$(BINARY_YQ) -i e "(select(.kind == \"CronJob\").spec.jobTemplate.spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").env[]|select(.name==\"STAGE\").value)=\"${STAGE}\"" $(K8S_RESOURCE_TEMP_YAML)
 
 .PHONY: template-log-level
 template-log-level:
 	@echo "Setting LOG_LEVEL env in deployment to ${LOG_LEVEL}!"
 	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").env[]|select(.name==\"LOG_LEVEL\").value)=\"${LOG_LEVEL}\"" $(K8S_RESOURCE_TEMP_YAML)
+	@$(BINARY_YQ) -i e "(select(.kind == \"CronJob\").spec.jobTemplate.spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").env[]|select(.name==\"LOG_LEVEL\").value)=\"${LOG_LEVEL}\"" $(K8S_RESOURCE_TEMP_YAML)
 
 .PHONY: template-dev-only-image-pull-policy
 template-dev-only-image-pull-policy: $(BINARY_YQ)
 	@echo "Setting pull policy to always!"
 	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").imagePullPolicy)=\"Always\"" $(K8S_RESOURCE_TEMP_YAML)
+	@$(BINARY_YQ) -i e "(select(.kind == \"CronJob\").spec.jobTemplate.spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").imagePullPolicy)=\"Always\"" $(K8S_RESOURCE_TEMP_YAML)
+
+.PHONY: template-cronjob-image
+template-cronjob-image: $(BINARY_YQ)
+	@echo "Setting image for CronJobs..."
+	@if [[ ${STAGE} == "development" ]]; then \
+	  $(BINARY_YQ) -i e "(select(.kind == \"CronJob\").spec.jobTemplate.spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").image)=\"$(IMAGE_DEV)\"" $(K8S_RESOURCE_TEMP_YAML); \
+	else \
+	  $(BINARY_YQ) -i e "(select(.kind == \"CronJob\").spec.jobTemplate.spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").image)=\"$(IMAGE)\"" $(K8S_RESOURCE_TEMP_YAML); \
+	fi
+	@echo "Done."
 
 .PHONY: kill-operator-pod
 kill-operator-pod:

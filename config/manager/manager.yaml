@@ -48,7 +48,8 @@ spec:
           type: RuntimeDefault
       containers:
       - args:
-        - --leader-elect
+          - operator
+          - --leader-elect
         env:
           - name: STAGE
             value: "production"

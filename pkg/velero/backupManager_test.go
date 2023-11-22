@@ -34,6 +34,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
 			Spec: velerov1.BackupSpec{
+				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
 				DefaultVolumesToFsBackup: &volumeFsBackup,
@@ -71,6 +72,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
 			Spec: velerov1.BackupSpec{
+				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
 				DefaultVolumesToFsBackup: &volumeFsBackup,
@@ -109,6 +111,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
 			Spec: velerov1.BackupSpec{
+				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
 				DefaultVolumesToFsBackup: &volumeFsBackup,
@@ -163,6 +166,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
 			Spec: velerov1.BackupSpec{
+				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
 				DefaultVolumesToFsBackup: &volumeFsBackup,
@@ -218,6 +222,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
 			Spec: velerov1.BackupSpec{
+				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
 				DefaultVolumesToFsBackup: &volumeFsBackup,
@@ -273,6 +278,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
 			Spec: velerov1.BackupSpec{
+				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
 				DefaultVolumesToFsBackup: &volumeFsBackup,

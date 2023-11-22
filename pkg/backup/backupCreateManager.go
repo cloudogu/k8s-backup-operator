@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudogu/cesapp-lib/registry"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
@@ -40,6 +42,19 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in backup resource: %w", v1.BackupStatusInProgress, err)
 	}
+
+	backup.Status.StartTimestamp = metav1.Now()
+	backup, err = bcm.client.UpdateStatus(ctx, backup, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update start time in status of backup resource: %w", err)
+	}
+
+	defer func(backup *v1.Backup) {
+		errDefer := bcm.updateCompletionTimestamp(ctx, backup)
+		if errDefer != nil {
+			logger.Error(fmt.Errorf("failed to update completion time in status of backup resource: %w", err), "backup error")
+		}
+	}(backup)
 
 	backup, err = bcm.client.AddFinalizer(ctx, backup, v1.BackupFinalizer)
 	if err != nil {
@@ -80,6 +95,19 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 	}
 
 	return nil
+}
+
+func (bcm *backupCreateManager) updateCompletionTimestamp(ctx context.Context, backup *v1.Backup) error {
+	return retry.OnConflict(func() error {
+		backup, err := bcm.client.Get(ctx, backup.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		backup.Status.CompletionTimestamp = metav1.Now()
+		_, err = bcm.client.UpdateStatus(ctx, backup, metav1.UpdateOptions{})
+		return err
+	})
 }
 
 func (bcm *backupCreateManager) triggerBackup(ctx context.Context, backup *v1.Backup) error {

@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.6.0] - 2023-11-22
+### Added
+- [#11] Automated deletion of Backups via various retention strategies.
+
 ## [v0.5.0] - 2023-11-09
 ### Added
 - [#8] Functionality to schedule backups via a `BackupSchedule` Resource

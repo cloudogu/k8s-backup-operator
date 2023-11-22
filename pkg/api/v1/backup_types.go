@@ -48,12 +48,15 @@ type BackupSpec struct {
 }
 
 // BackupStatus defines the observed state of Backup
-// +kubebuilder:object:generate=false
 type BackupStatus struct {
 	// Status represents the state of the backup.
 	Status string `json:"status,omitempty"`
 	// RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.
 	RequeueTimeNanos time.Duration `json:"requeueTimeNanos,omitempty"`
+	// StartTimestamp marks the date/time when the backup started being processed.
+	StartTimestamp metav1.Time `json:"startTimestamp,omitempty"`
+	// CompletionTimestamp marks the date/time when the backup finished being processed, regardless of any errors.
+	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
 }
 
 // +kubebuilder:object:root=true
