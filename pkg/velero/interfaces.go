@@ -21,6 +21,35 @@ type veleroClientSet interface {
 	versioned.Interface
 }
 
+type ecosystemClientSet interface {
+	ecosystem.Interface
+}
+
+type manager interface {
+	backupManager
+	restoreManager
+	syncManager
+}
+
+type backupManager interface {
+	// CreateBackup creates backup according to the backup configuration in v1.Backup.
+	CreateBackup(ctx context.Context, backup *v1.Backup) error
+	// DeleteBackup deletes backup from the cluster state and the backup storage.
+	DeleteBackup(ctx context.Context, backup *v1.Backup) error
+}
+
+type restoreManager interface {
+	// CreateRestore creates a restore according to the restore configuration in v1.Restore.
+	CreateRestore(ctx context.Context, restore *v1.Restore) error
+	// DeleteRestore deletes the velero restore resource.
+	DeleteRestore(ctx context.Context, restore *v1.Restore) error
+}
+
+type syncManager interface {
+	// SyncBackups syncs backup CRs with velero CRs
+	SyncBackups(ctx context.Context) error
+}
+
 // The following interfaces are here to generate mocks.
 
 //nolint:unused
@@ -65,21 +94,8 @@ type ecosystemWatch interface {
 	watch.Interface
 }
 
-type manager interface {
-	backupManager
-	restoreManager
-}
-
-type backupManager interface {
-	// CreateBackup creates backup according to the backup configuration in v1.Backup.
-	CreateBackup(ctx context.Context, backup *v1.Backup) error
-	// DeleteBackup deletes backup from the cluster state and the backup storage.
-	DeleteBackup(ctx context.Context, backup *v1.Backup) error
-}
-
-type restoreManager interface {
-	// CreateRestore creates a restore according to the restore configuration in v1.Restore.
-	CreateRestore(ctx context.Context, restore *v1.Restore) error
-	// DeleteRestore deletes the velero restore resource.
-	DeleteRestore(ctx context.Context, restore *v1.Restore) error
+//nolint:unused
+//goland:noinspection GoUnusedType
+type ecosystemV1Alpha1Interface interface {
+	ecosystem.V1Alpha1Interface
 }

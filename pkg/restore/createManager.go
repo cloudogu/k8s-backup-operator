@@ -19,23 +19,24 @@ const (
 )
 
 type defaultCreateManager struct {
-	restoreClient         ecosystemRestoreInterface
+	ecosystemClientSet    ecosystemInterface
+	namespace             string
 	cleanup               cleanupManager
 	recorder              eventRecorder
 	maintenanceModeSwitch maintenanceModeSwitch
 }
 
 func newCreateManager(
-	restoreClient ecosystemRestoreInterface,
+	ecosystemClientSet ecosystemInterface,
+	namespace string,
 	recorder eventRecorder,
 	registry cesRegistry,
-	statefulSetInterface statefulSetInterface,
-	serviceInterface serviceInterface,
 	cleanup cleanupManager,
 ) *defaultCreateManager {
-	maintenanceSwitch := maintenance.NewWithLooseCoupling(registry.GlobalConfig(), statefulSetInterface, serviceInterface)
+	maintenanceSwitch := maintenance.NewWithLooseCoupling(registry.GlobalConfig(), ecosystemClientSet.AppsV1().StatefulSets(namespace), ecosystemClientSet.CoreV1().Services(namespace))
 	return &defaultCreateManager{
-		restoreClient:         restoreClient,
+		ecosystemClientSet:    ecosystemClientSet,
+		namespace:             namespace,
 		recorder:              recorder,
 		maintenanceModeSwitch: maintenanceSwitch,
 		cleanup:               cleanup,
@@ -46,23 +47,25 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	logger := log.FromContext(ctx)
 	cm.recorder.Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
 
+	restoreClient := cm.ecosystemClientSet.EcosystemV1Alpha1().Restores(cm.namespace)
+
 	restoreName := restore.Name
-	restore, err := cm.restoreClient.UpdateStatusInProgress(ctx, restore)
+	restore, err := restoreClient.UpdateStatusInProgress(ctx, restore)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusInProgress, restoreName, err)
 	}
 
-	restore, err = cm.restoreClient.AddFinalizer(ctx, restore, v1.RestoreFinalizer)
+	restore, err = restoreClient.AddFinalizer(ctx, restore, v1.RestoreFinalizer)
 	if err != nil {
 		return fmt.Errorf("failed to add finalizer [%s] in restore resource [%s]: %w", v1.RestoreFinalizer, restoreName, err)
 	}
 
-	restore, err = cm.restoreClient.AddLabels(ctx, restore)
+	restore, err = restoreClient.AddLabels(ctx, restore)
 	if err != nil {
 		return fmt.Errorf("failed to add labels to restore resource [%s]: %w", restoreName, err)
 	}
 
-	provider, err := restoreprovider.GetProvider(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder)
+	provider, err := restoreprovider.GetProvider(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder, cm.ecosystemClientSet)
 	if err != nil {
 		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
 	}
@@ -87,7 +90,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	err = provider.CreateRestore(ctx, restore)
 	if err != nil {
 		err = fmt.Errorf("failed to trigger provider: %w", err)
-		_, updateStatusErr := cm.restoreClient.UpdateStatusFailed(ctx, restore)
+		_, updateStatusErr := restoreClient.UpdateStatusFailed(ctx, restore)
 		if updateStatusErr != nil {
 			err = errors.Join(err, fmt.Errorf("failed to update restore status to '%s': %w", v1.RestoreStatusFailed, updateStatusErr))
 		}
@@ -95,7 +98,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		return err
 	}
 
-	_, err = cm.restoreClient.UpdateStatusCompleted(ctx, restore)
+	_, err = restoreClient.UpdateStatusCompleted(ctx, restore)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusCompleted, restoreName, err)
 	}

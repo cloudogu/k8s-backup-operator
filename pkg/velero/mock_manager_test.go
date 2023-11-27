@@ -194,6 +194,48 @@ func (_c *mockManager_DeleteRestore_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// SyncBackups provides a mock function with given fields: ctx
+func (_m *mockManager) SyncBackups(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockManager_SyncBackups_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SyncBackups'
+type mockManager_SyncBackups_Call struct {
+	*mock.Call
+}
+
+// SyncBackups is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *mockManager_Expecter) SyncBackups(ctx interface{}) *mockManager_SyncBackups_Call {
+	return &mockManager_SyncBackups_Call{Call: _e.mock.On("SyncBackups", ctx)}
+}
+
+func (_c *mockManager_SyncBackups_Call) Run(run func(ctx context.Context)) *mockManager_SyncBackups_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *mockManager_SyncBackups_Call) Return(_a0 error) *mockManager_SyncBackups_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockManager_SyncBackups_Call) RunAndReturn(run func(context.Context) error) *mockManager_SyncBackups_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 type mockConstructorTestingTnewMockManager interface {
 	mock.TestingT
 	Cleanup(func())

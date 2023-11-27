@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 )
@@ -23,4 +24,10 @@ type Provider interface {
 	CreateRestore(ctx context.Context, restore *v1.Restore) error
 	// DeleteRestore just deletes the provider restore object.
 	DeleteRestore(ctx context.Context, restore *v1.Restore) error
+	// SyncBackups syncs backup CRs with provider backups
+	SyncBackups(ctx context.Context) error
+}
+
+type EcosystemClientSet interface {
+	ecosystem.Interface
 }
