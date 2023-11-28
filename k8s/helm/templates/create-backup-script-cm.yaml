@@ -3,10 +3,7 @@ kind: ConfigMap
 metadata:
   name: k8s-create-backup-script
   labels:
-    app: ces
-    k8s.cloudogu.com/part-of: backup
-    app.kubernetes.io/name: scheduled-backup-creator
-    app.kubernetes.io/part-of: k8s-backup-operator
+    {{- include "k8s-backup-operator.labels" . | nindent 4 }}
 data:
   entrypoint.sh: |
     #!/bin/bash
@@ -16,11 +13,7 @@ data:
     kind: Backup
     metadata:
       labels:
-        app: ces
-        k8s.cloudogu.com/part-of: backup
-        app.kubernetes.io/name: backup
-        app.kubernetes.io/part-of: k8s-backup-operator
-        app.kubernetes.io/created-by: k8s-backup-operator
+        {{- include "k8s-backup-operator.labels" . | nindent 4 }}
       name: ${SCHEDULED_BACKUP_NAME}-${TIMESTAMP}
       namespace: ${NAMESPACE}
     spec:

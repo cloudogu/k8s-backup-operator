@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-backup-operator.name" . }}-controller-manager-metrics-service
+  labels:
+    app.kubernetes.io/component: kube-rbac-proxy
+  {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.metricsService.type }}
+  selector:
+  {{- include "k8s-backup-operator.selectorLabels" . | nindent 4 }}
+  ports:
+	{{- .Values.metricsService.ports | toYaml | nindent 2 -}}
