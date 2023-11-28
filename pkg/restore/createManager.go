@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -95,6 +94,11 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 			err = errors.Join(err, fmt.Errorf("failed to update restore status to '%s': %w", v1.RestoreStatusFailed, updateStatusErr))
 		}
 
+		return err
+	}
+
+	err = provider.SyncBackups(ctx)
+	if err != nil {
 		return err
 	}
 
