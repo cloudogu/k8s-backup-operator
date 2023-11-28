@@ -65,11 +65,12 @@ func (d *defaultSyncManager) SyncBackups(ctx context.Context) error {
 	for _, veleroBackup := range veleroBackupsList.Items {
 		if _, exists := backupMap[veleroBackup.Name]; !exists {
 			newBackup := &backupv1.Backup{
-				TypeMeta:   metav1.TypeMeta{},
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec:       backupv1.BackupSpec{Provider: backupv1.ProviderVelero},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: veleroBackup.Name,
+				},
+				Spec: backupv1.BackupSpec{Provider: backupv1.ProviderVelero},
 				Status: backupv1.BackupStatus{
-					Status:              "completed",
+					Status:              backupv1.BackupStatusCompleted,
 					StartTimestamp:      *veleroBackupMap[veleroBackup.Name].Status.StartTimestamp,
 					CompletionTimestamp: *veleroBackupMap[veleroBackup.Name].Status.CompletionTimestamp,
 				},
