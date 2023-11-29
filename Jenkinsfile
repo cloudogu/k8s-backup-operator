@@ -1,6 +1,6 @@
 #!groovy
 
-@Library('github.com/cloudogu/ces-build-lib@d6e00bcca6ef37ae7a2388a091a096bba4d4056f')
+@Library('github.com/cloudogu/ces-build-lib@0a91f7e096c8c84f3e5e30b924c248ae272df9c9')
 import com.cloudogu.ces.cesbuildlib.*
 
 // Creating necessary git objects
@@ -64,17 +64,9 @@ node('docker') {
 //                            }
 
                             stage('Generate k8s Resources') {
+                                make 'crd-helm-generate'
                                 make 'helm-generate'
-                                archiveArtifacts 'target/*.yaml'
-                            }
-
-                            stage('Generate Helm Resources') {
-                                String controllerVersion = makefile.getVersion()
-                                make 'helm-package-release'
-                                sh ".bin/helm template ${repositoryName} target/helm/${repositoryName}-${controllerVersion}.tgz --output-dir=target/helm"
-
-                                make 'crd-helm-package'
-                                sh ".bin/helm template ${repositoryName}-crd target/helm-crd/${repositoryName}-crd-${controllerVersion}.tgz --output-dir=target/helm"
+                                archiveArtifacts 'target/k8s/**/*'
                             }
                         }
 
@@ -101,7 +93,7 @@ node('docker') {
             }
 
             stage('Update development resources') {
-                GString repository = imageName.substring(0, imageName.lastIndexOf(":"))
+                def repository = imageName.substring(0, imageName.lastIndexOf(":"))
                 docker.image("golang:${goVersion}")
                         .mountJenkinsUser()
                         .inside("--volume ${WORKSPACE}:/workdir -w /workdir") {
