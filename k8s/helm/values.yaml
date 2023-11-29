@@ -19,10 +19,11 @@ kubeRbacProxy:
 manager:
   env:
     stage: production
-    logLevel: debug
+    logLevel: info
   image:
     repository: k3ces.local:30099/k8s-backup-operator
     tag: 0.6.0
+  imagePullPolicy: IfNotPresent
   resources:
     limits:
       cpu: 500m

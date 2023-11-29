@@ -22,70 +22,34 @@ include build/make/clean.mk
 include build/make/digital-signature.mk
 include build/make/mocks.mk
 
-PRE_COMPILE=generate
-K8S_RESOURCE_TEMP_FOLDER ?= $(TARGET_DIR)
-K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource template-dev-only-image-pull-policy template-cronjob-image
+PRE_COMPILE=generate-deepcopy
+HELM_PRE_APPLY_TARGETS=template-stage template-log-level template-image-pull-policy
 
 include build/make/k8s-controller.mk
 
 .PHONY: build-boot
-build-boot: image-import k8s-apply kill-operator-pod ## Builds a new version of the operator and deploys it into the K8s-EcoSystem.
-
-##@ Controller specific targets
-
-.PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	@echo "Generate manifests..."
-	@$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	@cp config/crd/bases/k8s.cloudogu.com_backups.yaml pkg/api/v1/
-	@cp config/crd/bases/k8s.cloudogu.com_restores.yaml pkg/api/v1/
-	@cp config/crd/bases/k8s.cloudogu.com_backupschedules.yaml pkg/api/v1/
-
-.PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	@echo "Auto-generate deepcopy functions..."
-	@$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-##@ Deployment
-
-.PHONY: install
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
-
-.PHONY: uninstall
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	@$(KUSTOMIZE) build config/crd | kubectl delete --wait=false --ignore-not-found=true -f -
-	@kubectl patch crd/backups.k8s.cloudogu.com -p '{"metadata":{"finalizers":[]}}' --type=merge || true
-	@kubectl patch crd/restores.k8s.cloudogu.com -p '{"metadata":{"finalizers":[]}}' --type=merge || true
-	@kubectl patch crd/backupschedules.k8s.cloudogu.com -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+build-boot: helm-apply kill-operator-pod ## Builds a new version of the operator and deploys it into the K8s-EcoSystem.
 
 .PHONY: template-stage
-template-stage:
-	@echo "Setting STAGE env in deployment to ${STAGE}!"
-	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").env[]|select(.name==\"STAGE\").value)=\"${STAGE}\"" $(K8S_RESOURCE_TEMP_YAML)
-	@$(BINARY_YQ) -i e "(select(.kind == \"CronJob\").spec.jobTemplate.spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").env[]|select(.name==\"STAGE\").value)=\"${STAGE}\"" $(K8S_RESOURCE_TEMP_YAML)
+template-stage: ${BINARY_YQ}
+	@if [[ "${STAGE}" == "development" ]]; then \
+  	  echo "Setting STAGE env in deployment to ${STAGE}!" ; \
+  	  $(BINARY_YQ) -i e ".manager.env.stage=\"${STAGE}\"" "$(K8S_HELM_TARGET)/values.yaml" ; \
+    fi
 
 .PHONY: template-log-level
-template-log-level:
-	@echo "Setting LOG_LEVEL env in deployment to ${LOG_LEVEL}!"
-	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").env[]|select(.name==\"LOG_LEVEL\").value)=\"${LOG_LEVEL}\"" $(K8S_RESOURCE_TEMP_YAML)
-	@$(BINARY_YQ) -i e "(select(.kind == \"CronJob\").spec.jobTemplate.spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").env[]|select(.name==\"LOG_LEVEL\").value)=\"${LOG_LEVEL}\"" $(K8S_RESOURCE_TEMP_YAML)
+template-log-level: ${BINARY_YQ}
+	@if [[ "${STAGE}" == "development" ]]; then \
+      echo "Setting LOG_LEVEL env in deployment to ${LOG_LEVEL}!" ; \
+      $(BINARY_YQ) -i e ".manager.env.logLevel=\"${LOG_LEVEL}\"" "$(K8S_HELM_TARGET)/values.yaml" ; \
+    fi
 
-.PHONY: template-dev-only-image-pull-policy
-template-dev-only-image-pull-policy: $(BINARY_YQ)
-	@echo "Setting pull policy to always!"
-	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").imagePullPolicy)=\"Always\"" $(K8S_RESOURCE_TEMP_YAML)
-	@$(BINARY_YQ) -i e "(select(.kind == \"CronJob\").spec.jobTemplate.spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").imagePullPolicy)=\"Always\"" $(K8S_RESOURCE_TEMP_YAML)
-
-.PHONY: template-cronjob-image
-template-cronjob-image: $(BINARY_YQ)
-	@echo "Setting image for CronJobs..."
-	@if [[ ${STAGE} == "development" ]]; then \
-	  $(BINARY_YQ) -i e "(select(.kind == \"CronJob\").spec.jobTemplate.spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").image)=\"$(IMAGE_DEV)\"" $(K8S_RESOURCE_TEMP_YAML); \
-	else \
-	  $(BINARY_YQ) -i e "(select(.kind == \"CronJob\").spec.jobTemplate.spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").image)=\"$(IMAGE)\"" $(K8S_RESOURCE_TEMP_YAML); \
-	fi
-	@echo "Done."
+.PHONY: template-image-pull-policy
+template-image-pull-policy: $(BINARY_YQ)
+	@if [[ "${STAGE}" == "development" ]]; then \
+          echo "Setting pull policy to always!" ; \
+          $(BINARY_YQ) -i e ".manager.imagePullPolicy=\"Always\"" "$(K8S_HELM_TARGET)/values.yaml" ; \
+    fi
 
 .PHONY: kill-operator-pod
 kill-operator-pod:

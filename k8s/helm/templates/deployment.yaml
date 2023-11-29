@@ -50,7 +50,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         image: {{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.manager.imagePullPolicy }}
         livenessProbe:
           httpGet:
             path: /healthz
