@@ -1,10 +1,8 @@
 additionalImages:
   kubectl: "bitnami/kubectl:1.27.7"
-
 retention:
   strategy: keepAll
   garbageCollectionCron: "0 * * * *"
-
 kubeRbacProxy:
   image:
     repository: gcr.io/kubebuilder/kube-rbac-proxy
@@ -21,7 +19,7 @@ manager:
     stage: production
     logLevel: info
   image:
-    repository: k3ces.local:30099/k8s-backup-operator
+    repository: cloudogu/k8s-backup-operator
     tag: 0.6.0
   imagePullPolicy: IfNotPresent
   resources:
