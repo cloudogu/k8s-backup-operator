@@ -24,7 +24,7 @@ func TestNewBackupCreateManager(t *testing.T) {
 		registryMock.EXPECT().GlobalConfig().Return(globalMock)
 
 		// when
-		manager := NewBackupCreateManager(nil, "", nil, registryMock)
+		manager := newBackupCreateManager(nil, "", nil, registryMock)
 
 		// then
 		require.NotNil(t, manager)

@@ -24,8 +24,11 @@ type Provider interface {
 	CreateRestore(ctx context.Context, restore *v1.Restore) error
 	// DeleteRestore just deletes the provider restore object.
 	DeleteRestore(ctx context.Context, restore *v1.Restore) error
-	// SyncBackups syncs backup CRs with provider backups
+	// SyncBackups syncs backup CRs with provider backups.
 	SyncBackups(ctx context.Context) error
+	// SyncBackupStatus syncs the status of the backup CR with the corresponding provider backup.
+	// The provider backup must be completed or an error is thrown.
+	SyncBackupStatus(ctx context.Context, backup *v1.Backup) error
 }
 
 type EcosystemClientSet interface {

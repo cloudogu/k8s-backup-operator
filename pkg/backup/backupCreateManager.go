@@ -29,8 +29,8 @@ type backupCreateManager struct {
 	maintenanceModeSwitch MaintenanceModeSwitch
 }
 
-// NewBackupCreateManager creates a new instance of backupCreateManager.
-func NewBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, registry registry.Registry) *backupCreateManager {
+// newBackupCreateManager creates a new instance of backupCreateManager.
+func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, registry registry.Registry) *backupCreateManager {
 	maintenanceModeSwitch := maintenance.New(registry.GlobalConfig())
 	return &backupCreateManager{clientSet: clientSet, namespace: namespace, registry: registry, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch}
 }

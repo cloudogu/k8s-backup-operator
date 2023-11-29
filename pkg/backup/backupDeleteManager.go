@@ -13,8 +13,8 @@ type backupDeleteManager struct {
 	recorder  eventRecorder
 }
 
-// NewBackupDeleteManager creates a new instance of backupDeleteManager.
-func NewBackupDeleteManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder) *backupDeleteManager {
+// newBackupDeleteManager creates a new instance of backupDeleteManager.
+func newBackupDeleteManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder) *backupDeleteManager {
 	return &backupDeleteManager{clientSet: clientSet, namespace: namespace, recorder: recorder}
 }
 

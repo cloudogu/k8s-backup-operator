@@ -13,7 +13,7 @@ import (
 )
 
 func TestNewBackupDeleteManager(t *testing.T) {
-	manager := NewBackupDeleteManager(nil, testNamespace, nil)
+	manager := newBackupDeleteManager(nil, testNamespace, nil)
 
 	require.NotNil(t, manager)
 }

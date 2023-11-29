@@ -108,6 +108,49 @@ func (_c *mockBackupControllerManager_delete_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// syncStatus provides a mock function with given fields: ctx, backup
+func (_m *mockBackupControllerManager) syncStatus(ctx context.Context, backup *v1.Backup) error {
+	ret := _m.Called(ctx, backup)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) error); ok {
+		r0 = rf(ctx, backup)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockBackupControllerManager_syncStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'syncStatus'
+type mockBackupControllerManager_syncStatus_Call struct {
+	*mock.Call
+}
+
+// syncStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - backup *v1.Backup
+func (_e *mockBackupControllerManager_Expecter) syncStatus(ctx interface{}, backup interface{}) *mockBackupControllerManager_syncStatus_Call {
+	return &mockBackupControllerManager_syncStatus_Call{Call: _e.mock.On("syncStatus", ctx, backup)}
+}
+
+func (_c *mockBackupControllerManager_syncStatus_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockBackupControllerManager_syncStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Backup))
+	})
+	return _c
+}
+
+func (_c *mockBackupControllerManager_syncStatus_Call) Return(_a0 error) *mockBackupControllerManager_syncStatus_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockBackupControllerManager_syncStatus_Call) RunAndReturn(run func(context.Context, *v1.Backup) error) *mockBackupControllerManager_syncStatus_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 type mockConstructorTestingTnewMockBackupControllerManager interface {
 	mock.TestingT
 	Cleanup(func())

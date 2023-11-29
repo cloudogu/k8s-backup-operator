@@ -99,7 +99,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 
 	err = provider.SyncBackups(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to sync backups with provider: %w", err)
 	}
 
 	_, err = restoreClient.UpdateStatusCompleted(ctx, restore)

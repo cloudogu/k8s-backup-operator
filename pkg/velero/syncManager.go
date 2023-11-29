@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 
 	backupv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -17,6 +18,7 @@ type defaultSyncManager struct {
 	namespace          string
 }
 
+// SyncBackups syncs backup CRs with velero CRs
 func (d *defaultSyncManager) SyncBackups(ctx context.Context) error {
 	// Get all Backup CRs from the cluster
 	backupsClient := d.ecosystemClientSet.EcosystemV1Alpha1().Backups(d.namespace)
@@ -68,11 +70,9 @@ func (d *defaultSyncManager) SyncBackups(ctx context.Context) error {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: veleroBackup.Name,
 				},
-				Spec: backupv1.BackupSpec{Provider: backupv1.ProviderVelero},
-				Status: backupv1.BackupStatus{
-					Status:              backupv1.BackupStatusCompleted,
-					StartTimestamp:      *veleroBackupMap[veleroBackup.Name].Status.StartTimestamp,
-					CompletionTimestamp: *veleroBackupMap[veleroBackup.Name].Status.CompletionTimestamp,
+				Spec: backupv1.BackupSpec{
+					Provider:           backupv1.ProviderVelero,
+					SyncedFromProvider: true,
 				},
 			}
 			_, err := backupsClient.Create(ctx, newBackup, metav1.CreateOptions{})
@@ -83,6 +83,43 @@ func (d *defaultSyncManager) SyncBackups(ctx context.Context) error {
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to sync backups with velero: %w", errors.Join(errs...))
+	}
+
+	return nil
+}
+
+// SyncBackupStatus syncs the status of the backup CR with the corresponding velero backup.
+// The velero backup must be completed or an error is thrown.
+func (d *defaultSyncManager) SyncBackupStatus(ctx context.Context, backup *backupv1.Backup) error {
+	veleroBackup, err := d.veleroClientSet.VeleroV1().Backups(d.namespace).Get(ctx, backup.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to find corresponding velero backup for backup %q: %w", backup.Name, err)
+	}
+
+	if veleroBackup.Status.Phase != velerov1.BackupPhaseCompleted {
+		return fmt.Errorf("velero backup %q is not completed and therefore cannot be synced", veleroBackup.Name)
+	}
+
+	err = retry.OnConflict(func() error {
+		backupClient := d.ecosystemClientSet.EcosystemV1Alpha1().Backups(d.namespace)
+		updatedBackup, err := backupClient.Get(ctx, backup.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		updatedBackup.Status.Status = backupv1.BackupStatusCompleted
+		updatedBackup.Status.StartTimestamp = *veleroBackup.Status.StartTimestamp
+		updatedBackup.Status.CompletionTimestamp = *veleroBackup.Status.CompletionTimestamp
+
+		_, err = backupClient.UpdateStatus(ctx, updatedBackup, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update status of backup %q: %w", backup.Name, err)
 	}
 
 	return nil

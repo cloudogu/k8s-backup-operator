@@ -48,6 +48,9 @@ type restoreManager interface {
 type syncManager interface {
 	// SyncBackups syncs backup CRs with velero CRs
 	SyncBackups(ctx context.Context) error
+	// SyncBackupStatus syncs the status of the backup CR with the corresponding velero backup.
+	// The velero backup must be completed or an error is thrown.
+	SyncBackupStatus(ctx context.Context, backup *v1.Backup) error
 }
 
 // The following interfaces are here to generate mocks.

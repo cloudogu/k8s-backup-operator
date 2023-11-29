@@ -169,11 +169,11 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 		}
 		createBackupMock := backupv1.Backup{
 			TypeMeta:   v1.TypeMeta{},
-			ObjectMeta: v1.ObjectMeta{},
+			ObjectMeta: v1.ObjectMeta{Name: veleroBackupName},
 			Spec: backupv1.BackupSpec{
-				Provider: backupv1.ProviderVelero,
+				Provider:           backupv1.ProviderVelero,
+				SyncedFromProvider: true,
 			},
-			Status: backupv1.BackupStatus{Status: "completed"},
 		}
 
 		backupClientMock := newMockEcosystemBackupInterface(t)
@@ -234,11 +234,11 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 		}
 		createBackupMock := backupv1.Backup{
 			TypeMeta:   v1.TypeMeta{},
-			ObjectMeta: v1.ObjectMeta{},
+			ObjectMeta: v1.ObjectMeta{Name: veleroBackupName},
 			Spec: backupv1.BackupSpec{
-				Provider: backupv1.ProviderVelero,
+				Provider:           backupv1.ProviderVelero,
+				SyncedFromProvider: true,
 			},
-			Status: backupv1.BackupStatus{Status: "completed"},
 		}
 
 		backupClientMock := newMockEcosystemBackupInterface(t)
