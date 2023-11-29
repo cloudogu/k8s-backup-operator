@@ -32,11 +32,3 @@ manager:
       cpu: 10m
       memory: 64Mi
   replicas: 1
-
-metricsService:
-  ports:
-    - name: https
-      port: 8443
-      protocol: TCP
-      targetPort: https
-  type: ClusterIP
