@@ -125,7 +125,7 @@ func (d *defaultSyncManager) SyncBackupStatus(ctx context.Context, backup *backu
 	return nil
 }
 
-// NewDefaultSyncManager creates a new instance of defaultSyncManager.
-func NewDefaultSyncManager(veleroClientSet veleroClientSet, ecosystemClientSet ecosystemClientSet, recorder eventRecorder, namespace string) *defaultSyncManager {
+// newDefaultSyncManager creates a new instance of defaultSyncManager.
+func newDefaultSyncManager(veleroClientSet veleroClientSet, ecosystemClientSet ecosystemClientSet, recorder eventRecorder, namespace string) *defaultSyncManager {
 	return &defaultSyncManager{veleroClientSet: veleroClientSet, ecosystemClientSet: ecosystemClientSet, recorder: recorder, namespace: namespace}
 }

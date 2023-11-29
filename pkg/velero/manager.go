@@ -9,8 +9,8 @@ type defaultManager struct {
 // NewDefaultManager creates a new instance of defaultManager.
 func NewDefaultManager(veleroClientSet veleroClientSet, ecosystemClientSet ecosystemClientSet, recorder eventRecorder, namespace string) *defaultManager {
 	return &defaultManager{
-		backupManager:  NewDefaultBackupManager(veleroClientSet, recorder),
-		restoreManager: NewDefaultRestoreManager(veleroClientSet, recorder),
-		syncManager:    NewDefaultSyncManager(veleroClientSet, ecosystemClientSet, recorder, namespace),
+		backupManager:  newDefaultBackupManager(veleroClientSet, recorder),
+		restoreManager: newDefaultRestoreManager(veleroClientSet, recorder),
+		syncManager:    newDefaultSyncManager(veleroClientSet, ecosystemClientSet, recorder, namespace),
 	}
 }
