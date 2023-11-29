@@ -5,32 +5,33 @@ retention:
   strategy: keepAll
   garbageCollectionCron: "0 * * * *"
 
-controllerManager:
-  kubeRbacProxy:
-    image:
-      repository: gcr.io/kubebuilder/kube-rbac-proxy
-      tag: v0.14.1
-    resources:
-      limits:
-        cpu: 500m
-        memory: 128Mi
-      requests:
-        cpu: 5m
-        memory: 64Mi
-  manager:
-    env:
-      stage: production
-      logLevel: debug
-    image:
-      repository: cloudogu/k8s-backup-operator
-    resources:
-      limits:
-        cpu: 500m
-        memory: 128Mi
-      requests:
-        cpu: 10m
-        memory: 64Mi
+kubeRbacProxy:
+  image:
+    repository: gcr.io/kubebuilder/kube-rbac-proxy
+    tag: v0.14.1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 5m
+      memory: 64Mi
+manager:
+  env:
+    stage: production
+    logLevel: debug
+  image:
+    repository: k3ces.local:30099/k8s-backup-operator
+    tag: 0.6.0
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
   replicas: 1
+
 metricsService:
   ports:
     - name: https

@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/component: manager
   {{- include "k8s-backup-operator.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.controllerManager.replicas }}
+  replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
     {{- include "k8s-backup-operator.selectorLabels" . | nindent 6 }}
@@ -22,13 +22,13 @@ spec:
         - --secure-listen-address=0.0.0.0:8443
         - --upstream=http://127.0.0.1:8080/
         - --v=0
-        image: {{ .Values.controllerManager.kubeRbacProxy.image.repository }}:{{ .Values.controllerManager.kubeRbacProxy.image.tag }}
+        image: {{ .Values.kubeRbacProxy.image.repository }}:{{ .Values.kubeRbacProxy.image.tag }}
         name: kube-rbac-proxy
         ports:
         - containerPort: 8443
           name: https
           protocol: TCP
-        resources: {{- toYaml .Values.controllerManager.kubeRbacProxy.resources | nindent
+        resources: {{- toYaml .Values.kubeRbacProxy.resources | nindent
           10 }}
         securityContext:
           allowPrivilegeEscalation: false
@@ -42,15 +42,14 @@ spec:
         - --leader-elect
         env:
         - name: STAGE
-          value: {{ .Values.controllerManager.manager.env.stage }}
+          value: {{ .Values.manager.env.stage }}
         - name: LOG_LEVEL
-          value: {{ .Values.controllerManager.manager.env.logLevel }}
+          value: {{ .Values.manager.env.logLevel }}
         - name: NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
-          | default .Chart.AppVersion }}
+        image: {{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -65,7 +64,7 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
-        resources: {{- toYaml .Values.controllerManager.manager.resources | nindent 10
+        resources: {{- toYaml .Values.manager.resources | nindent 10
           }}
         securityContext:
           allowPrivilegeEscalation: false
