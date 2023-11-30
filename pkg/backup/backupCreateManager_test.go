@@ -24,7 +24,7 @@ func TestNewBackupCreateManager(t *testing.T) {
 		registryMock.EXPECT().GlobalConfig().Return(globalMock)
 
 		// when
-		manager := NewBackupCreateManager(nil, nil, registryMock)
+		manager := newBackupCreateManager(nil, "", nil, registryMock)
 
 		// then
 		require.NotNil(t, manager)
@@ -42,7 +42,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -65,7 +65,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -83,7 +88,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -107,7 +112,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -126,7 +136,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().UpdateStatusInProgress(testCtx, backup).Return(nil, assert.AnError)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock}
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -150,7 +165,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 			assert.NotEmpty(t, backup.Status.StartTimestamp)
 		}).Return(nil, assert.AnError)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock}
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -179,7 +199,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		}).Return(backup, nil)
 		clientMock.EXPECT().AddFinalizer(testCtx, backup, v1.BackupFinalizer).Return(nil, assert.AnError)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock}
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -209,7 +234,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		}).Return(backup, nil)
 		clientMock.EXPECT().AddLabels(testCtx, backup).Return(nil, assert.AnError)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock}
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -241,7 +271,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(assert.AnError)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -274,8 +309,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -291,7 +330,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return nil, assert.AnError
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -313,8 +352,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -333,7 +376,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -355,8 +398,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -375,7 +422,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -397,8 +444,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -417,7 +468,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -439,8 +490,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -461,7 +516,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -483,8 +538,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(assert.AnError)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -502,7 +561,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -521,8 +580,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -540,7 +603,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -562,8 +625,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -581,7 +648,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -603,8 +670,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
 		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, client: clientMock, maintenanceModeSwitch: maintenanceModeMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)

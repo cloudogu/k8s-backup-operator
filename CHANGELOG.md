@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.7.0] - 2023-11-30
+### Added
+- [#13] Sync completed (velero) backups with backup CRs after a restore has finished
+
 ## [v0.6.0] - 2023-11-22
 ### Added
 - [#11] Automated deletion of Backups via various retention strategies.

@@ -17,8 +17,18 @@ func Test_newCreateManager(t *testing.T) {
 		registryMock := newMockCesRegistry(t)
 		registryMock.EXPECT().GlobalConfig().Return(globalConfigMock)
 
+		statefulSetMock := newMockStatefulSetInterface(t)
+		serviceMock := newMockServiceInterface(t)
+		appsV1Mock := newMockAppsV1Interface(t)
+		appsV1Mock.EXPECT().StatefulSets(testNamespace).Return(statefulSetMock)
+		coreV1Mock := newMockCoreV1Interface(t)
+		coreV1Mock.EXPECT().Services(testNamespace).Return(serviceMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().AppsV1().Return(appsV1Mock)
+		clientSetMock.EXPECT().CoreV1().Return(coreV1Mock)
+
 		// when
-		manager := newCreateManager(nil, nil, registryMock, nil, nil, nil)
+		manager := newCreateManager(clientSetMock, testNamespace, nil, registryMock, nil)
 
 		// then
 		require.NotNil(t, manager)
@@ -41,8 +51,9 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateRestore(testCtx, restore).Return(nil)
+		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
 		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
@@ -56,13 +67,63 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock}
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
 
 		// then
 		require.NoError(t, err)
+	})
+
+	t.Run("should fail to sync backups after restore", func(t *testing.T) {
+		// given
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
+
+		restoreClientMock := newMockEcosystemRestoreInterface(t)
+		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
+		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
+
+		providerMock := newMockRestoreProvider(t)
+		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+		providerMock.EXPECT().CreateRestore(testCtx, restore).Return(nil)
+		providerMock.EXPECT().SyncBackups(testCtx).Return(assert.AnError)
+		oldNewVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+			return providerMock, nil
+		}
+		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
+
+		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
+		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Restore in progress").Return(nil)
+		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+
+		cleanupMock := newMockCleanupManager(t)
+		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
+
+		// when
+		err := sut.create(testCtx, restore)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to sync backups with provider")
 	})
 
 	t.Run("should return error on failing update status in progress", func(t *testing.T) {
@@ -75,7 +136,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(nil, assert.AnError)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock}
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -97,7 +163,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(nil, assert.AnError)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock}
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -120,7 +191,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(nil, assert.AnError)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock}
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -144,12 +220,17 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
 
 		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return nil, assert.AnError
 		}
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock}
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -175,15 +256,19 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Restore in progress").Return(assert.AnError)
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -209,7 +294,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
@@ -220,8 +305,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(assert.AnError)
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -249,7 +338,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateRestore(testCtx, restore).Return(assert.AnError)
 		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
@@ -260,8 +349,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -289,7 +382,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateRestore(testCtx, restore).Return(assert.AnError)
 		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
@@ -300,8 +393,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -328,8 +425,9 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateRestore(testCtx, restore).Return(nil)
+		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
 		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
@@ -341,7 +439,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
 
-		sut := &defaultCreateManager{recorder: recorderMock, restoreClient: restoreClientMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock}
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
