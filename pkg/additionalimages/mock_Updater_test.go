@@ -21,13 +21,13 @@ func (_m *MockUpdater) EXPECT() *MockUpdater_Expecter {
 	return &MockUpdater_Expecter{mock: &_m.Mock}
 }
 
-// Update provides a mock function with given fields: ctx
-func (_m *MockUpdater) Update(ctx context.Context) error {
-	ret := _m.Called(ctx)
+// Update provides a mock function with given fields: ctx, config
+func (_m *MockUpdater) Update(ctx context.Context, config ImageConfig) error {
+	ret := _m.Called(ctx, config)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, ImageConfig) error); ok {
+		r0 = rf(ctx, config)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -42,13 +42,14 @@ type MockUpdater_Update_Call struct {
 
 // Update is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockUpdater_Expecter) Update(ctx interface{}) *MockUpdater_Update_Call {
-	return &MockUpdater_Update_Call{Call: _e.mock.On("Update", ctx)}
+//   - config ImageConfig
+func (_e *MockUpdater_Expecter) Update(ctx interface{}, config interface{}) *MockUpdater_Update_Call {
+	return &MockUpdater_Update_Call{Call: _e.mock.On("Update", ctx, config)}
 }
 
-func (_c *MockUpdater_Update_Call) Run(run func(ctx context.Context)) *MockUpdater_Update_Call {
+func (_c *MockUpdater_Update_Call) Run(run func(ctx context.Context, config ImageConfig)) *MockUpdater_Update_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(ImageConfig))
 	})
 	return _c
 }
@@ -58,7 +59,7 @@ func (_c *MockUpdater_Update_Call) Return(_a0 error) *MockUpdater_Update_Call {
 	return _c
 }
 
-func (_c *MockUpdater_Update_Call) RunAndReturn(run func(context.Context) error) *MockUpdater_Update_Call {
+func (_c *MockUpdater_Update_Call) RunAndReturn(run func(context.Context, ImageConfig) error) *MockUpdater_Update_Call {
 	_c.Call.Return(run)
 	return _c
 }

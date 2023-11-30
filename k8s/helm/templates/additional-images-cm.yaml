@@ -5,4 +5,6 @@ metadata:
   labels:
     {{- include "k8s-backup-operator.labels" . | nindent 4 }}
 data:
-  kubectlImage: "{{ .Values.additionalImages.kubectl }}"
+  operatorImage: "{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag
+          | default .Chart.AppVersion }}"
+  {{- toYaml .Values.additionalImages | nindent 2 }}

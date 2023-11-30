@@ -2,6 +2,7 @@ package retention
 
 import (
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/time"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -33,7 +34,7 @@ func TestStrategyGetter_Get(t *testing.T) {
 		{
 			name:         "should return keepLastSevenDays strategy",
 			strategyName: StrategyId("keepLastSevenDays"),
-			want:         &keepLastSevenDaysStrategy{clock: &clock{}},
+			want:         &keepLastSevenDaysStrategy{clock: &time.Clock{}},
 			wantErr:      assert.NoError,
 		},
 		{
@@ -51,7 +52,7 @@ func TestStrategyGetter_Get(t *testing.T) {
 						newTimeInterval("threeHundredSixtyDays", 181, 360, "OLDEST"),
 					},
 				},
-				clock: &clock{},
+				clock: &time.Clock{},
 			},
 			wantErr: assert.NoError,
 		},

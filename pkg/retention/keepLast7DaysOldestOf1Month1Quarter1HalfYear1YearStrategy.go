@@ -1,5 +1,7 @@
 package retention
 
+import "github.com/cloudogu/k8s-backup-operator/pkg/time"
+
 func newKeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy() Strategy {
 	calendar := newIntervalCalendar(KeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy).
 		addTimeIntervals([]timeInterval{
@@ -10,7 +12,7 @@ func newKeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy() Strategy {
 			newTimeInterval("threeHundredSixtyDays", 181, 360, keepOldestIntervalMode),
 		})
 
-	clock := &clock{}
+	clock := &time.Clock{}
 	rs := newIntervalBasedStrategy(KeepLast7DaysOldestOf1Month1Quarter1HalfYear1YearStrategy, calendar, clock)
 	return rs
 }

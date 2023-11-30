@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,14 +16,14 @@ import (
 )
 
 type defaultCreateManager struct {
-	clientSet    ecosystemInterface
-	recorder     eventRecorder
-	namespace    string
-	kubectlImage string
+	clientSet   ecosystemInterface
+	recorder    eventRecorder
+	namespace   string
+	imageConfig additionalimages.ImageConfig
 }
 
-func newCreateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string, kubectlImage string) *defaultCreateManager {
-	return &defaultCreateManager{clientSet: clientSet, recorder: recorder, namespace: namespace, kubectlImage: kubectlImage}
+func newCreateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string, imageConfig additionalimages.ImageConfig) *defaultCreateManager {
+	return &defaultCreateManager{clientSet: clientSet, recorder: recorder, namespace: namespace, imageConfig: imageConfig}
 }
 
 func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.BackupSchedule) error {
@@ -57,7 +58,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.B
 		return err
 	}
 
-	backupSchedule, err = cm.setCurrentKubectlImage(ctx, backupScheduleClient, backupSchedule)
+	backupSchedule, err = cm.setCurrentCronJobImage(ctx, backupScheduleClient, backupSchedule)
 	if err != nil {
 		return fmt.Errorf("failed to set currently used kubectl image in status of backup schedule resource [%s]: %w", backupScheduleName, err)
 	}
@@ -70,8 +71,8 @@ func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.B
 	return nil
 }
 
-func (cm *defaultCreateManager) setCurrentKubectlImage(ctx context.Context, client ecosystem.BackupScheduleInterface, schedule *v1.BackupSchedule) (*v1.BackupSchedule, error) {
-	schedule.Status.CurrentKubectlImage = cm.kubectlImage
+func (cm *defaultCreateManager) setCurrentCronJobImage(ctx context.Context, client ecosystem.BackupScheduleInterface, schedule *v1.BackupSchedule) (*v1.BackupSchedule, error) {
+	schedule.Status.CurrentCronJobImage = cm.imageConfig.OperatorImage
 
 	return client.UpdateStatus(ctx, schedule, metav1.UpdateOptions{})
 }
@@ -92,7 +93,7 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 			Schedule: schedule.Spec.Schedule,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
-					Template: schedule.CronJobPodTemplate(cm.kubectlImage),
+					Template: schedule.CronJobPodTemplate(cm.imageConfig.OperatorImage),
 				},
 			},
 		},
