@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- [#17] Replace create-backup-script with an operator subcommand.
+  This way, the backup schedule cron job can use the same image as the operator.
 - [#15] Delete kustomize structure and hold the operator yaml files just in a helm chart.
 
 ## [v0.7.0] - 2023-11-30
