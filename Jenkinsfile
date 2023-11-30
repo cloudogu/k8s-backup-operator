@@ -200,29 +200,8 @@ void stageAutomaticRelease(Makefile makefile) {
             }
         }
 
-        stage('Finish Release') {
-            gitflow.finishRelease(releaseVersion, productionReleaseBranch)
-        }
-
         stage('Sign after Release') {
             gpg.createSignature()
-        }
-
-        stage('Regenerate resources for release') {
-            new Docker(this)
-                    .image("golang:${goVersion}")
-                    .mountJenkinsUser()
-                    .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
-                            {
-                                make 'k8s-create-temporary-resource'
-                            }
-        }
-
-        stage('Push to Registry') {
-            GString targetOperatorResourceYaml = "target/${repositoryName}_${controllerVersion}.yaml"
-
-            DoguRegistry registry = new DoguRegistry(this)
-            registry.pushK8sYaml(targetOperatorResourceYaml, repositoryName, "k8s", "${controllerVersion}")
         }
 
         stage('Push Helm chart to Harbor') {
@@ -232,7 +211,7 @@ void stageAutomaticRelease(Makefile makefile) {
                     .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
                             {
                                 // Package operator-chart & crd-chart
-                                make 'helm-package-release'
+                                make 'helm-package'
                                 make 'crd-helm-package'
 
                                 // Push charts
@@ -243,6 +222,10 @@ void stageAutomaticRelease(Makefile makefile) {
                                     sh ".bin/helm push target/k8s/helm-crd/${repositoryName}-crd-${controllerVersion}.tgz oci://${registry}/${registry_namespace}/"
                                 }
                             }
+        }
+
+        stage('Finish Release') {
+            gitflow.finishRelease(releaseVersion, productionReleaseBranch)
         }
 
         stage('Add Github-Release') {
