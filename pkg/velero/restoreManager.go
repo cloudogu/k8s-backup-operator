@@ -17,8 +17,8 @@ type defaultRestoreManager struct {
 	recorder        eventRecorder
 }
 
-// NewDefaultRestoreManager creates a new instance of defaultRestoreManager.
-func NewDefaultRestoreManager(veleroClientSet veleroClientSet, recorder eventRecorder) *defaultRestoreManager {
+// newDefaultRestoreManager creates a new instance of defaultRestoreManager.
+func newDefaultRestoreManager(veleroClientSet veleroClientSet, recorder eventRecorder) *defaultRestoreManager {
 	return &defaultRestoreManager{veleroClientSet: veleroClientSet, recorder: recorder}
 }
 

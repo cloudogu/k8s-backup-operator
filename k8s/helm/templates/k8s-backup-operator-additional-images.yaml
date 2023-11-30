@@ -4,6 +4,8 @@ metadata:
   name: k8s-backup-operator-additional-images
   labels:
     app: ces
+    k8s.cloudogu.com/part-of: backup
     app.kubernetes.io/name: k8s-backup-operator-additional-images
+    app.kubernetes.io/part-of: k8s-backup-operator
 data:
   kubectlImage: "{{ .Values.additionalImages.kubectl }}"

@@ -236,6 +236,91 @@ func (_c *mockRestoreProvider_DeleteRestore_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// SyncBackupStatus provides a mock function with given fields: ctx, backup
+func (_m *mockRestoreProvider) SyncBackupStatus(ctx context.Context, backup *v1.Backup) error {
+	ret := _m.Called(ctx, backup)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) error); ok {
+		r0 = rf(ctx, backup)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockRestoreProvider_SyncBackupStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SyncBackupStatus'
+type mockRestoreProvider_SyncBackupStatus_Call struct {
+	*mock.Call
+}
+
+// SyncBackupStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - backup *v1.Backup
+func (_e *mockRestoreProvider_Expecter) SyncBackupStatus(ctx interface{}, backup interface{}) *mockRestoreProvider_SyncBackupStatus_Call {
+	return &mockRestoreProvider_SyncBackupStatus_Call{Call: _e.mock.On("SyncBackupStatus", ctx, backup)}
+}
+
+func (_c *mockRestoreProvider_SyncBackupStatus_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockRestoreProvider_SyncBackupStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Backup))
+	})
+	return _c
+}
+
+func (_c *mockRestoreProvider_SyncBackupStatus_Call) Return(_a0 error) *mockRestoreProvider_SyncBackupStatus_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockRestoreProvider_SyncBackupStatus_Call) RunAndReturn(run func(context.Context, *v1.Backup) error) *mockRestoreProvider_SyncBackupStatus_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SyncBackups provides a mock function with given fields: ctx
+func (_m *mockRestoreProvider) SyncBackups(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockRestoreProvider_SyncBackups_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SyncBackups'
+type mockRestoreProvider_SyncBackups_Call struct {
+	*mock.Call
+}
+
+// SyncBackups is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *mockRestoreProvider_Expecter) SyncBackups(ctx interface{}) *mockRestoreProvider_SyncBackups_Call {
+	return &mockRestoreProvider_SyncBackups_Call{Call: _e.mock.On("SyncBackups", ctx)}
+}
+
+func (_c *mockRestoreProvider_SyncBackups_Call) Run(run func(ctx context.Context)) *mockRestoreProvider_SyncBackups_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *mockRestoreProvider_SyncBackups_Call) Return(_a0 error) *mockRestoreProvider_SyncBackups_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockRestoreProvider_SyncBackups_Call) RunAndReturn(run func(context.Context) error) *mockRestoreProvider_SyncBackups_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 type mockConstructorTestingTnewMockRestoreProvider interface {
 	mock.TestingT
 	Cleanup(func())

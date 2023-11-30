@@ -13,7 +13,7 @@ import (
 )
 
 func TestNewBackupDeleteManager(t *testing.T) {
-	manager := NewBackupDeleteManager(nil, nil)
+	manager := newBackupDeleteManager(nil, testNamespace, nil)
 
 	require.NotNil(t, manager)
 }
@@ -28,7 +28,7 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -37,7 +37,13 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusDeleting(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().RemoveFinalizer(testCtx, backup, v1.BackupFinalizer).Return(backup, nil)
 		recorderMock := newMockEventRecorder(t)
-		sut := &backupDeleteManager{client: clientMock, recorder: recorderMock}
+
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &backupDeleteManager{clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, backup)
@@ -53,8 +59,13 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().UpdateStatusDeleting(testCtx, backup).Return(nil, assert.AnError)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
 		recorderMock := newMockEventRecorder(t)
-		sut := &backupDeleteManager{client: clientMock, recorder: recorderMock}
+		sut := &backupDeleteManager{clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, backup)
@@ -72,8 +83,13 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().UpdateStatusDeleting(testCtx, backup).Return(backup, nil)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
 		recorderMock := newMockEventRecorder(t)
-		sut := &backupDeleteManager{client: clientMock, recorder: recorderMock}
+		sut := &backupDeleteManager{clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, backup)
@@ -92,15 +108,20 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
 
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().UpdateStatusDeleting(testCtx, backup).Return(backup, nil)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
 		recorderMock := newMockEventRecorder(t)
-		sut := &backupDeleteManager{client: clientMock, recorder: recorderMock}
+		sut := &backupDeleteManager{clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, backup)
@@ -120,7 +141,7 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().DeleteBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -128,8 +149,13 @@ func Test_backupDeleteManager_delete(t *testing.T) {
 		clientMock := newMockEcosystemBackupInterface(t)
 		clientMock.EXPECT().UpdateStatusDeleting(testCtx, backup).Return(backup, nil)
 		clientMock.EXPECT().RemoveFinalizer(testCtx, backup, "cloudogu-backup-finalizer").Return(nil, assert.AnError)
+		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
 		recorderMock := newMockEventRecorder(t)
-		sut := &backupDeleteManager{client: clientMock, recorder: recorderMock}
+		sut := &backupDeleteManager{clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, backup)

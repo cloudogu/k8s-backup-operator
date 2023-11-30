@@ -13,10 +13,10 @@ func Test_defaultDeleteManager_delete(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		recorderMock := newMockEventRecorder(t)
-		restoreClientMock := newMockEcosystemRestoreInterface(t)
+		clientSetMock := newMockEcosystemInterface(t)
 
 		// when
-		manager := newDeleteManager(restoreClientMock, recorderMock)
+		manager := newDeleteManager(clientSetMock, testNamespace, recorderMock)
 
 		// then
 		require.NotNil(t, manager)
@@ -38,12 +38,17 @@ func Test_newDeleteManager(t *testing.T) {
 		providerMock.EXPECT().DeleteRestore(testCtx, restore).Return(nil)
 
 		oldVeleroProviderGetter := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderGetter }()
 
-		sut := &defaultDeleteManager{restoreClient: restoreClientMock, recorder: recorderMock}
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultDeleteManager{clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -60,7 +65,12 @@ func Test_newDeleteManager(t *testing.T) {
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusDeleting(testCtx, restore).Return(nil, assert.AnError)
 
-		sut := &defaultDeleteManager{restoreClient: restoreClientMock, recorder: recorderMock}
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultDeleteManager{clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -84,12 +94,16 @@ func Test_newDeleteManager(t *testing.T) {
 		providerMock.EXPECT().DeleteRestore(testCtx, restore).Return(assert.AnError)
 
 		oldVeleroProviderGetter := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderGetter }()
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultDeleteManager{restoreClient: restoreClientMock, recorder: recorderMock}
+		sut := &defaultDeleteManager{clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -114,12 +128,16 @@ func Test_newDeleteManager(t *testing.T) {
 		providerMock.EXPECT().DeleteRestore(testCtx, restore).Return(nil)
 
 		oldVeleroProviderGetter := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderGetter }()
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultDeleteManager{restoreClient: restoreClientMock, recorder: recorderMock}
+		sut := &defaultDeleteManager{clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, restore)
