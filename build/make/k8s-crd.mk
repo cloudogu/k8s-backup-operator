@@ -98,3 +98,7 @@ crd-component-apply: check-k8s-namespace-env-var crd-helm-chart-import crd-compo
 crd-component-delete: check-k8s-namespace-env-var crd-component-generate ## Deletes the CRD component YAML resource from the actual defined context.
 	@kubectl delete -f "${K8S_RESOURCE_CRD_COMPONENT}" --namespace="${NAMESPACE}" || true
 	@echo "Done."
+
+.PHONY: crd-helm-lint
+crd-helm-lint: $(BINARY_HELM) crd-helm-generate
+	@$(BINARY_HELM) lint "${HELM_CRD_TARGET_DIR}"

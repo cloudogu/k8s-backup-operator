@@ -68,11 +68,12 @@ node('docker') {
                                 make 'helm-generate'
                                 archiveArtifacts 'target/k8s/**/*'
                             }
-                        }
 
-        stage("Lint k8s Resources") {
-            stageLintK8SResources(makefile)
-        }
+                            stage("Lint helm") {
+                                make 'crd-helm-lint'
+                                make 'helm-lint'
+                            }
+                        }
 
         stage('SonarQube') {
             stageStaticAnalysisSonarQube()
@@ -135,18 +136,6 @@ void gitWithCredentials(String command) {
                 returnStdout: true
         )
     }
-}
-
-void stageLintK8SResources(Makefile makefile) {
-    String kubevalImage = "cytopia/kubeval:0.13"
-    String controllerVersion = makefile.getVersion()
-
-    docker
-            .image(kubevalImage)
-            .inside("-v ${WORKSPACE}/target:/data -t --entrypoint=")
-                    {
-                        sh "kubeval /data/${repositoryName}_${controllerVersion}.yaml --ignore-missing-schemas"
-                    }
 }
 
 void stageStaticAnalysisReviewDog() {
