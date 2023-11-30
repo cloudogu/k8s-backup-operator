@@ -3,11 +3,13 @@ package backup
 type backupManager struct {
 	createManager
 	deleteManager
+	statusSyncManager
 }
 
-// NewBackupManager creates a new instance of backupManager containing a createManager and deleteManager.
-func NewBackupManager(backupClient ecosystemBackupInterface, recorder eventRecorder, registry etcdRegistry) *backupManager {
-	creator := NewBackupCreateManager(backupClient, recorder, registry)
-	remover := NewBackupDeleteManager(backupClient, recorder)
-	return &backupManager{createManager: creator, deleteManager: remover}
+// NewBackupManager creates a new instance of backupManager containing a createManager, deleteManager and statusSyncManager.
+func NewBackupManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, registry etcdRegistry) *backupManager {
+	creator := newBackupCreateManager(clientSet, namespace, recorder, registry)
+	remover := newBackupDeleteManager(clientSet, namespace, recorder)
+	statusSyncManager := newBackupStatusSyncManager(clientSet, namespace, recorder)
+	return &backupManager{createManager: creator, deleteManager: remover, statusSyncManager: statusSyncManager}
 }

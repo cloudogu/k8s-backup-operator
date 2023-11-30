@@ -114,7 +114,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	globalConfigMock := newMockEtcdContext(t)
 	mockRegistry.EXPECT().GlobalConfig().Return(globalConfigMock)
 
-	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(namespace), recorderMock, mockRegistry)
+	backupManager := backup.NewBackupManager(ecosystemClientSet, namespace, recorderMock, mockRegistry)
 	gomega.Expect(backupManager).NotTo(gomega.BeNil())
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorderMock, namespace)
 	gomega.Expect(requeueHandler).NotTo(gomega.BeNil())
@@ -127,11 +127,10 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	cleanupMock := cleanup.NewManager(namespace, k8sManager.GetClient(), clientSet)
 	restoreManager := restore.NewRestoreManager(
-		ecosystemClientSet.EcosystemV1Alpha1().Restores(namespace),
+		ecosystemClientSet,
+		namespace,
 		recorderMock,
 		mockRegistry,
-		ecosystemClientSet.AppsV1().StatefulSets(namespace),
-		ecosystemClientSet.CoreV1().Services(namespace),
 		cleanupMock,
 	)
 	gomega.Expect(restoreManager).NotTo(gomega.BeNil())

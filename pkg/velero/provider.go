@@ -15,13 +15,13 @@ type defaultProvider struct {
 }
 
 // NewDefaultProvider creates a new instance of defaultProvider.
-func NewDefaultProvider(namespace string, recorder eventRecorder) (*defaultProvider, error) {
+func NewDefaultProvider(ecosystemClientSet ecosystemClientSet, namespace string, recorder eventRecorder) (*defaultProvider, error) {
 	factory := veleroclient.NewFactory("k8s-backup-operator", map[string]interface{}{"namespace": namespace})
-	clientSet, err := factory.Client()
+	veleroClientSet, err := factory.Client()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create velero clientset: %w", err)
 	}
-	return &defaultProvider{manager: NewDefaultManager(clientSet, recorder), veleroClientSet: clientSet, namespace: namespace}, nil
+	return &defaultProvider{manager: NewDefaultManager(veleroClientSet, ecosystemClientSet, recorder, namespace), veleroClientSet: veleroClientSet, namespace: namespace}, nil
 }
 
 // CheckReady validates that velero is installed and can establish a connection to its backup store.

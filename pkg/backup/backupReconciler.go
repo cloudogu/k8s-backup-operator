@@ -20,9 +20,10 @@ import (
 type operation string
 
 const (
-	operationCreate = operation("create")
-	operationDelete = operation("delete")
-	operationIgnore = operation("ignore")
+	operationCreate     = operation("create")
+	operationDelete     = operation("delete")
+	operationIgnore     = operation("ignore")
+	operationSyncStatus = operation("syncStatus")
 )
 
 // backupReconciler reconciles a Backup object
@@ -63,6 +64,8 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return r.performCreateOperation(ctx, backup)
 	case operationDelete:
 		return r.performDeleteOperation(ctx, backup)
+	case operationSyncStatus:
+		return r.performSyncStatusOperation(ctx, backup)
 	case operationIgnore:
 		return ctrl.Result{}, nil
 	default:
@@ -76,6 +79,10 @@ func (r *backupReconciler) performCreateOperation(ctx context.Context, backup *k
 
 func (r *backupReconciler) performDeleteOperation(ctx context.Context, backup *k8sv1.Backup) (ctrl.Result, error) {
 	return r.performOperation(ctx, backup, k8sv1.DeleteEventReason, backup.Status.Status, r.manager.delete)
+}
+
+func (r *backupReconciler) performSyncStatusOperation(ctx context.Context, backup *k8sv1.Backup) (ctrl.Result, error) {
+	return r.performOperation(ctx, backup, k8sv1.SyncStatusEventReason, backup.Status.Status, r.manager.syncStatus)
 }
 
 // performOperation executes the given operationFn and requeues if necessary.
@@ -115,6 +122,10 @@ func (r *backupReconciler) performOperation(
 func evaluateRequiredOperation(backup *k8sv1.Backup) operation {
 	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.IsZero() {
 		return operationDelete
+	}
+
+	if backup.Spec.SyncedFromProvider {
+		return operationSyncStatus
 	}
 
 	switch backup.Status.Status {

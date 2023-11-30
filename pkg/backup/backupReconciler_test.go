@@ -1,7 +1,6 @@
 package backup
 
 import (
-	"context"
 	"errors"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
@@ -44,23 +43,23 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 
 		clientSetMock := newMockEcosystemInterface(t)
 		backupInterfaceMock := newMockEcosystemBackupInterface(t)
-		backupInterfaceMock.EXPECT().Get(context.TODO(), backupName, metav1.GetOptions{}).Return(backup, nil)
+		backupInterfaceMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(backup, nil)
 		backupClientGetterMock := newMockBackupV1Alpha1Interface(t)
 		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
 
 		managerMock := newMockBackupControllerManager(t)
-		managerMock.EXPECT().create(context.TODO(), backup).Return(nil)
+		managerMock.EXPECT().create(testCtx, backup).Return(nil)
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, v12.EventTypeNormal, "Creation", "Creation successful")
 
 		requeueHandlerMock := newMockRequeueHandler(t)
-		requeueHandlerMock.EXPECT().Handle(context.TODO(), "Creation failed with backup backup", backup, nil, "").Return(ctrl.Result{}, nil)
+		requeueHandlerMock.EXPECT().Handle(testCtx, "Creation failed with backup backup", backup, nil, "").Return(ctrl.Result{}, nil)
 
 		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
 
 		// when
-		actual, err := sut.Reconcile(context.TODO(), request)
+		actual, err := sut.Reconcile(testCtx, request)
 
 		// then
 		require.NoError(t, err)
@@ -79,7 +78,7 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 
 		clientSetMock := newMockEcosystemInterface(t)
 		backupInterfaceMock := newMockEcosystemBackupInterface(t)
-		backupInterfaceMock.EXPECT().Get(context.TODO(), backupName, metav1.GetOptions{}).Return(backup, nil)
+		backupInterfaceMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(backup, nil)
 		backupClientGetterMock := newMockBackupV1Alpha1Interface(t)
 		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
@@ -87,7 +86,52 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace}
 
 		// when
-		actual, err := sut.Reconcile(context.TODO(), request)
+		actual, err := sut.Reconcile(testCtx, request)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, actual)
+	})
+
+	t.Run("should sync status on syncFromProvider flag", func(t *testing.T) {
+		// given
+		backupName := "backup"
+
+		request := ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: testNamespace,
+			Name:      backupName,
+		}}
+		backup := &v1.Backup{
+			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace},
+			Spec:       v1.BackupSpec{SyncedFromProvider: true},
+		}
+
+		managerMock := newMockBackupControllerManager(t)
+		managerMock.EXPECT().syncStatus(testCtx, backup).Return(nil)
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, v12.EventTypeNormal, "SyncStatus", "SyncStatus successful")
+
+		requeueHandlerMock := newMockRequeueHandler(t)
+		requeueHandlerMock.EXPECT().Handle(testCtx, "SyncStatus failed with backup backup", backup, nil, "").Return(ctrl.Result{}, nil)
+
+		clientSetMock := newMockEcosystemInterface(t)
+		backupInterfaceMock := newMockEcosystemBackupInterface(t)
+		backupInterfaceMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(backup, nil)
+		backupClientGetterMock := newMockBackupV1Alpha1Interface(t)
+		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
+
+		sut := &backupReconciler{
+			clientSet:      clientSetMock,
+			namespace:      testNamespace,
+			manager:        managerMock,
+			recorder:       recorderMock,
+			requeueHandler: requeueHandlerMock,
+		}
+
+		// when
+		actual, err := sut.Reconcile(testCtx, request)
 
 		// then
 		require.NoError(t, err)
@@ -107,24 +151,24 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 
 		clientSetMock := newMockEcosystemInterface(t)
 		backupInterfaceMock := newMockEcosystemBackupInterface(t)
-		backupInterfaceMock.EXPECT().Get(context.TODO(), backupName, metav1.GetOptions{}).Return(backup, nil)
+		backupInterfaceMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(backup, nil)
 		backupClientGetterMock := newMockBackupV1Alpha1Interface(t)
 		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
 
 		managerMock := newMockBackupControllerManager(t)
-		managerMock.EXPECT().delete(context.TODO(), backup).Return(nil)
+		managerMock.EXPECT().delete(testCtx, backup).Return(nil)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, v12.EventTypeNormal, "Delete", "Delete successful")
 
 		requeueHandlerMock := newMockRequeueHandler(t)
-		requeueHandlerMock.EXPECT().Handle(context.TODO(), "Delete failed with backup backup", backup, nil, v1.BackupStatusCompleted).Return(ctrl.Result{}, nil)
+		requeueHandlerMock.EXPECT().Handle(testCtx, "Delete failed with backup backup", backup, nil, v1.BackupStatusCompleted).Return(ctrl.Result{}, nil)
 
 		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
 
 		// when
-		actual, err := sut.Reconcile(context.TODO(), request)
+		actual, err := sut.Reconcile(testCtx, request)
 
 		// then
 		require.NoError(t, err)
@@ -144,25 +188,25 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 
 		clientSetMock := newMockEcosystemInterface(t)
 		backupInterfaceMock := newMockEcosystemBackupInterface(t)
-		backupInterfaceMock.EXPECT().Get(context.TODO(), backupName, metav1.GetOptions{}).Return(backup, nil)
+		backupInterfaceMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(backup, nil)
 		backupClientGetterMock := newMockBackupV1Alpha1Interface(t)
 		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
 
 		testErr := requeueError{errors.New("test")}
 		managerMock := newMockBackupControllerManager(t)
-		managerMock.EXPECT().delete(context.TODO(), backup).Return(testErr)
+		managerMock.EXPECT().delete(testCtx, backup).Return(testErr)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, v12.EventTypeWarning, "Delete", "Delete failed. Reason: test")
 
 		requeueHandlerMock := newMockRequeueHandler(t)
-		requeueHandlerMock.EXPECT().Handle(context.TODO(), "Delete failed with backup backup", backup, testErr, v1.BackupStatusCompleted).Return(ctrl.Result{}, nil)
+		requeueHandlerMock.EXPECT().Handle(testCtx, "Delete failed with backup backup", backup, testErr, v1.BackupStatusCompleted).Return(ctrl.Result{}, nil)
 
 		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
 
 		// when
-		actual, err := sut.Reconcile(context.TODO(), request)
+		actual, err := sut.Reconcile(testCtx, request)
 
 		// then
 		require.NoError(t, err)
@@ -182,26 +226,26 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 
 		clientSetMock := newMockEcosystemInterface(t)
 		backupInterfaceMock := newMockEcosystemBackupInterface(t)
-		backupInterfaceMock.EXPECT().Get(context.TODO(), backupName, metav1.GetOptions{}).Return(backup, nil)
+		backupInterfaceMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(backup, nil)
 		backupClientGetterMock := newMockBackupV1Alpha1Interface(t)
 		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
 
 		testErr := requeueError{errors.New("test")}
 		managerMock := newMockBackupControllerManager(t)
-		managerMock.EXPECT().delete(context.TODO(), backup).Return(testErr)
+		managerMock.EXPECT().delete(testCtx, backup).Return(testErr)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, v12.EventTypeWarning, "Delete", "Delete failed. Reason: test")
 		recorderMock.EXPECT().Eventf(backup, v12.EventTypeWarning, "Requeue", "Failed to requeue the %s.", "delete")
 
 		requeueHandlerMock := newMockRequeueHandler(t)
-		requeueHandlerMock.EXPECT().Handle(context.TODO(), "Delete failed with backup backup", backup, testErr, v1.BackupStatusCompleted).Return(ctrl.Result{}, assert.AnError)
+		requeueHandlerMock.EXPECT().Handle(testCtx, "Delete failed with backup backup", backup, testErr, v1.BackupStatusCompleted).Return(ctrl.Result{}, assert.AnError)
 
 		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
 
 		// when
-		actual, err := sut.Reconcile(context.TODO(), request)
+		actual, err := sut.Reconcile(testCtx, request)
 
 		// then
 		require.Error(t, err)
@@ -221,7 +265,7 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 
 		clientSetMock := newMockEcosystemInterface(t)
 		backupInterfaceMock := newMockEcosystemBackupInterface(t)
-		backupInterfaceMock.EXPECT().Get(context.TODO(), backupName, metav1.GetOptions{}).Return(nil, assert.AnError)
+		backupInterfaceMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(nil, assert.AnError)
 		backupClientGetterMock := newMockBackupV1Alpha1Interface(t)
 		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
@@ -229,7 +273,7 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace}
 
 		// when
-		actual, err := sut.Reconcile(context.TODO(), request)
+		actual, err := sut.Reconcile(testCtx, request)
 
 		// then
 		require.Error(t, err)
@@ -262,7 +306,7 @@ func Test_backupReconciler_SetupWithManager(t *testing.T) {
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
-		logger := log.FromContext(context.TODO())
+		logger := log.FromContext(testCtx)
 		ctrlManMock.EXPECT().GetLogger().Return(logger)
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetCache().Return(nil)

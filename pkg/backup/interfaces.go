@@ -34,6 +34,7 @@ type MaintenanceModeSwitch interface {
 type backupControllerManager interface {
 	createManager
 	deleteManager
+	statusSyncManager
 }
 
 type createManager interface {
@@ -42,6 +43,10 @@ type createManager interface {
 
 type deleteManager interface {
 	delete(ctx context.Context, backup *v1.Backup) error
+}
+
+type statusSyncManager interface {
+	syncStatus(ctx context.Context, backup *v1.Backup) error
 }
 
 type requeueHandler interface {

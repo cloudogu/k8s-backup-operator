@@ -19,7 +19,7 @@ import (
 func TestNewDefaultRestoreManager(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		// when
-		newDefaultRestoreManager := NewDefaultRestoreManager(nil, nil)
+		newDefaultRestoreManager := newDefaultRestoreManager(nil, nil)
 
 		// then
 		require.NotNil(t, newDefaultRestoreManager)

@@ -29,8 +29,8 @@ type defaultBackupManager struct {
 	recorder        eventRecorder
 }
 
-// NewDefaultBackupManager creates a new instance of defaultBackupManager.
-func NewDefaultBackupManager(veleroClientSet veleroClientSet, recorder eventRecorder) *defaultBackupManager {
+// newDefaultBackupManager creates a new instance of defaultBackupManager.
+func newDefaultBackupManager(veleroClientSet veleroClientSet, recorder eventRecorder) *defaultBackupManager {
 	return &defaultBackupManager{veleroClientSet: veleroClientSet, recorder: recorder}
 }
 

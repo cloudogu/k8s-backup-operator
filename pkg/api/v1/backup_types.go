@@ -25,6 +25,7 @@ const (
 	CreateEventReason        = "Creation"
 	DeleteEventReason        = "Delete"
 	UpdateEventReason        = "Update"
+	SyncStatusEventReason    = "SyncStatus"
 	ErrorOnCreateEventReason = "ErrCreation"
 )
 
@@ -45,6 +46,10 @@ type BackupSpec struct {
 
 	// Provider defines the backup provider which should be used for the backup.
 	Provider Provider `json:"provider,omitempty"`
+	// SyncedFromProvider defines that this backup already exists in the provider and its status should be synced.
+	// This is necessary because we cannot set the status of a backup on creation, see:
+	// https://stackoverflow.com/questions/73574615/how-to-create-kubernetes-objects-with-status-fields
+	SyncedFromProvider bool `json:"syncedFromProvider,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup
