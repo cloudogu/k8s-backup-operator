@@ -50,18 +50,18 @@ node('docker') {
                                 make 'build-controller'
                             }
 
-//                            stage("Unit test") {
-//                                make 'unit-test'
-//                                junit allowEmptyResults: true, testResults: 'target/unit-tests/*-tests.xml'
-//                            }
-//
-//                            stage('k8s-Integration-Test') {
-//                                make 'k8s-integration-test'
-//                            }
-//
-//                            stage("Review dog analysis") {
-//                                stageStaticAnalysisReviewDog()
-//                            }
+                            stage("Unit test") {
+                                make 'unit-test'
+                                junit allowEmptyResults: true, testResults: 'target/unit-tests/*-tests.xml'
+                            }
+
+                            stage('k8s-Integration-Test') {
+                                make 'k8s-integration-test'
+                            }
+
+                            stage("Review dog analysis") {
+                                stageStaticAnalysisReviewDog()
+                            }
 
                             stage('Generate k8s Resources') {
                                 make 'crd-helm-generate'
@@ -70,13 +70,13 @@ node('docker') {
                             }
                         }
 
-//        stage("Lint k8s Resources") {
-//            stageLintK8SResources(makefile)
-//        }
-//
-//        stage('SonarQube') {
-//            stageStaticAnalysisSonarQube()
-//        }
+        stage("Lint k8s Resources") {
+            stageLintK8SResources(makefile)
+        }
+
+        stage('SonarQube') {
+            stageStaticAnalysisSonarQube()
+        }
 
         K3d k3d = new K3d(this, "${WORKSPACE}", "${WORKSPACE}/k3d", env.PATH)
 
