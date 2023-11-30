@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 
 	backupv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
@@ -49,21 +50,22 @@ func (d *defaultSyncManager) SyncBackups(ctx context.Context) error {
 	var errs []error
 
 	// Remove Backup CRs which have no corresponding Velero backup
-	for _, backup := range backupsList.Items {
-		if _, exists := veleroBackupMap[backup.Name]; !exists {
-			_, err := backupsClient.RemoveFinalizer(ctx, &backup, backupv1.BackupFinalizer)
-			if err != nil {
-				errs = append(errs, err)
-				break
-			}
-			err = backupsClient.Delete(ctx, backup.Name, metav1.DeleteOptions{})
-			if err != nil {
-				errs = append(errs, err)
-			}
-		}
-	}
+	removeErrs := removeBackupsWithoutVeleroBackup(ctx, backupsList, veleroBackupMap, backupsClient)
+	errs = append(errs, removeErrs...)
 
 	// Create Backup CRs for Velero backups that have no counterpart in the cluster yet
+	createErrs := createBackupsForVeleroBackups(ctx, veleroBackupsList, backupMap, backupsClient)
+	errs = append(errs, createErrs...)
+
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to sync backups with velero: %w", errors.Join(errs...))
+	}
+
+	return nil
+}
+
+func createBackupsForVeleroBackups(ctx context.Context, veleroBackupsList *velerov1.BackupList, backupMap map[string]*backupv1.Backup, backupsClient ecosystem.BackupInterface) []error {
+	var errs []error
 	for _, veleroBackup := range veleroBackupsList.Items {
 		if _, exists := backupMap[veleroBackup.Name]; !exists {
 			newBackup := &backupv1.Backup{
@@ -81,11 +83,25 @@ func (d *defaultSyncManager) SyncBackups(ctx context.Context) error {
 			}
 		}
 	}
-	if len(errs) > 0 {
-		return fmt.Errorf("failed to sync backups with velero: %w", errors.Join(errs...))
-	}
+	return errs
+}
 
-	return nil
+func removeBackupsWithoutVeleroBackup(ctx context.Context, backupsList *backupv1.BackupList, veleroBackupMap map[string]*velerov1.Backup, backupsClient ecosystem.BackupInterface) []error {
+	var errs []error
+	for _, backup := range backupsList.Items {
+		if _, exists := veleroBackupMap[backup.Name]; !exists {
+			_, err := backupsClient.RemoveFinalizer(ctx, &backup, backupv1.BackupFinalizer)
+			if err != nil {
+				errs = append(errs, err)
+				break
+			}
+			err = backupsClient.Delete(ctx, backup.Name, metav1.DeleteOptions{})
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errs
 }
 
 // SyncBackupStatus syncs the status of the backup CR with the corresponding velero backup.
