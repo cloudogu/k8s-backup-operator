@@ -84,6 +84,8 @@ type appsV1Interface interface {
 	appsv1.AppsV1Interface
 }
 
+//nolint:unused
+//goland:noinspection GoUnusedType
 type coreV1Interface interface {
 	v12.CoreV1Interface
 }
