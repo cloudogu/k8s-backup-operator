@@ -4,6 +4,7 @@ import (
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -18,6 +19,12 @@ type controllerManager interface {
 }
 
 // used for mocks
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type backupProvider interface {
+	provider.Provider
+}
 
 //nolint:unused
 //goland:noinspection GoUnusedType
