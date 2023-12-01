@@ -3,7 +3,7 @@ ARTIFACT_ID=k8s-backup-operator
 VERSION=0.7.0
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.21
-MAKEFILES_VERSION=9.0.0
+MAKEFILES_VERSION=9.0.1
 LINT_VERSION=v1.55.2
 STAGE?=production
 
@@ -29,19 +29,19 @@ PRE_COMPILE=generate-deepcopy
 HELM_PRE_APPLY_TARGETS=template-stage template-log-level template-image-pull-policy
 HELM_PRE_GENERATE_TARGETS = helm-values-update-image-version
 HELM_POST_GENERATE_TARGETS = helm-values-replace-image-repo
-CRD_POST_MANIFEST_TARGETS = crd-add-labels
+CRD_POST_MANIFEST_TARGETS = crd-add-labels crd-add-backup-labels
+CHECK_VAR_TARGETS=check-all-vars
+IMAGE_IMPORT_TARGET=image-import
 
 include build/make/k8s-controller.mk
 
 .PHONY: build-boot
 build-boot: helm-apply kill-operator-pod ## Builds a new version of the operator and deploys it into the K8s-EcoSystem.
-.PHONY: crd-add-labels
-crd-add-labels: $(BINARY_YQ)
-	@echo "Adding labels to CRD..."
-	@for file in "${CRD_BACKUP_SOURCE}" "${CRD_RESTORE_SOURCE}" "${CRD_SCHEDULE_SOURCE}"; do \
-	  $(BINARY_YQ) -i e ".metadata.labels.app = \"ces\"" $$file ; \
-	  $(BINARY_YQ) -i e ".metadata.labels.\"app.kubernetes.io/name\" = \"$(ARTIFACT_ID)\"" $$file ; \
-	  $(BINARY_YQ) -i e ".metadata.labels.\"k8s.cloudogu.com/part-of\" = \"backup\"" $$file ; \
+.PHONY: crd-add-backup-labels
+crd-add-backup-labels: $(BINARY_YQ)
+	@echo "Adding backup label to CRDs..."
+	@for file in ${HELM_CRD_SOURCE_DIR}/templates/*.yaml ; do \
+		$(BINARY_YQ) -i e ".metadata.labels.\"k8s.cloudogu.com/part-of\" = \"backup\"" $${file} ;\
 	done
 
 .PHONY: helm-values-update-image-version

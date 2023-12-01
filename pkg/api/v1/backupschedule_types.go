@@ -1,5 +1,5 @@
 /*
-This file was generated with "make generate".
+This file was generated with "make generate-deepcopy".
 */
 
 package v1
@@ -59,8 +59,8 @@ func (bss BackupScheduleStatus) GetStatus() string {
 	return bss.Status
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // BackupSchedule is the Schema for the backupschedules API
 type BackupSchedule struct {
