@@ -40,8 +40,8 @@ build-boot: helm-apply kill-operator-pod ## Builds a new version of the operator
 .PHONY: crd-add-backup-labels
 crd-add-backup-labels: $(BINARY_YQ)
 	@echo "Adding backup label to CRDs..."
-	@for file in ${HELM_CRD_SOURCE_DIR}/templates/*.yaml; do
-		$(BINARY_YQ) -i e ".metadata.labels.\"k8s.cloudogu.com/part-of\" = \"backup\"" $$file
+	@for file in ${HELM_CRD_SOURCE_DIR}/templates/*.yaml ; do \
+		$(BINARY_YQ) -i e ".metadata.labels.\"k8s.cloudogu.com/part-of\" = \"backup\"" $${file} ;\
 	done
 
 .PHONY: helm-values-update-image-version
