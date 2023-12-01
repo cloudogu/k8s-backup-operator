@@ -81,9 +81,11 @@ func main() {
 
 	if len(os.Args) < 2 {
 		fmt.Printf("expected one of the following subcommands:\n"+
-			"  %s - start in operator-mode, reconciling this operators custom resources\n"+
+			"  %s - start in operator mode, reconciling this operators custom resources\n"+
+			"  %s - start in scheduled-backup mode, this is used by backup schedule cron jobs\n"+
 			"  %s - start in garbage-collection mode, deleting backups according to the configured retention strategy\n",
 			operatorCmd.Name(),
+			scheduledBackupCmd.Name(),
 			garbageCollectorCmd.Name())
 		os.Exit(1)
 	}
