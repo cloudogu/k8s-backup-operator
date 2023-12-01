@@ -21,4 +21,5 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- define "k8s-backup-operator.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "k8s-backup-operator.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+k8s.cloudogu.com/part-of: k8s-backup-operator
 {{- end }}
