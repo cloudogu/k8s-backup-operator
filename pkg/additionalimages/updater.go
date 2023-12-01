@@ -98,7 +98,7 @@ func (bsu *updater) patchCronJob(ctx context.Context, schedule *v1.BackupSchedul
 		return fmt.Errorf("failed to get cron job %s: %w", schedule.CronJobName(), err)
 	}
 
-	cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image = image
+	(*cronJob).Spec.JobTemplate.Spec.Template = schedule.CronJobPodTemplate(image)
 	_, err = cronJobClient.Update(ctx, cronJob, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update image in backup schedule cron job %s: %w", schedule.CronJobName(), err)

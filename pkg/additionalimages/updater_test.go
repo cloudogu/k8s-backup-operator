@@ -62,14 +62,14 @@ func Test_updater_Update(t *testing.T) {
 		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
 
 		cronJobOldImage := &batchv1.CronJob{}
-		cronJobOldImage.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{{}}
+		cronJobOldImage.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{{Image: "old-image"}}
 		cronJobMock.EXPECT().Get(testCtx, scheduleOldImage.CronJobName(), metav1.GetOptions{}).Return(cronJobOldImage, nil)
 		cronJobMock.EXPECT().Update(testCtx, cronJobOldImage, metav1.UpdateOptions{}).Return(cronJobOldImage, nil)
 
 		cronJobNoImage := &batchv1.CronJob{}
 		cronJobNoImage.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{{}}
 		cronJobMock.EXPECT().Get(testCtx, scheduleNoImage.CronJobName(), metav1.GetOptions{}).Return(cronJobNoImage, nil)
-		cronJobMock.EXPECT().Update(testCtx, cronJobOldImage, metav1.UpdateOptions{}).Return(cronJobNoImage, nil)
+		cronJobMock.EXPECT().Update(testCtx, cronJobNoImage, metav1.UpdateOptions{}).Return(cronJobNoImage, nil)
 
 		backupScheduleClientMock.EXPECT().UpdateStatus(testCtx, mock.Anything, metav1.UpdateOptions{}).
 			Run(func(ctx context.Context, backupSchedule *backupv1.BackupSchedule, opts metav1.UpdateOptions) {
