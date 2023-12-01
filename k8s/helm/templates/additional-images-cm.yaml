@@ -1,8 +1,6 @@
 {{- $images := include "k8s-backup-operator.defaultImages" . | fromYaml -}}
 {{- if hasKey .Values "additionalImages" -}}
   {{- $images = mustMergeOverwrite (dict) .Values.additionalImages $images -}}
-{{- else -}}
-  {{- $images = $images -}}
 {{- end -}}
 apiVersion: v1
 kind: ConfigMap
