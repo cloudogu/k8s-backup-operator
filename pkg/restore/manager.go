@@ -7,15 +7,14 @@ type defaultManager struct {
 
 // NewRestoreManager creates a new instance of defaultManager.
 func NewRestoreManager(
-	restoreClient ecosystemRestoreInterface,
+	clientSet ecosystemInterface,
+	namespace string,
 	recorder eventRecorder,
 	registry cesRegistry,
-	statefulSetClient statefulSetInterface,
-	serviceInterface serviceInterface,
 	cleanup cleanupManager,
 ) *defaultManager {
 	return &defaultManager{
-		createManager: newCreateManager(restoreClient, recorder, registry, statefulSetClient, serviceInterface, cleanup),
-		deleteManager: newDeleteManager(restoreClient, recorder),
+		createManager: newCreateManager(clientSet, namespace, recorder, registry, cleanup),
+		deleteManager: newDeleteManager(clientSet, namespace, recorder),
 	}
 }
