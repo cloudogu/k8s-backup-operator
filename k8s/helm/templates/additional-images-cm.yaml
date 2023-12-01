@@ -4,7 +4,6 @@ metadata:
   name: k8s-backup-operator-additional-images
   labels:
     {{- include "k8s-backup-operator.labels" . | nindent 4 }}
-data:
+data: {{- toYaml .Values.additionalImages | nindent 2 }}
   operatorImage: "{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag
           | default .Chart.AppVersion }}"
-  {{- toYaml .Values.additionalImages | nindent 2 }}
