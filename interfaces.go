@@ -4,6 +4,7 @@ import (
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
+	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,14 +23,20 @@ type controllerManager interface {
 
 //nolint:unused
 //goland:noinspection GoUnusedType
-type additionalImageGetter interface {
-	additionalimages.Getter
+type scheduledBackupManager interface {
+	scheduledbackup.Manager
 }
 
 //nolint:unused
 //goland:noinspection GoUnusedType
-type scheduledBackupManager interface {
-	scheduledbackup.Manager
+type gcManager interface {
+	garbagecollection.Manager
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type additionalImageGetter interface {
+	additionalimages.Getter
 }
 
 //nolint:unused
