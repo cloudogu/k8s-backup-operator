@@ -1,9 +1,13 @@
+{{- $images := include "k8s-backup-operator.defaultImages" . | fromYaml -}}
+{{- if hasKey .Values "additionalImages" -}}
+  {{- $images = mustMergeOverwrite (dict) .Values.additionalImages $images -}}
+{{- else -}}
+  {{- $images = $images -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: k8s-backup-operator-additional-images
   labels:
     {{- include "k8s-backup-operator.labels" . | nindent 4 }}
-data: {{- toYaml .Values.additionalImages | nindent 2 }}
-  operatorImage: "{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag
-          | default .Chart.AppVersion }}"
+data: {{- toYaml $images | nindent 2 }}
