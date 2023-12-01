@@ -5,6 +5,7 @@ import (
 	"flag"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"testing"
@@ -550,6 +551,72 @@ func Test_startOperator(t *testing.T) {
 
 		// when
 		err := startOperator(testCtx, flags, []string{})
+
+		// then
+		require.NoError(t, err)
+	})
+}
+
+func Test_startScheduledBackup(t *testing.T) {
+	t.Run("should fail to schedule backup", func(t *testing.T) {
+		// given
+		t.Setenv("NAMESPACE", "ecosystem")
+		t.Setenv("STAGE", "development")
+
+		oldGetConfigFunc := ctrl.GetConfigOrDie
+		oldNewScheduledBackupManagerFunc := newScheduledBackupManager
+		defer func() {
+			ctrl.GetConfigOrDie = oldGetConfigFunc
+			newScheduledBackupManager = oldNewScheduledBackupManagerFunc
+		}()
+
+		restConfig := &rest.Config{}
+		ctrl.GetConfigOrDie = func() *rest.Config {
+			return restConfig
+		}
+
+		scheduledBackupManagerMock := newMockScheduledBackupManager(t)
+		scheduledBackupManagerMock.EXPECT().ScheduleBackup(testCtx).Return(assert.AnError)
+		newScheduledBackupManager = func(clientSet ecosystem.Interface, options scheduledbackup.Options) scheduledbackup.Manager {
+			return scheduledBackupManagerMock
+		}
+
+		flags := flag.NewFlagSet("scheduled-backup", flag.ContinueOnError)
+
+		// when
+		err := startScheduledBackup(testCtx, flags, []string{"--name=banana", "--provider=velero"})
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+	t.Run("should succeed to schedule backup", func(t *testing.T) {
+		// given
+		t.Setenv("NAMESPACE", "ecosystem")
+		t.Setenv("STAGE", "development")
+
+		oldGetConfigFunc := ctrl.GetConfigOrDie
+		oldNewScheduledBackupManagerFunc := newScheduledBackupManager
+		defer func() {
+			ctrl.GetConfigOrDie = oldGetConfigFunc
+			newScheduledBackupManager = oldNewScheduledBackupManagerFunc
+		}()
+
+		restConfig := &rest.Config{}
+		ctrl.GetConfigOrDie = func() *rest.Config {
+			return restConfig
+		}
+
+		scheduledBackupManagerMock := newMockScheduledBackupManager(t)
+		scheduledBackupManagerMock.EXPECT().ScheduleBackup(testCtx).Return(nil)
+		newScheduledBackupManager = func(clientSet ecosystem.Interface, options scheduledbackup.Options) scheduledbackup.Manager {
+			return scheduledBackupManagerMock
+		}
+
+		flags := flag.NewFlagSet("scheduled-backup", flag.ContinueOnError)
+
+		// when
+		err := startScheduledBackup(testCtx, flags, []string{"--name=banana", "--provider=velero"})
 
 		// then
 		require.NoError(t, err)

@@ -3,6 +3,7 @@ package scheduledbackup
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	time2 "github.com/cloudogu/k8s-backup-operator/pkg/time"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -50,6 +51,6 @@ func (dm *DefaultManager) ScheduleBackup(ctx context.Context) error {
 	return nil
 }
 
-func NewManager(clientSet ecosystemClientSet, options Options) *DefaultManager {
+func NewManager(clientSet ecosystem.Interface, options Options) Manager {
 	return &DefaultManager{clientSet: clientSet, options: options, clock: &time2.Clock{}}
 }
