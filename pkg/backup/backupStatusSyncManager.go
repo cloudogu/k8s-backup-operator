@@ -24,7 +24,7 @@ func (bsm *backupStatusSyncManager) syncStatus(ctx context.Context, backup *v1.B
 	logger.Info(startMessage)
 	bsm.recorder.Event(backup, corev1.EventTypeNormal, v1.SyncStatusEventReason, startMessage)
 
-	backupProvider, err := provider.GetProvider(ctx, backup, backup.Spec.Provider, backup.Namespace, bsm.recorder, bsm.clientSet)
+	backupProvider, err := provider.Get(ctx, backup, backup.Spec.Provider, backup.Namespace, bsm.recorder, bsm.clientSet)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}
