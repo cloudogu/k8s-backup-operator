@@ -8,5 +8,11 @@ values:
 patches:
   values.yaml:
     additionalImages:
-      kubectl: "{{ registryFrom .images.kubectl }}/{{ repositoryFrom .images.kubectl }}:{{ tagFrom .images.kubectl }}"
-#      TODO: Wait for conversion from kustomize to helm
+    kubeRbacProxy:
+      image:
+        repository: "{{ registryFrom .images.kube-rbac-proxy }}/{{ repositoryFrom .images.kube-rbac-proxy }}"
+        tag: "{{ tagFrom .images.kube-rbac-proxy }}"
+    manager:
+      image:
+        repository: "{{ registryFrom .images.backup-operator }}/{{ repositoryFrom .images.backup-operator }}"
+        tag: "{{ tagFrom .images.backup-operator }}"
