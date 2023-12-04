@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"os"
 	"time"
 
@@ -276,6 +278,11 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("failed to create CES registry: %w", err)
 	}
 
+	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, ecosystemClientSet)
+	if err != nil {
+		return fmt.Errorf("failed to sync backups with provider backups on startup: %w", err)
+	}
+
 	imageGetter := newAdditionalImageGetter(k8sClientSet, operatorConfig.Namespace)
 	operatorImage, err := imageGetter.ImageForKey(ctx, config.OperatorImageConfigmapNameKey)
 	if err != nil {
@@ -314,6 +321,18 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	// +kubebuilder:scaffold:builder
 
 	return nil
+}
+
+func syncBackupsWithProviders(ctx context.Context, operatorConfig *config.OperatorConfig, recorder eventRecorder, ecosystemClientSet *ecosystem.ClientSet) error {
+	var errs []error
+	allProviders := provider.GetAll(ctx, operatorConfig.Namespace, recorder, ecosystemClientSet)
+	for _, prov := range allProviders {
+		err := prov.SyncBackups(ctx)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func addChecks(k8sManager controllerManager) error {

@@ -66,7 +66,7 @@ node('docker') {
                             stage('Generate k8s Resources') {
                                 make 'crd-helm-generate'
                                 make 'helm-generate'
-                                archiveArtifacts 'target/k8s/**/*'
+                                archiveArtifacts "${helmTargetDir}/**/*"
                             }
 
                             stage("Lint helm") {
@@ -103,7 +103,10 @@ node('docker') {
             }
 
             stage('Deploy etcd') {
-                k3d.kubectl("apply -f https://raw.githubusercontent.com/cloudogu/k8s-etcd/develop/manifests/etcd.yaml")
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD']]) {
+                    k3d.helm("registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'")
+                    k3d.helm("install k8s-etcd oci://${registry}/${registry_namespace}/k8s-etcd --version 3.5.9-1")
+                }
             }
 
             stage('Wait for etcd to be ready') {
@@ -216,6 +219,7 @@ void stageAutomaticRelease(Makefile makefile) {
                                 // Package operator-chart & crd-chart
                                 make 'helm-package'
                                 make 'crd-helm-package'
+                                archiveArtifacts "${helmTargetDir}/**/*"
 
                                 // Push charts
                                 withCredentials([usernamePassword(credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD')]) {

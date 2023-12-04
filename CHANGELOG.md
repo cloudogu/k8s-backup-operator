@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This way, the backup schedule cron job can use the same image as the operator.
 - [#15] Delete kustomize structure and hold the operator yaml files just in a helm chart.
 
+## [v0.8.0] - 2023-12-04
+### Added
+- [#19] Sync backup list with provider on operator startup
+
 ## [v0.7.0] - 2023-11-30
 ### Added
 - [#13] Sync completed (velero) backups with backup CRs after a restore has finished
