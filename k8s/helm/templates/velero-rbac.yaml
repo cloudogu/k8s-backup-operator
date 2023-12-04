@@ -1,0 +1,66 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "k8s-backup-operator.name" . }}-velero-role
+  labels:
+    app.kubernetes.io/component: rbac
+  {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - velero.io
+  resources:
+  - backupstoragelocations
+  verbs:
+  - get
+- apiGroups:
+  - velero.io
+  resources:
+  - backups
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - restores
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - deletebackuprequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - deletebackuprequests/status
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "k8s-backup-operator.name" . }}-velero-rolebinding
+  labels:
+    app.kubernetes.io/component: rbac
+  {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: '{{ include "k8s-backup-operator.name" . }}-velero-role'
+subjects:
+- kind: ServiceAccount
+  name: '{{ include "k8s-backup-operator.name" . }}-controller-manager'
+  namespace: '{{ .Release.Namespace }}'
