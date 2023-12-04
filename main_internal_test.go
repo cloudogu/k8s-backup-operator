@@ -5,6 +5,7 @@ import (
 	"flag"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"testing"
@@ -133,6 +134,50 @@ func Test_startOperator(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "unable to start manager")
+	})
+	t.Run("should fail to sync backups", func(t *testing.T) {
+		// given
+		t.Setenv("NAMESPACE", "ecosystem")
+		t.Setenv("STAGE", "development")
+
+		oldNewManagerFunc := ctrl.NewManager
+		oldGetConfigFunc := ctrl.GetConfigOrDie
+		oldNewVeleroProviderFunc := provider.NewVeleroProvider
+		defer func() {
+			ctrl.NewManager = oldNewManagerFunc
+			ctrl.GetConfigOrDie = oldGetConfigFunc
+			provider.NewVeleroProvider = oldNewVeleroProviderFunc
+		}()
+
+		restConfig := &rest.Config{}
+		recorderMock := newMockEventRecorder(t)
+		ctrlManMock := newMockControllerManager(t)
+		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
+
+		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
+			return ctrlManMock, nil
+		}
+		ctrl.GetConfigOrDie = func() *rest.Config {
+			return restConfig
+		}
+
+		providerMock := newMockBackupProvider(t)
+		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+		providerMock.EXPECT().SyncBackups(testCtx).Return(assert.AnError)
+		provider.NewVeleroProvider = func(ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+			return providerMock, nil
+		}
+
+		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
+
+		// when
+		err := startOperator(testCtx, flags, []string{})
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to sync backups with provider backups on startup")
 	})
 	t.Run("should fail to get kubectl image", func(t *testing.T) {
 		// given
