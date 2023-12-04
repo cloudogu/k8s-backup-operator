@@ -28,7 +28,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/restore"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -73,7 +73,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	ginkgo.By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("k8s", "helm-crd", "templates")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -95,7 +95,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = k8sv1.AddToScheme(k8sScheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: k8sScheme.Scheme,
 	})
@@ -114,7 +114,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	globalConfigMock := newMockEtcdContext(t)
 	mockRegistry.EXPECT().GlobalConfig().Return(globalConfigMock)
 
-	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(namespace), recorderMock, mockRegistry)
+	backupManager := backup.NewBackupManager(ecosystemClientSet, namespace, recorderMock, mockRegistry)
 	gomega.Expect(backupManager).NotTo(gomega.BeNil())
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorderMock, namespace)
 	gomega.Expect(requeueHandler).NotTo(gomega.BeNil())
@@ -127,11 +127,10 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	cleanupMock := cleanup.NewManager(namespace, k8sManager.GetClient(), clientSet)
 	restoreManager := restore.NewRestoreManager(
-		ecosystemClientSet.EcosystemV1Alpha1().Restores(namespace),
+		ecosystemClientSet,
+		namespace,
 		recorderMock,
 		mockRegistry,
-		ecosystemClientSet.AppsV1().StatefulSets(namespace),
-		ecosystemClientSet.CoreV1().Services(namespace),
 		cleanupMock,
 	)
 	gomega.Expect(restoreManager).NotTo(gomega.BeNil())

@@ -54,23 +54,41 @@ type cesRegistry interface {
 	registry.Registry
 }
 
-type ecosystemRestoreInterface interface {
-	ecosystem.RestoreInterface
-}
-
-type statefulSetInterface interface {
-	appsv1.StatefulSetInterface
-}
-
-type serviceInterface interface {
-	v12.ServiceInterface
-}
-
 type cleanupManager interface {
 	cleanup.Manager
 }
 
 // used for mocks
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type ecosystemRestoreInterface interface {
+	ecosystem.RestoreInterface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type statefulSetInterface interface {
+	appsv1.StatefulSetInterface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type serviceInterface interface {
+	v12.ServiceInterface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type appsV1Interface interface {
+	appsv1.AppsV1Interface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type coreV1Interface interface {
+	v12.CoreV1Interface
+}
 
 //nolint:unused
 //goland:noinspection GoUnusedType

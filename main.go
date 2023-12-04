@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"os"
 	"time"
 
@@ -231,6 +233,11 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("failed to create CES registry: %w", err)
 	}
 
+	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, ecosystemClientSet)
+	if err != nil {
+		return fmt.Errorf("failed to sync backups with provider backups on startup: %w", err)
+	}
+
 	imageGetter := newAdditionalImageGetter(k8sClientSet, operatorConfig.Namespace)
 	kubectlImage, err := imageGetter.ImageForKey(ctx, config.KubectlImageConfigmapNameKey)
 	if err != nil {
@@ -246,18 +253,17 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
 	cleanupManager := cleanup.NewManager(operatorConfig.Namespace, k8sManager.GetClient(), k8sClientSet)
 	restoreManager := restore.NewRestoreManager(
-		ecosystemClientSet.EcosystemV1Alpha1().Restores(operatorConfig.Namespace),
+		ecosystemClientSet,
+		operatorConfig.Namespace,
 		recorder,
 		registry,
-		ecosystemClientSet.AppsV1().StatefulSets(operatorConfig.Namespace),
-		ecosystemClientSet.CoreV1().Services(operatorConfig.Namespace),
 		cleanupManager,
 	)
 	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
-	backupManager := backup.NewBackupManager(ecosystemClientSet.EcosystemV1Alpha1().Backups(operatorConfig.Namespace), recorder, registry)
+	backupManager := backup.NewBackupManager(ecosystemClientSet, operatorConfig.Namespace, recorder, registry)
 	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
@@ -268,6 +274,18 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	// +kubebuilder:scaffold:builder
 
 	return nil
+}
+
+func syncBackupsWithProviders(ctx context.Context, operatorConfig *config.OperatorConfig, recorder eventRecorder, ecosystemClientSet *ecosystem.ClientSet) error {
+	var errs []error
+	allProviders := provider.GetAll(ctx, operatorConfig.Namespace, recorder, ecosystemClientSet)
+	for _, prov := range allProviders {
+		err := prov.SyncBackups(ctx)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func addChecks(k8sManager controllerManager) error {

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-create-backup-script
+  labels:
+    {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+data:
+  entrypoint.sh: |
+    #!/bin/bash
+    TIMESTAMP=$(date +"%y%m%d%H%M%S")
+    CR_DEFINITION_TEXT="
+    apiVersion: k8s.cloudogu.com/v1
+    kind: Backup
+    metadata:
+      labels:
+        {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+      name: ${SCHEDULED_BACKUP_NAME}-${TIMESTAMP}
+      namespace: ${NAMESPACE}
+    spec:
+      provider: ${PROVIDER}
+    "
+    echo "${CR_DEFINITION_TEXT}" | kubectl apply -f -

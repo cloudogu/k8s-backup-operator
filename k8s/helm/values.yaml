@@ -1,6 +1,32 @@
 additionalImages:
   kubectl: "bitnami/kubectl:1.27.7"
-
 retention:
   strategy: keepAll
   garbageCollectionCron: "0 * * * *"
+kubeRbacProxy:
+  image:
+    repository: gcr.io/kubebuilder/kube-rbac-proxy
+    tag: v0.14.1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 5m
+      memory: 64Mi
+manager:
+  env:
+    stage: production
+    logLevel: info
+  image:
+    repository: cloudogu/k8s-backup-operator
+    tag: 0.6.0
+  imagePullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+  replicas: 1

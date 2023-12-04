@@ -5,7 +5,6 @@ go 1.21
 require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/cloudogu/cesapp-lib v0.12.2
-	github.com/cloudogu/k8s-dogu-operator v0.38.0
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/go-logr/logr v1.3.0
 	github.com/google/gnostic-models v0.6.8

@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: k8s-backup-operator-additional-images
-  labels:
-    app: ces
-    app.kubernetes.io/name: k8s-backup-operator-additional-images
-data:
-  kubectlImage: "{{ .Values.additionalImages.kubectl }}"
