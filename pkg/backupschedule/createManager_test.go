@@ -260,7 +260,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to set currently used kubectl image in status of backup schedule resource")
+		assert.ErrorContains(t, err, "failed to set currently used cron job image in status of backup schedule resource")
 	})
 
 	t.Run("should return error on set status created error", func(t *testing.T) {
