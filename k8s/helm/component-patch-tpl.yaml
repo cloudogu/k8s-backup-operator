@@ -2,8 +2,7 @@ apiVersion: v1
 
 values:
   images:
-    backup-operator: cloudogu/k8s-backup-operator:0.6.0
-    kubectl: bitnami/kubectl:1.27.7
+    backup-operator: cloudogu/k8s-backup-operator:0.8.0
     kube-rbac-proxy: gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1
 
 patches:
