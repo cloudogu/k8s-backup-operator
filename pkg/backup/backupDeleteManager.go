@@ -39,7 +39,7 @@ func (bdm *backupDeleteManager) delete(ctx context.Context, backup *k8sv1.Backup
 }
 
 func (bdm *backupDeleteManager) triggerBackupDelete(ctx context.Context, backup *k8sv1.Backup) error {
-	backupProvider, err := provider.GetProvider(ctx, backup, backup.Spec.Provider, backup.Namespace, bdm.recorder, bdm.clientSet)
+	backupProvider, err := provider.Get(ctx, backup, backup.Spec.Provider, backup.Namespace, bdm.recorder, bdm.clientSet)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}
