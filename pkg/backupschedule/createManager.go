@@ -60,7 +60,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.B
 
 	backupSchedule, err = cm.setCurrentCronJobImage(ctx, backupScheduleClient, backupSchedule)
 	if err != nil {
-		return fmt.Errorf("failed to set currently used kubectl image in status of backup schedule resource [%s]: %w", backupScheduleName, err)
+		return fmt.Errorf("failed to set currently used cron job image in status of backup schedule resource [%s]: %w", backupScheduleName, err)
 	}
 
 	_, err = backupScheduleClient.UpdateStatusCreated(ctx, backupSchedule)
