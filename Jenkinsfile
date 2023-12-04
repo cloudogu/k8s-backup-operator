@@ -66,7 +66,7 @@ node('docker') {
                             stage('Generate k8s Resources') {
                                 make 'crd-helm-generate'
                                 make 'helm-generate'
-                                archiveArtifacts 'target/k8s/**/*'
+                                archiveArtifacts "${helmTargetDir}/**/*"
                             }
 
                             stage("Lint helm") {
@@ -216,6 +216,7 @@ void stageAutomaticRelease(Makefile makefile) {
                                 // Package operator-chart & crd-chart
                                 make 'helm-package'
                                 make 'crd-helm-package'
+                                archiveArtifacts "${helmTargetDir}/**/*"
 
                                 // Push charts
                                 withCredentials([usernamePassword(credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD')]) {
