@@ -1,5 +1,4 @@
 additionalImages:
-  kubectl: "bitnami/kubectl:1.27.7"
 retention:
   strategy: keepAll
   garbageCollectionCron: "0 * * * *"
