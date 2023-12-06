@@ -26,7 +26,7 @@ func TestNewManager(t *testing.T) {
 func TestDefaultManager_ScheduleBackup(t *testing.T) {
 	t.Run("should fail to apply backup", func(t *testing.T) {
 		// given
-		expectedBackupName := "banana-2023-11-30T10.30.00"
+		expectedBackupName := "banana-2023-11-30t10.30.00"
 		expectedBackup := &v1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      expectedBackupName,
@@ -68,7 +68,7 @@ func TestDefaultManager_ScheduleBackup(t *testing.T) {
 	})
 	t.Run("should succeed to apply backup", func(t *testing.T) {
 		// given
-		expectedBackupName := "banana-2023-11-30T10.30.00"
+		expectedBackupName := "banana-2023-11-30t10.30.00"
 		expectedBackup := &v1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      expectedBackupName,
