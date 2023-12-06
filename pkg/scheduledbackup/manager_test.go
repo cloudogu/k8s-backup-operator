@@ -64,7 +64,7 @@ func TestDefaultManager_ScheduleBackup(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to apply backup \"banana-2023-11-30T10.30.00\"")
+		assert.ErrorContains(t, err, "failed to apply backup \"banana-2023-11-30t10.30.00\"")
 	})
 	t.Run("should succeed to apply backup", func(t *testing.T) {
 		// given
