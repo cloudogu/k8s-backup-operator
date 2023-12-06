@@ -10,7 +10,7 @@ import (
 	backupv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 )
 
-const timeFormatK8sAcceptableName = "2006-01-02T15.04.05"
+const timeFormatK8sAcceptableName = "2006-01-02t15.04.05"
 
 type Options struct {
 	Name      string
