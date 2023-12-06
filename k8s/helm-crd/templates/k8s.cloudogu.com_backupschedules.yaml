@@ -45,7 +45,7 @@ spec:
               description: BackupScheduleStatus defines the observed state of BackupSchedule
               properties:
                 cronJobImage:
-                  description: CurrentCronJobImage is the image currently used to create scheduled backups.
+                  description: CronJobImage is the image currently used to create scheduled backups.
                   type: string
                 requeueTimeNanos:
                   description: RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.
