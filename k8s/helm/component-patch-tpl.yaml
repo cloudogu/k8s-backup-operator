@@ -6,7 +6,6 @@ values:
     kubeRbacProxy: gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1
 patches:
   values.yaml:
-    additionalImages:
     kubeRbacProxy:
       image:
         repository: "{{ registryFrom .images.kubeRbacProxy }}/{{ repositoryFrom .images.kubeRbacProxy }}"
