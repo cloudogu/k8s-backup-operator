@@ -97,21 +97,21 @@ func main() {
 		err := startOperator(ctx, operatorCmd, os.Args[2:])
 		if err != nil {
 			logger.Error(err, "failed to start operator")
-			fmt.Println(fmt.Sprintf("failed to start operator: %s", err.Error()))
+			fmt.Printf("failed to start operator: %s\n", err.Error())
 			os.Exit(1)
 		}
 	case scheduledBackupCmd.Name():
 		err := startScheduledBackup(ctx, scheduledBackupCmd, os.Args[2:])
 		if err != nil {
 			logger.Error(err, "failed to create scheduled backup")
-			fmt.Println(fmt.Sprintf("failed to create scheduled backup: %s", err.Error()))
+			fmt.Printf("failed to create scheduled backup: %s\n", err.Error())
 			os.Exit(1)
 		}
 	case garbageCollectorCmd.Name():
 		err := startGarbageCollector(ctx, garbageCollectorCmd, os.Args[2:])
 		if err != nil {
 			logger.Error(err, "failed to start garbage-collector")
-			fmt.Println(fmt.Sprintf("failed to start garbage-collector: %s", err.Error()))
+			fmt.Printf("failed to start garbage-collector: %s\n", err.Error())
 			os.Exit(1)
 		}
 	}
