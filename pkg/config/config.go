@@ -18,8 +18,9 @@ const (
 const (
 	// OperatorAdditionalImagesConfigmapName contains the configmap name which consists of auxiliary yet necessary container images.
 	OperatorAdditionalImagesConfigmapName = "k8s-backup-operator-additional-images"
-	// KubectlImageConfigmapNameKey contains the key to retrieve the kubectl container image from the OperatorAdditionalImagesConfigmapName configmap.
-	KubectlImageConfigmapNameKey = "kubectlImage"
+	// OperatorImageConfigmapNameKey contains the key to retrieve this operators'
+	// container image from the OperatorAdditionalImagesConfigmapName configmap.
+	OperatorImageConfigmapNameKey = "operatorImage"
 )
 
 var log = ctrl.Log.WithName("config")

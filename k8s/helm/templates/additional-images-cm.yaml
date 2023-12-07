@@ -1,8 +1,11 @@
+{{- $images := include "k8s-backup-operator.defaultImages" . | fromYaml -}}
+{{- if hasKey .Values "additionalImages" -}}
+  {{- $images = mustMergeOverwrite (dict) .Values.additionalImages $images -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: k8s-backup-operator-additional-images
   labels:
     {{- include "k8s-backup-operator.labels" . | nindent 4 }}
-data:
-  kubectlImage: "{{ .Values.additionalImages.kubectl }}"
+data: {{- toYaml $images | nindent 2 }}

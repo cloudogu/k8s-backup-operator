@@ -37,11 +37,13 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"github.com/cloudogu/k8s-backup-operator/pkg/restore"
+	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
 	// +kubebuilder:scaffold:imports
 )
 
 var (
 	operatorCmd         = flag.NewFlagSet("operator", flag.ExitOnError)
+	scheduledBackupCmd  = flag.NewFlagSet("scheduled-backup", flag.ExitOnError)
 	garbageCollectorCmd = flag.NewFlagSet("gc", flag.ExitOnError)
 )
 
@@ -63,6 +65,7 @@ var (
 	newAdditionalImageGetter    = additionalimages.NewGetter
 	newAdditionalImageUpdater   = additionalimages.NewUpdater
 	newGarbageCollectionManager = garbagecollection.NewManager
+	newScheduledBackupManager   = scheduledbackup.NewManager
 )
 
 func init() {
@@ -80,9 +83,11 @@ func main() {
 
 	if len(os.Args) < 2 {
 		fmt.Printf("expected one of the following subcommands:\n"+
-			"  %s - start in operator-mode, reconciling this operators custom resources\n"+
+			"  %s - start in operator mode, reconciling this operators custom resources\n"+
+			"  %s - start in scheduled-backup mode, this is used by backup schedule cron jobs\n"+
 			"  %s - start in garbage-collection mode, deleting backups according to the configured retention strategy\n",
 			operatorCmd.Name(),
+			scheduledBackupCmd.Name(),
 			garbageCollectorCmd.Name())
 		os.Exit(1)
 	}
@@ -92,15 +97,58 @@ func main() {
 		err := startOperator(ctx, operatorCmd, os.Args[2:])
 		if err != nil {
 			logger.Error(err, "failed to start operator")
+			fmt.Printf("failed to start operator: %s\n", err.Error())
+			os.Exit(1)
+		}
+	case scheduledBackupCmd.Name():
+		err := startScheduledBackup(ctx, scheduledBackupCmd, os.Args[2:])
+		if err != nil {
+			logger.Error(err, "failed to create scheduled backup")
+			fmt.Printf("failed to create scheduled backup: %s\n", err.Error())
 			os.Exit(1)
 		}
 	case garbageCollectorCmd.Name():
 		err := startGarbageCollector(ctx, garbageCollectorCmd, os.Args[2:])
 		if err != nil {
 			logger.Error(err, "failed to start garbage-collector")
+			fmt.Printf("failed to start garbage-collector: %s\n", err.Error())
 			os.Exit(1)
 		}
 	}
+}
+
+func startScheduledBackup(ctx context.Context, cmd *flag.FlagSet, args []string) error {
+	restConfig := ctrl.GetConfigOrDie()
+	namespace, err := config.GetNamespace()
+	if err != nil {
+		return fmt.Errorf("unable to get current namespace: %w", err)
+	}
+
+	k8sClientSet, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return fmt.Errorf("unable to create k8s clientset: %w", err)
+	}
+
+	ecosystemClientSet, err := ecosystem.NewClientSet(restConfig, k8sClientSet)
+	if err != nil {
+		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
+	}
+
+	options := parseScheduledBackupOptions(cmd, args)
+	options.Namespace = namespace
+
+	manager := newScheduledBackupManager(ecosystemClientSet, options)
+	return manager.ScheduleBackup(ctx)
+}
+
+func parseScheduledBackupOptions(flags *flag.FlagSet, args []string) scheduledbackup.Options {
+	options := scheduledbackup.Options{}
+	flags.StringVar(&options.Name, "name", "", "The name of the schedule that triggers this backup. The final name of the backup will this name appended with a timestamp. Required.")
+	flags.StringVar(&options.Provider, "provider", "", "The name of the provider that should be used for this backup. Default: velero.")
+
+	// Ignore errors; flags is set to exit on errors
+	_ = flags.Parse(args)
+	return options
 }
 
 func startGarbageCollector(ctx context.Context, flags *flag.FlagSet, args []string) error {
@@ -239,13 +287,15 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	}
 
 	imageGetter := newAdditionalImageGetter(k8sClientSet, operatorConfig.Namespace)
-	kubectlImage, err := imageGetter.ImageForKey(ctx, config.KubectlImageConfigmapNameKey)
+	operatorImage, err := imageGetter.ImageForKey(ctx, config.OperatorImageConfigmapNameKey)
 	if err != nil {
-		return fmt.Errorf("failed to get kubectl image: %w", err)
+		return fmt.Errorf("failed to get operator image: %w", err)
 	}
 
-	additionalImageUpdater := newAdditionalImageUpdater(ecosystemClientSet, operatorConfig.Namespace, kubectlImage, recorder)
-	err = additionalImageUpdater.Update(ctx)
+	imageConfig := additionalimages.ImageConfig{OperatorImage: operatorImage}
+
+	additionalImageUpdater := newAdditionalImageUpdater(ecosystemClientSet, operatorConfig.Namespace, recorder)
+	err = additionalImageUpdater.Update(ctx, imageConfig)
 	if err != nil {
 		return fmt.Errorf("failed to update additional images in existing resources: %w", err)
 	}
@@ -268,7 +318,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
 
-	if err = backupschedule.NewReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler, kubectlImage).SetupWithManager(k8sManager); err != nil {
+	if err = backupschedule.NewReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler, imageConfig).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backupSchedule controller: %w", err)
 	}
 	// +kubebuilder:scaffold:builder

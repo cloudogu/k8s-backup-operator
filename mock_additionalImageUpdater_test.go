@@ -5,6 +5,8 @@ package main
 import (
 	context "context"
 
+	additionalimages "github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -21,13 +23,13 @@ func (_m *mockAdditionalImageUpdater) EXPECT() *mockAdditionalImageUpdater_Expec
 	return &mockAdditionalImageUpdater_Expecter{mock: &_m.Mock}
 }
 
-// Update provides a mock function with given fields: ctx
-func (_m *mockAdditionalImageUpdater) Update(ctx context.Context) error {
-	ret := _m.Called(ctx)
+// Update provides a mock function with given fields: ctx, config
+func (_m *mockAdditionalImageUpdater) Update(ctx context.Context, config additionalimages.ImageConfig) error {
+	ret := _m.Called(ctx, config)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, additionalimages.ImageConfig) error); ok {
+		r0 = rf(ctx, config)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -42,13 +44,14 @@ type mockAdditionalImageUpdater_Update_Call struct {
 
 // Update is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *mockAdditionalImageUpdater_Expecter) Update(ctx interface{}) *mockAdditionalImageUpdater_Update_Call {
-	return &mockAdditionalImageUpdater_Update_Call{Call: _e.mock.On("Update", ctx)}
+//   - config additionalimages.ImageConfig
+func (_e *mockAdditionalImageUpdater_Expecter) Update(ctx interface{}, config interface{}) *mockAdditionalImageUpdater_Update_Call {
+	return &mockAdditionalImageUpdater_Update_Call{Call: _e.mock.On("Update", ctx, config)}
 }
 
-func (_c *mockAdditionalImageUpdater_Update_Call) Run(run func(ctx context.Context)) *mockAdditionalImageUpdater_Update_Call {
+func (_c *mockAdditionalImageUpdater_Update_Call) Run(run func(ctx context.Context, config additionalimages.ImageConfig)) *mockAdditionalImageUpdater_Update_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(additionalimages.ImageConfig))
 	})
 	return _c
 }
@@ -58,7 +61,7 @@ func (_c *mockAdditionalImageUpdater_Update_Call) Return(_a0 error) *mockAdditio
 	return _c
 }
 
-func (_c *mockAdditionalImageUpdater_Update_Call) RunAndReturn(run func(context.Context) error) *mockAdditionalImageUpdater_Update_Call {
+func (_c *mockAdditionalImageUpdater_Update_Call) RunAndReturn(run func(context.Context, additionalimages.ImageConfig) error) *mockAdditionalImageUpdater_Update_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -1,6 +1,7 @@
 package backupschedule
 
 import (
+	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -26,7 +27,7 @@ func TestNewReconciler(t *testing.T) {
 	// given
 
 	// when
-	actual := NewReconciler(nil, nil, testNamespace, nil, "")
+	actual := NewReconciler(nil, nil, testNamespace, nil, additionalimages.ImageConfig{})
 
 	// then
 	assert.NotEmpty(t, actual)

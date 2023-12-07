@@ -26,7 +26,7 @@ func Test_additionalImageGetter_ImageForKey(t *testing.T) {
 		sut := NewGetter(fakeClient, testNamespace)
 
 		// when
-		_, err := sut.ImageForKey(testCtx, config.KubectlImageConfigmapNameKey)
+		_, err := sut.ImageForKey(testCtx, config.OperatorImageConfigmapNameKey)
 
 		// then
 		require.Error(t, err)
@@ -44,11 +44,11 @@ func Test_additionalImageGetter_ImageForKey(t *testing.T) {
 		sut := NewGetter(fakeClient, testNamespace)
 
 		// when
-		_, err := sut.ImageForKey(testCtx, config.KubectlImageConfigmapNameKey)
+		_, err := sut.ImageForKey(testCtx, config.OperatorImageConfigmapNameKey)
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "configmap 'k8s-backup-operator-additional-images' must not contain empty chown init image name")
+		assert.ErrorContains(t, err, "image \"operatorImage\" in configmap \"k8s-backup-operator-additional-images\" be empty")
 	})
 	t.Run("should fail on invalid image tag", func(t *testing.T) {
 		// given
@@ -57,13 +57,13 @@ func Test_additionalImageGetter_ImageForKey(t *testing.T) {
 				Name:      config.OperatorAdditionalImagesConfigmapName,
 				Namespace: testNamespace,
 			},
-			Data: map[string]string{config.KubectlImageConfigmapNameKey: "busybox:::::123"},
+			Data: map[string]string{config.OperatorImageConfigmapNameKey: "busybox:::::123"},
 		}
 		fakeClient := fake.NewSimpleClientset(invalidCM)
 		sut := NewGetter(fakeClient, testNamespace)
 
 		// when
-		_, err := sut.ImageForKey(testCtx, config.KubectlImageConfigmapNameKey)
+		_, err := sut.ImageForKey(testCtx, config.OperatorImageConfigmapNameKey)
 
 		// then
 		require.Error(t, err)
@@ -76,13 +76,13 @@ func Test_additionalImageGetter_ImageForKey(t *testing.T) {
 				Name:      config.OperatorAdditionalImagesConfigmapName,
 				Namespace: testNamespace,
 			},
-			Data: map[string]string{config.KubectlImageConfigmapNameKey: "kubectl:123"},
+			Data: map[string]string{config.OperatorImageConfigmapNameKey: "kubectl:123"},
 		}
 		fakeClient := fake.NewSimpleClientset(validCM)
 		sut := NewGetter(fakeClient, testNamespace)
 
 		// when
-		actual, err := sut.ImageForKey(testCtx, config.KubectlImageConfigmapNameKey)
+		actual, err := sut.ImageForKey(testCtx, config.OperatorImageConfigmapNameKey)
 
 		// then
 		require.NoError(t, err)

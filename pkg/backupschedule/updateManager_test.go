@@ -67,10 +67,10 @@ func Test_defaultUpdateManager_update(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.Equal(t, "0 0 * * *", cronJob.Spec.Schedule)
-		envVars := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env
-		assert.True(t, len(envVars) == 3)
-		expectedProviderEnv := corev1.EnvVar{Name: k8sv1.ProviderEnvVar, Value: "velero"}
-		assert.Contains(t, envVars, expectedProviderEnv)
+		args := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Args
+		assert.True(t, len(args) == 3)
+		expectedProviderArg := "--provider=velero"
+		assert.Contains(t, args, expectedProviderArg)
 	})
 
 	t.Run("should return error on update status updating error", func(t *testing.T) {

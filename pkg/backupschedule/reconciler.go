@@ -3,6 +3,7 @@ package backupschedule
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -36,12 +37,12 @@ type backupScheduleReconciler struct {
 	requeueHandler requeueHandler
 }
 
-func NewReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, requeueHandler requeueHandler, kubectlImage string) *backupScheduleReconciler {
+func NewReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, requeueHandler requeueHandler, imageConfig additionalimages.ImageConfig) *backupScheduleReconciler {
 	return &backupScheduleReconciler{
 		clientSet:      clientSet,
 		recorder:       recorder,
 		requeueHandler: requeueHandler,
-		manager:        NewManager(clientSet, recorder, namespace, kubectlImage),
+		manager:        NewManager(clientSet, recorder, namespace, imageConfig),
 		namespace:      namespace,
 	}
 }
