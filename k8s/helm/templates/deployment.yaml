@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/component: manager
   {{- include "k8s-backup-operator.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicas }}
+  replicas: {{ .Values.manager.replicas }}
   selector:
     matchLabels:
     {{- include "k8s-backup-operator.selectorLabels" . | nindent 6 }}
