@@ -2,6 +2,7 @@ package backupschedule
 
 import (
 	"context"
+	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	backupv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,10 +20,10 @@ func TestNewCreateManager(t *testing.T) {
 		// given
 
 		// when
-		manager := newCreateManager(nil, nil, "test", "")
+		manager := newCreateManager(nil, nil, "test", additionalimages.ImageConfig{})
 
 		// then
-		require.NotNil(t, manager)
+		require.NotEmpty(t, manager)
 	})
 }
 
@@ -62,7 +63,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		batchV1Mock.EXPECT().CronJobs(testNamespace).Return(cronJobMock)
 		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
 
-		mode := int32(0550)
 		expectedCreatedCronJob := &batchv1.CronJob{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "backup-schedule-backupSchedule", Namespace: testNamespace,
@@ -88,22 +88,13 @@ func Test_defaultCreateManager_create(t *testing.T) {
 								},
 							},
 							Spec: corev1.PodSpec{
-								Volumes: []corev1.Volume{{
-									Name: "k8s-backup-operator-create-backup-script",
-									VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-										LocalObjectReference: corev1.LocalObjectReference{Name: "k8s-create-backup-script"}, DefaultMode: &mode,
-									}},
-								}},
 								Containers: []corev1.Container{{
-									Name:    "backup-schedule-backupSchedule",
-									Image:   "bitnami/kubectl:1.27.7",
-									Command: []string{"/bin/entrypoint.sh"},
+									Name:  "backup-schedule-backupSchedule",
+									Image: "my-backup-operator:1.2.3",
+									Args:  []string{"scheduled-backup", "--name=backupSchedule", "--provider=velero"},
 									Env: []corev1.EnvVar{
 										{Name: "NAMESPACE", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}},
-										{Name: "SCHEDULED_BACKUP_NAME", Value: "backupSchedule"},
-										{Name: "PROVIDER", Value: "velero"},
 									},
-									VolumeMounts:    []corev1.VolumeMount{{Name: "k8s-backup-operator-create-backup-script", ReadOnly: true, MountPath: "/bin/entrypoint.sh", SubPath: "entrypoint.sh"}},
 									ImagePullPolicy: corev1.PullIfNotPresent,
 								}},
 								RestartPolicy:      corev1.RestartPolicyOnFailure,
@@ -117,10 +108,10 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		cronJobMock.EXPECT().Create(testCtx, expectedCreatedCronJob, metav1.CreateOptions{}).Return(&batchv1.CronJob{}, nil)
 
 		sut := &defaultCreateManager{
-			recorder:     recorderMock,
-			clientSet:    clientMock,
-			namespace:    testNamespace,
-			kubectlImage: "bitnami/kubectl:1.27.7",
+			recorder:    recorderMock,
+			clientSet:   clientMock,
+			namespace:   testNamespace,
+			imageConfig: additionalimages.ImageConfig{OperatorImage: "my-backup-operator:1.2.3"},
 		}
 
 		// when
@@ -128,7 +119,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, "bitnami/kubectl:1.27.7", backupSchedule.Status.CurrentKubectlImage)
+		assert.Equal(t, "my-backup-operator:1.2.3", backupSchedule.Status.CurrentCronJobImage)
 	})
 
 	t.Run("should return error on update status creating error", func(t *testing.T) {
@@ -269,7 +260,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to set currently used kubectl image in status of backup schedule resource")
+		assert.ErrorContains(t, err, "failed to set currently used cron job image in status of backup schedule resource")
 	})
 
 	t.Run("should return error on set status created error", func(t *testing.T) {

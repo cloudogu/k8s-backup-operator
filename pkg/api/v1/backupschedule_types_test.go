@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,62 +49,100 @@ func TestBackupSchedule_GetStatus(t *testing.T) {
 }
 
 func TestBackupSchedule_CronJobPodTemplate(t *testing.T) {
-	// given
-	mode := int32(0550)
-	expected := corev1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "scheduled-backup-creator",
-			Namespace: testNamespace,
-			Labels: map[string]string{
-				"app":                          "ces",
-				"k8s.cloudogu.com/part-of":     "backup",
-				"app.kubernetes.io/created-by": "k8s-backup-operator",
-				"app.kubernetes.io/part-of":    "k8s-backup-operator",
-			},
-		},
-		Spec: corev1.PodSpec{
-			Volumes: []corev1.Volume{{
-				Name: "k8s-backup-operator-create-backup-script",
-				VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: "k8s-create-backup-script"},
-					DefaultMode:          &mode,
-				}},
-			}},
-			Containers: []corev1.Container{{
-				Name:            "backup-schedule-my-schedule",
-				Image:           "bitnami/kubectl:1.27.7",
-				ImagePullPolicy: corev1.PullIfNotPresent,
-				Command:         []string{"/bin/entrypoint.sh"},
-				Env: []corev1.EnvVar{
-					{Name: "NAMESPACE", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}},
-					{Name: "SCHEDULED_BACKUP_NAME", Value: "my-schedule"},
-					{Name: "PROVIDER", Value: "velero"},
+	t.Run("should use pullifpresent on production", func(t *testing.T) {
+		// given
+		expected := corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "scheduled-backup-creator",
+				Namespace: testNamespace,
+				Labels: map[string]string{
+					"app":                          "ces",
+					"k8s.cloudogu.com/part-of":     "backup",
+					"app.kubernetes.io/created-by": "k8s-backup-operator",
+					"app.kubernetes.io/part-of":    "k8s-backup-operator",
 				},
-				VolumeMounts: []corev1.VolumeMount{{
-					Name:      "k8s-backup-operator-create-backup-script",
-					ReadOnly:  true,
-					MountPath: "/bin/entrypoint.sh",
-					SubPath:   "entrypoint.sh",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:            "backup-schedule-my-schedule",
+					Image:           "bitnami/kubectl:1.27.7",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args:            []string{"scheduled-backup", "--name=my-schedule", "--provider=velero"},
+					Env: []corev1.EnvVar{
+						{Name: "NAMESPACE", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}},
+					},
 				}},
-			}},
-			RestartPolicy:      corev1.RestartPolicyOnFailure,
-			ServiceAccountName: "k8s-backup-operator-scheduled-backup-creator-manager",
-		},
-	}
-	sut := &BackupSchedule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-schedule",
-			Namespace: testNamespace,
-		},
-		Spec: BackupScheduleSpec{
-			Schedule: "* * * * *",
-			Provider: "velero",
-		},
-	}
+				RestartPolicy:      corev1.RestartPolicyOnFailure,
+				ServiceAccountName: "k8s-backup-operator-scheduled-backup-creator-manager",
+			},
+		}
+		sut := &BackupSchedule{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-schedule",
+				Namespace: testNamespace,
+			},
+			Spec: BackupScheduleSpec{
+				Schedule: "* * * * *",
+				Provider: "velero",
+			},
+		}
 
-	// when
-	actual := sut.CronJobPodTemplate("bitnami/kubectl:1.27.7")
+		// when
+		actual := sut.CronJobPodTemplate("bitnami/kubectl:1.27.7")
 
-	// then
-	assert.Equal(t, expected, actual)
+		// then
+		assert.Equal(t, expected, actual)
+	})
+	t.Run("should use pullalways in development", func(t *testing.T) {
+		// given
+		oldStage := config.Stage
+		defer func() {
+			config.Stage = oldStage
+		}()
+
+		config.Stage = config.StageDevelopment
+
+		expected := corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "scheduled-backup-creator",
+				Namespace: testNamespace,
+				Labels: map[string]string{
+					"app":                          "ces",
+					"k8s.cloudogu.com/part-of":     "backup",
+					"app.kubernetes.io/created-by": "k8s-backup-operator",
+					"app.kubernetes.io/part-of":    "k8s-backup-operator",
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:            "backup-schedule-my-schedule",
+					Image:           "bitnami/kubectl:1.27.7",
+					ImagePullPolicy: corev1.PullAlways,
+					Args:            []string{"scheduled-backup", "--name=my-schedule", "--provider=velero"},
+					Env: []corev1.EnvVar{
+						{Name: "NAMESPACE", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}},
+					},
+				}},
+				RestartPolicy:      corev1.RestartPolicyOnFailure,
+				ServiceAccountName: "k8s-backup-operator-scheduled-backup-creator-manager",
+			},
+		}
+
+		sut := &BackupSchedule{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-schedule",
+				Namespace: testNamespace,
+			},
+			Spec: BackupScheduleSpec{
+				Schedule: "* * * * *",
+				Provider: "velero",
+			},
+		}
+
+		// when
+		actual := sut.CronJobPodTemplate("bitnami/kubectl:1.27.7")
+
+		// then
+		assert.Equal(t, expected, actual)
+	})
 }

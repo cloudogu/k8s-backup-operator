@@ -2,10 +2,11 @@ package retention
 
 import (
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/time"
 )
 
 func newKeepLastSevenDaysStrategy() Strategy {
-	clock := &clock{}
+	clock := &time.Clock{}
 	return &keepLastSevenDaysStrategy{clock: clock}
 }
 

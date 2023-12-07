@@ -1,4 +1,4 @@
-package retention
+package time
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -6,7 +6,7 @@ import (
 )
 
 func Test_clock_Now(t *testing.T) {
-	sut := &clock{}
+	sut := &Clock{}
 	now := sut.Now()
 	assert.NotEmpty(t, now)
 }

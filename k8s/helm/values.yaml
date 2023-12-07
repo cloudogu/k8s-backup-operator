@@ -1,4 +1,3 @@
-additionalImages:
 retention:
   strategy: keepAll
   garbageCollectionCron: "0 * * * *"

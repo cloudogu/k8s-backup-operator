@@ -16,7 +16,8 @@ import (
 )
 
 func Test_updater_Update(t *testing.T) {
-	kubectlImage := "bitnami/kubectl:1.1.1"
+	operatorImage := "my-backup-operator:1.2.3"
+	imageConfig := ImageConfig{OperatorImage: operatorImage}
 
 	t.Run("success", func(t *testing.T) {
 		// given
@@ -28,7 +29,7 @@ func Test_updater_Update(t *testing.T) {
 
 		scheduleUpToDate := backupv1.BackupSchedule{
 			Status: backupv1.BackupScheduleStatus{
-				CurrentKubectlImage: kubectlImage,
+				CurrentCronJobImage: operatorImage,
 			},
 		}
 		scheduleOldImage := backupv1.BackupSchedule{
@@ -36,7 +37,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "OldImage",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentKubectlImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "my-backup-operator:1.1.0",
 			},
 		}
 		scheduleNoImage := backupv1.BackupSchedule{
@@ -61,35 +62,35 @@ func Test_updater_Update(t *testing.T) {
 		clientMock.EXPECT().BatchV1().Return(batchV1Mock)
 
 		cronJobOldImage := &batchv1.CronJob{}
-		cronJobOldImage.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{{}}
+		cronJobOldImage.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{{Image: "old-image"}}
 		cronJobMock.EXPECT().Get(testCtx, scheduleOldImage.CronJobName(), metav1.GetOptions{}).Return(cronJobOldImage, nil)
 		cronJobMock.EXPECT().Update(testCtx, cronJobOldImage, metav1.UpdateOptions{}).Return(cronJobOldImage, nil)
 
 		cronJobNoImage := &batchv1.CronJob{}
 		cronJobNoImage.Spec.JobTemplate.Spec.Template.Spec.Containers = []corev1.Container{{}}
 		cronJobMock.EXPECT().Get(testCtx, scheduleNoImage.CronJobName(), metav1.GetOptions{}).Return(cronJobNoImage, nil)
-		cronJobMock.EXPECT().Update(testCtx, cronJobOldImage, metav1.UpdateOptions{}).Return(cronJobNoImage, nil)
+		cronJobMock.EXPECT().Update(testCtx, cronJobNoImage, metav1.UpdateOptions{}).Return(cronJobNoImage, nil)
 
 		backupScheduleClientMock.EXPECT().UpdateStatus(testCtx, mock.Anything, metav1.UpdateOptions{}).
 			Run(func(ctx context.Context, backupSchedule *backupv1.BackupSchedule, opts metav1.UpdateOptions) {
-				assert.Equal(t, kubectlImage, backupSchedule.Status.CurrentKubectlImage)
+				assert.Equal(t, operatorImage, backupSchedule.Status.CurrentCronJobImage)
 			}).Return(&backupv1.BackupSchedule{}, nil).Times(2)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Eventf(&scheduleOldImage, corev1.EventTypeNormal, imageUpdateEventReason,
-			"Updated kubectl image in CronJob to %s.", kubectlImage)
+			"Updated image in backup schedule cron job to %s.", operatorImage)
 		recorderMock.EXPECT().Eventf(&scheduleNoImage, corev1.EventTypeNormal, imageUpdateEventReason,
-			"Updated kubectl image in CronJob to %s.", kubectlImage)
+			"Updated image in backup schedule cron job to %s.", operatorImage)
 
-		sut := NewUpdater(clientMock, testNamespace, kubectlImage, recorderMock)
+		sut := NewUpdater(clientMock, testNamespace, recorderMock)
 
 		// when
-		err := sut.Update(testCtx)
+		err := sut.Update(testCtx, imageConfig)
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, kubectlImage, cronJobOldImage.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image)
-		assert.Equal(t, kubectlImage, cronJobNoImage.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image)
+		assert.Equal(t, operatorImage, cronJobOldImage.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image)
+		assert.Equal(t, operatorImage, cronJobNoImage.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image)
 	})
 
 	t.Run("should failed to list backup schedules", func(t *testing.T) {
@@ -102,10 +103,10 @@ func Test_updater_Update(t *testing.T) {
 
 		backupScheduleClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(nil, assert.AnError)
 
-		sut := NewUpdater(clientMock, testNamespace, kubectlImage, nil)
+		sut := NewUpdater(clientMock, testNamespace, nil)
 
 		// when
-		err := sut.Update(testCtx)
+		err := sut.Update(testCtx, imageConfig)
 
 		// then
 		require.Error(t, err)
@@ -123,7 +124,7 @@ func Test_updater_Update(t *testing.T) {
 
 		scheduleOldImage := backupv1.BackupSchedule{
 			Status: backupv1.BackupScheduleStatus{
-				CurrentKubectlImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
 			},
 		}
 		schedules := []backupv1.BackupSchedule{
@@ -144,17 +145,17 @@ func Test_updater_Update(t *testing.T) {
 
 		backupScheduleClientMock.EXPECT().UpdateStatus(testCtx, mock.Anything, metav1.UpdateOptions{}).
 			Run(func(ctx context.Context, backupSchedule *backupv1.BackupSchedule, opts metav1.UpdateOptions) {
-				assert.Equal(t, kubectlImage, backupSchedule.Status.CurrentKubectlImage)
+				assert.Equal(t, operatorImage, backupSchedule.Status.CurrentCronJobImage)
 			}).Return(&backupv1.BackupSchedule{}, nil)
 
 		recorderMock := newMockEventRecorder(t)
-		message := fmt.Sprintf("Cron job %s for backup schedule %s does not exist. Skipping kubectl image update.", scheduleOldImage.CronJobName(), scheduleOldImage.Name)
+		message := fmt.Sprintf("Cron job %s for backup schedule %s does not exist. Skipping cron job image update.", scheduleOldImage.CronJobName(), scheduleOldImage.Name)
 		recorderMock.EXPECT().Event(&scheduleOldImage, corev1.EventTypeWarning, imageUpdateEventReason, message)
 
-		sut := NewUpdater(clientMock, testNamespace, kubectlImage, recorderMock)
+		sut := NewUpdater(clientMock, testNamespace, recorderMock)
 
 		// when
-		err := sut.Update(testCtx)
+		err := sut.Update(testCtx, imageConfig)
 
 		// then
 		require.NoError(t, err)
@@ -173,7 +174,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "GetError",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentKubectlImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
 			},
 		}
 		scheduleOldImage := backupv1.BackupSchedule{
@@ -181,7 +182,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "OldImage",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentKubectlImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
 			},
 		}
 		schedules := []backupv1.BackupSchedule{
@@ -208,23 +209,24 @@ func Test_updater_Update(t *testing.T) {
 		backupScheduleClientMock.EXPECT().UpdateStatus(testCtx, mock.Anything, metav1.UpdateOptions{}).
 			Run(func(ctx context.Context, backupSchedule *backupv1.BackupSchedule, opts metav1.UpdateOptions) {
 				assert.Equal(t, scheduleOldImage.Name, backupSchedule.Name)
-				assert.Equal(t, kubectlImage, backupSchedule.Status.CurrentKubectlImage)
+				assert.Equal(t, operatorImage, backupSchedule.Status.CurrentCronJobImage)
 			}).Return(&backupv1.BackupSchedule{}, nil).Once()
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Eventf(&scheduleOldImage, corev1.EventTypeNormal, imageUpdateEventReason,
-			"Updated kubectl image in CronJob to %s.", kubectlImage)
+			"Updated image in backup schedule cron job to %s.", operatorImage)
 
-		sut := NewUpdater(clientMock, testNamespace, kubectlImage, recorderMock)
+		sut := NewUpdater(clientMock, testNamespace, recorderMock)
 
 		// when
-		err := sut.Update(testCtx)
+		err := sut.Update(testCtx, imageConfig)
 
 		// then
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to update additional images in cron job")
-		assert.ErrorContains(t, err, "failed to get cron job")
+		assert.ErrorContains(t, err, "failed to update backup schedule cron job images")
+		assert.ErrorContains(t, err, "failed to update image in cron job backup-schedule-GetError")
+		assert.ErrorContains(t, err, "failed to get cron job backup-schedule-GetError")
 	})
 
 	t.Run("should fail on updating cron job", func(t *testing.T) {
@@ -240,7 +242,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "GetError",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentKubectlImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
 			},
 		}
 		scheduleOldImage := backupv1.BackupSchedule{
@@ -248,7 +250,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "OldImage",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentKubectlImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
 			},
 		}
 		schedules := []backupv1.BackupSchedule{
@@ -278,23 +280,24 @@ func Test_updater_Update(t *testing.T) {
 		backupScheduleClientMock.EXPECT().UpdateStatus(testCtx, mock.Anything, metav1.UpdateOptions{}).
 			Run(func(ctx context.Context, backupSchedule *backupv1.BackupSchedule, opts metav1.UpdateOptions) {
 				assert.Equal(t, scheduleOldImage.Name, backupSchedule.Name)
-				assert.Equal(t, kubectlImage, backupSchedule.Status.CurrentKubectlImage)
+				assert.Equal(t, operatorImage, backupSchedule.Status.CurrentCronJobImage)
 			}).Return(&backupv1.BackupSchedule{}, nil).Once()
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Eventf(&scheduleOldImage, corev1.EventTypeNormal, imageUpdateEventReason,
-			"Updated kubectl image in CronJob to %s.", kubectlImage)
+			"Updated image in backup schedule cron job to %s.", operatorImage)
 
-		sut := NewUpdater(clientMock, testNamespace, kubectlImage, recorderMock)
+		sut := NewUpdater(clientMock, testNamespace, recorderMock)
 
 		// when
-		err := sut.Update(testCtx)
+		err := sut.Update(testCtx, imageConfig)
 
 		// then
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to update additional images in cron job")
-		assert.ErrorContains(t, err, "failed to update kubectl image in cron job")
+		assert.ErrorContains(t, err, "failed to update backup schedule cron job images")
+		assert.ErrorContains(t, err, "failed to update image in cron job backup-schedule-GetError")
+		assert.ErrorContains(t, err, "failed to update image in backup schedule cron job backup-schedule-GetError")
 	})
 
 	t.Run("should fail on updating the status of backup schedule resource", func(t *testing.T) {
@@ -310,7 +313,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "GetError",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentKubectlImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
 			},
 		}
 		scheduleOldImage := backupv1.BackupSchedule{
@@ -318,7 +321,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "OldImage",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentKubectlImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
 			},
 		}
 		schedules := []backupv1.BackupSchedule{
@@ -338,25 +341,26 @@ func Test_updater_Update(t *testing.T) {
 		notFound := errors.NewNotFound(schema.GroupResource{}, scheduleOldImage.CronJobName())
 		cronJobMock.EXPECT().Get(testCtx, mock.Anything, metav1.GetOptions{}).Return(nil, notFound).Times(2)
 
-		scheduleGetError.Status.CurrentKubectlImage = kubectlImage
+		scheduleGetError.Status.CurrentCronJobImage = operatorImage
 		backupScheduleClientMock.EXPECT().UpdateStatus(testCtx, &scheduleGetError, metav1.UpdateOptions{}).Return(nil, assert.AnError).Once()
 		backupScheduleClientMock.EXPECT().UpdateStatus(testCtx, mock.Anything, metav1.UpdateOptions{}).
 			Run(func(ctx context.Context, backupSchedule *backupv1.BackupSchedule, opts metav1.UpdateOptions) {
 				assert.Equal(t, scheduleOldImage.Name, backupSchedule.Name)
-				assert.Equal(t, kubectlImage, backupSchedule.Status.CurrentKubectlImage)
+				assert.Equal(t, operatorImage, backupSchedule.Status.CurrentCronJobImage)
 			}).Return(&backupv1.BackupSchedule{}, nil).Once()
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
-		sut := NewUpdater(clientMock, testNamespace, kubectlImage, recorderMock)
+		sut := NewUpdater(clientMock, testNamespace, recorderMock)
 
 		// when
-		err := sut.Update(testCtx)
+		err := sut.Update(testCtx, imageConfig)
 
 		// then
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to update current kubectl image in status of backup schedule")
+		assert.ErrorContains(t, err, "failed to update backup schedule cron job images")
+		assert.ErrorContains(t, err, "failed to update current cron job image in status of backup schedule GetError")
 	})
 }

@@ -44,7 +44,7 @@ func (adig *getter) ImageForKey(ctx context.Context, key string) (string, error)
 
 	imageTag := configMap.Data[key]
 	if imageTag == "" {
-		return "", fmt.Errorf("configmap '%s' must not contain empty chown init image name", config.OperatorAdditionalImagesConfigmapName)
+		return "", fmt.Errorf("image %q in configmap %q be empty", key, config.OperatorAdditionalImagesConfigmapName)
 	}
 
 	err = verifyImageTag(imageTag)
