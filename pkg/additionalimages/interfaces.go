@@ -26,9 +26,9 @@ type Getter interface {
 }
 
 type Updater interface {
-	// Update sets the newest additional images wherever they are needed.
-	// E.g., the kubectl image used in the CronJob of a BackupSchedule.
-	Update(ctx context.Context) error
+	// Update sets these images wherever they are needed.
+	// E.g., the image used in the CronJob of a BackupSchedule.
+	Update(ctx context.Context, config ImageConfig) error
 }
 
 //nolint:unused

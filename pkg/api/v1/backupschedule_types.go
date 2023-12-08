@@ -1,11 +1,12 @@
 /*
-This file was generated with "make generate".
+This file was generated with "make generate-deepcopy".
 */
 
 package v1
 
 import (
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -44,8 +45,8 @@ type BackupScheduleStatus struct {
 	Status string `json:"status,omitempty"`
 	// RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.
 	RequeueTimeNanos time.Duration `json:"requeueTimeNanos,omitempty"`
-	// CurrentKubectlImage is the image currently used to create scheduled backups.
-	CurrentKubectlImage string `json:"currentKubectlImage,omitempty"`
+	// CurrentCronJobImage is the image currently used to create scheduled backups.
+	CurrentCronJobImage string `json:"currentCronJobImage,omitempty"`
 }
 
 // GetRequeueTimeNanos returns the requeue time in nano seconds.
@@ -58,8 +59,8 @@ func (bss BackupScheduleStatus) GetStatus() string {
 	return bss.Status
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // BackupSchedule is the Schema for the backupschedules API
 type BackupSchedule struct {
@@ -75,10 +76,10 @@ func (bs *BackupSchedule) GetStatus() RequeueableStatus {
 	return bs.Status
 }
 
-func (bs *BackupSchedule) CronJobPodTemplate(kubectlImage string) corev1.PodTemplateSpec {
+func (bs *BackupSchedule) CronJobPodTemplate(image string) corev1.PodTemplateSpec {
 	return corev1.PodTemplateSpec{
 		ObjectMeta: cronJobPodMeta(bs.Namespace),
-		Spec:       bs.cronJobPodSpec(kubectlImage),
+		Spec:       bs.cronJobPodSpec(image),
 	}
 }
 
@@ -95,46 +96,34 @@ func cronJobPodMeta(namespace string) metav1.ObjectMeta {
 	}
 }
 
-func (bs *BackupSchedule) cronJobPodSpec(kubectlImage string) corev1.PodSpec {
-	mode := int32(0550)
-	volumeName := "k8s-backup-operator-create-backup-script"
-	scriptPath := "/bin/entrypoint.sh"
+func (bs *BackupSchedule) cronJobPodSpec(image string) corev1.PodSpec {
+	pullPolicy := corev1.PullIfNotPresent
+	if config.IsStageDevelopment() {
+		pullPolicy = corev1.PullAlways
+	}
+
 	return corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Name:            bs.CronJobName(),
-			Image:           kubectlImage,
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Command:         []string{scriptPath},
-			Env:             bs.cronJobEnvVars(),
-			VolumeMounts: []corev1.VolumeMount{{
-				Name:      volumeName,
-				ReadOnly:  true,
-				MountPath: scriptPath,
-				SubPath:   "entrypoint.sh",
-			}},
+			Image:           image,
+			ImagePullPolicy: pullPolicy,
+			Args: []string{
+				"scheduled-backup",
+				fmt.Sprintf("--name=%s", bs.Name),
+				fmt.Sprintf("--provider=%s", bs.Spec.Provider),
+			},
+			Env: []corev1.EnvVar{
+				{Name: "NAMESPACE",
+					ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "metadata.namespace"}}}},
 		}},
 		RestartPolicy:      corev1.RestartPolicyOnFailure,
 		ServiceAccountName: "k8s-backup-operator-scheduled-backup-creator-manager",
-		Volumes: []corev1.Volume{{
-			Name: volumeName,
-			VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: "k8s-create-backup-script"},
-				DefaultMode:          &mode,
-			}},
-		}},
 	}
 }
 
 func (bs *BackupSchedule) CronJobName() string {
 	return fmt.Sprintf("backup-schedule-%s", bs.Name)
-}
-
-func (bs *BackupSchedule) cronJobEnvVars() []corev1.EnvVar {
-	return []corev1.EnvVar{
-		{Name: "NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}}},
-		{Name: "SCHEDULED_BACKUP_NAME", Value: bs.Name},
-		{Name: ProviderEnvVar, Value: string(bs.Spec.Provider)}}
 }
 
 //+kubebuilder:object:root=true

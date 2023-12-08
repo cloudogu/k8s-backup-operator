@@ -69,7 +69,7 @@ func (interval timeInterval) isTimestampInInterval(timestamp time.Time, current 
 	timeStampFormatted := timestamp.Truncate(day)
 
 	/* sample to understand the functionality
-	 * Backup was started 12.05.2019 at 9o'clock => timestamp 12.05.2019:09:00:00
+	 * Backup was started 12.05.2019 at 9o'Clock => timestamp 12.05.2019:09:00:00
 	 * today is the 17.05.2019; the interval is defined from 0 to 7 (17.05.2019-10.05.2019)
 	 * because the 12.05 is between 10.05. and 17.05. the function returns true
 	 */
