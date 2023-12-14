@@ -38,6 +38,8 @@ spec:
           aws_secret_access_key: abcc1234
 ```
 
+`kubectl --namespace ecosystem apply -f k8s-longhorn.yaml`
+
 #### Snapshot-API
 
 Falls das Kubernetes-Cluster nicht die Snapshot-API unterstützt muss ebenfalls ein Snapshot-Controller installiert werden.
@@ -183,7 +185,7 @@ Da in einem bestehenden Cluster der Komponenten-Operator Credentials für die He
 
 ### Storage-Provisioner
 
-Konfiguration values.yaml:
+Konfiguration k8s-longhorn-values.yaml:
 
 ```yaml
 backup:
@@ -197,13 +199,13 @@ backup:
 
 Installation:
 
-`helm install k8s-longhorn oci://registry.cloudogu.com/k8s/k8s-longhorn --version 1.5.1-3 -f values.yaml --namespace ecosystem`
+`helm install k8s-longhorn oci://registry.cloudogu.com/k8s/k8s-longhorn --version 1.5.1-3 -f k8s-longhorn-values.yaml --namespace longhorn-system --create-namespace`
 
 ### Snapshot-API
 
 Installation:
 
-`helm install k8s-snapshot-controller-crd oci://registry.cloudogu.com/k8s/k8s-snapshot-controller-crd --version 5.0.1-5 --namespace ecosystem`
+`helm install k8s-snapshot-controller-crd oci://registry.cloudogu.com/k8s/k8s-snapshot-controller-crd --version 5.0.1-5 --namespace ecosystem --create-namespace`
 
 `helm install k8s-snapshot-controller oci://registry.cloudogu.com/k8s/k8s-snapshot-controller --version 5.0.1-5 --namespace ecosystem`
 
@@ -233,15 +235,15 @@ velero:
 
 Die Felder `s3Url` und `publicUrl` sind dementsprechend anzupassen.
 
-`helm install k8s-velero oci://registry.cloudogu.com/k8s/k8s-velero --version 5.0.2-4 -f values.yaml --namespace ecosystem`
+`helm install k8s-velero oci://registry.cloudogu.com/k8s/k8s-velero --version 5.0.2-4 -f k8s-velero-values.yaml --namespace ecosystem`
 
 ### Installation Backup-Operator
 
 Anschließend kann der Backup-Operator mit seinen CRDs installiert werden:
 
-`helm install k8s-backup-operator-crd oci://registry.cloudogu.com/k8s/k8s-backup-operator-crd --version 5.0.2-4 --namespace ecosystem`
+`helm install k8s-backup-operator-crd oci://registry.cloudogu.com/k8s/k8s-backup-operator-crd --version 0.9.0 --namespace ecosystem`
 
-`helm install k8s-backup-operator oci://registry.cloudogu.com/k8s/k8s-backup-operator --version 5.0.2-4 --namespace ecosystem`
+`helm install k8s-backup-operator oci://registry.cloudogu.com/k8s/k8s-backup-operator --version 0.9.0 --namespace ecosystem`
 
 Sind alle Komponenten auf Status `RUNNING` kann geprüft werden, ob die BackupStorageLocation verfügbar und der S3-Storage von Velero erreichbar ist.
 

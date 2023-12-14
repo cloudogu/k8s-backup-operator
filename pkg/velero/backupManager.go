@@ -40,7 +40,7 @@ func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Bac
 
 	volumeFsBackup := false
 	veleroBackup := &velerov1.Backup{
-		ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 		Spec: velerov1.BackupSpec{
 			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
 			IncludedNamespaces:       []string{backup.Namespace},
