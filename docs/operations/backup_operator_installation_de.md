@@ -14,10 +14,41 @@ Aktuell wird `velero` als Provider unterstützt.
 Ist in dem Cluster keine Snapshot-API verfügbar muss ebenfalls ein Snapshot-Controller installiert werden.
 Das Gleiche gilt für den Storage-Provisioner.
 
+#### Backup-Speicher
+
+Die Speicherung der Backups erfolgt in einem S3-kompatiblen Objektspeicher, z.B. [Minio](https://min.io/).
+Dieser Speicher sollte sich außerhalb des Kubernetes Clusters befinden, damit bei einem Ausfall des Clusters die Backups weiterhin vorhanden und sicher sind.
+Daher muss die Installation und der Betrieb des Backup-Speichers separat vom CES durchgeführt werden.
+
 ### Storage-Provisioner
 
 Falls im Cluster kein Storage-Provisioner existiert kann `longhorn` installiert und verwendet werden.
-Mit dem Attribute `valuesYamlOverwrite` können für die Backups URL und Credentials zu einem S3-Storage konfiguriert werden.
+
+### Secret für den Backup-Speicher erstellen
+
+Longhorn-Backups werden im oben beschriebenen Backup-Speicher abgelegt. Dazu benötigt `longhorn` Zugriff auf den Speicher.
+Die dafür benötigten Parameter müssen in einem Kubernetes-Secret abgelegt werden:
+
+| Secret Key            | Beschreibung                          |
+|-----------------------|---------------------------------------|
+| AWS_ENDPOINTS         | Die URL des Backup-Speicher           |
+| AWS_ACCESS_KEY_ID     | Die ID des AccessKey für Longhorn     |
+| AWS_SECRET_ACCESS_KEY | Das Secret zum AccessKey für Longhorn |
+
+Das Secret kann beispielsweise mit diesem Befehl angelegt werden:
+
+```shell
+kubectl create secret generic longhorn-backup-target --namespace=longhorn-system \
+--from-literal=AWS_ENDPOINTS=https://192.168.56.1:9000 \
+--from-literal=AWS_ACCESS_KEY_ID=MY-ACCESS-KEY \ 
+--from-literal=AWS_SECRET_ACCESS_KEY=MY-ACCESS-SECRET123
+```
+
+Das Secret muss im selben Kubernetes-Namespace wie `longhorn` angelegt werden.
+
+#### Longhorn konfigurieren
+
+Mit dem Attribute `valuesYamlOverwrite` können für die Backups URL und Credentials zu dem Backup-Speicher konfiguriert werden.
 
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
@@ -29,14 +60,18 @@ spec:
   deployNamespace: longhorn-system
   namespace: k8s
   valuesYamlOverwrite: |
-    backup:
-      target:
-        secret:
-          # aws_endpoint is just the server url to the s3 compatible storage.
-          aws_endpoint: http://192.168.56.1:9001 # Insert your s3 url here. Ensure that the bucket `longhorn` exists in the Storage
-          aws_access_key_id: abcd1234
-          aws_secret_access_key: abcc1234
+    longhorn:
+      defaultSettings:
+        backupTarget: s3://longhorn@dummyregion/
+        backupTargetCredentialSecret: long-backup-target
 ```
+
+Für das Backup sind folgende Parameter in der `valuesYamlOverwrite` relevant:
+
+| Parameter                                               | Beschreibung                                                                                         |
+|---------------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| `longhorn.defaultSettings.backupTarget`                 | Die Adresse des Speicherorts (Buckets) innerhalb des Backup-Speichers: `s3://<BUCKET_NAME>@<REGION>` |
+| `longhorn.defaultSettings.backupTargetCredentialSecret` | Der Name des oben erstellen Secrets, dass die Zugangsdaten zum Backup-Speicher enthält               |
 
 #### Snapshot-API
 
@@ -72,6 +107,29 @@ Installation:
 #### Velero
 
 Velero benötigt zur Ablage der Backups ebenfalls Konfiguration.
+
+### Secret für den Backup-Speicher erstellen
+
+Velero-Backups werden ebenfalls im oben beschriebenen Backup-Speicher abgelegt. Dazu benötigt Velero Zugriff auf den Speicher.
+Die dafür benötigten Parameter müssen in einem Kubernetes-Secret abgelegt werden:
+
+| Secret Key            | Beschreibung                          |
+|-----------------------|---------------------------------------|
+| AWS_ENDPOINTS         | Die URL des Backup-Speicher           |
+| AWS_ACCESS_KEY_ID     | Die ID des AccessKey für Longhorn     |
+| AWS_SECRET_ACCESS_KEY | Das Secret zum AccessKey für Longhorn |
+
+Das Secret kann beispielsweise mit diesem Befehl angelegt werden:
+
+```shell
+kubectl create secret generic velero-backup-target --namespace=longhorn-system \
+--from-literal=AWS_ENDPOINTS=https://192.168.56.1:9000 \
+--from-literal=AWS_ACCESS_KEY_ID=MY-ACCESS-KEY \ 
+--from-literal=AWS_SECRET_ACCESS_KEY=MY-ACCESS-SECRET123
+```
+
+Das Secret muss im selben Kubernetes-Namespace wie `longhorn` angelegt werden.
+
 Diese beinhaltet den Access-Key, Secret-Key und die URL des S3-Storage.
 Mit dem Attribut `valuesYamlOverwrite` lassen sich auch hier beliebige Konfigurationen hinzufügen oder überschreiben:
 
