@@ -1,23 +1,23 @@
-# Installation des Backup-Operators
+# Installing the backup operator
 
-Der Backup-Operator lässt sich gewöhnlich in einem bestehenden Cloudogu EcoSystem oder leeren Cluster installieren.
+The backup operator can usually be installed in an existing Cloudogu EcoSystem or empty cluster.
 
-## Installation mit bestehenden Cloudogu EcoSystem
+## Installation with an existing Cloudogu EcoSystem
 
-In einem bestehenden Cloudogu EcoSystem wird der Backup-Operator über den Component-Operator installiert.
-Dafür muss eine Custom Resource `Component` für den Backup-Operator und seine eigenen CRDs angelegt werden.
+In an existing Cloudogu EcoSystem, the backup operator is installed via the component operator.
+To do this, a custom resource `Component` must be created for the backup operator and its own CRDs.
 
-### Abhängigkeiten
+### Dependencies
 
-Vorher sollten aber die Abhängigkeiten des Operators installiert werden. Der Backup-Operator benötigt einen Backup-Provider.
-Aktuell wird `velero` als Provider unterstützt. 
-Ist in dem Cluster keine Snapshot-API verfügbar muss ebenfalls ein Snapshot-Controller installiert werden.
-Das Gleiche gilt für den Storage-Provisioner.
+However, the operator's dependencies should be installed first. The backup operator requires a backup provider.
+Currently `velero` is supported as a provider.
+If no snapshot API is available in the cluster, a snapshot controller must also be installed.
+The same applies to the storage provider.
 
-### Storage-Provisioner
+### Storage provisioner
 
-Falls im Cluster kein Storage-Provisioner existiert kann `longhorn` installiert und verwendet werden.
-Mit dem Attribute `valuesYamlOverwrite` können für die Backups URL und Credentials zu einem S3-Storage konfiguriert werden.
+If no storage provisioner exists in the cluster, `longhorn` can be installed and used.
+The attribute `valuesYamlOverwrite` can be used to configure the URL and credentials for backups to an S3 storage.
 
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
@@ -34,16 +34,16 @@ spec:
         secret:
           # aws_endpoint is just the server url to the s3 compatible storage.
           aws_endpoint: http://192.168.56.1:9001 # Insert your s3 url here. Ensure that the bucket `longhorn` exists in the Storage
-          aws_access_key_id: abcd1234
-          aws_secret_access_key: abcc1234
+          aws_access_key_id: abcd1234 # Insert your access key here
+          aws_secret_access_key: abcc1234 # Insert your access secret key here
 ```
 
 `kubectl --namespace ecosystem apply -f k8s-longhorn.yaml`
 
-#### Snapshot-API
+#### Snapshot API
 
-Falls das Kubernetes-Cluster nicht die Snapshot-API unterstützt muss ebenfalls ein Snapshot-Controller installiert werden.
-Dies ist der Fall, wenn man zum Beispiel `k3s` als Kubernetes-Distribution verwendet.
+If the Kubernetes cluster does not support the snapshot API, a snapshot controller must also be installed.
+This is the case if, for example, `k3s` is used as the Kubernetes distribution.
 
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
@@ -73,9 +73,9 @@ Installation:
 
 #### Velero
 
-Velero benötigt zur Ablage der Backups ebenfalls Konfiguration.
-Diese beinhaltet den Access-Key, Secret-Key und die URL des S3-Storage.
-Mit dem Attribut `valuesYamlOverwrite` lassen sich auch hier beliebige Konfigurationen hinzufügen oder überschreiben:
+Velero also requires configuration to store the backups.
+This includes the access key, secret key and the URL of the S3 storage.
+The attribute `valuesYamlOverwrite` can also be used here to add or overwrite any configurations:
 
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
@@ -92,8 +92,8 @@ spec:
         secretContents:
           cloud: |
             [default]
-            aws_access_key_id=abcd1234
-            aws_secret_access_key=abcc1234
+            aws_access_key_id=abcd1234 # Insert your access key here
+            aws_secret_access_key=abcc1234 # Insert your access secret key here
       configuration:
         backupStorageLocation:
           - name: default
@@ -107,13 +107,13 @@ spec:
               publicUrl: http://localhost:9001 # Insert your url here
 ```
 
-Die Felder `aws_access_key_id`, `aws_secret_access_key_id`, `s3Url` und `publicUrl` sind dementsprechend anzupassen.
+The `aws_access_key_id`, `aws_secret_access_key_id`, `s3Url` and `publicUrl` fields must be adapted accordingly.
 
 `kubectl --namespace ecosystem apply -f k8s-velero.yaml`
 
-### Installation Backup-Operator
+### Installation backup operator
 
-Anschließend kann der Backup-Operator mit seinen Komponenten-CRs installiert werden:
+The backup operator can then be installed with its Component-CRs:
 
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
@@ -142,8 +142,8 @@ spec:
 
 ---
 > Info:
-> 
-> Die Versionen der Komponenten können über das Attribut `version` angepasst passt werden:
+>
+> The versions of the components can be customized using the `version` attribute:
 
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
@@ -157,35 +157,35 @@ spec:
 ```
 
 
-Sind alle Komponenten auf Status `RUNNING` kann geprüft werden, ob die BackupStorageLocation verfügbar und der S3-Storage von Velero erreichbar ist.
+If all components have the status `RUNNING`, you can check whether the BackupStorageLocation is available and the S3 storage of Velero is accessible.
 
 `kubectl --namespace ecosystem get backupstoragelocation default`
 
-Anschließend kann ein reguläres Backup durchgeführt werden. Siehe [Durchführung Backup](backup_de.md).
+A regular backup can then be performed. See [Perform backup](backup_en.md).
 
-## Installation in einem leeren Cluster
+## Installation in an empty cluster
 
-Es kann durchaus Sinn machen Backups nicht in einem bestehenden Cloudogu EcoSystem wiederherzustellen.
-Dies ist sinnvoll, wenn man zum Beispiel ein Restore in einen neuen Cluster ausführen möchte.
-Dadurch erspart man sich ein initiales Setup des Cloudogu EcoSystems.
+It may make sense not to restore backups to an existing Cloudogu EcoSystem.
+This makes sense, for example, if you want to perform a restore to a new cluster.
+This saves an initial setup of the Cloudogu EcoSystem.
 
-Der Unterschied zu der Methode [Installation in einem bestehenden Cluster](#installation-mit-bestehenden-cloudogu-ecosystem) ist, dass hier die Installation nicht mit dem Komponenten-Operator durchgeführt werden können.
-Stattdessen werden die regulären Helm-Charts angewendet. Konfigurationen liegen nicht in der Component-CR, sondern in einer values.yaml.
+The difference to the method [Installation in an existing cluster](#installation-with-existing-cloudogu-ecosystem) is that the installation cannot be carried out with the component operator.
+Instead, the regular Helm charts are used. Configurations are not in the component CR, but in a values.yaml.
 
-Die Bestimmung der Abhängigkeiten bleibt bei dieser Methode gleich:
-- Falls kein Storage-Provisioner existiert, muss `k8s-longhorn` installiert werden.
-- Fall keine Snapshot-API existiert, muss `k8s-snapshot-controller-crd` und `k8s-snapshot-controller` installiert werden.
-- Als Backup-Provider muss `k8s-velero` installiert werden.
+The determination of dependencies remains the same with this method:
+- If no storage provisioner exists, `k8s-longhorn` must be installed.
+- If no snapshot API exists, `k8s-snapshot-controller-crd` and `k8s-snapshot-controller` must be installed.
+- The backup provider `k8s-velero` must be installed.
 
-### Helm-Registry Login
+### Helm registry login
 
-Da in einem bestehenden Cluster der Komponenten-Operator Credentials für die Helm-Registry hat, muss man bei dieser Methode sich direkt mit der Registry authentifizieren.
+Since the component operator in an existing cluster has credentials for the Helm registry, this method requires you to authenticate yourself directly with the registry.
 
 `helm registry login registry.cloudogu.com`
 
 ### Storage-Provisioner
 
-Konfiguration k8s-longhorn-values.yaml:
+Configuration k8s-longhorn-values.yaml:
 
 ```yaml
 backup:
@@ -193,15 +193,15 @@ backup:
     secret:
       # aws_endpoint is just the server url to the s3 compatible storage.
       aws_endpoint: http://192.168.56.1:9001 # Insert your s3 url here. Ensure that the bucket `longhorn` exists in the Storage
-      aws_access_key_id: abcd1234
-      aws_secret_access_key: abcc1234
+      aws_access_key_id: abcd1234 # Insert your access key here
+      aws_secret_access_key: abcc1234 # Insert your access secret key here
 ```
 
 Installation:
 
 `helm install k8s-longhorn oci://registry.cloudogu.com/k8s/k8s-longhorn --version 1.5.1-3 -f k8s-longhorn-values.yaml --namespace longhorn-system --create-namespace`
 
-### Snapshot-API
+### Snapshot API
 
 Installation:
 
@@ -218,8 +218,8 @@ velero:
     secretContents:
       cloud: |
         [default]
-        aws_access_key_id=abcd1234
-        aws_secret_access_key=abcc1234
+        aws_access_key_id=abcd1234 # Insert your access key here
+        aws_secret_access_key=abcc1234 # Insert your access secret key here
   configuration:
     backupStorageLocation:
       - name: default
@@ -233,24 +233,24 @@ velero:
           publicUrl: http://localhost:9001 # Insert your url here
 ```
 
-Die Felder `aws_access_key_id`, `aws_secret_access_key_id`, `s3Url` und `publicUrl` sind dementsprechend anzupassen.
+The `aws_access_key_id`, `aws_secret_access_key_id`, `s3Url` and `publicUrl` fields must be adapted accordingly.
 
 `helm install k8s-velero oci://registry.cloudogu.com/k8s/k8s-velero --version 5.0.2-4 -f k8s-velero-values.yaml --namespace ecosystem`
 
-### Installation Backup-Operator
+### Installation backup operator
 
-Anschließend kann der Backup-Operator installiert werden:
+The backup operator can then be installed:
 
 `helm install k8s-backup-operator-crd oci://registry.cloudogu.com/k8s/k8s-backup-operator-crd --version 0.9.0 --namespace ecosystem`
 
 `helm install k8s-backup-operator oci://registry.cloudogu.com/k8s/k8s-backup-operator --version 0.9.0 --namespace ecosystem`
 
-Sind alle Komponenten auf Status `RUNNING` kann geprüft werden, ob die BackupStorageLocation verfügbar und der S3-Storage von Velero erreichbar ist.
+If all components have the status `RUNNING`, you can check whether the BackupStorageLocation is available and the S3 storage of Velero is accessible.
 
 `kubectl --namespace ecosystem get backupstoragelocation default`
 
-Anschließend kann ein regulärer Restore durchgeführt werden. Siehe [Durchführung Restore](restore_de.md).
+A regular restore can then be performed. See [Execution Restore](restore_en.md).
 
-### Helm-Registry Logout
+### Helm registry logout
 
-`helm registry logout registry.cloudogu.com`
+`helm registry logout registry.cloudogu.com`.
