@@ -24,7 +24,7 @@ Daher muss die Installation und der Betrieb des Backup-Speichers separat vom CES
 
 Falls im Cluster kein Storage-Provisioner existiert kann `longhorn` installiert und verwendet werden.
 
-### Secret für den Backup-Speicher erstellen
+#### Secret für den Backup-Speicher erstellen
 
 Longhorn-Backups werden im oben beschriebenen Backup-Speicher abgelegt. Dazu benötigt `longhorn` Zugriff auf den Speicher.
 Die dafür benötigten Parameter müssen in einem Kubernetes-Secret abgelegt werden:
@@ -73,7 +73,7 @@ Für das Backup sind folgende Parameter in der `valuesYamlOverwrite` relevant:
 | `longhorn.defaultSettings.backupTarget`                 | Die Adresse des Speicherorts (Buckets) innerhalb des Backup-Speichers: `s3://<BUCKET_NAME>@<REGION>` |
 | `longhorn.defaultSettings.backupTargetCredentialSecret` | Der Name des oben erstellen Secrets, dass die Zugangsdaten zum Backup-Speicher enthält               |
 
-TODO
+Die erstellte `yaml`-Datei für die Longhorn-Komponente kann mit folgendem Befehl angewendet werden:
 
 `kubectl --namespace ecosystem apply -f k8s-longhorn.yaml`
 
@@ -112,7 +112,7 @@ Installation:
 
 Velero benötigt zur Ablage der Backups ebenfalls Konfiguration.
 
-### Secret für den Backup-Speicher erstellen
+#### Secret für den Backup-Speicher erstellen
 
 Velero-Backups werden ebenfalls im oben beschriebenen Backup-Speicher abgelegt. Dazu benötigt Velero Zugriff auf den Speicher.
 Die dafür benötigten Parameter müssen in einem Kubernetes-Secret abgelegt werden:
@@ -141,7 +141,7 @@ EOF
 
 Das Secret muss im selben Kubernetes-Namespace wie `velero` angelegt werden.
 
-#### Longhorn konfigurieren
+#### Velero konfigurieren
 
 Mit dem Attribut `valuesYamlOverwrite` lassen sich auch hier beliebige Konfigurationen hinzufügen oder überschreiben:
 
@@ -307,6 +307,7 @@ stringData:
     aws_secret_access_key=MY-VELERO.ACCESS-SECRET123
 EOF
 ```
+
 Konfiguration values.yaml:
 
 ```yaml
