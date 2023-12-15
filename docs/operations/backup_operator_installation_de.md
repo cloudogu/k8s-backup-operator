@@ -73,6 +73,10 @@ Für das Backup sind folgende Parameter in der `valuesYamlOverwrite` relevant:
 | `longhorn.defaultSettings.backupTarget`                 | Die Adresse des Speicherorts (Buckets) innerhalb des Backup-Speichers: `s3://<BUCKET_NAME>@<REGION>` |
 | `longhorn.defaultSettings.backupTargetCredentialSecret` | Der Name des oben erstellen Secrets, dass die Zugangsdaten zum Backup-Speicher enthält               |
 
+TODO
+
+`kubectl --namespace ecosystem apply -f k8s-longhorn.yaml`
+
 #### Snapshot-API
 
 Falls das Kubernetes-Cluster nicht die Snapshot-API unterstützt muss ebenfalls ein Snapshot-Controller installiert werden.
@@ -183,7 +187,7 @@ kubectl --namespace ecosystem apply -f k8s-velero.yaml
 
 ### Installation Backup-Operator
 
-Anschließend kann der Backup-Operator mit seinen CRDs installiert werden:
+Anschließend kann der Backup-Operator mit seinen Komponenten-CRs installiert werden:
 
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
@@ -212,7 +216,7 @@ spec:
 
 ---
 > Info:
->
+> 
 > Die Versionen der Komponenten können über das Attribut `version` angepasst passt werden:
 
 ```yaml
@@ -264,7 +268,7 @@ kubectl create secret generic longhorn-backup-target --namespace=longhorn-system
 --from-literal=AWS_SECRET_ACCESS_KEY=MY-ACCESS-SECRET123
 ```
 
-Konfiguration values.yaml:
+Konfiguration k8s-longhorn-values.yaml:
 
 ```yaml
 longhorn:
@@ -275,13 +279,13 @@ longhorn:
 
 Installation:
 
-`helm install k8s-longhorn oci://registry.cloudogu.com/k8s/k8s-longhorn --version 1.5.1-3 -f values.yaml --namespace ecosystem`
+`helm install k8s-longhorn oci://registry.cloudogu.com/k8s/k8s-longhorn --version 1.5.1-3 -f k8s-longhorn-values.yaml --namespace longhorn-system --create-namespace`
 
 ### Snapshot-API
 
 Installation:
 
-`helm install k8s-snapshot-controller-crd oci://registry.cloudogu.com/k8s/k8s-snapshot-controller-crd --version 5.0.1-5 --namespace ecosystem`
+`helm install k8s-snapshot-controller-crd oci://registry.cloudogu.com/k8s/k8s-snapshot-controller-crd --version 5.0.1-5 --namespace ecosystem --create-namespace`
 
 `helm install k8s-snapshot-controller oci://registry.cloudogu.com/k8s/k8s-snapshot-controller --version 5.0.1-5 --namespace ecosystem`
 
@@ -327,11 +331,11 @@ velero:
 
 ### Installation Backup-Operator
 
-Anschließend kann der Backup-Operator mit seinen CRDs installiert werden:
+Anschließend kann der Backup-Operator installiert werden:
 
-`helm install k8s-backup-operator-crd oci://registry.cloudogu.com/k8s/k8s-backup-operator-crd --version 5.0.2-4 --namespace ecosystem`
+`helm install k8s-backup-operator-crd oci://registry.cloudogu.com/k8s/k8s-backup-operator-crd --version 0.9.0 --namespace ecosystem`
 
-`helm install k8s-backup-operator oci://registry.cloudogu.com/k8s/k8s-backup-operator --version 5.0.2-4 --namespace ecosystem`
+`helm install k8s-backup-operator oci://registry.cloudogu.com/k8s/k8s-backup-operator --version 0.9.0 --namespace ecosystem`
 
 Sind alle Komponenten auf Status `RUNNING` kann geprüft werden, ob die BackupStorageLocation verfügbar und der S3-Storage von Velero erreichbar ist.
 
