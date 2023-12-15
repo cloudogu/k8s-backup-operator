@@ -10,7 +10,7 @@ Dafür muss eine Custom Resource `Component` für den Backup-Operator und seine 
 ### Abhängigkeiten
 
 Vorher sollten aber die Abhängigkeiten des Operators installiert werden. Der Backup-Operator benötigt einen Backup-Provider.
-Aktuell wird `velero` als Provider unterstützt. 
+Aktuell wird `velero` als Provider unterstützt.
 Ist in dem Cluster keine Snapshot-API verfügbar muss ebenfalls ein Snapshot-Controller installiert werden.
 Das Gleiche gilt für den Storage-Provisioner.
 
@@ -113,24 +113,32 @@ Velero benötigt zur Ablage der Backups ebenfalls Konfiguration.
 Velero-Backups werden ebenfalls im oben beschriebenen Backup-Speicher abgelegt. Dazu benötigt Velero Zugriff auf den Speicher.
 Die dafür benötigten Parameter müssen in einem Kubernetes-Secret abgelegt werden:
 
-| Secret Key            | Beschreibung                          |
-|-----------------------|---------------------------------------|
-| AWS_ENDPOINTS         | Die URL des Backup-Speicher           |
-| AWS_ACCESS_KEY_ID     | Die ID des AccessKey für Longhorn     |
-| AWS_SECRET_ACCESS_KEY | Das Secret zum AccessKey für Longhorn |
+| Secret Key            | Beschreibung                        |
+|-----------------------|-------------------------------------|
+| aws_access_key_id     | Die ID des AccessKey für Velero     |
+| aws_secret_access_key | Das Secret zum AccessKey für Velero |
 
-Das Secret kann beispielsweise mit diesem Befehl angelegt werden:
+Das Secret für wird als Datei in Velero verwendet und muss daher nach folgendem Beispiel angelegt werden:
 
 ```shell
-kubectl create secret generic velero-backup-target --namespace=longhorn-system \
---from-literal=AWS_ENDPOINTS=https://192.168.56.1:9000 \
---from-literal=AWS_ACCESS_KEY_ID=MY-ACCESS-KEY \ 
---from-literal=AWS_SECRET_ACCESS_KEY=MY-ACCESS-SECRET123
+kubectl apply --namespace=ecosystem -f - <<EOF
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: velero-backup-target
+stringData:
+  cloud: |
+    [default]
+    aws_access_key_id=MY-VELERO-ACCESS-KEY
+    aws_secret_access_key=MY-VELERO.ACCESS-SECRET123
+EOF
 ```
 
-Das Secret muss im selben Kubernetes-Namespace wie `longhorn` angelegt werden.
+Das Secret muss im selben Kubernetes-Namespace wie `velero` angelegt werden.
 
-Diese beinhaltet den Access-Key, Secret-Key und die URL des S3-Storage.
+#### Longhorn konfigurieren
+
 Mit dem Attribut `valuesYamlOverwrite` lassen sich auch hier beliebige Konfigurationen hinzufügen oder überschreiben:
 
 ```yaml
@@ -145,11 +153,7 @@ spec:
     velero:
       credentials:
         useSecret: true
-        secretContents:
-          cloud: |
-            [default]
-            aws_access_key_id=abcd1234
-            aws_secret_access_key=abcc1234
+        existingSecret: "velero-backup-target" # Name of a pre-existing secret in the Velero namespace
       configuration:
         backupStorageLocation:
           - name: default
@@ -162,10 +166,20 @@ spec:
               s3Url: http://192.168.56.1:9001 # Insert your url here
               publicUrl: http://localhost:9001 # Insert your url here
 ```
+Die folgenden Parameter in der `valuesYamlOverwrite` sind für die Backup-Konfiguration relevant:
 
-Die Felder `s3Url` und `publicUrl` sind dementsprechend anzupassen.
+| Parameter                                                              | Beschreibung                                                                                      |
+|------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| `velero.credentials.existingSecret`                                    | Der Name des oben erstellen Secrets, dass die Zugangsdaten für Velero zum Backup-Speicher enthält |
+| `velero.configuration.backupStorageLocation[default].bucket`           | Der Name des Buckets für Velero innerhalb des Backup-Speichers                                    |
+| `velero.configuration.backupStorageLocation[default].config.s3Url`     | Die URL des Backup-Speichers                                                                      |
+| `velero.configuration.backupStorageLocation[default].config.publicUrl` | Die öffentliche URL des Backup-Speichers                                                          |
 
-`kubectl --namespace ecosystem apply -f k8s-velero.yaml`
+Die erstellte `yaml`-Datei für die Velero-Komponente kann mit folgendem Befehl angewendet werden:
+
+```shell
+kubectl --namespace ecosystem apply -f k8s-velero.yaml
+```
 
 ### Installation Backup-Operator
 
@@ -198,7 +212,7 @@ spec:
 
 ---
 > Info:
-> 
+>
 > Die Versionen der Komponenten können über das Attribut `version` angepasst passt werden:
 
 ```yaml
@@ -241,16 +255,22 @@ Da in einem bestehenden Cluster der Komponenten-Operator Credentials für die He
 
 ### Storage-Provisioner
 
+Erstellung des Longhorn-Secrets für den Backup-Speicher:
+
+```shell
+kubectl create secret generic longhorn-backup-target --namespace=longhorn-system \
+--from-literal=AWS_ENDPOINTS=https://192.168.56.1:9000 \
+--from-literal=AWS_ACCESS_KEY_ID=MY-ACCESS-KEY \ 
+--from-literal=AWS_SECRET_ACCESS_KEY=MY-ACCESS-SECRET123
+```
+
 Konfiguration values.yaml:
 
 ```yaml
-backup:
-  target:
-    secret:
-      # aws_endpoint is just the server url to the s3 compatible storage.
-      aws_endpoint: http://192.168.56.1:9001 # Insert your s3 url here. Ensure that the bucket `longhorn` exists in the Storage
-      aws_access_key_id: abcd1234
-      aws_secret_access_key: abcc1234
+longhorn:
+  defaultSettings:
+    backupTarget: s3://longhorn@dummyregion/
+    backupTargetCredentialSecret: long-backup-target
 ```
 
 Installation:
@@ -267,15 +287,29 @@ Installation:
 
 ### Velero
 
+Erstellung des Velero-Secrets für den Backup-Speicher:
+
+```shell
+kubectl apply --namespace=ecosystem -f - <<EOF
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: velero-backup-target
+stringData:
+  cloud: |
+    [default]
+    aws_access_key_id=MY-VELERO-ACCESS-KEY
+    aws_secret_access_key=MY-VELERO.ACCESS-SECRET123
+EOF
+```
+Konfiguration values.yaml:
+
 ```yaml
 velero:
   credentials:
     useSecret: true
-    secretContents:
-      cloud: |
-        [default]
-        aws_access_key_id=abcd1234
-        aws_secret_access_key=abcc1234
+    existingSecret: "velero-backup-target" # Name of a pre-existing secret in the Velero namespace
   configuration:
     backupStorageLocation:
       - name: default
@@ -288,8 +322,6 @@ velero:
           s3Url: http://192.168.56.1:9001 # Insert your url here
           publicUrl: http://localhost:9001 # Insert your url here
 ```
-
-Die Felder `s3Url` und `publicUrl` sind dementsprechend anzupassen.
 
 `helm install k8s-velero oci://registry.cloudogu.com/k8s/k8s-velero --version 5.0.2-4 -f values.yaml --namespace ecosystem`
 
