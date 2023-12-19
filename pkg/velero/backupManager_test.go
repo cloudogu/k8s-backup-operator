@@ -32,7 +32,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 
 		volumeFsBackup := false
 		expectedVeleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
@@ -70,7 +70,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 
 		volumeFsBackup := false
 		expectedVeleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
@@ -109,7 +109,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 
 		volumeFsBackup := false
 		expectedVeleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
@@ -142,7 +142,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 			resultChan <- watch.Event{
 				Type: watch.Deleted,
 				Object: &velerov1.Backup{
-					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 				},
 			}
 		}()
@@ -164,7 +164,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 
 		volumeFsBackup := false
 		expectedVeleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
@@ -197,7 +197,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 			resultChan <- watch.Event{
 				Type: watch.Modified,
 				Object: &velerov1.Backup{
-					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 					Status:     velerov1.BackupStatus{Phase: velerov1.BackupPhaseFailedValidation},
 				},
 			}
@@ -220,7 +220,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 
 		volumeFsBackup := false
 		expectedVeleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
@@ -253,7 +253,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 			resultChan <- watch.Event{
 				Type: watch.Modified,
 				Object: &velerov1.Backup{
-					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 					Status:     velerov1.BackupStatus{Phase: velerov1.BackupPhaseDeleting},
 				},
 			}
@@ -276,7 +276,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 
 		volumeFsBackup := false
 		expectedVeleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
@@ -309,7 +309,7 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 			resultChan <- watch.Event{
 				Type: watch.Modified,
 				Object: &velerov1.Backup{
-					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace},
+					ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 					Status:     velerov1.BackupStatus{Phase: velerov1.BackupPhaseCompleted},
 				},
 			}

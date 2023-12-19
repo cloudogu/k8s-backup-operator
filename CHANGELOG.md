@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.10.0] - 2023-12-19
+### Added
+- [#23] Added docs for installing the operator in an existent Cloudogu EcoSystem and on an empty cluster.
+
+### Fixed
+- Fix value of label `k8s.cloudogu.com/part-of` in helm template do avoid deletion in cleanup process.
+
 ## [v0.9.0] - 2023-12-08
 ### Added
 - [#14] Patch template for mirroring this component and its images
