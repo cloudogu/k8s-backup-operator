@@ -21,6 +21,7 @@ const (
 	deleteVerb                   = "delete"
 	customResourceDefinitionKind = "CustomResourceDefinition"
 	podKind                      = "Pod"
+	veleroGroup                  = "velero.io"
 )
 
 var defaultCleanupSelector = &metav1.LabelSelector{
@@ -108,7 +109,11 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 	u.SetGroupVersionKind(gvk)
 
 	// Skip crd deletion because we need the provider and snapshot-controller components.
-	if gvk.Kind == customResourceDefinitionKind || gvk.Kind == podKind {
+	if gvk.Kind == customResourceDefinitionKind ||
+		// Skip pod deletion because this would kill our backup operator.
+		gvk.Kind == podKind ||
+		// Skip velero resource deletion because we need those to restore.
+		gvk.Group == veleroGroup {
 		return nil
 	}
 
