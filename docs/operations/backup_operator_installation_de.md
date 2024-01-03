@@ -40,7 +40,7 @@ Das Secret kann beispielsweise mit diesem Befehl angelegt werden:
 ```shell
 kubectl create secret generic longhorn-backup-target --namespace=longhorn-system \
 --from-literal=AWS_ENDPOINTS=https://192.168.56.1:9000 \
---from-literal=AWS_ACCESS_KEY_ID=MY-ACCESS-KEY \ 
+--from-literal=AWS_ACCESS_KEY_ID=MY-ACCESS-KEY \
 --from-literal=AWS_SECRET_ACCESS_KEY=MY-ACCESS-SECRET123
 ```
 
