@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - [#14] Updated docs for installing and configuring `k8s-longhorn` and `k8s-velero`.
 
+## [v0.10.0] - 2023-12-19
 ### Added
 - [#23] Added docs for installing the operator in an existent Cloudogu EcoSystem and on an empty cluster.
 
