@@ -48,7 +48,7 @@ Das Secret muss im selben Kubernetes-Namespace wie `longhorn` angelegt werden.
 
 #### Longhorn konfigurieren
 
-Mit dem Attribute `valuesYamlOverwrite` können für die Backups URL und Credentials zu dem Backup-Speicher konfiguriert werden.
+Mit dem Attribut `valuesYamlOverwrite` können für die Backups URL und Credentials zu dem Backup-Speicher konfiguriert werden.
 
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
@@ -71,7 +71,7 @@ Für das Backup sind folgende Parameter in der `valuesYamlOverwrite` relevant:
 | Parameter                                               | Beschreibung                                                                                         |
 |---------------------------------------------------------|------------------------------------------------------------------------------------------------------|
 | `longhorn.defaultSettings.backupTarget`                 | Die Adresse des Speicherorts (Buckets) innerhalb des Backup-Speichers: `s3://<BUCKET_NAME>@<REGION>` |
-| `longhorn.defaultSettings.backupTargetCredentialSecret` | Der Name des oben erstellen Secrets, dass die Zugangsdaten zum Backup-Speicher enthält               |
+| `longhorn.defaultSettings.backupTargetCredentialSecret` | Der Name des oben erstellten Secrets, dass die Zugangsdaten zum Backup-Speicher enthält               |
 
 Die erstellte `yaml`-Datei für die Longhorn-Komponente kann mit folgendem Befehl angewendet werden:
 
