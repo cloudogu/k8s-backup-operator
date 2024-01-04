@@ -63,7 +63,7 @@ spec:
     longhorn:
       defaultSettings:
         backupTarget: s3://longhorn@dummyregion/
-        backupTargetCredentialSecret: long-backup-target
+        backupTargetCredentialSecret: longhorn-backup-target
 ```
 
 The following parameters in the `valuesYamlOverwrite` are relevant for the backup:
@@ -167,8 +167,8 @@ spec:
             config:
               region: minio-default
               s3ForcePathStyle: true
-              s3Url: http://192.168.56.1:9001 # Insert your url here
-              publicUrl: http://localhost:9001 # Insert your url here
+              s3Url: http://192.168.56.1:9000 # Insert your url here
+              publicUrl: http://localhost:9000 # Insert your url here
 ```
 
 The following parameters in the `valuesYamlOverwrite` are relevant for the backup configuration:
@@ -325,8 +325,8 @@ velero:
         config:
           region: minio-default
           s3ForcePathStyle: true
-          s3Url: http://192.168.56.1:9001 # Insert your url here
-          publicUrl: http://localhost:9001 # Insert your url here
+          s3Url: http://192.168.56.1:9000 # Insert your url here
+          publicUrl: http://localhost:9000 # Insert your url here
 ```
 
 The `aws_access_key_id`, `aws_secret_access_key_id`, `s3Url` and `publicUrl` fields must be adapted accordingly.

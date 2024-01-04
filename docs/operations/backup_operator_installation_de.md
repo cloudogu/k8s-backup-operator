@@ -63,7 +63,7 @@ spec:
     longhorn:
       defaultSettings:
         backupTarget: s3://longhorn@dummyregion/
-        backupTargetCredentialSecret: long-backup-target
+        backupTargetCredentialSecret: longhorn-backup-target
 ```
 
 Für das Backup sind folgende Parameter in der `valuesYamlOverwrite` relevant:
@@ -167,8 +167,8 @@ spec:
             config:
               region: minio-default
               s3ForcePathStyle: true
-              s3Url: http://192.168.56.1:9001 # Insert your url here
-              publicUrl: http://localhost:9001 # Insert your url here
+              s3Url: http://192.168.56.1:9000 # Insert your url here
+              publicUrl: http://localhost:9000 # Insert your url here
 ```
 Die folgenden Parameter in der `valuesYamlOverwrite` sind für die Backup-Konfiguration relevant:
 
