@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.10.1] - 2024-01-10
+### Fixed
+- [#27] Added missing watch permission for statefulsets.
+  - This is used when waiting for the etcd on maintenance switch.
+
+### Changed
+- [#14] Updated docs for installing and configuring `k8s-longhorn` and `k8s-velero`.
+
 ## [v0.10.0] - 2023-12-19
 ### Added
 - [#23] Added docs for installing the operator in an existent Cloudogu EcoSystem and on an empty cluster.
