@@ -2,7 +2,7 @@
 ARTIFACT_ID=k8s-backup-operator
 VERSION=0.11.0
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
-GOTAG?=1.22
+GOTAG?=1.23
 MAKEFILES_VERSION=9.2.1
 STAGE?=production
 
