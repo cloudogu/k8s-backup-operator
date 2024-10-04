@@ -10,11 +10,11 @@ func NewRestoreManager(
 	clientSet ecosystemInterface,
 	namespace string,
 	recorder eventRecorder,
-	registry cesRegistry,
+	globalConfigRepository globalConfigRepository,
 	cleanup cleanupManager,
 ) *defaultManager {
 	return &defaultManager{
-		createManager: newCreateManager(clientSet, namespace, recorder, registry, cleanup),
+		createManager: newCreateManager(clientSet, namespace, recorder, globalConfigRepository, cleanup),
 		deleteManager: newDeleteManager(clientSet, namespace, recorder),
 	}
 }

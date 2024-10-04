@@ -29,10 +29,10 @@ func newCreateManager(
 	ecosystemClientSet ecosystemInterface,
 	namespace string,
 	recorder eventRecorder,
-	registry cesRegistry,
+	globalConfigRepository globalConfigRepository,
 	cleanup cleanupManager,
 ) *defaultCreateManager {
-	maintenanceSwitch := maintenance.NewWithLooseCoupling(registry.GlobalConfig(), ecosystemClientSet.AppsV1().StatefulSets(namespace), ecosystemClientSet.CoreV1().Services(namespace))
+	maintenanceSwitch := maintenance.NewWithLooseCoupling(globalConfigRepository, ecosystemClientSet.AppsV1().StatefulSets(namespace), ecosystemClientSet.CoreV1().Services(namespace))
 	return &defaultCreateManager{
 		ecosystemClientSet:    ecosystemClientSet,
 		namespace:             namespace,

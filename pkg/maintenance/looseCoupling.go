@@ -21,9 +21,9 @@ type looselyCoupledMaintenanceSwitch struct {
 
 // NewWithLooseCoupling creates a switch that checks if the configuration registry (e.g., etcd) exists before switching.
 // If the registry does not exist, no switch is executed.
-func NewWithLooseCoupling(globalConfig globalConfig, clientSet statefulSetInterface, serviceInterface serviceInterface) *looselyCoupledMaintenanceSwitch {
+func NewWithLooseCoupling(globalConfigRepository globalConfigRepository, clientSet statefulSetInterface, serviceInterface serviceInterface) *looselyCoupledMaintenanceSwitch {
 	return &looselyCoupledMaintenanceSwitch{
-		maintenanceModeSwitch: New(globalConfig),
+		maintenanceModeSwitch: New(globalConfigRepository),
 		statefulSetClient:     clientSet,
 		serviceInterface:      serviceInterface,
 	}

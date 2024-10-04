@@ -8,7 +8,6 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/cloudogu/cesapp-lib/registry"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/maintenance"
 
@@ -22,17 +21,17 @@ const (
 )
 
 type backupCreateManager struct {
-	clientSet             ecosystemInterface
-	namespace             string
-	registry              registry.Registry
-	recorder              eventRecorder
-	maintenanceModeSwitch MaintenanceModeSwitch
+	clientSet              ecosystemInterface
+	namespace              string
+	globalConfigRepository globalConfigRepository
+	recorder               eventRecorder
+	maintenanceModeSwitch  MaintenanceModeSwitch
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, registry registry.Registry) *backupCreateManager {
-	maintenanceModeSwitch := maintenance.New(registry.GlobalConfig())
-	return &backupCreateManager{clientSet: clientSet, namespace: namespace, registry: registry, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch}
+func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository) *backupCreateManager {
+	maintenanceModeSwitch := maintenance.New(globalConfigRepository)
+	return &backupCreateManager{clientSet: clientSet, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch}
 }
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {

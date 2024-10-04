@@ -15,6 +15,7 @@ github.com/cloudogu/cesapp-lib v0.12.2 h1:++yK7s69DMCtpIt1nQ2x05cGAe6UH4KnsgEscV
 github.com/cloudogu/cesapp-lib v0.12.2/go.mod h1:PTQqI3xs1ReJMXYE6BGTF33yAfmS4J7P8UiE4AwDMDY=
 github.com/cloudogu/cesapp-lib v0.14.0 h1:955cU7ivgiSJGPJ36/YHhbrT0d7Km+7BwOITPrAJijo=
 github.com/cloudogu/cesapp-lib v0.14.0/go.mod h1:PTQqI3xs1ReJMXYE6BGTF33yAfmS4J7P8UiE4AwDMDY=
+github.com/cloudogu/k8s-registry-lib v0.4.1 h1:V5fOMIYYH1XqwNQ0NjTWViD1G4R146KQVjIuCuPO5dc=
 github.com/cloudogu/k8s-registry-lib v0.4.1/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
 github.com/coreos/go-semver v0.3.1 h1:yi21YpKnrx1gt5R+la8n5WgS0kCrsPp33dmEyHReZr4=
 github.com/coreos/go-semver v0.3.1/go.mod h1:irMmmIw/7yzSRPWryHsK7EYSg09caPQL03VsM8rvUec=

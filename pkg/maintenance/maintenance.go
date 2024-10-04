@@ -6,12 +6,13 @@ import (
 	"fmt"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
+	"github.com/cloudogu/k8s-registry-lib/config"
 )
 
 const registryKeyMaintenance = "maintenance"
 
 type maintenanceSwitch struct {
-	globalConfig globalConfig
+	globalConfigRepository globalConfigRepository
 }
 
 type maintenanceRegistryObject struct {
@@ -20,13 +21,13 @@ type maintenanceRegistryObject struct {
 }
 
 // New create a new instance of maintenanceSwitch.
-func New(globalConfig globalConfig) *maintenanceSwitch {
-	return &maintenanceSwitch{globalConfig: globalConfig}
+func New(globalConfigRepository globalConfigRepository) *maintenanceSwitch {
+	return &maintenanceSwitch{globalConfigRepository: globalConfigRepository}
 }
 
 // ActivateMaintenanceMode activates the maintenance mode with given title and text by writing in the global config.
-func (ms *maintenanceSwitch) ActivateMaintenanceMode(_ context.Context, title string, text string) error {
-	isActive, err := ms.isActive()
+func (ms *maintenanceSwitch) ActivateMaintenanceMode(ctx context.Context, title string, text string) error {
+	isActive, err := ms.isActive(ctx)
 	if err != nil {
 		return err
 	}
@@ -38,24 +39,34 @@ func (ms *maintenanceSwitch) ActivateMaintenanceMode(_ context.Context, title st
 		}
 	}
 
-	return ms.activate(title, text)
+	return ms.activate(ctx, title, text)
 }
 
 // DeactivateMaintenanceMode deactivates the maintenance mode by deleting the maintenance key in the global config.
-func (ms *maintenanceSwitch) DeactivateMaintenanceMode(_ context.Context) error {
-	return ms.globalConfig.Delete(registryKeyMaintenance)
+func (ms *maintenanceSwitch) DeactivateMaintenanceMode(ctx context.Context) error {
+	globalConfig, err := ms.globalConfigRepository.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get global config: %w", err)
+	}
+	cfg := globalConfig.Delete(registryKeyMaintenance)
+	_, err = ms.globalConfigRepository.Update(ctx, config.GlobalConfig{
+		Config: cfg,
+	})
+	return err
 }
 
-func (ms *maintenanceSwitch) isActive() (bool, error) {
-	exists, err := ms.globalConfig.Exists(registryKeyMaintenance)
+func (ms *maintenanceSwitch) isActive(ctx context.Context) (bool, error) {
+	globalConfig, err := ms.globalConfigRepository.Get(ctx)
 	if err != nil {
-		return false, fmt.Errorf("failed to check if maintenance mode is active: %w", err)
+		return false, fmt.Errorf("failed to get global config: %w", err)
 	}
+
+	_, exists := globalConfig.Get(registryKeyMaintenance)
 
 	return exists, nil
 }
 
-func (ms *maintenanceSwitch) activate(title, text string) error {
+func (ms *maintenanceSwitch) activate(ctx context.Context, title, text string) error {
 	value := maintenanceRegistryObject{
 		Title: title,
 		Text:  text,
@@ -66,5 +77,16 @@ func (ms *maintenanceSwitch) activate(title, text string) error {
 		return fmt.Errorf("failed to marshal maintenance globalConfig value object [%+v]: %w", value, err)
 	}
 
-	return ms.globalConfig.Set(registryKeyMaintenance, string(marshal))
+	globalConfig, err := ms.globalConfigRepository.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get global config: %w", err)
+	}
+	cfg, err := globalConfig.Set(registryKeyMaintenance, config.Value(marshal))
+	if err != nil {
+		return fmt.Errorf("failed to set global config: %w", err)
+	}
+	_, err = ms.globalConfigRepository.Update(ctx, config.GlobalConfig{
+		Config: cfg,
+	})
+	return err
 }

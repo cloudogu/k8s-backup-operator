@@ -6,6 +6,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	"github.com/cloudogu/k8s-registry-lib/config"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -75,4 +76,9 @@ type backupV1Alpha1Interface interface {
 //goland:noinspection GoUnusedType
 type backupProvider interface {
 	provider.Provider
+}
+
+type globalConfigRepository interface {
+	Get(ctx context.Context) (config.GlobalConfig, error)
+	Update(ctx context.Context, globalConfig config.GlobalConfig) (config.GlobalConfig, error)
 }

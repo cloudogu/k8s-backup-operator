@@ -3,6 +3,7 @@ package restore
 import (
 	"context"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
+	"github.com/cloudogu/k8s-registry-lib/config"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -106,4 +107,9 @@ type configurationContext interface {
 //goland:noinspection GoUnusedType
 type restoreProvider interface {
 	provider.Provider
+}
+
+type globalConfigRepository interface {
+	Get(ctx context.Context) (config.GlobalConfig, error)
+	Update(ctx context.Context, globalConfig config.GlobalConfig) (config.GlobalConfig, error)
 }
