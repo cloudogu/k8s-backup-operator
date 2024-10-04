@@ -13,9 +13,7 @@ import (
 func Test_newCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		globalConfigMock := newMockConfigurationContext(t)
-		registryMock := newMockCesRegistry(t)
-		registryMock.EXPECT().GlobalConfig().Return(globalConfigMock)
+		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
 
 		statefulSetMock := newMockStatefulSetInterface(t)
 		serviceMock := newMockServiceInterface(t)
@@ -28,7 +26,7 @@ func Test_newCreateManager(t *testing.T) {
 		clientSetMock.EXPECT().CoreV1().Return(coreV1Mock)
 
 		// when
-		manager := newCreateManager(clientSetMock, testNamespace, nil, registryMock, nil)
+		manager := newCreateManager(clientSetMock, testNamespace, nil, globalConfigRepositoryMock, nil)
 
 		// then
 		require.NotNil(t, manager)

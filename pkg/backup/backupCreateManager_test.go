@@ -19,12 +19,10 @@ var testCtx = context.TODO()
 func TestNewBackupCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		registryMock := newMockEtcdRegistry(t)
-		globalMock := newMockConfigurationContext(t)
-		registryMock.EXPECT().GlobalConfig().Return(globalMock)
+		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
 
 		// when
-		manager := newBackupCreateManager(nil, "", nil, registryMock)
+		manager := newBackupCreateManager(nil, "", nil, globalConfigRepositoryMock)
 
 		// then
 		require.NotNil(t, manager)

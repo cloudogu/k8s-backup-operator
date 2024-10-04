@@ -9,9 +9,7 @@ import (
 func TestNewRestoreManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		registryMock := newMockCesRegistry(t)
-		globalConfigMock := newMockConfigurationContext(t)
-		registryMock.EXPECT().GlobalConfig().Return(globalConfigMock)
+		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
 
 		statefulSetMock := newMockStatefulSetInterface(t)
 		serviceMock := newMockServiceInterface(t)
@@ -24,7 +22,7 @@ func TestNewRestoreManager(t *testing.T) {
 		clientSetMock.EXPECT().CoreV1().Return(coreV1Mock)
 
 		// when
-		manager := NewRestoreManager(clientSetMock, testNamespace, nil, registryMock, nil)
+		manager := NewRestoreManager(clientSetMock, testNamespace, nil, globalConfigRepositoryMock, nil)
 
 		// then
 		require.NotNil(t, manager)

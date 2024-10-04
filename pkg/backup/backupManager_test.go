@@ -8,12 +8,10 @@ import (
 func TestNewBackupManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		registryMock := newMockEtcdRegistry(t)
-		globalMock := newMockConfigurationContext(t)
-		registryMock.EXPECT().GlobalConfig().Return(globalMock)
+		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
 
 		// when
-		manager := NewBackupManager(nil, testNamespace, nil, registryMock)
+		manager := NewBackupManager(nil, testNamespace, nil, globalConfigRepositoryMock)
 
 		// then
 		require.NotNil(t, manager)
