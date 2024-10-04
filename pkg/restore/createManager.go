@@ -32,7 +32,7 @@ func newCreateManager(
 	globalConfigRepository globalConfigRepository,
 	cleanup cleanupManager,
 ) *defaultCreateManager {
-	maintenanceSwitch := maintenance.NewWithLooseCoupling(globalConfigRepository, ecosystemClientSet.AppsV1().StatefulSets(namespace), ecosystemClientSet.CoreV1().Services(namespace))
+	maintenanceSwitch := maintenance.NewWithLooseCoupling(globalConfigRepository)
 	return &defaultCreateManager{
 		ecosystemClientSet:    ecosystemClientSet,
 		namespace:             namespace,

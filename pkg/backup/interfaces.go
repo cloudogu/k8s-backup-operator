@@ -2,7 +2,6 @@ package backup
 
 import (
 	"context"
-	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
@@ -54,17 +53,7 @@ type requeueHandler interface {
 	Handle(ctx context.Context, contextMessage string, backup v1.RequeuableObject, originalErr error, requeueStatus string) (ctrl.Result, error)
 }
 
-type etcdRegistry interface {
-	registry.Registry
-}
-
 // used for mocks
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type configurationContext interface {
-	registry.ConfigurationContext
-}
 
 //nolint:unused
 //goland:noinspection GoUnusedType
