@@ -9,7 +9,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
@@ -49,10 +48,6 @@ type maintenanceModeSwitch interface {
 	ActivateMaintenanceMode(ctx context.Context, title string, text string) error
 	// DeactivateMaintenanceMode deactivates the maintenance mode.
 	DeactivateMaintenanceMode(ctx context.Context) error
-}
-
-type cesRegistry interface {
-	registry.Registry
 }
 
 type cleanupManager interface {
@@ -95,12 +90,6 @@ type coreV1Interface interface {
 //goland:noinspection GoUnusedType
 type ecosystemV1Alpha1Interface interface {
 	ecosystem.V1Alpha1Interface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type configurationContext interface {
-	registry.ConfigurationContext
 }
 
 //nolint:unused
