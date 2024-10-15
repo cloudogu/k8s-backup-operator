@@ -4,8 +4,9 @@ import (
 	"context"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -44,10 +45,10 @@ type requeueHandler interface {
 }
 
 type maintenanceModeSwitch interface {
-	// ActivateMaintenanceMode activates the maintenance mode.
-	ActivateMaintenanceMode(ctx context.Context, title string, text string) error
-	// DeactivateMaintenanceMode deactivates the maintenance mode.
-	DeactivateMaintenanceMode(ctx context.Context) error
+	// Activate activates the maintenance mode.
+	Activate(ctx context.Context, description repository.MaintenanceModeDescription) error
+	// Deactivate deactivates the maintenance mode.
+	Deactivate(ctx context.Context) error
 }
 
 type cleanupManager interface {
@@ -71,7 +72,7 @@ type statefulSetInterface interface {
 //nolint:unused
 //goland:noinspection GoUnusedType
 type serviceInterface interface {
-	v12.ServiceInterface
+	corev1.ServiceInterface
 }
 
 //nolint:unused
@@ -83,7 +84,13 @@ type appsV1Interface interface {
 //nolint:unused
 //goland:noinspection GoUnusedType
 type coreV1Interface interface {
-	v12.CoreV1Interface
+	corev1.CoreV1Interface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type configMapInterface interface {
+	corev1.ConfigMapInterface
 }
 
 //nolint:unused

@@ -6,6 +6,8 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-registry-lib/repository"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -27,8 +29,8 @@ type eventRecorder interface {
 }
 
 type MaintenanceModeSwitch interface {
-	ActivateMaintenanceMode(ctx context.Context, title string, text string) error
-	DeactivateMaintenanceMode(ctx context.Context) error
+	Activate(ctx context.Context, description repository.MaintenanceModeDescription) error
+	Deactivate(ctx context.Context) error
 }
 
 type backupControllerManager interface {
@@ -59,6 +61,18 @@ type requeueHandler interface {
 //goland:noinspection GoUnusedType
 type backupV1Alpha1Interface interface {
 	ecosystem.V1Alpha1Interface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type backupCoreV1Interface interface {
+	corev1.CoreV1Interface
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type backupConfigMapInterface interface {
+	corev1.ConfigMapInterface
 }
 
 //nolint:unused

@@ -305,7 +305,6 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		ecosystemClientSet,
 		operatorConfig.Namespace,
 		recorder,
-		globalConfig,
 		cleanupManager,
 	)
 	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {

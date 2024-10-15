@@ -14,6 +14,8 @@ github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UF
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/cloudogu/cesapp-lib v0.14.0 h1:955cU7ivgiSJGPJ36/YHhbrT0d7Km+7BwOITPrAJijo=
 github.com/cloudogu/cesapp-lib v0.14.0/go.mod h1:PTQqI3xs1ReJMXYE6BGTF33yAfmS4J7P8UiE4AwDMDY=
+github.com/cloudogu/k8s-registry-lib v0.2.2-0.20241008133309-abfe7e839085 h1:geLHVzF/ln8QjYNNUC3QR/RVElI8/fdDMSFgEvrw8pQ=
+github.com/cloudogu/k8s-registry-lib v0.2.2-0.20241008133309-abfe7e839085/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
 github.com/cloudogu/k8s-registry-lib v0.4.1 h1:V5fOMIYYH1XqwNQ0NjTWViD1G4R146KQVjIuCuPO5dc=
 github.com/cloudogu/k8s-registry-lib v0.4.1/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=

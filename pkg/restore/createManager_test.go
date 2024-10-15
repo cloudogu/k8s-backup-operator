@@ -3,7 +3,9 @@ package restore
 import (
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,11 +15,14 @@ import (
 func Test_newCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
+		configMapMock := newMockConfigMapInterface(t)
+		corev1Client := newMockCoreV1Interface(t)
+		corev1Client.EXPECT().ConfigMaps(mock.Anything).Return(configMapMock)
 		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().CoreV1().Return(corev1Client)
 
 		// when
-		manager := newCreateManager(clientSetMock, testNamespace, nil, globalConfigRepositoryMock, nil)
+		manager := newCreateManager(clientSetMock, testNamespace, nil, nil)
 
 		// then
 		require.NotNil(t, manager)
@@ -48,8 +53,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Restore in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 
 		restoreClientMock.EXPECT().UpdateStatusCompleted(testCtx, restore).Return(restore, nil)
 
@@ -93,8 +98,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Restore in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
@@ -251,7 +256,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Restore in progress").Return(assert.AnError)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}).Return(assert.AnError)
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
 		clientSetMock := newMockEcosystemInterface(t)
@@ -289,8 +294,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Restore in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(assert.AnError)
@@ -333,8 +338,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Restore in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
@@ -377,8 +382,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Restore in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
@@ -422,8 +427,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Restore in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)

@@ -5,6 +5,7 @@ package backup
 import (
 	context "context"
 
+	repository "github.com/cloudogu/k8s-registry-lib/repository"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -21,17 +22,17 @@ func (_m *MockMaintenanceModeSwitch) EXPECT() *MockMaintenanceModeSwitch_Expecte
 	return &MockMaintenanceModeSwitch_Expecter{mock: &_m.Mock}
 }
 
-// ActivateMaintenanceMode provides a mock function with given fields: ctx, title, text
-func (_m *MockMaintenanceModeSwitch) ActivateMaintenanceMode(ctx context.Context, title string, text string) error {
-	ret := _m.Called(ctx, title, text)
+// Activate provides a mock function with given fields: ctx, description
+func (_m *MockMaintenanceModeSwitch) Activate(ctx context.Context, description repository.MaintenanceModeDescription) error {
+	ret := _m.Called(ctx, description)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ActivateMaintenanceMode")
+		panic("no return value specified for Activate")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, title, text)
+	if rf, ok := ret.Get(0).(func(context.Context, repository.MaintenanceModeDescription) error); ok {
+		r0 = rf(ctx, description)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -39,42 +40,41 @@ func (_m *MockMaintenanceModeSwitch) ActivateMaintenanceMode(ctx context.Context
 	return r0
 }
 
-// MockMaintenanceModeSwitch_ActivateMaintenanceMode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ActivateMaintenanceMode'
-type MockMaintenanceModeSwitch_ActivateMaintenanceMode_Call struct {
+// MockMaintenanceModeSwitch_Activate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Activate'
+type MockMaintenanceModeSwitch_Activate_Call struct {
 	*mock.Call
 }
 
-// ActivateMaintenanceMode is a helper method to define mock.On call
+// Activate is a helper method to define mock.On call
 //   - ctx context.Context
-//   - title string
-//   - text string
-func (_e *MockMaintenanceModeSwitch_Expecter) ActivateMaintenanceMode(ctx interface{}, title interface{}, text interface{}) *MockMaintenanceModeSwitch_ActivateMaintenanceMode_Call {
-	return &MockMaintenanceModeSwitch_ActivateMaintenanceMode_Call{Call: _e.mock.On("ActivateMaintenanceMode", ctx, title, text)}
+//   - description repository.MaintenanceModeDescription
+func (_e *MockMaintenanceModeSwitch_Expecter) Activate(ctx interface{}, description interface{}) *MockMaintenanceModeSwitch_Activate_Call {
+	return &MockMaintenanceModeSwitch_Activate_Call{Call: _e.mock.On("Activate", ctx, description)}
 }
 
-func (_c *MockMaintenanceModeSwitch_ActivateMaintenanceMode_Call) Run(run func(ctx context.Context, title string, text string)) *MockMaintenanceModeSwitch_ActivateMaintenanceMode_Call {
+func (_c *MockMaintenanceModeSwitch_Activate_Call) Run(run func(ctx context.Context, description repository.MaintenanceModeDescription)) *MockMaintenanceModeSwitch_Activate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(repository.MaintenanceModeDescription))
 	})
 	return _c
 }
 
-func (_c *MockMaintenanceModeSwitch_ActivateMaintenanceMode_Call) Return(_a0 error) *MockMaintenanceModeSwitch_ActivateMaintenanceMode_Call {
+func (_c *MockMaintenanceModeSwitch_Activate_Call) Return(_a0 error) *MockMaintenanceModeSwitch_Activate_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockMaintenanceModeSwitch_ActivateMaintenanceMode_Call) RunAndReturn(run func(context.Context, string, string) error) *MockMaintenanceModeSwitch_ActivateMaintenanceMode_Call {
+func (_c *MockMaintenanceModeSwitch_Activate_Call) RunAndReturn(run func(context.Context, repository.MaintenanceModeDescription) error) *MockMaintenanceModeSwitch_Activate_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// DeactivateMaintenanceMode provides a mock function with given fields: ctx
-func (_m *MockMaintenanceModeSwitch) DeactivateMaintenanceMode(ctx context.Context) error {
+// Deactivate provides a mock function with given fields: ctx
+func (_m *MockMaintenanceModeSwitch) Deactivate(ctx context.Context) error {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for DeactivateMaintenanceMode")
+		panic("no return value specified for Deactivate")
 	}
 
 	var r0 error
@@ -87,30 +87,30 @@ func (_m *MockMaintenanceModeSwitch) DeactivateMaintenanceMode(ctx context.Conte
 	return r0
 }
 
-// MockMaintenanceModeSwitch_DeactivateMaintenanceMode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeactivateMaintenanceMode'
-type MockMaintenanceModeSwitch_DeactivateMaintenanceMode_Call struct {
+// MockMaintenanceModeSwitch_Deactivate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Deactivate'
+type MockMaintenanceModeSwitch_Deactivate_Call struct {
 	*mock.Call
 }
 
-// DeactivateMaintenanceMode is a helper method to define mock.On call
+// Deactivate is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockMaintenanceModeSwitch_Expecter) DeactivateMaintenanceMode(ctx interface{}) *MockMaintenanceModeSwitch_DeactivateMaintenanceMode_Call {
-	return &MockMaintenanceModeSwitch_DeactivateMaintenanceMode_Call{Call: _e.mock.On("DeactivateMaintenanceMode", ctx)}
+func (_e *MockMaintenanceModeSwitch_Expecter) Deactivate(ctx interface{}) *MockMaintenanceModeSwitch_Deactivate_Call {
+	return &MockMaintenanceModeSwitch_Deactivate_Call{Call: _e.mock.On("Deactivate", ctx)}
 }
 
-func (_c *MockMaintenanceModeSwitch_DeactivateMaintenanceMode_Call) Run(run func(ctx context.Context)) *MockMaintenanceModeSwitch_DeactivateMaintenanceMode_Call {
+func (_c *MockMaintenanceModeSwitch_Deactivate_Call) Run(run func(ctx context.Context)) *MockMaintenanceModeSwitch_Deactivate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context))
 	})
 	return _c
 }
 
-func (_c *MockMaintenanceModeSwitch_DeactivateMaintenanceMode_Call) Return(_a0 error) *MockMaintenanceModeSwitch_DeactivateMaintenanceMode_Call {
+func (_c *MockMaintenanceModeSwitch_Deactivate_Call) Return(_a0 error) *MockMaintenanceModeSwitch_Deactivate_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockMaintenanceModeSwitch_DeactivateMaintenanceMode_Call) RunAndReturn(run func(context.Context) error) *MockMaintenanceModeSwitch_DeactivateMaintenanceMode_Call {
+func (_c *MockMaintenanceModeSwitch_Deactivate_Call) RunAndReturn(run func(context.Context) error) *MockMaintenanceModeSwitch_Deactivate_Call {
 	_c.Call.Return(run)
 	return _c
 }
