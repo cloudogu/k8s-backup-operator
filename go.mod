@@ -6,13 +6,10 @@ toolchain go1.23.1
 
 require (
 	github.com/Masterminds/semver/v3 v3.3.0
-	github.com/cloudogu/cesapp-lib v0.14.0
 	github.com/cloudogu/k8s-registry-lib v0.2.2-0.20241008133309-abfe7e839085
 	github.com/dlclark/regexp2 v1.11.4
 	github.com/go-logr/logr v1.4.2
 	github.com/google/gnostic-models v0.6.8
-	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega v1.34.2
 	github.com/stretchr/testify v1.9.0
 	github.com/vmware-tanzu/velero v1.12.1
 	k8s.io/api v0.31.1
