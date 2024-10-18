@@ -1,6 +1,6 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-backup-operator
-VERSION=0.11.0
+VERSION=1.0.0
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.23
 LINT_VERSION=v1.61.0
