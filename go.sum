@@ -18,6 +18,8 @@ github.com/cloudogu/k8s-registry-lib v0.2.2-0.20241008133309-abfe7e839085 h1:geL
 github.com/cloudogu/k8s-registry-lib v0.2.2-0.20241008133309-abfe7e839085/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
 github.com/cloudogu/k8s-registry-lib v0.4.1 h1:V5fOMIYYH1XqwNQ0NjTWViD1G4R146KQVjIuCuPO5dc=
 github.com/cloudogu/k8s-registry-lib v0.4.1/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
+github.com/cloudogu/k8s-registry-lib v0.5.0 h1:mdo8+0cSLicCNyymc8GbTl8ku5sMGA3IR/n5ga2WIvI=
+github.com/cloudogu/k8s-registry-lib v0.5.0/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
 github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
 github.com/containerd/platforms v0.2.1 h1:zvwtM3rz2YHPQsF2CHYM8+KtB5dvhISiXh5ZpSBQv6A=
