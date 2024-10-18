@@ -434,6 +434,7 @@ func Test_startOperator(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "unable to configure manager: unable to add checks to the manager: unable to set up health check")
 	})
+	var skipNameValidation = true
 	t.Run("should fail to add readiness check to controller manager", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
@@ -464,7 +465,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
-		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
+		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
@@ -507,6 +508,7 @@ func Test_startOperator(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "unable to configure manager: unable to add checks to the manager: unable to set up ready check")
 	})
+
 	t.Run("should fail to start controller manager", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
@@ -539,7 +541,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
-		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
+		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
@@ -618,7 +620,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
-		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
+		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)

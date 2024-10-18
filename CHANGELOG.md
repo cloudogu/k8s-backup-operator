@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.0] - 2024-10-18
+### Changed
+- [#31] Use cluster native config instead of the etcd.
+
 ## [v0.11.0] - 2024-09-18
 ### Changed
 - [#29] Relicense to AGPL-3.0-only

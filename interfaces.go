@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
@@ -16,11 +15,13 @@ type eventRecorder interface {
 	record.EventRecorder
 }
 
+// used for mocks
+
+//nolint:unused
+//goland:noinspection GoUnusedType
 type controllerManager interface {
 	manager.Manager
 }
-
-// used for mocks
 
 //nolint:unused
 //goland:noinspection GoUnusedType
@@ -50,18 +51,6 @@ type additionalImageGetter interface {
 //goland:noinspection GoUnusedType
 type additionalImageUpdater interface {
 	additionalimages.Updater
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type etcdRegistry interface {
-	registry.Registry
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type etcdContext interface {
-	registry.ConfigurationContext
 }
 
 //nolint:unused

@@ -2,6 +2,8 @@ package backup
 
 import (
 	"context"
+	"github.com/cloudogu/k8s-registry-lib/repository"
+	"github.com/stretchr/testify/mock"
 	"testing"
 
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
@@ -19,12 +21,15 @@ var testCtx = context.TODO()
 func TestNewBackupCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		registryMock := newMockEtcdRegistry(t)
-		globalMock := newMockConfigurationContext(t)
-		registryMock.EXPECT().GlobalConfig().Return(globalMock)
+		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
+		configMapMock := newMockBackupConfigMapInterface(t)
+		corev1Client := newMockBackupCoreV1Interface(t)
+		corev1Client.EXPECT().ConfigMaps(mock.Anything).Return(configMapMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().CoreV1().Return(corev1Client)
 
 		// when
-		manager := newBackupCreateManager(nil, "", nil, registryMock)
+		manager := newBackupCreateManager(clientSetMock, "", nil, globalConfigRepositoryMock)
 
 		// then
 		require.NotNil(t, manager)
@@ -62,8 +67,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 			assert.NotEmpty(t, backup.Status.CompletionTimestamp)
 		}).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
@@ -109,8 +114,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 			assert.NotEmpty(t, backup.Status.CompletionTimestamp)
 		}).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
@@ -269,7 +274,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 			assert.NotEmpty(t, backup.Status.CompletionTimestamp)
 		}).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(assert.AnError)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(assert.AnError)
 
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
@@ -307,8 +312,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 			assert.NotEmpty(t, backup.Status.CompletionTimestamp)
 		}).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
 		clientSetMock := newMockEcosystemInterface(t)
@@ -350,8 +355,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 			assert.NotEmpty(t, backup.Status.CompletionTimestamp)
 		}).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
 		clientSetMock := newMockEcosystemInterface(t)
@@ -396,8 +401,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 			assert.NotEmpty(t, backup.Status.CompletionTimestamp)
 		}).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
 		clientSetMock := newMockEcosystemInterface(t)
@@ -442,8 +447,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 			assert.NotEmpty(t, backup.Status.CompletionTimestamp)
 		}).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
 		clientSetMock := newMockEcosystemInterface(t)
@@ -488,8 +493,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		}).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusFailed(testCtx, backup).Return(nil, assert.AnError)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
 		clientSetMock := newMockEcosystemInterface(t)
@@ -536,8 +541,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 			assert.NotEmpty(t, backup.Status.CompletionTimestamp)
 		}).Return(backup, nil)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(assert.AnError)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(assert.AnError)
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
 		clientSetMock := newMockEcosystemInterface(t)
@@ -578,8 +583,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientMock.EXPECT().UpdateStatusCompleted(testCtx, backup).Return(nil, nil)
 		clientMock.EXPECT().Get(testCtx, backup.Name, metav1.GetOptions{}).Return(nil, assert.AnError)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
 		clientSetMock := newMockEcosystemInterface(t)
@@ -623,8 +628,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 			assert.NotEmpty(t, backup.Status.CompletionTimestamp)
 		}).Return(nil, assert.AnError)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
 		clientSetMock := newMockEcosystemInterface(t)
@@ -668,8 +673,8 @@ func Test_backupCreateManager_create(t *testing.T) {
 		}).Return(backup, nil)
 		clientMock.EXPECT().UpdateStatusCompleted(testCtx, backup).Return(nil, assert.AnError)
 		maintenanceModeMock := NewMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().ActivateMaintenanceMode(testCtx, "Service temporary unavailable", "Backup in progress").Return(nil)
-		maintenanceModeMock.EXPECT().DeactivateMaintenanceMode(testCtx).Return(nil)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Backup in progress"}).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
 		v1Alpha1Client := newMockBackupV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
 		clientSetMock := newMockEcosystemInterface(t)

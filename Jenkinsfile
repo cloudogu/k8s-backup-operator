@@ -12,7 +12,7 @@ github = new GitHub(this, git)
 changelog = new Changelog(this)
 Docker docker = new Docker(this)
 gpg = new Gpg(this, docker)
-goVersion = "1.22"
+goVersion = "1.23"
 Makefile makefile = new Makefile(this)
 
 // Configuration of repository
@@ -53,10 +53,6 @@ node('docker') {
                             stage("Unit test") {
                                 make 'unit-test'
                                 junit allowEmptyResults: true, testResults: 'target/unit-tests/*-tests.xml'
-                            }
-
-                            stage('k8s-Integration-Test') {
-                                make 'k8s-integration-test'
                             }
 
                             stage("Review dog analysis") {
@@ -100,18 +96,6 @@ node('docker') {
                         .inside("--volume ${WORKSPACE}:/workdir -w /workdir") {
                             sh "STAGE=development IMAGE_DEV=${repository} make helm-values-replace-image-repo"
                         }
-            }
-
-            stage('Deploy etcd') {
-                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD']]) {
-                    k3d.helm("registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'")
-                    k3d.helm("install k8s-etcd oci://${registry}/${registry_namespace}/k8s-etcd --version 3.5.9-1")
-                }
-            }
-
-            stage('Wait for etcd to be ready') {
-                sleep(time: 5, unit: "SECONDS")
-                k3d.kubectl("wait --for=condition=ready pod -l statefulset.kubernetes.io/pod-name=etcd-0 --timeout=300s")
             }
 
             stage('Deploy Manager') {
