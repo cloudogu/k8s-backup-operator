@@ -8,9 +8,8 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/cloudogu/cesapp-lib/registry"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/maintenance"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -22,17 +21,17 @@ const (
 )
 
 type backupCreateManager struct {
-	clientSet             ecosystemInterface
-	namespace             string
-	registry              registry.Registry
-	recorder              eventRecorder
-	maintenanceModeSwitch MaintenanceModeSwitch
+	clientSet              ecosystemInterface
+	namespace              string
+	globalConfigRepository globalConfigRepository
+	recorder               eventRecorder
+	maintenanceModeSwitch  MaintenanceModeSwitch
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, registry registry.Registry) *backupCreateManager {
-	maintenanceModeSwitch := maintenance.New(registry.GlobalConfig())
-	return &backupCreateManager{clientSet: clientSet, namespace: namespace, registry: registry, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch}
+func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository) *backupCreateManager {
+	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", clientSet.CoreV1().ConfigMaps(namespace))
+	return &backupCreateManager{clientSet: clientSet, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch}
 }
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {
@@ -68,13 +67,13 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 		return fmt.Errorf("failed to add labels to backup resource: %w", err)
 	}
 
-	err = bcm.maintenanceModeSwitch.ActivateMaintenanceMode(ctx, maintenanceModeTitle, maintenanceModeText)
+	err = bcm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText})
 	if err != nil {
 		return fmt.Errorf("failed to active maintenance mode: %w", err)
 	}
 
 	defer func() {
-		errDefer := bcm.maintenanceModeSwitch.DeactivateMaintenanceMode(ctx)
+		errDefer := bcm.maintenanceModeSwitch.Deactivate(ctx)
 		if errDefer != nil {
 			logger.Error(fmt.Errorf("failed to deactivate maintenance mode: [%w]", errDefer), "backup error")
 		}

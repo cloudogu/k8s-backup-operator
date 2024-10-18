@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/maintenance"
 	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 
@@ -29,10 +29,9 @@ func newCreateManager(
 	ecosystemClientSet ecosystemInterface,
 	namespace string,
 	recorder eventRecorder,
-	registry cesRegistry,
 	cleanup cleanupManager,
 ) *defaultCreateManager {
-	maintenanceSwitch := maintenance.NewWithLooseCoupling(registry.GlobalConfig(), ecosystemClientSet.AppsV1().StatefulSets(namespace), ecosystemClientSet.CoreV1().Services(namespace))
+	maintenanceSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", ecosystemClientSet.CoreV1().ConfigMaps(namespace))
 	return &defaultCreateManager{
 		ecosystemClientSet:    ecosystemClientSet,
 		namespace:             namespace,
@@ -69,13 +68,13 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
 	}
 
-	err = cm.maintenanceModeSwitch.ActivateMaintenanceMode(ctx, maintenanceModeTitle, maintenanceModeText)
+	err = cm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText})
 	if err != nil {
 		return fmt.Errorf("failed to activate maintenance mode: %w", err)
 	}
 
 	defer func() {
-		errDefer := cm.maintenanceModeSwitch.DeactivateMaintenanceMode(ctx)
+		errDefer := cm.maintenanceModeSwitch.Deactivate(ctx)
 		if errDefer != nil {
 			logger.Error(fmt.Errorf("failed to deactivate maintenance mode: [%w]", errDefer), "restore error")
 		}

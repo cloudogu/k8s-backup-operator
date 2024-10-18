@@ -1,6 +1,7 @@
 package restore
 
 import (
+	"github.com/stretchr/testify/mock"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,22 +10,14 @@ import (
 func TestNewRestoreManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		registryMock := newMockCesRegistry(t)
-		globalConfigMock := newMockConfigurationContext(t)
-		registryMock.EXPECT().GlobalConfig().Return(globalConfigMock)
-
-		statefulSetMock := newMockStatefulSetInterface(t)
-		serviceMock := newMockServiceInterface(t)
-		appsV1Mock := newMockAppsV1Interface(t)
-		appsV1Mock.EXPECT().StatefulSets(testNamespace).Return(statefulSetMock)
-		coreV1Mock := newMockCoreV1Interface(t)
-		coreV1Mock.EXPECT().Services(testNamespace).Return(serviceMock)
+		corev1Client := newMockCoreV1Interface(t)
+		configMapMock := newMockConfigMapInterface(t)
+		corev1Client.EXPECT().ConfigMaps(mock.Anything).Return(configMapMock)
 		clientSetMock := newMockEcosystemInterface(t)
-		clientSetMock.EXPECT().AppsV1().Return(appsV1Mock)
-		clientSetMock.EXPECT().CoreV1().Return(coreV1Mock)
+		clientSetMock.EXPECT().CoreV1().Return(corev1Client)
 
 		// when
-		manager := NewRestoreManager(clientSetMock, testNamespace, nil, registryMock, nil)
+		manager := NewRestoreManager(clientSetMock, testNamespace, nil, nil)
 
 		// then
 		require.NotNil(t, manager)
