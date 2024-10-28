@@ -1,15 +1,17 @@
 apiVersion: v1
 values:
   images:
-    backupOperator: cloudogu/k8s-backup-operator:1.0.0
+    backupOperator: cloudogu/k8s-backup-operator:1.1.0
     kubeRbacProxy: gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1
 patches:
   values.yaml:
     kubeRbacProxy:
       image:
-        repository: "{{ registryFrom .images.kubeRbacProxy }}/{{ repositoryFrom .images.kubeRbacProxy }}"
+        registry: "{{ registryFrom .images.kubeRbacProxy }}"
+        repository: "{{ repositoryFrom .images.kubeRbacProxy }}"
         tag: "{{ tagFrom .images.kubeRbacProxy }}"
     manager:
       image:
-        repository: "{{ registryFrom .images.backupOperator }}/{{ repositoryFrom .images.backupOperator }}"
+        registry: "{{ registryFrom .images.backupOperator }}"
+        repository: "{{ repositoryFrom .images.backupOperator }}"
         tag: "{{ tagFrom .images.backupOperator }}"
