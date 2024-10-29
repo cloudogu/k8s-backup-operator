@@ -25,4 +25,4 @@ appVersion: "0.0.0-replaceme"
 
 annotations:
   "k8s.cloudogu.com/ces-dependency/k8s-velero": "5.0.x-0"
-  "k8s.cloudogu.com/ces-dependency/k8s-backup-operator-crd": "0.x.x-0"
+  "k8s.cloudogu.com/ces-dependency/k8s-backup-operator-crd": "1.x.x-0"
