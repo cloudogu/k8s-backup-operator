@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.1] - 2024-10-29
+### Fixed
+- [#35] Use correct helm dependency constraint for `backup-operator-crd`.
+
 ## [v1.1.0] - 2024-10-28
 ### Changed
 - [#33] Make imagePullSecrets configurable via helm values and use `ces-container-registries` as default.
