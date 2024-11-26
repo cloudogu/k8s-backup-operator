@@ -22,6 +22,8 @@ and an access key `longhorn-test-key` with the secret key `longhorn-test-secret-
 Furthermore, [k8s-snapshot-controller][snapshot-ctrl-repo] and [k8s-velero][velero-repo] have to be installed as components.
 To do this, check out the repositories and execute the following commands inside:
 ```shell
+# only in k8s-velero
+cd k8s/helm/templates && helm dependency update
 # only in the snapshot-controller:
 make crd-component-apply
 # for snapshot-controller and velero:
