@@ -1,0 +1,34 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "k8s-backup-operator.name" . }}-backup-editor-role
+  labels:
+    app.kubernetes.io/component: rbac
+  {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - k8s.cloudogu.com
+  resources:
+  - backups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.cloudogu.com
+  resources:
+  - backups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - k8s.cloudogu.com
+  resources:
+  - backups/status
+  verbs:
+  - get
+  - patch
+  - update
