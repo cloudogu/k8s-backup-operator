@@ -37,19 +37,3 @@ rules:
   verbs:
   - create
   - patch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ include "k8s-backup-operator.name" . }}-leader-election-rolebinding
-  labels:
-    app.kubernetes.io/component: rbac
-  {{- include "k8s-backup-operator.labels" . | nindent 4 }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: '{{ include "k8s-backup-operator.name" . }}-leader-election-role'
-subjects:
-- kind: ServiceAccount
-  name: '{{ include "k8s-backup-operator.name" . }}-controller-manager'
-  namespace: '{{ .Release.Namespace }}'
