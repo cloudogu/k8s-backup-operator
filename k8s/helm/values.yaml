@@ -23,7 +23,7 @@ manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-backup-operator
-    tag: 1.1.1
+    tag: 1.2.0
   imagePullPolicy: IfNotPresent
   resources:
     limits:
