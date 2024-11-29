@@ -1,3 +1,4 @@
+# This is necessary to manage velero backups and restores
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -48,19 +49,3 @@ rules:
   - get
   - list
   - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ include "k8s-backup-operator.name" . }}-velero-rolebinding
-  labels:
-    app.kubernetes.io/component: rbac
-  {{- include "k8s-backup-operator.labels" . | nindent 4 }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: '{{ include "k8s-backup-operator.name" . }}-velero-role'
-subjects:
-- kind: ServiceAccount
-  name: '{{ include "k8s-backup-operator.name" . }}-controller-manager'
-  namespace: '{{ .Release.Namespace }}'

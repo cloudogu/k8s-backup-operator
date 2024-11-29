@@ -1,6 +1,6 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-backup-operator
-VERSION=1.1.1
+VERSION=1.2.0
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.23
 LINT_VERSION=v1.61.0
@@ -26,9 +26,8 @@ CRD_BACKUP_SOURCE = ${HELM_CRD_SOURCE_DIR}/templates/k8s.cloudogu.com_backups.ya
 CRD_RESTORE_SOURCE = ${HELM_CRD_SOURCE_DIR}/templates/k8s.cloudogu.com_restores.yaml
 CRD_SCHEDULE_SOURCE = ${HELM_CRD_SOURCE_DIR}/templates/k8s.cloudogu.com_backupschedules.yaml
 PRE_COMPILE=generate-deepcopy
-HELM_PRE_APPLY_TARGETS=template-stage template-log-level template-image-pull-policy
 HELM_PRE_GENERATE_TARGETS = helm-values-update-image-version
-HELM_POST_GENERATE_TARGETS = helm-values-replace-image-repo
+HELM_POST_GENERATE_TARGETS = helm-values-replace-image-repo template-stage template-log-level template-image-pull-policy
 CRD_POST_MANIFEST_TARGETS = crd-add-labels crd-add-backup-labels
 CHECK_VAR_TARGETS=check-all-vars
 IMAGE_IMPORT_TARGET=image-import

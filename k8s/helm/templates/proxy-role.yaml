@@ -1,0 +1,21 @@
+# This is necessary for the rbac proxy of the controller
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "k8s-backup-operator.name" . }}-proxy-role
+  labels:
+    app.kubernetes.io/component: kube-rbac-proxy
+  {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create

@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.0] - 2024-11-29
+### Changed
+- [#37] Refactor rbac permissions to be more clear and better match the use cases
+
+### Removed
+- [#37] Leader election and leader election rbac permissions
+- [#37] Metrics rbac permissions
+
+### Fixed
+- Do not abort restore when maintenance mode cannot be activated
+
 ## [v1.1.1] - 2024-10-29
 ### Fixed
 - [#35] Use correct helm dependency constraint for `backup-operator-crd`.

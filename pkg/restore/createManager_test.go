@@ -235,7 +235,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
-	t.Run("should return error failing activate maintenance mode", func(t *testing.T) {
+	t.Run("should continue with restore when failing ti activate maintenance mode", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
 
@@ -249,6 +249,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+		providerMock.EXPECT().CreateRestore(testCtx, restore).Return(nil)
+		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
 		oldNewVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
@@ -257,20 +259,25 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}).Return(assert.AnError)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx).Return(nil)
+
+		restoreClientMock.EXPECT().UpdateStatusCompleted(testCtx, restore).Return(restore, nil)
+
+		cleanupMock := newMockCleanupManager(t)
+		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
 
 		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to activate maintenance mode")
-		assert.ErrorIs(t, err, assert.AnError)
+		require.NoError(t, err)
 	})
 
 	t.Run("should return error on cleanup error", func(t *testing.T) {
