@@ -1,0 +1,23 @@
+apiVersion: k8s.cloudogu.com/v1
+kind: Component
+metadata:
+  labels:
+    app: ces
+  name: k8s-backup-operator-crd
+  namespace: ecosystem
+spec:
+  name: k8s-backup-operator-crd
+  namespace: k8s
+  version: 1.1.1
+---
+apiVersion: k8s.cloudogu.com/v1
+kind: Component
+metadata:
+  labels:
+    app: ces
+  name: k8s-backup-operator
+  namespace: ecosystem
+spec:
+  name: k8s-backup-operator
+  namespace: k8s
+  version: 1.1.1
