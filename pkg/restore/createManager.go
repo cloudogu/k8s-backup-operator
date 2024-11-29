@@ -70,7 +70,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 
 	err = cm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText})
 	if err != nil {
-		return fmt.Errorf("failed to activate maintenance mode: %w", err)
+		logger.Error(err, "The Maintenance mode could not be activated. Continuing anyways...")
 	}
 
 	defer func() {
