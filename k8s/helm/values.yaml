@@ -1,6 +1,8 @@
 global:
   imagePullSecrets:
     - name: "ces-container-registries"
+  networkPolicies:
+    enabled: true
 retention:
   strategy: keepAll
   garbageCollectionCron: "0 * * * *"
@@ -33,5 +35,3 @@ manager:
       cpu: 10m
       memory: 64Mi
   replicas: 1
-networkPolicies:
-  enabled: true
