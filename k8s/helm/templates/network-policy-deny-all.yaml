@@ -1,0 +1,15 @@
+{{- if .Values.global.networkPolicies.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backup-operator-deny-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+      {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: k8s-backup-operator
+  policyTypes:
+    - Ingress
+{{- end }}
