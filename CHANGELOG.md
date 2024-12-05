@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.0] - 2024-12-05
+### Added
+- [#40] Add NetworkPolicy to deny all ingress traffic
+
 ## [v1.2.0] - 2024-11-29
 ### Changed
 - [#37] Refactor rbac permissions to be more clear and better match the use cases
