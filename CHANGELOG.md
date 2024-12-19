@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.1] - 2024-12-19
+### Fixed
+- [#42] Removed unnecessary rbac proxy to fix CVE-2024-45337
+
 ## [v1.3.0] - 2024-12-05
 ### Added
 - [#40] Add NetworkPolicy to deny all ingress traffic

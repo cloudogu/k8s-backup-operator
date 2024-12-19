@@ -37,7 +37,7 @@ spec:
             imagePullPolicy: {{ .Values.manager.imagePullPolicy }}
             name: garbage-collector
             resources:
-            {{- toYaml .Values.kubeRbacProxy.resources | nindent 14 }}
+            {{- toYaml .Values.manager.resources | nindent 14 }}
             securityContext:
               allowPrivilegeEscalation: false
               capabilities:
