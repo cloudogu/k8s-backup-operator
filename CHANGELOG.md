@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- [#42] Removed rbac proxy to remove CVE-2024-45337
+- [#42] Removed unnecessary rbac proxy to fix CVE-2024-45337
 
 ## [v1.3.0] - 2024-12-05
 ### Added
