@@ -85,3 +85,7 @@ type globalConfigRepository interface {
 	Get(ctx context.Context) (config.GlobalConfig, error)
 	Update(ctx context.Context, globalConfig config.GlobalConfig) (config.GlobalConfig, error)
 }
+
+type ownerReferenceRecreator interface {
+	BackupOwnerReferences(ctx context.Context) error
+}

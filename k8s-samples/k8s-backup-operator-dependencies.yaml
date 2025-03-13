@@ -1,50 +1,13 @@
 apiVersion: v1
-data:
-  cloud: W2RlZmF1bHRdCmF3c19hY2Nlc3Nfa2V5X2lkPWxvbmdob3JuLXRlc3Qta2V5CmF3c19zZWNyZXRfYWNjZXNzX2tleT1sb25naG9ybi10ZXN0LXNlY3JldC1rZXkK
-kind: Secret
-metadata:
-  name: velero-backup-target
-  namespace: ecosystem
-type: Opaque
----
-apiVersion: k8s.cloudogu.com/v1
-kind: Component
-metadata:
-  labels:
-    app: ces
-  name: k8s-velero
-  namespace: ecosystem
-spec:
-  name: k8s-velero
-  namespace: k8s
-  version: 5.0.2-7
-  valuesYamlOverwrite: |
-    velero:
-      credentials:
-        useSecret: true
-        existingSecret: "velero-backup-target"
-      configuration:
-        backupStorageLocation:
-          - name: default
-            provider: aws
-            bucket: velero
-            accessMode: ReadWrite
-            config:
-              region: minio-default
-              s3ForcePathStyle: true
-              s3Url: http://192.168.56.1:9000
-              publicUrl: http://localhost:9000
----
-apiVersion: v1
-data:
-  AWS_ACCESS_KEY_ID: bG9uZ2hvcm4tdGVzdC1rZXk=
-  AWS_ENDPOINTS: aHR0cDovLzE5Mi4xNjguNTYuMTo5MDAw
-  AWS_SECRET_ACCESS_KEY: bG9uZ2hvcm4tdGVzdC1zZWNyZXQta2V5
 kind: Secret
 metadata:
   name: longhorn-backup-target
   namespace: longhorn-system
 type: Opaque
+stringData:
+  AWS_ENDPOINTS: "http://192.168.56.1:9000"
+  AWS_ACCESS_KEY_ID: "MY-ACCESS-KEY"
+  AWS_SECRET_ACCESS_KEY: "MY-ACCESS-SECRET123"
 ---
 apiVersion: k8s.cloudogu.com/v1
 kind: Component
@@ -57,7 +20,7 @@ spec:
   deployNamespace: longhorn-system
   name: k8s-longhorn
   namespace: k8s
-  version: 1.5.1-8
+  version: 1.5.1-9
   valuesYamlOverwrite: |
     longhorn:
       defaultSettings:
@@ -74,7 +37,7 @@ metadata:
 spec:
   name: k8s-snapshot-controller-crd
   namespace: k8s
-  version: 5.0.1-7
+  version: 5.0.1-8
 ---
 apiVersion: k8s.cloudogu.com/v1
 kind: Component
@@ -86,4 +49,44 @@ metadata:
 spec:
   name: k8s-snapshot-controller
   namespace: k8s
-  version: 5.0.1-7
+  version: 5.0.1-8
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: velero-backup-target
+  namespace: ecosystem
+type: Opaque
+stringData:
+  cloud: |
+    [default]
+    aws_access_key_id=MY-VELERO-ACCESS-KEY
+    aws_secret_access_key=MY-VELERO.ACCESS-SECRET123
+---
+apiVersion: k8s.cloudogu.com/v1
+kind: Component
+metadata:
+  labels:
+    app: ces
+  name: k8s-velero
+  namespace: ecosystem
+spec:
+  name: k8s-velero
+  namespace: k8s
+  version: 5.0.2-9
+  valuesYamlOverwrite: |
+    velero:
+      credentials:
+        useSecret: true
+        existingSecret: "velero-backup-target"
+      configuration:
+        backupStorageLocation:
+          - name: default
+            provider: aws
+            bucket: velero
+            accessMode: ReadWrite
+            config:
+              region: minio-default
+              s3ForcePathStyle: true
+              s3Url: http://192.168.56.1:9000
+              publicUrl: http://localhost:9000

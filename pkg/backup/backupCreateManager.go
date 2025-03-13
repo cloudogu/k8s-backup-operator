@@ -7,6 +7,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-registry-lib/repository"
@@ -26,18 +27,29 @@ type backupCreateManager struct {
 	globalConfigRepository globalConfigRepository
 	recorder               eventRecorder
 	maintenanceModeSwitch  MaintenanceModeSwitch
+	recreator              ownerReferenceRecreator
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository) *backupCreateManager {
+func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, recreator ownerReferenceRecreator) *backupCreateManager {
 	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", clientSet.CoreV1().ConfigMaps(namespace))
-	return &backupCreateManager{clientSet: clientSet, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch}
+	return &backupCreateManager{clientSet: clientSet, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, recreator: recreator}
 }
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {
 	logger := log.FromContext(ctx)
 	bcm.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 	backupClient := bcm.clientSet.EcosystemV1Alpha1().Backups(bcm.namespace)
+
+	if strings.Contains(backup.Name, "test") {
+		lErr := bcm.recreator.BackupOwnerReferences(ctx)
+		if lErr != nil {
+			fmt.Printf("ERROR: %v", lErr)
+			return lErr
+		}
+
+		return nil
+	}
 
 	backup, err := backupClient.UpdateStatusInProgress(ctx, backup)
 	if err != nil {
