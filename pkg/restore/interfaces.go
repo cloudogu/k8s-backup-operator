@@ -103,3 +103,7 @@ type ecosystemV1Alpha1Interface interface {
 type restoreProvider interface {
 	provider.Provider
 }
+
+type ownerReferenceRestore interface {
+	RestoreOwnerReferences(ctx context.Context) error
+}

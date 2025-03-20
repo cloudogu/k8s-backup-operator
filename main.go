@@ -300,6 +300,11 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("failed to update additional images in existing resources: %w", err)
 	}
 
+	r, err := ownerreference.NewRecreator(k8sManager.GetConfig(), namespace)
+	if err != nil {
+		return fmt.Errorf("unable to create owner reference client: %w", err)
+	}
+
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
 	cleanupManager := cleanup.NewManager(operatorConfig.Namespace, k8sManager.GetClient(), k8sClientSet)
 	restoreManager := restore.NewRestoreManager(
@@ -307,14 +312,10 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		operatorConfig.Namespace,
 		recorder,
 		cleanupManager,
+		r,
 	)
 	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
-	}
-
-	r, err := ownerreference.NewRecreator(k8sManager.GetConfig(), namespace)
-	if err != nil {
-		return fmt.Errorf("unable to create owner reference client: %w", err)
 	}
 
 	backupManager := backup.NewBackupManager(ecosystemClientSet, operatorConfig.Namespace, recorder, globalConfig, r)
