@@ -86,6 +86,6 @@ type globalConfigRepository interface {
 	Update(ctx context.Context, globalConfig config.GlobalConfig) (config.GlobalConfig, error)
 }
 
-type ownerReferenceRecreator interface {
+type ownerReferenceBackup interface {
 	BackupOwnerReferences(ctx context.Context) error
 }

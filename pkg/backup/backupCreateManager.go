@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
-
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-registry-lib/repository"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -27,11 +25,11 @@ type backupCreateManager struct {
 	globalConfigRepository globalConfigRepository
 	recorder               eventRecorder
 	maintenanceModeSwitch  MaintenanceModeSwitch
-	recreator              ownerReferenceRecreator
+	recreator              ownerReferenceBackup
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, recreator ownerReferenceRecreator) *backupCreateManager {
+func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, recreator ownerReferenceBackup) *backupCreateManager {
 	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", clientSet.CoreV1().ConfigMaps(namespace))
 	return &backupCreateManager{clientSet: clientSet, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, recreator: recreator}
 }
@@ -40,16 +38,6 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 	logger := log.FromContext(ctx)
 	bcm.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 	backupClient := bcm.clientSet.EcosystemV1Alpha1().Backups(bcm.namespace)
-
-	if strings.Contains(backup.Name, "test") {
-		lErr := bcm.recreator.BackupOwnerReferences(ctx)
-		if lErr != nil {
-			fmt.Printf("ERROR: %v", lErr)
-			return lErr
-		}
-
-		return nil
-	}
 
 	backup, err := backupClient.UpdateStatusInProgress(ctx, backup)
 	if err != nil {
@@ -68,6 +56,11 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 			logger.Error(fmt.Errorf("failed to update completion time in status of backup resource: %w", err), "backup error")
 		}
 	}(backup)
+
+	err = bcm.recreator.BackupOwnerReferences(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to backup owner references: %w", err)
+	}
 
 	backup, err = backupClient.AddFinalizer(ctx, backup, v1.BackupFinalizer)
 	if err != nil {

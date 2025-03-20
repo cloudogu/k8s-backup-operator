@@ -7,7 +7,7 @@ type backupManager struct {
 }
 
 // NewBackupManager creates a new instance of backupManager containing a createManager, deleteManager and statusSyncManager.
-func NewBackupManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, recreator ownerReferenceRecreator) *backupManager {
+func NewBackupManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, recreator ownerReferenceBackup) *backupManager {
 	creator := newBackupCreateManager(clientSet, namespace, recorder, globalConfigRepository, recreator)
 	remover := newBackupDeleteManager(clientSet, namespace, recorder)
 	statusSyncManager := newBackupStatusSyncManager(clientSet, namespace, recorder)
