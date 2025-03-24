@@ -30,10 +30,6 @@
                   ".": {},
                   "f:app": {},
                   "f:dogu.name": {}
-                },
-                "f:ownerReferences": {
-                  ".": {},
-                  "k:{\"uid\":\"96a3bb49-38b0-4b5c-a264-56e370bc08b6\"}": {}
                 }
               },
               "f:spec": {
@@ -459,10 +455,6 @@
                   ".": {},
                   "f:app": {},
                   "f:dogu.name": {}
-                },
-                "f:ownerReferences": {
-                  ".": {},
-                  "k:{\"uid\":\"251e79cc-e50c-4225-9874-c4a16b46f0d7\"}": {}
                 }
               },
               "f:spec": {
@@ -564,10 +556,6 @@
                   ".": {},
                   "f:app": {},
                   "f:dogu.name": {}
-                },
-                "f:ownerReferences": {
-                  ".": {},
-                  "k:{\"uid\":\"21bed76c-4b39-4ebc-8071-6db8e19e8ab0\"}": {}
                 }
               },
               "f:spec": {
@@ -681,10 +669,6 @@
                   ".": {},
                   "f:app": {},
                   "f:dogu.name": {}
-                },
-                "f:ownerReferences": {
-                  ".": {},
-                  "k:{\"uid\":\"6f2c80f3-9bd4-435e-a35d-597be5d8e12f\"}": {}
                 }
               },
               "f:spec": {
@@ -780,10 +764,6 @@
                   ".": {},
                   "f:app": {},
                   "f:dogu.name": {}
-                },
-                "f:ownerReferences": {
-                  ".": {},
-                  "k:{\"uid\":\"bfa80e89-54bb-4a68-a3c9-a0262b928de4\"}": {}
                 }
               },
               "f:spec": {
