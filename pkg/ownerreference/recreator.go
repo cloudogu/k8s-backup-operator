@@ -25,7 +25,7 @@ const (
 	_BackupUID               = "backup-uid"
 )
 
-const workerCount = 10
+const workerCount = 5
 
 type resourceWithGroup struct {
 	item  unstructured.Unstructured
@@ -46,7 +46,7 @@ type restoreResource struct {
 type Recreator struct {
 	namespace          string
 	dynamicClient      dynamic.Interface
-	discoveryClient    discovery.DiscoveryInterface
+	discoveryClient    discovery.ServerResourcesInterface
 	groupVersionParser func(gv string) (schema.GroupVersion, error)
 }
 
@@ -181,12 +181,10 @@ func (r Recreator) getKindsOfGroup(ctx context.Context, grps []string) ([]string
 			logger.Info("Could not get kind for custom resource", "crd", crd.GetName())
 		}
 
-		logger.Info("found kind for group", "kind", kind, "group", group)
-
 		kinds = append(kinds, kind)
 	}
 
-	logger.Info("Extracted kinds from group", "kinds", kinds, "groups", grps)
+	logger.Info("Extracted kinds from groups", "kinds", kinds, "groups", grps)
 
 	return kinds, nil
 }
@@ -222,6 +220,10 @@ func (r Recreator) fetchBackupResources(ctx context.Context, parentKinds []strin
 
 			if lErr != nil {
 				logger.Info("failed to list resources for group", "resource", apiResource.Name, "group", apiResource.Group)
+				continue
+			}
+
+			if res == nil {
 				continue
 			}
 
@@ -283,6 +285,12 @@ func worker(childMap map[types.UID][]resourceWithGroup, parentChan chan resource
 				isParent:          false,
 				isChild:           true,
 			}
+
+			// Currently we only investigate direct descendants of the parent, however a child can also be parent for another resource
+			/*
+				tasks.Add(1)
+				parentChan <- child
+			*/
 		}
 
 		resultChan <- backupResource{
@@ -416,6 +424,10 @@ func (r Recreator) fetchRestoreResources(ctx context.Context, parentKinds []stri
 
 			if lErr != nil {
 				logger.Info("failed to list resources for group", "resource", apiResource.Name, "group", apiResource.Group)
+				continue
+			}
+
+			if res == nil {
 				continue
 			}
 
