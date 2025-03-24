@@ -1,0 +1,605 @@
+{
+  "apiVersion": "k8s.cloudogu.com/v2",
+  "items": [
+    {
+      "apiVersion": "k8s.cloudogu.com/v2",
+      "kind": "Dogu",
+      "metadata": {
+        "annotations": {
+          "backup-uid": "6f2c80f3-9bd4-435e-a35d-597be5d8e12f"
+        },
+        "creationTimestamp": "2025-03-24T13:10:59Z",
+        "finalizers": [
+          "dogu-finalizer"
+        ],
+        "generation": 1,
+        "labels": {
+          "app": "ces",
+          "dogu.name": "nginx-static",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                }
+              },
+              "f:spec": {
+                ".": {},
+                "f:name": {},
+                "f:resources": {},
+                "f:upgradeConfig": {},
+                "f:version": {}
+              }
+            },
+            "manager": "k8s-ces-setup",
+            "operation": "Update",
+            "time": "2025-03-04T09:30:51Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"dogu-finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:security": {
+                  ".": {},
+                  "f:capabilities": {}
+                }
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:31:12Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:backup-uid": {}
+                }
+              }
+            },
+            "manager": "k8s-backup-operator",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:39Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                ".": {},
+                "f:health": {},
+                "f:installedVersion": {},
+                "f:requeuePhase": {},
+                "f:requeueTime": {},
+                "f:status": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-24T13:03:42Z"
+          }
+        ],
+        "name": "nginx-static",
+        "namespace": "ecosystem",
+        "resourceVersion": "10750",
+        "uid": "9909004b-20ad-46f5-8211-26aa28e555b3"
+      },
+      "spec": {
+        "name": "k8s/nginx-static",
+        "resources": {},
+        "security": {
+          "capabilities": {}
+        },
+        "upgradeConfig": {},
+        "version": "1.26.3-1"
+      },
+      "status": {
+        "health": "unavailable",
+        "installedVersion": "1.26.3-1",
+        "requeuePhase": "",
+        "requeueTime": 0,
+        "status": "installed"
+      }
+    },
+    {
+      "apiVersion": "k8s.cloudogu.com/v2",
+      "kind": "Dogu",
+      "metadata": {
+        "annotations": {
+          "backup-uid": "bfa80e89-54bb-4a68-a3c9-a0262b928de4"
+        },
+        "creationTimestamp": "2025-03-24T13:10:59Z",
+        "finalizers": [
+          "dogu-finalizer"
+        ],
+        "generation": 1,
+        "labels": {
+          "app": "ces",
+          "dogu.name": "postfix",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                }
+              },
+              "f:spec": {
+                ".": {},
+                "f:name": {},
+                "f:resources": {},
+                "f:upgradeConfig": {},
+                "f:version": {}
+              }
+            },
+            "manager": "k8s-ces-setup",
+            "operation": "Update",
+            "time": "2025-03-04T09:30:51Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"dogu-finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:security": {
+                  ".": {},
+                  "f:capabilities": {}
+                }
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:31:32Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                ".": {},
+                "f:health": {},
+                "f:installedVersion": {},
+                "f:requeuePhase": {},
+                "f:requeueTime": {},
+                "f:status": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-04T09:31:53Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:backup-uid": {}
+                }
+              }
+            },
+            "manager": "k8s-backup-operator",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:38Z"
+          }
+        ],
+        "name": "postfix",
+        "namespace": "ecosystem",
+        "resourceVersion": "10762",
+        "uid": "36da4471-b3b8-4ffd-8e26-4a6b05cd362e"
+      },
+      "spec": {
+        "name": "official/postfix",
+        "resources": {},
+        "security": {
+          "capabilities": {}
+        },
+        "upgradeConfig": {},
+        "version": "3.9.0-4"
+      },
+      "status": {
+        "health": "available",
+        "installedVersion": "3.9.0-4",
+        "requeuePhase": "",
+        "requeueTime": 0,
+        "status": "installed"
+      }
+    },
+    {
+      "apiVersion": "k8s.cloudogu.com/v2",
+      "kind": "Dogu",
+      "metadata": {
+        "annotations": {
+          "backup-uid": "96a3bb49-38b0-4b5c-a264-56e370bc08b6"
+        },
+        "creationTimestamp": "2025-03-24T13:10:59Z",
+        "finalizers": [
+          "dogu-finalizer"
+        ],
+        "generation": 1,
+        "labels": {
+          "app": "ces",
+          "dogu.name": "cas",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                }
+              },
+              "f:spec": {
+                ".": {},
+                "f:name": {},
+                "f:resources": {},
+                "f:upgradeConfig": {},
+                "f:version": {}
+              }
+            },
+            "manager": "k8s-ces-setup",
+            "operation": "Update",
+            "time": "2025-03-04T09:32:29Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"dogu-finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:security": {
+                  ".": {},
+                  "f:capabilities": {}
+                }
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:32:29Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:backup-uid": {}
+                }
+              }
+            },
+            "manager": "k8s-backup-operator",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:40Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                ".": {},
+                "f:health": {},
+                "f:installedVersion": {},
+                "f:requeuePhase": {},
+                "f:requeueTime": {},
+                "f:status": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-24T13:11:08Z"
+          }
+        ],
+        "name": "cas",
+        "namespace": "ecosystem",
+        "resourceVersion": "11094",
+        "uid": "bd1dd89c-755b-4be4-897c-10720e06be72"
+      },
+      "spec": {
+        "name": "official/cas",
+        "resources": {},
+        "security": {
+          "capabilities": {}
+        },
+        "upgradeConfig": {},
+        "version": "7.0.8-11"
+      },
+      "status": {
+        "health": "unavailable",
+        "installedVersion": "7.0.8-11",
+        "requeuePhase": "",
+        "requeueTime": 0,
+        "status": "installed"
+      }
+    },
+    {
+      "apiVersion": "k8s.cloudogu.com/v2",
+      "kind": "Dogu",
+      "metadata": {
+        "annotations": {
+          "backup-uid": "251e79cc-e50c-4225-9874-c4a16b46f0d7"
+        },
+        "creationTimestamp": "2025-03-24T13:10:59Z",
+        "finalizers": [
+          "dogu-finalizer"
+        ],
+        "generation": 1,
+        "labels": {
+          "app": "ces",
+          "dogu.name": "ldap",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                }
+              },
+              "f:spec": {
+                ".": {},
+                "f:name": {},
+                "f:resources": {},
+                "f:upgradeConfig": {},
+                "f:version": {}
+              }
+            },
+            "manager": "k8s-ces-setup",
+            "operation": "Update",
+            "time": "2025-03-04T09:30:51Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"dogu-finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:security": {
+                  ".": {},
+                  "f:capabilities": {}
+                }
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:31:40Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:backup-uid": {}
+                }
+              }
+            },
+            "manager": "k8s-backup-operator",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:41Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                ".": {},
+                "f:health": {},
+                "f:installedVersion": {},
+                "f:requeuePhase": {},
+                "f:requeueTime": {},
+                "f:status": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-24T13:11:08Z"
+          }
+        ],
+        "name": "ldap",
+        "namespace": "ecosystem",
+        "resourceVersion": "11096",
+        "uid": "bd96e5ef-2767-4286-b3bd-9e5e040872bf"
+      },
+      "spec": {
+        "name": "official/ldap",
+        "resources": {},
+        "security": {
+          "capabilities": {}
+        },
+        "upgradeConfig": {},
+        "version": "2.6.8-3"
+      },
+      "status": {
+        "health": "unavailable",
+        "installedVersion": "2.6.8-3",
+        "requeuePhase": "",
+        "requeueTime": 0,
+        "status": "installed"
+      }
+    },
+    {
+      "apiVersion": "k8s.cloudogu.com/v2",
+      "kind": "Dogu",
+      "metadata": {
+        "annotations": {
+          "backup-uid": "21bed76c-4b39-4ebc-8071-6db8e19e8ab0"
+        },
+        "creationTimestamp": "2025-03-24T13:10:59Z",
+        "finalizers": [
+          "dogu-finalizer"
+        ],
+        "generation": 1,
+        "labels": {
+          "app": "ces",
+          "dogu.name": "nginx-ingress",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                }
+              },
+              "f:spec": {
+                ".": {},
+                "f:name": {},
+                "f:resources": {},
+                "f:upgradeConfig": {},
+                "f:version": {}
+              }
+            },
+            "manager": "k8s-ces-setup",
+            "operation": "Update",
+            "time": "2025-03-04T09:30:51Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"dogu-finalizer\"": {}
+                }
+              },
+              "f:spec": {
+                "f:security": {
+                  ".": {},
+                  "f:capabilities": {}
+                }
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:30:51Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:backup-uid": {}
+                }
+              }
+            },
+            "manager": "k8s-backup-operator",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:41Z"
+          },
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                ".": {},
+                "f:health": {},
+                "f:installedVersion": {},
+                "f:requeuePhase": {},
+                "f:requeueTime": {},
+                "f:status": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-24T13:11:08Z"
+          }
+        ],
+        "name": "nginx-ingress",
+        "namespace": "ecosystem",
+        "resourceVersion": "11099",
+        "uid": "4da4800f-beac-4457-9824-e3a54b05df6f"
+      },
+      "spec": {
+        "name": "k8s/nginx-ingress",
+        "resources": {},
+        "security": {
+          "capabilities": {}
+        },
+        "upgradeConfig": {},
+        "version": "1.11.1-4"
+      },
+      "status": {
+        "health": "unavailable",
+        "installedVersion": "1.11.1-4",
+        "requeuePhase": "",
+        "requeueTime": 0,
+        "status": "installed"
+      }
+    }
+  ],
+  "kind": "DoguList",
+  "metadata": {
+    "continue": "",
+    "resourceVersion": "11108"
+  }
+}
