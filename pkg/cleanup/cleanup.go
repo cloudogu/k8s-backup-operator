@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"time"
 )
 
 const (
@@ -52,7 +52,33 @@ func NewManager(namespace string, client k8sClient, discoveryClient discoveryInt
 
 // Cleanup deletes all components with labels app=ces and not k8s.cloudogu.com/part-of=backup.
 func (c *defaultCleanupManager) Cleanup(ctx context.Context) error {
-	return c.deleteResourcesByLabelSelector(ctx, defaultCleanupSelector)
+	err := c.deleteResourcesByLabelSelector(ctx, defaultCleanupSelector)
+	if err != nil {
+		return fmt.Errorf("error while deleting resources by labels %s: %w", defaultCleanupSelector, err)
+	}
+	return c.waitForResourcesToBeDeleted(ctx, defaultCleanupSelector)
+}
+
+func (c *defaultCleanupManager) waitForResourcesToBeDeleted(ctx context.Context, labelSelector *metav1.LabelSelector) error {
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		return fmt.Errorf("failed to create selector from given label selector %s: %w", labelSelector, err)
+	}
+
+	listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: selector}}
+	objectList := &unstructured.UnstructuredList{}
+	for {
+		log.FromContext(ctx).Info("Wait for resources to be deleted.")
+		_ = c.client.List(ctx, objectList, &listOptions)
+		if len(objectList.Items) != 0 {
+			log.FromContext(ctx).Info("Items to delete", objectList.Items)
+		} else {
+			break
+		}
+		time.Sleep(time.Second * 5)
+	}
+	return nil
+
 }
 
 func (c *defaultCleanupManager) deleteResourcesByLabelSelector(ctx context.Context, labelSelector *metav1.LabelSelector) error {

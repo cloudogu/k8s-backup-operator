@@ -76,7 +76,9 @@ func Test_defaultCleanupManager_Cleanup(t *testing.T) {
 		emptyListList := []*metav1.APIResourceList{{APIResources: make([]metav1.APIResource, 0)}}
 		discoveryMock := newMockDiscoveryInterface(t)
 		discoveryMock.EXPECT().ServerPreferredResources().Return(emptyListList, nil)
-		sut := &defaultCleanupManager{discoveryClient: discoveryMock}
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(nil)
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
 
 		// when
 		err := sut.Cleanup(testCtx)
