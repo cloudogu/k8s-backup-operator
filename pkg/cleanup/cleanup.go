@@ -14,6 +14,7 @@ import (
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sync"
 	"time"
 )
 
@@ -52,36 +53,87 @@ func NewManager(namespace string, client k8sClient, discoveryClient discoveryInt
 
 // Cleanup deletes all components with labels app=ces and not k8s.cloudogu.com/part-of=backup.
 func (c *defaultCleanupManager) Cleanup(ctx context.Context) error {
-	err := c.deleteResourcesByLabelSelector(ctx, defaultCleanupSelector)
-	if err != nil {
-		return fmt.Errorf("error while deleting resources by labels %s: %w", defaultCleanupSelector, err)
-	}
-	return c.waitForResourcesToBeDeleted(ctx, defaultCleanupSelector)
+	return c.deleteResourcesByLabelSelector(ctx, defaultCleanupSelector)
 }
 
-func (c *defaultCleanupManager) waitForResourcesToBeDeleted(ctx context.Context, labelSelector *metav1.LabelSelector) error {
-	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
-	if err != nil {
-		return fmt.Errorf("failed to create selector from given label selector %s: %w", labelSelector, err)
-	}
+/*
+	func (c *defaultCleanupManager) listResources(ctx context.Context, labelSelector *metav1.LabelSelector, result *unstructured.UnstructuredList) error {
+		apiResourceLists, err := c.discoveryClient.ServerPreferredResources()
 
-	listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: selector}}
-	objectList := &unstructured.UnstructuredList{}
-	for {
-		log.FromContext(ctx).Info("Wait for resources to be deleted.")
-		_ = c.client.List(ctx, objectList, &listOptions)
-		if len(objectList.Items) != 0 {
-			log.FromContext(ctx).Info("Items to delete", objectList.Items)
-		} else {
-			break
+		selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+		if err != nil {
+			return fmt.Errorf("failed to create selector from given label selector %s: %w", labelSelector, err)
 		}
-		time.Sleep(time.Second * 5)
+
+		for _, apiResourceList := range apiResourceLists {
+			for _, apiResource := range apiResourceList.APIResources {
+				gvk := groupVersionKind(apiResource)
+				result.SetGroupVersionKind(gvk)
+				listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: selector}}
+				if len(apiResource.Verbs) != 0 && slices.Contains(apiResource.Verbs, deleteVerb) {
+					_ = c.client.List(ctx, result, &listOptions)
+				}
+			}
+		}
 	}
-	return nil
+
+	func (c *defaultCleanupManager) waitForResourcesToBeDeleted(ctx context.Context, labelSelector *metav1.LabelSelector) error {
+		apiResourceLists, err := c.discoveryClient.ServerPreferredResources()
+
+		selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+		if err != nil {
+			return fmt.Errorf("failed to create selector from given label selector %s: %w", labelSelector, err)
+		}
+
+		var errs []error
+		for _, apiResourceList := range apiResourceLists {
+			for _, apiResource := range apiResourceList.APIResources {
+				gvk := groupVersionKind(apiResource)
+				objectList := &unstructured.UnstructuredList{}
+				objectList.SetGroupVersionKind(gvk)
+				listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: selector}}
+				if len(apiResource.Verbs) != 0 && slices.Contains(apiResource.Verbs, deleteVerb) {
+					_ = c.client.List(ctx, objectList, &listOptions)
+				}
+			}
+		}
+
+		for _, list := range apiResourceLists {
+			deleteErrs := c.deleteApiResourcesByLabelSelector(ctx, list, selector)
+			errs = append(errs, deleteErrs...)
+		}
+
+		for _, resource := range list.APIResources {
+			if len(resource.Verbs) != 0 && slices.Contains(resource.Verbs, deleteVerb) {
+				resource.Group = gv.Group
+				resource.Version = gv.Version
+
+				deleteErrs := c.deleteByLabelSelector(ctx, resource, selector)
+				errs = append(errs, deleteErrs...)
+			}
+		}
+
+		listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: selector}}
+		objectList := &unstructured.UnstructuredList{}
+		for {
+			log.FromContext(ctx).Info("Wait for resources to be deleted.")
+			_ = c.client.List(ctx, objectList, &listOptions)
+			if len(objectList.Items) != 0 {
+				log.FromContext(ctx).Info("Items to delete", objectList.Items)
+			} else {
+				break
+			}
+			time.Sleep(time.Second * 5)
+		}
+		return nil
 
 }
+*/
 
 func (c *defaultCleanupManager) deleteResourcesByLabelSelector(ctx context.Context, labelSelector *metav1.LabelSelector) error {
+	var wg sync.WaitGroup
+	ctxWithWaitGroup := context.WithValue(ctx, "wg", wg)
+
 	lists, err := c.discoveryClient.ServerPreferredResources()
 	if err != nil {
 		return fmt.Errorf("failed to get resource lists from server: %w", err)
@@ -94,13 +146,15 @@ func (c *defaultCleanupManager) deleteResourcesByLabelSelector(ctx context.Conte
 
 	var errs []error
 	for _, list := range lists {
-		deleteErrs := c.deleteApiResourcesByLabelSelector(ctx, list, selector)
+		deleteErrs := c.deleteApiResourcesByLabelSelector(ctxWithWaitGroup, list, selector)
 		errs = append(errs, deleteErrs...)
 	}
 
 	if len(errs) != 0 {
 		return fmt.Errorf("failed to delete api resources with label selector %q: %w", selector, errors.Join(errs...))
 	}
+
+	wg.Wait()
 
 	return nil
 }
@@ -168,6 +222,23 @@ func (c *defaultCleanupManager) deleteByLabelSelector(ctx context.Context, resou
 		if err != nil && !k8sErr.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete %s/%s (%s): %w", item.GetNamespace(), item.GetName(), gvk, err))
 		}
+
+		wg := ctx.Value("wg").(sync.WaitGroup)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				log.FromContext(ctx).Info("Wait for resources to be deleted.", "ns", item.GetNamespace(), "name", item.GetName())
+				err = c.client.Get(ctx, client.ObjectKey{Namespace: item.GetNamespace(), Name: item.GetName()}, &item)
+				if err == nil {
+					log.FromContext(ctx).Info("Items to delete", objectList.Items)
+				} else {
+					break
+				}
+				time.Sleep(time.Second * 5)
+			}
+		}()
+
 	}
 
 	return errs

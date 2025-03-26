@@ -77,7 +77,6 @@ func Test_defaultCleanupManager_Cleanup(t *testing.T) {
 		discoveryMock := newMockDiscoveryInterface(t)
 		discoveryMock.EXPECT().ServerPreferredResources().Return(emptyListList, nil)
 		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(nil)
 		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
 
 		// when
