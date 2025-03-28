@@ -61,6 +61,10 @@ func (bss BackupScheduleStatus) GetStatus() string {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName="bs"
+// +kubebuilder:printcolumn:name="Schedule",type="string",JSONPath=".spec.schedule",description="The cron schedule for the backup schedule"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status",description="The current status of the backup schedule"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 
 // BackupSchedule is the Schema for the backupschedules API
 type BackupSchedule struct {

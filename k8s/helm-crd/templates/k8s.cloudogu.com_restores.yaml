@@ -18,7 +18,20 @@ spec:
     singular: restore
   scope: Namespaced
   versions:
-    - name: v1
+    - additionalPrinterColumns:
+        - description: The backup name for the restore
+          jsonPath: .spec.backupName
+          name: Backup name
+          type: string
+        - description: The current status of the restore
+          jsonPath: .status.status
+          name: Status
+          type: string
+        - description: The age of the resource
+          jsonPath: .metadata.creationTimestamp
+          name: Age
+          type: date
+      name: v1
       schema:
         openAPIV3Schema:
           description: Restore is the Schema for the restores API

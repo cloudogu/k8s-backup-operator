@@ -18,7 +18,20 @@ spec:
     singular: backup
   scope: Namespaced
   versions:
-    - name: v1
+    - additionalPrinterColumns:
+        - description: The current status of the backup
+          jsonPath: .status.status
+          name: Status
+          type: string
+        - description: The completion timestamp of the backup
+          jsonPath: .status.completionTimestamp
+          name: Completion Timestamp
+          type: string
+        - description: The age of the resource
+          jsonPath: .metadata.creationTimestamp
+          name: Age
+          type: date
+      name: v1
       schema:
         openAPIV3Schema:
           description: Backup is the Schema for the backups API
