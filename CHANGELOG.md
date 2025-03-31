@@ -6,9 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- [#47] Fixed endless loop of reconciles because the image was not set in update manager and difference comparison 
+- [#46] Fixed endless loop of reconciles because the image was not set in update manager and difference comparison 
   did not check the cron job provider correctly
-- [#47] Fixed missing CronJobs apiGroup in RBACs
+- [#46] Fixed missing CronJobs apiGroup in RBACs
+- [#46] Add a waiting routine to fix race condition while deleting and restoring resources
 
 ## [v1.3.1] - 2024-12-19
 ### Fixed
