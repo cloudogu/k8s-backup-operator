@@ -15,10 +15,25 @@ spec:
     kind: BackupSchedule
     listKind: BackupScheduleList
     plural: backupschedules
+    shortNames:
+      - bs
     singular: backupschedule
   scope: Namespaced
   versions:
-    - name: v1
+    - additionalPrinterColumns:
+        - description: The cron schedule for the backup schedule
+          jsonPath: .spec.schedule
+          name: Schedule
+          type: string
+        - description: The current status of the backup schedule
+          jsonPath: .status.status
+          name: Status
+          type: string
+        - description: The age of the resource
+          jsonPath: .metadata.creationTimestamp
+          name: Age
+          type: date
+      name: v1
       schema:
         openAPIV3Schema:
           description: BackupSchedule is the Schema for the backupschedules API

@@ -5,11 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Fixed
 - [#46] Fixed endless loop of reconciles because the image was not set in update manager and difference comparison 
   did not check the cron job provider correctly
 - [#46] Fixed missing CronJobs apiGroup in RBACs
 - [#46] Add a waiting routine to fix race condition while deleting and restoring resources
+
+### Added
+- [#47] Add additional print columns and aliases to CRDs
 
 ## [v1.3.1] - 2024-12-19
 ### Fixed
