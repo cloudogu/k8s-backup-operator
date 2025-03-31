@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- [#47] Fixed endless loop of reconciles because the image was not set in update manager and difference comparison 
+  did not check the cron job provider correctly
+- [#47] Fixed missing CronJobs apiGroup in RBACs
 
 ## [v1.3.1] - 2024-12-19
 ### Fixed
