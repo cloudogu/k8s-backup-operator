@@ -25,6 +25,7 @@ const (
 const BackupScheduleFinalizer = "cloudogu-backup-schedule-finalizer"
 
 const ProviderEnvVar = "PROVIDER"
+const ProviderArgFlag = "--provider"
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -110,7 +111,7 @@ func (bs *BackupSchedule) cronJobPodSpec(image string) corev1.PodSpec {
 			Args: []string{
 				"scheduled-backup",
 				fmt.Sprintf("--name=%s", bs.Name),
-				fmt.Sprintf("--provider=%s", bs.Spec.Provider),
+				fmt.Sprintf("%s=%s", ProviderArgFlag, bs.Spec.Provider),
 			},
 			Env: []corev1.EnvVar{
 				{Name: "NAMESPACE",
