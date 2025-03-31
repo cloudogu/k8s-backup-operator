@@ -225,6 +225,25 @@ func TestDeleteObject(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("should not return an error if resource was not found", func(t *testing.T) {
+		ctx := context.TODO()
+		clientMock := newMockK8sClient(t)
+
+		propagationPolicy := metav1.DeletePropagationBackground
+		deleteOptions := client.DeleteOptions{PropagationPolicy: &propagationPolicy}
+		item := unstructured.Unstructured{}
+
+		e := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
+		clientMock.EXPECT().Delete(ctx, &item, &deleteOptions).Return(e)
+
+		sut := &defaultCleanupManager{client: clientMock}
+
+		err := sut.deleteObject(ctx, &item)
+
+		assert.NoError(t, err)
+
+	})
+
 }
 
 func TestExistObject(t *testing.T) {
@@ -252,8 +271,6 @@ func TestExistObject(t *testing.T) {
 
 func TestRemoveFinalizer(t *testing.T) {
 	t.Run("should retry if a update conflict occurred", func(t *testing.T) {
-		t.Skip("How to test retry.OnConflict calls?")
-
 		ctx := context.TODO()
 		object := unstructured.Unstructured{}
 		object.SetNamespace("ns")
@@ -263,10 +280,9 @@ func TestRemoveFinalizer(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 		resource := schema.GroupResource{Group: "example.com", Resource: "Pod"}
 
-		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(nil)
-		clientMock.EXPECT().Update(ctx, &object).Return(errors.NewConflict(resource, "aName", assert.AnError))
-		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(nil)
-		clientMock.EXPECT().Update(ctx, &object).Return(nil)
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(nil).Twice()
+		clientMock.EXPECT().Update(ctx, &object).Return(errors.NewConflict(resource, "aName", assert.AnError)).Once()
+		clientMock.EXPECT().Update(ctx, &object).Return(nil).Once()
 
 		sut := &defaultCleanupManager{client: clientMock}
 

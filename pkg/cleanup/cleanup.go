@@ -157,7 +157,12 @@ func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 func (c *defaultCleanupManager) deleteObject(ctx context.Context, object client.Object) error {
 	propagationPolicy := metav1.DeletePropagationBackground
 	deleteOptions := client.DeleteOptions{PropagationPolicy: &propagationPolicy}
-	return c.client.Delete(ctx, object, &deleteOptions)
+	err := c.client.Delete(ctx, object, &deleteOptions)
+	// The resource was already deleted by parent resource, so this is not a real error.
+	if k8sErr.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func (c *defaultCleanupManager) waitForObjectToBeDeleted(ctx context.Context, object client.Object, wg *sync.WaitGroup) {
@@ -165,13 +170,14 @@ func (c *defaultCleanupManager) waitForObjectToBeDeleted(ctx context.Context, ob
 	go func() {
 		defer wg.Done()
 		for {
-			msg := fmt.Sprintf("Wait for object to be deleted. ns=%s, name=%s", object.GetNamespace(), object.GetName())
-			log.FromContext(ctx).Info(msg, "ns", object.GetNamespace(), "name", object.GetName())
 			if c.existObject(ctx, object) {
-				time.Sleep(time.Second * 10)
+				time.Sleep(time.Second * 3)
 			} else {
 				break
 			}
+			msg := fmt.Sprintf("Wait for object to be deleted. ns=%s, name=%s, gvk=%s", object.GetNamespace(), object.GetName(), object.GetObjectKind().GroupVersionKind())
+			log.FromContext(ctx).Info(msg, "ns", object.GetNamespace(), "name", object.GetName(), "gvk", object.GetObjectKind().GroupVersionKind())
+			object.GetObjectKind().GroupVersionKind()
 		}
 	}()
 }
