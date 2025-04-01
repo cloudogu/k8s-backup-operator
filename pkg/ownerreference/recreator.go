@@ -267,7 +267,16 @@ func (r Recreator) updateResources(ctx context.Context, resList []resourceWithGr
 	return nil
 }
 
-// worker processes tasks by checking for child resources
+// worker processes tasks by checking for immediate child resources.
+//
+// worker iterates parent nodes which are provided by the parent channel. Basically it inspects top level resources like
+// dogus, backups, components, etc. but only to the first level of its children in order to save metadata later-on.
+// The reconciling mechanism of the lower level children like ingress etc. are reconciled properly and will be overwritten
+// even if they will be restored with a previously saved owner reference. One can think of the inspected data structure
+// like this:
+//
+//	dogu --> service    --> ingress (not regarded)
+//	     \-> deployment --> replica set (not regarded)
 func worker(childMap map[types.UID][]resourceWithGroup, parentChan chan resourceWithGroup, resultChan chan<- backupResource, wg, tasks *sync.WaitGroup) {
 	defer wg.Done()
 
