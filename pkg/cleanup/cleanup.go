@@ -12,6 +12,7 @@ import (
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"strings"
 	"sync"
 	"time"
 )
@@ -58,25 +59,25 @@ func (c *defaultCleanupManager) Cleanup(ctx context.Context) error {
 		return fmt.Errorf("find object: %w", err)
 	}
 	for _, object := range objects {
-		err2 := c.removeFinalizers(ctx, &object)
-		if err2 != nil {
+		err = c.removeFinalizers(ctx, &object)
+		if err != nil {
 			return fmt.Errorf(
 				"remove finalizer of object: namespace=%s, kind=%s, name=%s: %w",
 				object.GetNamespace(),
 				object.GetKind(),
 				object.GetName(),
-				err2,
+				err,
 			)
 		}
-		err3 := c.deleteObject(ctx, &object)
-		if err3 != nil {
+		err = c.deleteObject(ctx, &object)
+		if err != nil {
 			object.GetKind()
 			return fmt.Errorf(
 				"delete object namespace=%s, kind=%s, name=%s: %w",
 				object.GetNamespace(),
 				object.GetKind(),
 				object.GetName(),
-				err3,
+				err,
 			)
 		}
 		c.waitForObjectToBeDeleted(ctx, &object, &wg)
@@ -112,14 +113,12 @@ func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *
 			listOptions.Namespace = c.namespace
 		}
 
-		err3 := c.client.List(ctx, objects, &listOptions)
-		if err3 != nil {
-			return []unstructured.Unstructured{}, fmt.Errorf("list objects of resource (%s): %w", gvk, err3)
+		err = c.client.List(ctx, objects, &listOptions)
+		if err != nil {
+			return []unstructured.Unstructured{}, fmt.Errorf("list objects of resource (%s): %w", gvk, err)
 		}
 
-		for _, item := range objects.Items {
-			result = append(result, item)
-		}
+		result = append(result, objects.Items...)
 	}
 
 	return result, nil
@@ -177,7 +176,6 @@ func (c *defaultCleanupManager) waitForObjectToBeDeleted(ctx context.Context, ob
 			}
 			msg := fmt.Sprintf("Wait for object to be deleted. ns=%s, name=%s, gvk=%s", object.GetNamespace(), object.GetName(), object.GetObjectKind().GroupVersionKind())
 			log.FromContext(ctx).Info(msg, "ns", object.GetNamespace(), "name", object.GetName(), "gvk", object.GetObjectKind().GroupVersionKind())
-			object.GetObjectKind().GroupVersionKind()
 		}
 	}()
 }

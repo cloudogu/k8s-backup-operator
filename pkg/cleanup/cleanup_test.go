@@ -3,17 +3,65 @@ package cleanup
 import (
 	"context"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sync"
 	"testing"
 )
 
+func TestCleanUp(t *testing.T) {
+	t.Run("should successfully clean up object", func(t *testing.T) {
+		ctx := context.TODO()
+
+		resources := []*metav1.APIResourceList{
+			{APIResources: []metav1.APIResource{
+				{Kind: "MyKind", Group: "k8s.example.com", Version: "v2", Verbs: metav1.Verbs{"create", "update", "delete"}},
+			}, GroupVersion: "k8s.example.com/v2"},
+		}
+
+		discoveryMock := newMockDiscoveryInterface(t)
+		discoveryMock.EXPECT().ServerPreferredResources().Return(resources, nil)
+
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+
+		groupVersionKind := schema.GroupVersionKind{Group: "k8s.example.com", Version: "v2", Kind: "MyKind"}
+		objectList := &unstructured.UnstructuredList{}
+		objectList.SetGroupVersionKind(groupVersionKind)
+
+		selector, _ := metav1.LabelSelectorAsSelector(defaultCleanupSelector)
+		listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: selector}}
+
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(ctx, objectList, &listOptions).RunAndReturn(
+			func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+				c := list.(*unstructured.UnstructuredList)
+				c.Items = []unstructured.Unstructured{object}
+				return nil
+			})
+
+		propagationPolicy := metav1.DeletePropagationBackground
+		deleteOptions := client.DeleteOptions{PropagationPolicy: &propagationPolicy}
+		clientMock.EXPECT().Delete(ctx, &object, &deleteOptions).Return(nil)
+
+		notFoundError := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
+		clientMock.EXPECT().Get(ctx, mock.Anything, mock.Anything).Return(notFoundError)
+
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
+
+		err := sut.Cleanup(ctx)
+		assert.NoError(t, err)
+	})
+}
+
 func TestFindResources(t *testing.T) {
-	t.Run("should only delete resources that can be deleted", func(t *testing.T) {
+	t.Run("should only find resources that can be deleted", func(t *testing.T) {
 		discoveryMock := newMockDiscoveryInterface(t)
 
 		resources := []*metav1.APIResourceList{
@@ -119,7 +167,7 @@ func TestFindObjects(t *testing.T) {
 
 		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
 
-		sut.findObjects(ctx, defaultCleanupSelector)
+		_, _ = sut.findObjects(ctx, defaultCleanupSelector)
 	})
 
 	t.Run("should return objects", func(t *testing.T) {
@@ -289,5 +337,43 @@ func TestRemoveFinalizer(t *testing.T) {
 		err := sut.removeFinalizers(ctx, &object)
 
 		assert.NoError(t, err)
+	})
+}
+
+func TestWaitForObjectToBeDeleted(t *testing.T) {
+	t.Run("should not wait if a object is not found", func(t *testing.T) {
+		ctx := context.TODO()
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+		objectKey := types.NamespacedName{Namespace: "ns", Name: "aName"}
+
+		clientMock := newMockK8sClient(t)
+
+		notFoundError := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(notFoundError)
+
+		sut := &defaultCleanupManager{client: clientMock}
+		var wg sync.WaitGroup
+		sut.waitForObjectToBeDeleted(ctx, &object, &wg)
+		wg.Wait()
+	})
+	t.Run("should wait if a object still exists", func(t *testing.T) {
+		ctx := context.TODO()
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+		objectKey := types.NamespacedName{Namespace: "ns", Name: "aName"}
+
+		clientMock := newMockK8sClient(t)
+
+		notFoundError := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(nil).Once()
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(notFoundError).Once()
+
+		sut := &defaultCleanupManager{client: clientMock}
+		var wg sync.WaitGroup
+		sut.waitForObjectToBeDeleted(ctx, &object, &wg)
+		wg.Wait()
 	})
 }
