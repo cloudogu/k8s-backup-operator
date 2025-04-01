@@ -520,6 +520,8 @@ func restoreOwnerRefForResource(ctx context.Context, res restoreResource, parent
 			continue
 		}
 
+		// this is kind of ugly because the deployment controller copies our owner reference annotation from the deployment
+		// into the replica set. Avoid setting this during the restore by checking explicitly for the RS kind.
 		if res.item.GetKind() != "ReplicaSet" {
 			ownerRef.UID = parent.item.GetUID()
 			res.item.SetOwnerReferences(append(res.item.GetOwnerReferences(), ownerRef))
