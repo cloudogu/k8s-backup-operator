@@ -202,8 +202,14 @@ func (c *defaultCleanupManager) removeFinalizers(ctx context.Context, object cli
 			}
 			return err
 		}
-
-		object.SetFinalizers(make([]string, 0))
+		finalizers := make([]string, 0)
+		for _, finalizer := range object.GetFinalizers() {
+			if strings.HasPrefix(finalizer, "kubernetes.io") {
+				log.FromContext(ctx).Info(fmt.Sprintf("not removing kubernetes finalizer for resource %s(%s): %v", object.GetName(), object.GetObjectKind().GroupVersionKind(), finalizers))
+				finalizers = append(finalizers, finalizer)
+			}
+		}
+		object.SetFinalizers(finalizers)
 		return c.client.Update(ctx, object)
 	})
 	return err

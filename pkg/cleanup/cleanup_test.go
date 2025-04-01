@@ -338,6 +338,50 @@ func TestRemoveFinalizer(t *testing.T) {
 
 		assert.NoError(t, err)
 	})
+	t.Run("should remove finalizers", func(t *testing.T) {
+		ctx := context.TODO()
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+		object.SetFinalizers([]string{"myFinalizer"})
+		objectKey := types.NamespacedName{Namespace: "ns", Name: "aName"}
+
+		clientMock := newMockK8sClient(t)
+		resource := schema.GroupResource{Group: "example.com", Resource: "Pod"}
+
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(nil).Twice()
+		clientMock.EXPECT().Update(ctx, &object).Return(errors.NewConflict(resource, "aName", assert.AnError)).Once()
+		clientMock.EXPECT().Update(ctx, &object).Return(nil).Once()
+
+		sut := &defaultCleanupManager{client: clientMock}
+
+		err := sut.removeFinalizers(ctx, &object)
+
+		assert.NoError(t, err)
+		assert.Equal(t, []string{}, object.GetFinalizers())
+	})
+	t.Run("should not remove kubernetes.io finalizers", func(t *testing.T) {
+		ctx := context.TODO()
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+		object.SetFinalizers([]string{"kubernetes.io/myFinalizer"})
+		objectKey := types.NamespacedName{Namespace: "ns", Name: "aName"}
+
+		clientMock := newMockK8sClient(t)
+		resource := schema.GroupResource{Group: "example.com", Resource: "Pod"}
+
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(nil).Twice()
+		clientMock.EXPECT().Update(ctx, &object).Return(errors.NewConflict(resource, "aName", assert.AnError)).Once()
+		clientMock.EXPECT().Update(ctx, &object).Return(nil).Once()
+
+		sut := &defaultCleanupManager{client: clientMock}
+
+		err := sut.removeFinalizers(ctx, &object)
+
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"kubernetes.io/myFinalizer"}, object.GetFinalizers())
+	})
 }
 
 func TestWaitForObjectToBeDeleted(t *testing.T) {
