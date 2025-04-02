@@ -163,8 +163,7 @@ func (c *defaultCleanupManager) waitForObjectToBeDeleted(ctx context.Context, ob
 			} else {
 				break
 			}
-			msg := fmt.Sprintf("Wait for object to be deleted. ns=%s, name=%s, gvk=%s", object.GetNamespace(), object.GetName(), object.GetObjectKind().GroupVersionKind())
-			log.FromContext(ctx).Info(msg, "ns", object.GetNamespace(), "name", object.GetName(), "gvk", object.GetObjectKind().GroupVersionKind())
+			log.FromContext(ctx).Info("Wait for object to be deleted", "ns", object.GetNamespace(), "name", object.GetName(), "gvk", object.GetObjectKind().GroupVersionKind())
 		}
 	}()
 }
