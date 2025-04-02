@@ -108,7 +108,6 @@ func TestFindResources(t *testing.T) {
 		resources := []*metav1.APIResourceList{
 			{APIResources: []metav1.APIResource{
 				{Kind: "CustomResourceDefinition", Verbs: metav1.Verbs{"create", "update", "delete"}},
-				{Kind: "Pod", Verbs: metav1.Verbs{"create", "update", "delete"}},
 			}, GroupVersion: "k8s.example.com/v1"},
 			{APIResources: []metav1.APIResource{
 				{Kind: "MyKind", Verbs: metav1.Verbs{"create", "update", "delete"}},
