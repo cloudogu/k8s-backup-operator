@@ -1,6 +1,7 @@
 package backupschedule
 
 import (
+	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
@@ -580,8 +581,11 @@ func Test_backupScheduleReconciler_Reconcile(t *testing.T) {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{{
 									Name: testBackupSchedule,
-									Env: []corev1.EnvVar{
-										{Name: k8sv1.ProviderEnvVar, Value: "velero"}},
+									Args: []string{
+										"scheduled-backup",
+										fmt.Sprintf("--name=%s", testBackupSchedule),
+										fmt.Sprintf("%s=%s", k8sv1.ProviderArgFlag, "velero"),
+									},
 								}},
 							},
 						},

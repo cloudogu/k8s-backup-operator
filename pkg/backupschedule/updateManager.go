@@ -19,8 +19,8 @@ type defaultUpdateManager struct {
 	imageConfig additionalimages.ImageConfig
 }
 
-func newUpdateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string) *defaultUpdateManager {
-	return &defaultUpdateManager{clientSet: clientSet, recorder: recorder, namespace: namespace}
+func newUpdateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string, imageConfig additionalimages.ImageConfig) *defaultUpdateManager {
+	return &defaultUpdateManager{clientSet: clientSet, recorder: recorder, namespace: namespace, imageConfig: imageConfig}
 }
 
 func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.BackupSchedule) error {

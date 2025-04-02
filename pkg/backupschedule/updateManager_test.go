@@ -1,6 +1,7 @@
 package backupschedule
 
 import (
+	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -16,7 +17,7 @@ func TestNewUpdateManager(t *testing.T) {
 		// given
 
 		// when
-		manager := newUpdateManager(nil, nil, "test")
+		manager := newUpdateManager(nil, nil, "test", additionalimages.ImageConfig{})
 
 		// then
 		require.NotNil(t, manager)
@@ -59,7 +60,8 @@ func Test_defaultUpdateManager_update(t *testing.T) {
 		cronJobMock.EXPECT().Get(testCtx, backupSchedule.CronJobName(), metav1.GetOptions{}).Return(cronJob, nil)
 		cronJobMock.EXPECT().Update(testCtx, cronJob, metav1.UpdateOptions{}).Return(&batchv1.CronJob{}, nil)
 
-		sut := &defaultUpdateManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace}
+		image := additionalimages.ImageConfig{OperatorImage: "MyImage"}
+		sut := &defaultUpdateManager{recorder: recorderMock, clientSet: clientMock, namespace: testNamespace, imageConfig: image}
 
 		// when
 		err := sut.update(testCtx, backupSchedule)
@@ -71,6 +73,7 @@ func Test_defaultUpdateManager_update(t *testing.T) {
 		assert.True(t, len(args) == 3)
 		expectedProviderArg := "--provider=velero"
 		assert.Contains(t, args, expectedProviderArg)
+		assert.Equal(t, "MyImage", cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image)
 	})
 
 	t.Run("should return error on update status updating error", func(t *testing.T) {

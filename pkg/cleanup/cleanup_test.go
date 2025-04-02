@@ -4,338 +4,419 @@ import (
 	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sync"
 	"testing"
 )
 
-const testNamespace = "test-ns"
+func TestCleanUp(t *testing.T) {
+	t.Run("should successfully clean up object", func(t *testing.T) {
+		ctx := context.TODO()
 
-var testCtx = context.TODO()
+		resources := []*metav1.APIResourceList{
+			{APIResources: []metav1.APIResource{
+				{Kind: "MyKind", Group: "k8s.example.com", Version: "v2", Verbs: metav1.Verbs{"create", "update", "delete"}},
+			}, GroupVersion: "k8s.example.com/v2"},
+		}
 
-func TestNewManager(t *testing.T) {
-	actual := NewManager(testNamespace, nil, nil)
-	require.NotEmpty(t, actual)
+		discoveryMock := newMockDiscoveryInterface(t)
+		discoveryMock.EXPECT().ServerPreferredResources().Return(resources, nil)
+
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+
+		groupVersionKind := schema.GroupVersionKind{Group: "k8s.example.com", Version: "v2", Kind: "MyKind"}
+		objectList := &unstructured.UnstructuredList{}
+		objectList.SetGroupVersionKind(groupVersionKind)
+
+		selector, _ := metav1.LabelSelectorAsSelector(defaultCleanupSelector)
+		listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: selector}}
+
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(ctx, objectList, &listOptions).RunAndReturn(
+			func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+				c := list.(*unstructured.UnstructuredList)
+				c.Items = []unstructured.Unstructured{object}
+				return nil
+			})
+
+		propagationPolicy := metav1.DeletePropagationBackground
+		deleteOptions := client.DeleteOptions{PropagationPolicy: &propagationPolicy}
+		clientMock.EXPECT().Delete(ctx, &object, &deleteOptions).Return(nil)
+
+		notFoundError := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
+		clientMock.EXPECT().Get(ctx, mock.Anything, mock.Anything).Return(notFoundError)
+
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
+
+		err := sut.Cleanup(ctx)
+		assert.NoError(t, err)
+	})
 }
 
-func Test_defaultCleanupManager_Cleanup(t *testing.T) {
-	serverKnownResources := []*metav1.APIResourceList{
-		{APIResources: []metav1.APIResource{
-			{Kind: "Example", Verbs: metav1.Verbs{"create", "update"}},
-			{Kind: "MyObject", Verbs: metav1.Verbs{"create", "update"}},
-			{Namespaced: true, Kind: "MyNamespacedObject", Verbs: metav1.Verbs{"create", "update", "delete"}},
-		}, GroupVersion: "k8s.example.com/v1"},
-		{APIResources: []metav1.APIResource{
-			{Namespaced: false, Kind: "MyClusterScopedObject", Verbs: metav1.Verbs{"create", "update", "delete"}},
-		}, GroupVersion: "k8s.example.com/v2"},
-		{APIResources: []metav1.APIResource{
-			{Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"create", "update", "delete", "list", "delete", "patch", "get"}},
-		}, GroupVersion: "v1"},
-		{APIResources: []metav1.APIResource{
-			{Namespaced: false, Kind: "CustomResourceDefinition", Verbs: metav1.Verbs{"create", "update", "delete", "list", "delete", "patch", "get"}},
-		}, GroupVersion: "apiextensions.k8s.io/v1"},
-	}
-	t.Run("should fail to list the servers known api resources", func(t *testing.T) {
-		// given
+func TestFindResources(t *testing.T) {
+	t.Run("should only find resources that can be deleted", func(t *testing.T) {
+		discoveryMock := newMockDiscoveryInterface(t)
+
+		resources := []*metav1.APIResourceList{
+			{APIResources: []metav1.APIResource{
+				{Kind: "Example", Verbs: metav1.Verbs{"create", "update"}},
+			}, GroupVersion: "k8s.example.com/v1"},
+			{APIResources: []metav1.APIResource{
+				{Kind: "MyKind", Verbs: metav1.Verbs{"create", "update", "delete"}},
+			}, GroupVersion: "k8s.example.com/v2"},
+		}
+
+		discoveryMock.EXPECT().ServerPreferredResources().Return(resources, nil)
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock}
+
+		result, _ := sut.findResources()
+
+		assert.Equal(t, 1, len(result))
+		assert.Equal(t, "MyKind", result[0].Kind)
+	})
+
+	t.Run("should use GroupVersion from APIResourceList as Group and Version for APIResource", func(t *testing.T) {
+		discoveryMock := newMockDiscoveryInterface(t)
+
+		resources := []*metav1.APIResourceList{
+			{APIResources: []metav1.APIResource{
+				{Kind: "MyKind", Group: "AAA", Version: "VVV", Verbs: metav1.Verbs{"create", "update", "delete"}},
+			}, GroupVersion: "k8s.example.com/v2"},
+		}
+
+		discoveryMock.EXPECT().ServerPreferredResources().Return(resources, nil)
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock}
+
+		result, _ := sut.findResources()
+
+		assert.Equal(t, 1, len(result))
+		assert.Equal(t, "MyKind", result[0].Kind)
+		assert.Equal(t, "k8s.example.com", result[0].Group)
+		assert.Equal(t, "v2", result[0].Version)
+	})
+
+	t.Run("should not delete CustomResourceDefinition, Pods and resources under ApiGroup velero.io", func(t *testing.T) {
+		discoveryMock := newMockDiscoveryInterface(t)
+
+		resources := []*metav1.APIResourceList{
+			{APIResources: []metav1.APIResource{
+				{Kind: "CustomResourceDefinition", Verbs: metav1.Verbs{"create", "update", "delete"}},
+			}, GroupVersion: "k8s.example.com/v1"},
+			{APIResources: []metav1.APIResource{
+				{Kind: "MyKind", Verbs: metav1.Verbs{"create", "update", "delete"}},
+			}, GroupVersion: "k8s.example.com/v2"},
+			{APIResources: []metav1.APIResource{
+				{Kind: "VeleroKind1", Group: "velero.io", Verbs: metav1.Verbs{"create", "update", "delete"}},
+				{Kind: "VeleroKind2", Group: "velero.io", Verbs: metav1.Verbs{"create", "update", "delete"}},
+			}, GroupVersion: "velero.io/v2"},
+		}
+
+		discoveryMock.EXPECT().ServerPreferredResources().Return(resources, nil)
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock}
+
+		result, _ := sut.findResources()
+
+		assert.Equal(t, 1, len(result))
+		assert.Equal(t, "MyKind", result[0].Kind)
+	})
+
+	t.Run("should propagate errors while fetching resources", func(t *testing.T) {
+		discoveryMock := newMockDiscoveryInterface(t)
+		discoveryMock.EXPECT().ServerPreferredResources().Return([]*metav1.APIResourceList{}, assert.AnError)
+
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock}
+
+		_, err := sut.findResources()
+
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "fetching supported resources")
+
+	})
+}
+
+func TestFindObjects(t *testing.T) {
+	t.Run("only object with label app=ces and k8s.cloudogu.com/part-of != 'backup' should be deleted", func(t *testing.T) {
+		ctx := context.TODO()
+
+		resources := []*metav1.APIResourceList{
+			{APIResources: []metav1.APIResource{
+				{Kind: "MyKind", Group: "k8s.example.com", Version: "v2", Verbs: metav1.Verbs{"create", "update", "delete"}},
+			}, GroupVersion: "k8s.example.com/v2"},
+		}
+
+		discoveryMock := newMockDiscoveryInterface(t)
+		discoveryMock.EXPECT().ServerPreferredResources().Return(resources, nil)
+
+		groupVersionKind := schema.GroupVersionKind{Group: "k8s.example.com", Version: "v2", Kind: "MyKind"}
+		objectList := &unstructured.UnstructuredList{}
+		objectList.SetGroupVersionKind(groupVersionKind)
+
+		selector, _ := metav1.LabelSelectorAsSelector(defaultCleanupSelector)
+		listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: selector}}
+
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(ctx, objectList, &listOptions).Return(nil)
+
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
+
+		_, _ = sut.findObjects(ctx, defaultCleanupSelector)
+	})
+
+	t.Run("should return objects", func(t *testing.T) {
+		ctx := context.TODO()
+
+		resources := []*metav1.APIResourceList{
+			{APIResources: []metav1.APIResource{
+				{Kind: "MyKind", Group: "k8s.example.com", Version: "v2", Verbs: metav1.Verbs{"create", "update", "delete"}},
+			}, GroupVersion: "k8s.example.com/v2"},
+		}
+
+		discoveryMock := newMockDiscoveryInterface(t)
+		discoveryMock.EXPECT().ServerPreferredResources().Return(resources, nil)
+
+		groupVersionKind := schema.GroupVersionKind{Group: "k8s.example.com", Version: "v2", Kind: "MyKind"}
+		objectList := &unstructured.UnstructuredList{}
+		objectList.SetGroupVersionKind(groupVersionKind)
+
+		selector, _ := metav1.LabelSelectorAsSelector(defaultCleanupSelector)
+		listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: selector}}
+
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(ctx, objectList, &listOptions).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			t.Helper()
+			ul, _ := list.(*unstructured.UnstructuredList)
+			item := unstructured.Unstructured{}
+			item.SetGroupVersionKind(groupVersionKind)
+			item.SetName("MyKindObject")
+			ul.Items = []unstructured.Unstructured{item}
+			return nil
+		})
+
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
+
+		objects, err := sut.findObjects(ctx, defaultCleanupSelector)
+
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(objects))
+		assert.Equal(t, "MyKindObject", objects[0].GetName())
+	})
+
+	t.Run("should propagate error while find resources", func(t *testing.T) {
+		ctx := context.TODO()
+
 		discoveryMock := newMockDiscoveryInterface(t)
 		discoveryMock.EXPECT().ServerPreferredResources().Return(nil, assert.AnError)
+
 		sut := &defaultCleanupManager{discoveryClient: discoveryMock}
 
-		// when
-		err := sut.Cleanup(testCtx)
+		_, err := sut.findObjects(ctx, nil)
 
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to get resource lists from server")
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "find resources")
 	})
-	t.Run("should fail to create label selector", func(t *testing.T) {
-		// given
-		originalSelector := *defaultCleanupSelector
-		defer func() { defaultCleanupSelector = &originalSelector }()
-		defaultCleanupSelector = &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Operator: "br0k€n"}}}
 
-		discoveryMock := newMockDiscoveryInterface(t)
-		discoveryMock.EXPECT().ServerPreferredResources().Return(nil, nil)
-		sut := &defaultCleanupManager{discoveryClient: discoveryMock}
+	t.Run("should propagate error while list objects", func(t *testing.T) {
+		ctx := context.TODO()
 
-		// when
-		err := sut.Cleanup(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to create selector from given label selector &LabelSelector{MatchLabels:map[string]string{},MatchExpressions:[]LabelSelectorRequirement{LabelSelectorRequirement{Key:,Operator:br0k€n,Values:[],},},}")
-	})
-	t.Run("should return early if api resources for a group are empty", func(t *testing.T) {
-		// given
-		emptyListList := []*metav1.APIResourceList{{APIResources: make([]metav1.APIResource, 0)}}
-		discoveryMock := newMockDiscoveryInterface(t)
-		discoveryMock.EXPECT().ServerPreferredResources().Return(emptyListList, nil)
-		sut := &defaultCleanupManager{discoveryClient: discoveryMock}
-
-		// when
-		err := sut.Cleanup(testCtx)
-
-		// then
-		require.NoError(t, err)
-	})
-	t.Run("should return early if group version of api resources is not parsable", func(t *testing.T) {
-		// given
-		emptyListList := []*metav1.APIResourceList{{GroupVersion: "k8s/example/com/invalid/v1", APIResources: make([]metav1.APIResource, 1)}}
-		discoveryMock := newMockDiscoveryInterface(t)
-		discoveryMock.EXPECT().ServerPreferredResources().Return(emptyListList, nil)
-		sut := &defaultCleanupManager{discoveryClient: discoveryMock}
-
-		// when
-		err := sut.Cleanup(testCtx)
-
-		// then
-		require.NoError(t, err)
-	})
-	t.Run("should fail to list objects", func(t *testing.T) {
-		// given
-
-		discoveryMock := newMockDiscoveryInterface(t)
-		discoveryMock.EXPECT().ServerPreferredResources().Return(serverKnownResources, nil)
-
-		clientMock := newMockK8sClient(t)
-		expectedMyNamespacedObject, expectedMyClusterScopedObject := initTestLists()
-		clientMock.EXPECT().List(testCtx, expectedMyNamespacedObject, mock.Anything).Return(assert.AnError)
-		clientMock.EXPECT().List(testCtx, expectedMyClusterScopedObject, mock.Anything).Return(assert.AnError)
-
-		sut := &defaultCleanupManager{client: clientMock, discoveryClient: discoveryMock}
-
-		// when
-		err := sut.Cleanup(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to delete api resources with label selector \"app in (ces),k8s.cloudogu.com/part-of notin (backup)\"")
-		assert.ErrorContains(t, err, "failed to list objects in k8s.example.com/v1, Kind=MyNamespacedObject")
-		assert.ErrorContains(t, err, "failed to list objects in k8s.example.com/v2, Kind=MyClusterScopedObject")
-	})
-	t.Run("should fail to get objects when removing finalizer", func(t *testing.T) {
-		// given
-		discoveryMock := newMockDiscoveryInterface(t)
-		discoveryMock.EXPECT().ServerPreferredResources().Return(serverKnownResources, nil)
-
-		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
-			t.Helper()
-			ul, ok := list.(*unstructured.UnstructuredList)
-			require.True(t, ok, "Type of list should be UnstructuredList")
-			fillTestList(ul)
-			return nil
-		})
-		expectGet(clientMock, assert.AnError)
-		expectDelete(clientMock, false, nil)
-
-		sut := &defaultCleanupManager{client: clientMock, discoveryClient: discoveryMock}
-
-		// when
-		err := sut.Cleanup(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to delete api resources with label selector \"app in (ces),k8s.cloudogu.com/part-of notin (backup)\"")
-		assert.ErrorContains(t, err, "failed to remove finalizers for test-ns/item1 (k8s.example.com/v1, Kind=MyNamespacedObject)")
-		assert.ErrorContains(t, err, "failed to remove finalizers for test-ns/item2 (k8s.example.com/v1, Kind=MyNamespacedObject)")
-		assert.ErrorContains(t, err, "failed to remove finalizers for /item1 (k8s.example.com/v2, Kind=MyClusterScopedObject)")
-		assert.ErrorContains(t, err, "failed to remove finalizers for /item2 (k8s.example.com/v2, Kind=MyClusterScopedObject)")
-	})
-	t.Run("should not fail if not found", func(t *testing.T) {
-		// given
-		discoveryMock := newMockDiscoveryInterface(t)
-		discoveryMock.EXPECT().ServerPreferredResources().Return(serverKnownResources, nil)
-
-		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
-			t.Helper()
-			ul, ok := list.(*unstructured.UnstructuredList)
-			require.True(t, ok, "Type of list should be UnstructuredList")
-			fillTestList(ul)
-			return nil
-		})
-		notFoundErr := errors.NewNotFound(schema.GroupResource{}, "")
-		expectGet(clientMock, notFoundErr)
-		expectDelete(clientMock, false, notFoundErr)
-
-		sut := &defaultCleanupManager{client: clientMock, discoveryClient: discoveryMock}
-
-		// when
-		err := sut.Cleanup(testCtx)
-
-		// then
-		require.NoError(t, err)
-	})
-	t.Run("should fail to update objects when removing finalizer", func(t *testing.T) {
-		// given
-		discoveryMock := newMockDiscoveryInterface(t)
-		discoveryMock.EXPECT().ServerPreferredResources().Return(serverKnownResources, nil)
-
-		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
-			t.Helper()
-			ul, ok := list.(*unstructured.UnstructuredList)
-			require.True(t, ok, "Type of list should be UnstructuredList")
-			fillTestList(ul)
-			return nil
-		})
-		expectGet(clientMock, nil)
-		expectUpdate(clientMock, assert.AnError)
-		expectDelete(clientMock, true, nil)
-
-		sut := &defaultCleanupManager{client: clientMock, discoveryClient: discoveryMock}
-
-		// when
-		err := sut.Cleanup(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to delete api resources with label selector \"app in (ces),k8s.cloudogu.com/part-of notin (backup)\"")
-		assert.ErrorContains(t, err, "failed to remove finalizers for test-ns/item1 (k8s.example.com/v1, Kind=MyNamespacedObject)")
-		assert.ErrorContains(t, err, "failed to remove finalizers for test-ns/item2 (k8s.example.com/v1, Kind=MyNamespacedObject)")
-		assert.ErrorContains(t, err, "failed to remove finalizers for /item1 (k8s.example.com/v2, Kind=MyClusterScopedObject)")
-		assert.ErrorContains(t, err, "failed to remove finalizers for /item2 (k8s.example.com/v2, Kind=MyClusterScopedObject)")
-	})
-	t.Run("should fail to delete objects", func(t *testing.T) {
-		// given
-		discoveryMock := newMockDiscoveryInterface(t)
-		discoveryMock.EXPECT().ServerPreferredResources().Return(serverKnownResources, nil)
-
-		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
-			t.Helper()
-			ul, ok := list.(*unstructured.UnstructuredList)
-			require.True(t, ok, "Type of list should be UnstructuredList")
-			fillTestList(ul)
-			return nil
-		})
-		expectGet(clientMock, nil)
-		expectUpdate(clientMock, nil)
-		expectDelete(clientMock, true, assert.AnError)
-
-		sut := &defaultCleanupManager{client: clientMock, discoveryClient: discoveryMock}
-
-		// when
-		err := sut.Cleanup(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to delete api resources with label selector \"app in (ces),k8s.cloudogu.com/part-of notin (backup)\"")
-		assert.ErrorContains(t, err, "failed to delete test-ns/item1 (k8s.example.com/v1, Kind=MyNamespacedObject)")
-		assert.ErrorContains(t, err, "failed to delete test-ns/item2 (k8s.example.com/v1, Kind=MyNamespacedObject)")
-		assert.ErrorContains(t, err, "failed to delete /item1 (k8s.example.com/v2, Kind=MyClusterScopedObject)")
-		assert.ErrorContains(t, err, "failed to delete /item2 (k8s.example.com/v2, Kind=MyClusterScopedObject)")
-	})
-	t.Run("should succeed to delete objects", func(t *testing.T) {
-		// given
-		discoveryMock := newMockDiscoveryInterface(t)
-		discoveryMock.EXPECT().ServerPreferredResources().Return(serverKnownResources, nil)
-
-		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
-			t.Helper()
-			ul, ok := list.(*unstructured.UnstructuredList)
-			require.True(t, ok, "Type of list should be UnstructuredList")
-			fillTestList(ul)
-			return nil
-		})
-		expectGet(clientMock, nil)
-		expectUpdate(clientMock, nil)
-		expectDelete(clientMock, true, nil)
-
-		sut := &defaultCleanupManager{client: clientMock, discoveryClient: discoveryMock}
-
-		// when
-		err := sut.Cleanup(testCtx)
-
-		// then
-		require.NoError(t, err)
-	})
-}
-
-func expectUpdate(clientMock *mockK8sClient, err error) {
-	clientMock.EXPECT().Update(testCtx,
-		&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v1", "kind": "MyNamespacedObject", "metadata": map[string]interface{}{"finalizers": []interface{}{}, "labels": map[string]interface{}{"app": "ces"}, "name": "item1", "namespace": "test-ns"}}},
-	).Return(err)
-	clientMock.EXPECT().Update(testCtx,
-		&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v1", "kind": "MyNamespacedObject", "metadata": map[string]interface{}{"finalizers": []interface{}{}, "labels": map[string]interface{}{"app": "ces"}, "name": "item2", "namespace": "test-ns"}}},
-	).Return(err)
-	clientMock.EXPECT().Update(testCtx,
-		&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v2", "kind": "MyClusterScopedObject", "metadata": map[string]interface{}{"finalizers": []interface{}{}, "labels": map[string]interface{}{"app": "ces"}, "name": "item1"}}},
-	).Return(err)
-	clientMock.EXPECT().Update(testCtx,
-		&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v2", "kind": "MyClusterScopedObject", "metadata": map[string]interface{}{"finalizers": []interface{}{}, "labels": map[string]interface{}{"app": "ces"}, "name": "item2"}}},
-	).Return(err)
-}
-
-func expectDelete(clientMock *mockK8sClient, withFinalizers bool, err error) {
-	propagationPolicy := metav1.DeletePropagationBackground
-	items := []*unstructured.Unstructured{
-		{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v1", "kind": "MyNamespacedObject", "metadata": map[string]interface{}{"labels": map[string]interface{}{"app": "ces"}, "name": "item1", "namespace": "test-ns"}}},
-		{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v1", "kind": "MyNamespacedObject", "metadata": map[string]interface{}{"finalizers": []interface{}{"my-finalizer"}, "labels": map[string]interface{}{"app": "ces"}, "name": "item2", "namespace": "test-ns"}}},
-		{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v2", "kind": "MyClusterScopedObject", "metadata": map[string]interface{}{"labels": map[string]interface{}{"app": "ces"}, "name": "item1"}}},
-		{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v2", "kind": "MyClusterScopedObject", "metadata": map[string]interface{}{"finalizers": []interface{}{"my-finalizer"}, "labels": map[string]interface{}{"app": "ces"}, "name": "item2"}}},
-	}
-
-	for _, item := range items {
-		if withFinalizers {
-			item.SetFinalizers(make([]string, 0))
+		resources := []*metav1.APIResourceList{
+			{APIResources: []metav1.APIResource{
+				{Kind: "MyKind", Group: "k8s.example.com", Version: "v2", Verbs: metav1.Verbs{"create", "update", "delete"}},
+			}, GroupVersion: "k8s.example.com/v2"},
 		}
-		clientMock.EXPECT().Delete(testCtx,
-			item,
-			&client.DeleteOptions{GracePeriodSeconds: (*int64)(nil), Preconditions: (*metav1.Preconditions)(nil), PropagationPolicy: &propagationPolicy, Raw: (*metav1.DeleteOptions)(nil), DryRun: []string(nil)},
-		).Return(err)
-	}
+
+		discoveryMock := newMockDiscoveryInterface(t)
+		discoveryMock.EXPECT().ServerPreferredResources().Return(resources, nil)
+
+		groupVersionKind := schema.GroupVersionKind{Group: "k8s.example.com", Version: "v2", Kind: "MyKind"}
+		objectList := &unstructured.UnstructuredList{}
+		objectList.SetGroupVersionKind(groupVersionKind)
+
+		selector, _ := metav1.LabelSelectorAsSelector(defaultCleanupSelector)
+		listOptions := client.ListOptions{LabelSelector: &client.MatchingLabelsSelector{Selector: selector}}
+
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(ctx, objectList, &listOptions).Return(assert.AnError)
+
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
+
+		_, err := sut.findObjects(ctx, defaultCleanupSelector)
+
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "list objects of resource")
+	})
+
 }
 
-func expectGet(clientMock *mockK8sClient, err error) {
-	clientMock.EXPECT().Get(testCtx, types.NamespacedName{Name: "item1", Namespace: testNamespace},
-		&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v1", "kind": "MyNamespacedObject", "metadata": map[string]interface{}{"labels": map[string]interface{}{"app": "ces"}, "name": "item1", "namespace": "test-ns"}}},
-	).Return(err)
-	clientMock.EXPECT().Get(testCtx, types.NamespacedName{Name: "item2", Namespace: testNamespace},
-		&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v1", "kind": "MyNamespacedObject", "metadata": map[string]interface{}{"finalizers": []interface{}{"my-finalizer"}, "labels": map[string]interface{}{"app": "ces"}, "name": "item2", "namespace": "test-ns"}}},
-	).Return(err)
-	clientMock.EXPECT().Get(testCtx, types.NamespacedName{Name: "item1"},
-		&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v2", "kind": "MyClusterScopedObject", "metadata": map[string]interface{}{"labels": map[string]interface{}{"app": "ces"}, "name": "item1"}}},
-	).Return(err)
-	clientMock.EXPECT().Get(testCtx, types.NamespacedName{Name: "item2"},
-		&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v2", "kind": "MyClusterScopedObject", "metadata": map[string]interface{}{"finalizers": []interface{}{"my-finalizer"}, "labels": map[string]interface{}{"app": "ces"}, "name": "item2"}}},
-	).Return(err)
+func TestDeleteObject(t *testing.T) {
+	t.Run("should delete object", func(t *testing.T) {
+		ctx := context.TODO()
+		clientMock := newMockK8sClient(t)
+
+		propagationPolicy := metav1.DeletePropagationBackground
+		deleteOptions := client.DeleteOptions{PropagationPolicy: &propagationPolicy}
+		item := unstructured.Unstructured{}
+
+		clientMock.EXPECT().Delete(ctx, &item, &deleteOptions).Return(nil)
+
+		sut := &defaultCleanupManager{client: clientMock}
+
+		err := sut.deleteObject(ctx, &item)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("should not return an error if resource was not found", func(t *testing.T) {
+		ctx := context.TODO()
+		clientMock := newMockK8sClient(t)
+
+		propagationPolicy := metav1.DeletePropagationBackground
+		deleteOptions := client.DeleteOptions{PropagationPolicy: &propagationPolicy}
+		item := unstructured.Unstructured{}
+
+		e := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
+		clientMock.EXPECT().Delete(ctx, &item, &deleteOptions).Return(e)
+
+		sut := &defaultCleanupManager{client: clientMock}
+
+		err := sut.deleteObject(ctx, &item)
+
+		assert.NoError(t, err)
+
+	})
+
 }
 
-func initTestLists() (*unstructured.UnstructuredList, *unstructured.UnstructuredList) {
-	expectedMyNamespacedObject := &unstructured.UnstructuredList{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v1", "kind": "MyNamespacedObject"}}
-	expectedMyClusterScopedObject := &unstructured.UnstructuredList{Object: map[string]interface{}{"apiVersion": "k8s.example.com/v2", "kind": "MyClusterScopedObject"}}
-	return expectedMyNamespacedObject, expectedMyClusterScopedObject
+func TestExistObject(t *testing.T) {
+	t.Run("should return false if object was not found", func(t *testing.T) {
+		ctx := context.TODO()
+
+		clientMock := newMockK8sClient(t)
+
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+		objectKey := types.NamespacedName{Namespace: "ns", Name: "aName"}
+
+		e := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(e)
+
+		sut := &defaultCleanupManager{client: clientMock}
+
+		result := sut.existObject(ctx, &object)
+
+		assert.False(t, result)
+
+	})
 }
 
-func fillTestList(list *unstructured.UnstructuredList) {
-	item1 := unstructured.Unstructured{}
-	item1.SetGroupVersionKind(list.GroupVersionKind())
-	item1.SetName("item1")
-	item1.SetLabels(map[string]string{"app": "ces"})
+func TestRemoveFinalizer(t *testing.T) {
+	t.Run("should retry if a update conflict occurred", func(t *testing.T) {
+		ctx := context.TODO()
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+		objectKey := types.NamespacedName{Namespace: "ns", Name: "aName"}
 
-	item2 := unstructured.Unstructured{}
-	item2.SetGroupVersionKind(list.GroupVersionKind())
-	item2.SetName("item2")
-	item2.SetFinalizers([]string{"my-finalizer"})
-	item2.SetLabels(map[string]string{"app": "ces"})
+		clientMock := newMockK8sClient(t)
+		resource := schema.GroupResource{Group: "example.com", Resource: "Pod"}
 
-	if list.GetKind() == "MyNamespacedObject" {
-		item1.SetNamespace(testNamespace)
-		item2.SetNamespace(testNamespace)
-	}
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(nil).Twice()
+		clientMock.EXPECT().Update(ctx, &object).Return(errors.NewConflict(resource, "aName", assert.AnError)).Once()
+		clientMock.EXPECT().Update(ctx, &object).Return(nil).Once()
 
-	list.Items = []unstructured.Unstructured{item1, item2}
+		sut := &defaultCleanupManager{client: clientMock}
+
+		err := sut.removeFinalizers(ctx, &object)
+
+		assert.NoError(t, err)
+	})
+	t.Run("should remove finalizers", func(t *testing.T) {
+		ctx := context.TODO()
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+		object.SetFinalizers([]string{"myFinalizer"})
+		objectKey := types.NamespacedName{Namespace: "ns", Name: "aName"}
+
+		clientMock := newMockK8sClient(t)
+		resource := schema.GroupResource{Group: "example.com", Resource: "Pod"}
+
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(nil).Twice()
+		clientMock.EXPECT().Update(ctx, &object).Return(errors.NewConflict(resource, "aName", assert.AnError)).Once()
+		clientMock.EXPECT().Update(ctx, &object).Return(nil).Once()
+
+		sut := &defaultCleanupManager{client: clientMock}
+
+		err := sut.removeFinalizers(ctx, &object)
+
+		assert.NoError(t, err)
+		assert.Equal(t, []string{}, object.GetFinalizers())
+	})
+	t.Run("should not remove kubernetes.io finalizers", func(t *testing.T) {
+		ctx := context.TODO()
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+		object.SetFinalizers([]string{"kubernetes.io/myFinalizer"})
+		objectKey := types.NamespacedName{Namespace: "ns", Name: "aName"}
+
+		clientMock := newMockK8sClient(t)
+		resource := schema.GroupResource{Group: "example.com", Resource: "Pod"}
+
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(nil).Twice()
+		clientMock.EXPECT().Update(ctx, &object).Return(errors.NewConflict(resource, "aName", assert.AnError)).Once()
+		clientMock.EXPECT().Update(ctx, &object).Return(nil).Once()
+
+		sut := &defaultCleanupManager{client: clientMock}
+
+		err := sut.removeFinalizers(ctx, &object)
+
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"kubernetes.io/myFinalizer"}, object.GetFinalizers())
+	})
+}
+
+func TestWaitForObjectToBeDeleted(t *testing.T) {
+	t.Run("should not wait if a object is not found", func(t *testing.T) {
+		ctx := context.TODO()
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+		objectKey := types.NamespacedName{Namespace: "ns", Name: "aName"}
+
+		clientMock := newMockK8sClient(t)
+
+		notFoundError := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(notFoundError)
+
+		sut := &defaultCleanupManager{client: clientMock}
+		var wg sync.WaitGroup
+		sut.waitForObjectToBeDeleted(ctx, &object, &wg)
+		wg.Wait()
+	})
+	t.Run("should wait if a object still exists", func(t *testing.T) {
+		ctx := context.TODO()
+		object := unstructured.Unstructured{}
+		object.SetNamespace("ns")
+		object.SetName("aName")
+		objectKey := types.NamespacedName{Namespace: "ns", Name: "aName"}
+
+		clientMock := newMockK8sClient(t)
+
+		notFoundError := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(nil).Once()
+		clientMock.EXPECT().Get(ctx, objectKey, &object).Return(notFoundError).Once()
+
+		sut := &defaultCleanupManager{client: clientMock}
+		var wg sync.WaitGroup
+		sut.waitForObjectToBeDeleted(ctx, &object, &wg)
+		wg.Wait()
+	})
 }

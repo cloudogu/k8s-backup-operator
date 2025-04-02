@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
-	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 
 const (
