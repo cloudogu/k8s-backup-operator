@@ -60,30 +60,21 @@ func (c *defaultCleanupManager) Cleanup(ctx context.Context) error {
 	for _, object := range objects {
 		err = c.removeFinalizers(ctx, &object)
 		if err != nil {
-			return fmt.Errorf(
-				"remove finalizer of object: namespace=%s, kind=%s, name=%s: %w",
-				object.GetNamespace(),
-				object.GetKind(),
-				object.GetName(),
-				err,
-			)
+			return objectErr("remove finalizer of object", object, err)
 		}
 		err = c.deleteObject(ctx, &object)
 		if err != nil {
-			object.GetKind()
-			return fmt.Errorf(
-				"delete object namespace=%s, kind=%s, name=%s: %w",
-				object.GetNamespace(),
-				object.GetKind(),
-				object.GetName(),
-				err,
-			)
+			return objectErr("delete object namespace", object, err)
 		}
 		c.waitForObjectToBeDeleted(ctx, &object, &wg)
 	}
 
 	wg.Wait()
 	return nil
+}
+
+func objectErr(msg string, object unstructured.Unstructured, err error) error {
+	return fmt.Errorf("%s: namespace=%s, kind=%s, name=%s: %w", msg, object.GetNamespace(), object.GetKind(), object.GetName(), err)
 }
 
 func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *metav1.LabelSelector) ([]unstructured.Unstructured, error) {
