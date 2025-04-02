@@ -1,8 +1,8 @@
 module github.com/cloudogu/k8s-backup-operator
 
-go 1.23
+go 1.24
 
-toolchain go1.23.5
+toolchain go1.24.2
 
 require (
 	github.com/Masterminds/semver/v3 v3.3.0
