@@ -115,7 +115,7 @@ func TestFindResources(t *testing.T) {
 			}, GroupVersion: "k8s.example.com/v2"},
 			{APIResources: []metav1.APIResource{
 				{Kind: "VeleroKind1", Group: "velero.io", Verbs: metav1.Verbs{"create", "update", "delete"}},
-				{Kind: "VeleroKind1", Group: "velero.io", Verbs: metav1.Verbs{"create", "update", "delete"}},
+				{Kind: "VeleroKind2", Group: "velero.io", Verbs: metav1.Verbs{"create", "update", "delete"}},
 			}, GroupVersion: "velero.io/v2"},
 		}
 

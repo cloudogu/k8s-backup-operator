@@ -20,7 +20,6 @@ import (
 const (
 	deleteVerb                   = "delete"
 	customResourceDefinitionKind = "CustomResourceDefinition"
-	podKind                      = "Pod"
 	veleroGroup                  = "velero.io"
 )
 
@@ -141,8 +140,7 @@ func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 			resource.Group = gv.Group
 			resource.Version = gv.Version
 			include := len(resource.Verbs) != 0 && slices.Contains(resource.Verbs, deleteVerb)
-			exclude := resource.Kind == customResourceDefinitionKind || // Skip crd deletion because we need the provider and snapshot-controller components.
-				resource.Kind == podKind || // Skip pod deletion because this would kill our backup operator.
+			exclude := resource.Kind == customResourceDefinitionKind || // Skip crd deletion because we need the component-crd.
 				resource.Group == veleroGroup // Skip velero resource deletion because we need those to restore.
 			if include && !exclude {
 				result = append(result, resource)
@@ -205,7 +203,8 @@ func (c *defaultCleanupManager) removeFinalizers(ctx context.Context, object cli
 		finalizers := make([]string, 0)
 		for _, finalizer := range object.GetFinalizers() {
 			if strings.HasPrefix(finalizer, "kubernetes.io") {
-				log.FromContext(ctx).Info(fmt.Sprintf("not removing kubernetes finalizer for resource %s(%s): %v", object.GetName(), object.GetObjectKind().GroupVersionKind(), finalizers))
+				log.FromContext(ctx).Info(fmt.Sprintf("not removing kubernetes finalizer for resource %s(%s): %v",
+					object.GetName(), object.GetObjectKind().GroupVersionKind(), finalizers))
 				finalizers = append(finalizers, finalizer)
 			}
 		}
