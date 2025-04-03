@@ -11,9 +11,10 @@ func NewRestoreManager(
 	namespace string,
 	recorder eventRecorder,
 	cleanup cleanupManager,
+	recreator ownerReferenceRestore,
 ) *defaultManager {
 	return &defaultManager{
-		createManager: newCreateManager(clientSet, namespace, recorder, cleanup),
+		createManager: newCreateManager(clientSet, namespace, recorder, cleanup, recreator),
 		deleteManager: newDeleteManager(clientSet, namespace, recorder),
 	}
 }

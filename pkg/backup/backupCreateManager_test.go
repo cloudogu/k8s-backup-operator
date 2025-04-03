@@ -21,6 +21,7 @@ var testCtx = context.TODO()
 func TestNewBackupCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
 		configMapMock := newMockBackupConfigMapInterface(t)
 		corev1Client := newMockBackupCoreV1Interface(t)
@@ -29,7 +30,7 @@ func TestNewBackupCreateManager(t *testing.T) {
 		clientSetMock.EXPECT().CoreV1().Return(corev1Client)
 
 		// when
-		manager := newBackupCreateManager(clientSetMock, "", nil, globalConfigRepositoryMock)
+		manager := newBackupCreateManager(clientSetMock, "", nil, globalConfigRepositoryMock, ownerReferenceBackupMock)
 
 		// then
 		require.NotNil(t, manager)
@@ -75,7 +76,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -122,7 +126,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -209,7 +216,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -244,7 +254,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -281,7 +294,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -319,7 +335,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -362,7 +381,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -408,7 +430,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -454,7 +479,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -500,7 +528,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -548,7 +579,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -590,7 +624,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -635,7 +672,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -680,7 +720,10 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace}
+		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
+		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, recreator: ownerReferenceBackupMock}
 
 		// when
 		err := sut.create(testCtx, backup)

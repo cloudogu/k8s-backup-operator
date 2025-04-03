@@ -1,0 +1,535 @@
+[
+  {
+    "groupVersion": "v1",
+    "resources": [
+      {
+        "name": "limitranges",
+        "singularName": "limitrange",
+        "namespaced": true,
+        "kind": "LimitRange",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "limits"
+        ]
+      },
+      {
+        "name": "pods",
+        "singularName": "pod",
+        "namespaced": true,
+        "kind": "Pod",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "po"
+        ],
+        "categories": [
+          "all"
+        ]
+      },
+      {
+        "name": "persistentvolumeclaims",
+        "singularName": "persistentvolumeclaim",
+        "namespaced": true,
+        "kind": "PersistentVolumeClaim",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "pvc"
+        ]
+      },
+      {
+        "name": "serviceaccounts",
+        "singularName": "serviceaccount",
+        "namespaced": true,
+        "kind": "ServiceAccount",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "sa"
+        ]
+      },
+      {
+        "name": "configmaps",
+        "singularName": "configmap",
+        "namespaced": true,
+        "kind": "ConfigMap",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "cm"
+        ]
+      },
+      {
+        "name": "resourcequotas",
+        "singularName": "resourcequota",
+        "namespaced": true,
+        "kind": "ResourceQuota",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "quota"
+        ]
+      },
+      {
+        "name": "replicationcontrollers",
+        "singularName": "replicationcontroller",
+        "namespaced": true,
+        "kind": "ReplicationController",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "rc"
+        ],
+        "categories": [
+          "all"
+        ]
+      },
+      {
+        "name": "endpoints",
+        "singularName": "endpoints",
+        "namespaced": true,
+        "kind": "Endpoints",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "ep"
+        ]
+      },
+      {
+        "name": "podtemplates",
+        "singularName": "podtemplate",
+        "namespaced": true,
+        "kind": "PodTemplate",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ]
+      },
+      {
+        "name": "bindings",
+        "singularName": "binding",
+        "namespaced": true,
+        "kind": "Binding",
+        "verbs": [
+          "create"
+        ]
+      },
+      {
+        "name": "secrets",
+        "singularName": "secret",
+        "namespaced": true,
+        "kind": "Secret",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ]
+      },
+      {
+        "name": "events",
+        "singularName": "event",
+        "namespaced": true,
+        "kind": "Event",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "ev"
+        ]
+      },
+      {
+        "name": "services",
+        "singularName": "service",
+        "namespaced": true,
+        "kind": "Service",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "svc"
+        ],
+        "categories": [
+          "all"
+        ]
+      }
+    ]
+  },
+  {
+    "groupVersion": "apps/v1",
+    "resources": [
+      {
+        "name": "controllerrevisions",
+        "singularName": "controllerrevision",
+        "namespaced": true,
+        "kind": "ControllerRevision",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ]
+      },
+      {
+        "name": "deployments",
+        "singularName": "deployment",
+        "namespaced": true,
+        "kind": "Deployment",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "deploy"
+        ],
+        "categories": [
+          "all"
+        ]
+      },
+      {
+        "name": "daemonsets",
+        "singularName": "daemonset",
+        "namespaced": true,
+        "kind": "DaemonSet",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "ds"
+        ],
+        "categories": [
+          "all"
+        ]
+      },
+      {
+        "name": "statefulsets",
+        "singularName": "statefulset",
+        "namespaced": true,
+        "kind": "StatefulSet",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "sts"
+        ],
+        "categories": [
+          "all"
+        ]
+      },
+      {
+        "name": "replicasets",
+        "singularName": "replicaset",
+        "namespaced": true,
+        "kind": "ReplicaSet",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "rs"
+        ],
+        "categories": [
+          "all"
+        ]
+      }
+    ]
+  },
+  {
+    "groupVersion": "networking.k8s.io/v1",
+    "resources": [
+      {
+        "name": "ingresses",
+        "singularName": "ingress",
+        "namespaced": true,
+        "kind": "Ingress",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "ing"
+        ]
+      },
+      {
+        "name": "networkpolicies",
+        "singularName": "networkpolicy",
+        "namespaced": true,
+        "kind": "NetworkPolicy",
+        "verbs": [
+          "create",
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "update",
+          "watch"
+        ],
+        "shortNames": [
+          "netpol"
+        ]
+      }
+    ]
+  },
+  {
+    "groupVersion": "k8s.cloudogu.com/v2",
+    "resources": [
+      {
+        "name": "dogurestarts",
+        "singularName": "dogurestart",
+        "namespaced": true,
+        "group": "k8s.cloudogu.com",
+        "version": "v2",
+        "kind": "DoguRestart",
+        "verbs": [
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "create",
+          "update",
+          "watch"
+        ]
+      },
+      {
+        "name": "dogus",
+        "singularName": "dogu",
+        "namespaced": true,
+        "group": "k8s.cloudogu.com",
+        "version": "v2",
+        "kind": "Dogu",
+        "verbs": [
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "create",
+          "update",
+          "watch"
+        ]
+      }
+    ]
+  },
+  {
+    "groupVersion": "k8s.cloudogu.com/v1",
+    "resources": [
+      {
+        "name": "restores",
+        "singularName": "restore",
+        "namespaced": true,
+        "group": "k8s.cloudogu.com",
+        "version": "v1",
+        "kind": "Restore",
+        "verbs": [
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "create",
+          "update",
+          "watch"
+        ]
+      },
+      {
+        "name": "backupschedules",
+        "singularName": "backupschedule",
+        "namespaced": true,
+        "group": "k8s.cloudogu.com",
+        "version": "v1",
+        "kind": "BackupSchedule",
+        "verbs": [
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "create",
+          "update",
+          "watch"
+        ]
+      },
+      {
+        "name": "blueprints",
+        "singularName": "blueprint",
+        "namespaced": true,
+        "group": "k8s.cloudogu.com",
+        "version": "v1",
+        "kind": "Blueprint",
+        "verbs": [
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "create",
+          "update",
+          "watch"
+        ]
+      },
+      {
+        "name": "backups",
+        "singularName": "backup",
+        "namespaced": true,
+        "group": "k8s.cloudogu.com",
+        "version": "v1",
+        "kind": "Backup",
+        "verbs": [
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "create",
+          "update",
+          "watch"
+        ]
+      },
+      {
+        "name": "components",
+        "singularName": "component",
+        "namespaced": true,
+        "group": "k8s.cloudogu.com",
+        "version": "v1",
+        "kind": "Component",
+        "verbs": [
+          "delete",
+          "deletecollection",
+          "get",
+          "list",
+          "patch",
+          "create",
+          "update",
+          "watch"
+        ]
+      }
+    ]
+  }
+]
