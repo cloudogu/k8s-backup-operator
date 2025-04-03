@@ -15,7 +15,7 @@ type defaultManager struct {
 func NewManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string, imageConfig additionalimages.ImageConfig) *defaultManager {
 	return &defaultManager{
 		createManager: newCreateManager(clientSet, recorder, namespace, imageConfig),
-		updateManager: newUpdateManager(clientSet, recorder, namespace),
+		updateManager: newUpdateManager(clientSet, recorder, namespace, imageConfig),
 		deleteManager: newDeleteManager(clientSet, recorder, namespace),
 	}
 }

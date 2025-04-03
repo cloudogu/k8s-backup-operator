@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.2] - 2025-04-03
+### Fixed
+- [#46] Fixed endless loop of reconciles because the image was not set in update manager and difference comparison 
+  did not check the cron job provider correctly
+- [#46] Fixed missing CronJobs apiGroup in RBACs
+- [#46] Add a waiting routine to fix race condition while deleting and restoring resources
+
+### Added
+- [#47] Add additional print columns and aliases to CRDs
+
 ## [v1.3.1] - 2024-12-19
 ### Fixed
 - [#42] Removed unnecessary rbac proxy to fix CVE-2024-45337

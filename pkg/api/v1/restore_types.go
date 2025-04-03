@@ -38,6 +38,9 @@ type RestoreStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels=app=ces;app.kubernetes.io/name=k8s-backup-operator;k8s.cloudogu.com/part-of=backup
+// +kubebuilder:printcolumn:name="Backup name",type="string",JSONPath=".spec.backupName",description="The backup name for the restore"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status",description="The current status of the restore"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 
 // Restore is the Schema for the restores API
 type Restore struct {

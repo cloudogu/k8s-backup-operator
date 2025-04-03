@@ -25,6 +25,7 @@ const (
 const BackupScheduleFinalizer = "cloudogu-backup-schedule-finalizer"
 
 const ProviderEnvVar = "PROVIDER"
+const ProviderArgFlag = "--provider"
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -61,6 +62,10 @@ func (bss BackupScheduleStatus) GetStatus() string {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName="bs"
+// +kubebuilder:printcolumn:name="Schedule",type="string",JSONPath=".spec.schedule",description="The cron schedule for the backup schedule"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status",description="The current status of the backup schedule"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 
 // BackupSchedule is the Schema for the backupschedules API
 type BackupSchedule struct {
@@ -110,7 +115,7 @@ func (bs *BackupSchedule) cronJobPodSpec(image string) corev1.PodSpec {
 			Args: []string{
 				"scheduled-backup",
 				fmt.Sprintf("--name=%s", bs.Name),
-				fmt.Sprintf("--provider=%s", bs.Spec.Provider),
+				fmt.Sprintf("%s=%s", ProviderArgFlag, bs.Spec.Provider),
 			},
 			Env: []corev1.EnvVar{
 				{Name: "NAMESPACE",
