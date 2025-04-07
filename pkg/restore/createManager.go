@@ -23,7 +23,7 @@ type defaultCreateManager struct {
 	cleanup               cleanupManager
 	recorder              eventRecorder
 	maintenanceModeSwitch maintenanceModeSwitch
-	recreator             ownerReferenceRestore
+	ownerRefRestorer      ownerReferenceRestore
 }
 
 func newCreateManager(
@@ -31,7 +31,7 @@ func newCreateManager(
 	namespace string,
 	recorder eventRecorder,
 	cleanup cleanupManager,
-	recreator ownerReferenceRestore,
+	ownerRefRestorer ownerReferenceRestore,
 ) *defaultCreateManager {
 	maintenanceSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", ecosystemClientSet.CoreV1().ConfigMaps(namespace))
 	return &defaultCreateManager{
@@ -40,7 +40,7 @@ func newCreateManager(
 		recorder:              recorder,
 		maintenanceModeSwitch: maintenanceSwitch,
 		cleanup:               cleanup,
-		recreator:             recreator,
+		ownerRefRestorer:      ownerRefRestorer,
 	}
 }
 
@@ -104,7 +104,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to sync backups with provider: %w", err)
 	}
 
-	err = cm.recreator.RestoreOwnerReferences(ctx)
+	err = cm.ownerRefRestorer.RestoreOwnerReferences(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to restore owner references: %w", err)
 	}
