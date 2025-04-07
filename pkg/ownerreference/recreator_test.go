@@ -3,12 +3,14 @@ package ownerreference
 import (
 	"context"
 	"encoding/json"
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"slices"
 	"testing"
 )
@@ -35,6 +37,8 @@ func TestNewRecreator(t *testing.T) {
 func TestRecreator_BackupOwnerReferences(t *testing.T) {
 
 	t.Run("should backup owner references", func(t *testing.T) {
+		testCtx := context.Background()
+		log.IntoContext(testCtx, logr.New(log.NullLogSink{}))
 
 		validateBackup := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			// Deployments and Services should have backup of ownerReference
@@ -70,6 +74,7 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 
 		dynamicClientStub := &DynamicClientStub{
 			t:                t,
+			resources:        make(map[string]*unstructured.Unstructured),
 			testDataBasePath: "backup",
 			updateMock:       validateBackup,
 		}
@@ -81,11 +86,13 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 			groupVersionParser: schema.ParseGroupVersion,
 		}
 
-		err := recreator.BackupOwnerReferences(context.TODO())
+		err := recreator.BackupOwnerReferences(testCtx)
 		assert.NoError(t, err)
 	})
 
-	t.Run("Error - getKindsOfGroup", func(t *testing.T) {
+	t.Run("Error - getCloudoguCRDKinds", func(t *testing.T) {
+		testCtx := context.Background()
+		log.IntoContext(testCtx, logr.New(log.NullLogSink{}))
 
 		failUpdate := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			assert.Fail(t, "update resource should not be called")
@@ -95,6 +102,7 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 
 		dynamicClientStub := &DynamicClientStub{
 			t:                t,
+			resources:        make(map[string]*unstructured.Unstructured),
 			testDataBasePath: "backup",
 			updateMock:       failUpdate,
 			listCRDErr:       true,
@@ -107,11 +115,13 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 			groupVersionParser: schema.ParseGroupVersion,
 		}
 
-		err := recreator.BackupOwnerReferences(context.TODO())
+		err := recreator.BackupOwnerReferences(testCtx)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("Error - ServerPreferredNamespacedResources", func(t *testing.T) {
+		testCtx := context.Background()
+		log.IntoContext(testCtx, logr.New(log.NullLogSink{}))
 
 		failUpdate := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			assert.Fail(t, "update resource should not be called")
@@ -121,6 +131,7 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 
 		dynamicClientStub := &DynamicClientStub{
 			t:                t,
+			resources:        make(map[string]*unstructured.Unstructured),
 			testDataBasePath: "backup",
 			updateMock:       failUpdate,
 		}
@@ -132,11 +143,13 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 			groupVersionParser: schema.ParseGroupVersion,
 		}
 
-		err := recreator.BackupOwnerReferences(context.TODO())
+		err := recreator.BackupOwnerReferences(testCtx)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("Error - groupVersionParser", func(t *testing.T) {
+		testCtx := context.Background()
+		log.IntoContext(testCtx, logr.New(log.NullLogSink{}))
 
 		failUpdate := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			assert.Fail(t, "update resource should not be called")
@@ -146,6 +159,7 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 
 		dynamicClientStub := &DynamicClientStub{
 			t:                t,
+			resources:        make(map[string]*unstructured.Unstructured),
 			testDataBasePath: "backup",
 			updateMock:       failUpdate,
 		}
@@ -159,11 +173,13 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 			},
 		}
 
-		err := recreator.BackupOwnerReferences(context.TODO())
+		err := recreator.BackupOwnerReferences(testCtx)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("Error - updateResources", func(t *testing.T) {
+		testCtx := context.Background()
+		log.IntoContext(testCtx, logr.New(log.NullLogSink{}))
 
 		failUpdate := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			return nil, assert.AnError
@@ -171,6 +187,7 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 
 		dynamicClientStub := &DynamicClientStub{
 			t:                t,
+			resources:        make(map[string]*unstructured.Unstructured),
 			testDataBasePath: "backup",
 			updateMock:       failUpdate,
 		}
@@ -182,7 +199,7 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 			groupVersionParser: schema.ParseGroupVersion,
 		}
 
-		err := recreator.BackupOwnerReferences(context.TODO())
+		err := recreator.BackupOwnerReferences(testCtx)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
@@ -190,6 +207,8 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 
 func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 	t.Run("should restore owner references", func(t *testing.T) {
+		testCtx := context.Background()
+		log.IntoContext(testCtx, logr.New(log.NullLogSink{}))
 
 		validateRestore := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			// Deployments and Services should have backup of ownerReference
@@ -218,6 +237,7 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 
 		dynamicClientStub := &DynamicClientStub{
 			t:                t,
+			resources:        make(map[string]*unstructured.Unstructured),
 			testDataBasePath: "restore",
 			updateMock:       validateRestore,
 		}
@@ -229,11 +249,13 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 			groupVersionParser: schema.ParseGroupVersion,
 		}
 
-		err := recreator.RestoreOwnerReferences(context.TODO())
+		err := recreator.RestoreOwnerReferences(testCtx)
 		assert.NoError(t, err)
 	})
 
-	t.Run("Error - getKindsOfGroup", func(t *testing.T) {
+	t.Run("Error - getCloudoguCRDKinds", func(t *testing.T) {
+		testCtx := context.Background()
+		log.IntoContext(testCtx, logr.New(log.NullLogSink{}))
 
 		failUpdate := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			assert.Fail(t, "update resource should not be called")
@@ -243,6 +265,7 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 
 		dynamicClientStub := &DynamicClientStub{
 			t:                t,
+			resources:        make(map[string]*unstructured.Unstructured),
 			testDataBasePath: "restore",
 			updateMock:       failUpdate,
 			listCRDErr:       true,
@@ -255,11 +278,13 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 			groupVersionParser: schema.ParseGroupVersion,
 		}
 
-		err := recreator.RestoreOwnerReferences(context.TODO())
+		err := recreator.RestoreOwnerReferences(testCtx)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("Error - ServerPreferredNamespacedResources", func(t *testing.T) {
+		testCtx := context.Background()
+		log.IntoContext(testCtx, logr.New(log.NullLogSink{}))
 
 		failUpdate := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			assert.Fail(t, "update resource should not be called")
@@ -269,6 +294,7 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 
 		dynamicClientStub := &DynamicClientStub{
 			t:                t,
+			resources:        make(map[string]*unstructured.Unstructured),
 			testDataBasePath: "restore",
 			updateMock:       failUpdate,
 		}
@@ -280,11 +306,13 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 			groupVersionParser: schema.ParseGroupVersion,
 		}
 
-		err := recreator.RestoreOwnerReferences(context.TODO())
+		err := recreator.RestoreOwnerReferences(testCtx)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("Error - groupVersionParser", func(t *testing.T) {
+		testCtx := context.Background()
+		log.IntoContext(testCtx, logr.New(log.NullLogSink{}))
 
 		failUpdate := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			assert.Fail(t, "update resource should not be called")
@@ -294,6 +322,7 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 
 		dynamicClientStub := &DynamicClientStub{
 			t:                t,
+			resources:        make(map[string]*unstructured.Unstructured),
 			testDataBasePath: "restore",
 			updateMock:       failUpdate,
 		}
@@ -307,11 +336,13 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 			},
 		}
 
-		err := recreator.RestoreOwnerReferences(context.TODO())
+		err := recreator.RestoreOwnerReferences(testCtx)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("Error - updateResources", func(t *testing.T) {
+		testCtx := context.Background()
+		log.IntoContext(testCtx, logr.New(log.NullLogSink{}))
 
 		failUpdate := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			return nil, assert.AnError
@@ -319,6 +350,7 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 
 		dynamicClientStub := &DynamicClientStub{
 			t:                t,
+			resources:        make(map[string]*unstructured.Unstructured),
 			testDataBasePath: "restore",
 			updateMock:       failUpdate,
 		}
@@ -330,7 +362,7 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 			groupVersionParser: schema.ParseGroupVersion,
 		}
 
-		err := recreator.RestoreOwnerReferences(context.TODO())
+		err := recreator.RestoreOwnerReferences(testCtx)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 }

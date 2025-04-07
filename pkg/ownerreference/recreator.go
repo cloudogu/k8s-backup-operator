@@ -19,14 +19,16 @@ import (
 	"sync"
 )
 
-const cloudoguGroup = "k8s.cloudogu.com"
+// cloudoguResourceGroup is the group in which CRDs from Cloudogu are defined
+const cloudoguResourceGroup = "k8s.cloudogu.com"
+
+// searchWorkerCount defines the amount of search operations that can run concurrently
+const searchWorkerCount = 5
 
 var (
-	annotationBackupOwnerReferenceKey = fmt.Sprintf("%s/backup-owner-references", cloudoguGroup)
-	annotationBackupUIDKey            = fmt.Sprintf("%s/backup-uid", cloudoguGroup)
+	annotationBackupOwnerReferenceKey = fmt.Sprintf("%s/backup-owner-references", cloudoguResourceGroup)
+	annotationBackupUIDKey            = fmt.Sprintf("%s/backup-uid", cloudoguResourceGroup)
 )
-
-const workerCount = 5
 
 type resourceWithGroup struct {
 	item  unstructured.Unstructured
@@ -44,6 +46,18 @@ type restoreResource struct {
 	ownerRefs map[types.UID]metav1.OwnerReference
 }
 
+// Recreator is responsible for creating and restoring backups of owner references referred in the metadata
+// of a resource.
+//
+// It leverages dynamic and discovery clients to interact with the Kubernetes API
+// in a flexible and version-aware manner, enabling operations across different
+// resource types and API groups.
+//
+// Fields:
+//   - namespace: The Kubernetes namespace in which the Recreator operates.
+//   - dynamicClient: A dynamic client used to interact with arbitrary Kubernetes resources.
+//   - discoveryClient: A discovery interface used to fetch API resource information from the server.
+//   - groupVersionParser: A function used to parse and handle GroupVersion strings for resources.
 type Recreator struct {
 	namespace          string
 	dynamicClient      dynamic.Interface
@@ -51,6 +65,18 @@ type Recreator struct {
 	groupVersionParser func(gv string) (schema.GroupVersion, error)
 }
 
+// NewRecreator creates a new instance of Recreator using the provided Kubernetes
+// REST configuration and namespace. It initializes a dynamic client and a discovery
+// client for interacting with the Kubernetes API.
+//
+// Parameters:
+//   - cfg: A pointer to a rest.Config that contains the configuration required
+//     to connect to the Kubernetes API.
+//   - namespace: The Kubernetes namespace in which the Recreator will operate.
+//
+// Returns:
+//   - A pointer to the initialized Recreator instance.
+//   - An error if either the dynamic client or discovery client cannot be created.
 func NewRecreator(cfg *rest.Config, namespace string) (*Recreator, error) {
 	dynamicClient, err := dynamic.NewForConfig(cfg)
 	if err != nil {
@@ -70,70 +96,88 @@ func NewRecreator(cfg *rest.Config, namespace string) (*Recreator, error) {
 	}, nil
 }
 
+// BackupOwnerReferences scans all resources in the configured namespace to identify
+// which ones are referenced as owners by other resources and backs up these relationships
+// into resource annotations.
+//
+// This method performs the following steps:
+//  1. Fetches all Cloudogu CRD-based parent resources and a mapping of child resources
+//     referencing them via OwnerReferences.
+//  2. Starts a pool of worker goroutines to inspect each parent resource and determine
+//     if it's referenced as an owner.
+//  3. Collects both parent and child resources that need backup, annotates them with
+//     their UID or OwnerReferences
+//  4. Updates the annotated resources in the Kubernetes cluster.
+//
+// The backup enables later restoration of the ownership structure between resources.
 func (r Recreator) BackupOwnerReferences(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 
-	var wg, tasks sync.WaitGroup
+	// wg is a WaitGroup to track the lifecycle of worker goroutines
+	var wg sync.WaitGroup
+	// tasks is a WaitGroup to track individual parent resource search operations
+	var tasks sync.WaitGroup
 
-	// Channels
-	taskChan := make(chan resourceWithGroup, 100)
-	resultChan := make(chan backupResource, 100)
+	// parentChan queues parent resources to be processed by worker goroutines
+	// Each parent will be checked for any child resources referencing it via OwnerReferences
+	parentChan := make(chan resourceWithGroup, 100)
+	// backupChan receives parent and child resources that need their owner reference
+	// data backed up into annotations
+	backupChan := make(chan backupResource, 100)
 
-	rootGroups := []string{cloudoguGroup}
-	parentKinds, err := r.getKindsOfGroup(ctx, rootGroups)
+	// Pre-fetch all resources in the namespace
+	parentList, childMap, err := r.fetchResourcesForBackup(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to get kinds of groups %s: %w", rootGroups, err)
+		return fmt.Errorf("unable to fetch resources for backup: %w", err)
 	}
 
-	// Pre-fetch all resources in a namespace
-	parents, children, err := r.fetchBackupResources(ctx, parentKinds)
-	if err != nil {
-		return fmt.Errorf("unable to fetch resources for kinds %s: %w", parentKinds, err)
-	}
-
-	// Start worker pool
-	for i := 0; i < workerCount; i++ {
+	// Start a fixed-size worker pool to search for child resources referencing each parent
+	for i := 0; i < searchWorkerCount; i++ {
 		wg.Add(1)
-		go worker(children, taskChan, resultChan, &wg, &tasks)
+		go searchChildrenForParent(childMap, parentChan, backupChan, &wg, &tasks)
 	}
 
-	// Add root parents to task queue
-	for _, parent := range parents {
-		tasks.Add(1)
-		taskChan <- parent
+	// Enqueue each parent resource to trigger a search for its referencing children
+	for _, parent := range parentList {
+		tasks.Add(1)         // adds the search operation the ongoing tasks
+		parentChan <- parent // start search operation for a parent
 	}
 
-	// Close taskChan when all tasks are processed
+	// Wait for all search tasks and worker goroutines to complete before processing results
 	go func() {
 		tasks.Wait()
-		close(taskChan)
+		close(parentChan)
 		wg.Wait()
-		close(resultChan)
+		close(backupChan)
 	}()
 
 	backupResourceMap := make(map[types.UID]resourceWithGroup)
 
-	// Process results
-	for result := range resultChan {
-		_, ok := backupResourceMap[result.item.GetUID()]
+	// Process the backed-up results, ensuring parent UIDs and child OwnerReferences
+	// are properly annotated in memory before applying updates to the cluster
+	for resource := range backupChan {
+		resourceUID := resource.item.GetUID()
+
+		_, ok := backupResourceMap[resourceUID]
 		if !ok {
-			backupResourceMap[result.item.GetUID()] = result.resourceWithGroup
+			backupResourceMap[resourceUID] = resource.resourceWithGroup
 		}
 
-		if result.isParent {
-			backupResourceMap[result.item.GetUID()] = backupUidForParent(backupResourceMap[result.item.GetUID()])
+		if resource.isParent {
+			backupResourceMap[resourceUID] = setResourceUIDToAnnotations(backupResourceMap[resourceUID])
 		}
 
-		if result.isChild {
-			update, uErr := backupOwnerRefForResource(backupResourceMap[result.item.GetUID()])
+		if resource.isChild {
+			update, uErr := setOwnerReferencesToAnnotations(backupResourceMap[resourceUID])
 			if uErr != nil {
-				return fmt.Errorf("could not backup owner references for child resource %s: %w", result.item.GetName(), uErr)
+				return fmt.Errorf("could not backup owner references for child resource %s: %w", resource.item.GetName(), uErr)
 			}
 
-			backupResourceMap[result.item.GetUID()] = update
+			backupResourceMap[resourceUID] = update
 		}
 	}
 
+	// Persist the modified resources by updating them
 	if uErr := r.updateResources(ctx, slices.Collect(maps.Values(backupResourceMap))); uErr != nil {
 		return fmt.Errorf("unable to update resources: %w", uErr)
 	}
@@ -143,7 +187,7 @@ func (r Recreator) BackupOwnerReferences(ctx context.Context) error {
 	return nil
 }
 
-func (r Recreator) getKindsOfGroup(ctx context.Context, grps []string) ([]string, error) {
+func (r Recreator) getCloudoguCRDKinds(ctx context.Context) ([]string, error) {
 	logger := log.FromContext(ctx)
 	crdGVR := apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions")
 	crds, err := r.dynamicClient.Resource(crdGVR).List(ctx, metav1.ListOptions{})
@@ -156,50 +200,66 @@ func (r Recreator) getKindsOfGroup(ctx context.Context, grps []string) ([]string
 	for _, crd := range crds.Items {
 		spec, found, lErr := unstructured.NestedMap(crd.Object, "spec")
 		if lErr != nil || !found {
-			logger.Info("Could not get spec for custom resource", "crd", crd.GetName())
-			continue
+			return nil, fmt.Errorf("failed to find spec for CRD %s: %w", crd.GetName(), lErr)
 		}
 
 		group, ok := spec["group"].(string)
 		if !ok {
-			logger.Info("Could not get group for custom resource", "crd", crd.GetName())
-			continue
+			return nil, fmt.Errorf("failed to find group for CRD %s", crd.GetName())
 		}
 
-		if !slices.Contains(grps, group) {
-			// Ignore CRDs outside the target group
+		if group != cloudoguResourceGroup {
+			// Ignore CRDs outside the cloudogu group
 			continue
 		}
 
 		names, ok := spec["names"].(map[string]any)
 		if !ok {
-			logger.Info("Could not get names for custom resource", "crd", crd.GetName())
-			continue
+			return nil, fmt.Errorf("failed to find names for CRD %s", crd.GetName())
 		}
 
 		kind, ok := names["kind"].(string)
 		if !ok {
-			logger.Info("Could not get kind for custom resource", "crd", crd.GetName())
+			return nil, fmt.Errorf("failed to find kind for CRD %s", crd.GetName())
 		}
 
 		kinds = append(kinds, kind)
 	}
 
-	logger.Info("Extracted kinds from groups", "kinds", kinds, "groups", grps)
+	logger.Info("Extracted kinds from cloudogu resource group", "kinds", kinds)
 
 	return kinds, nil
 }
 
-func (r Recreator) fetchBackupResources(ctx context.Context, parentKinds []string) ([]resourceWithGroup, map[types.UID][]resourceWithGroup, error) {
+func (r Recreator) fetchResourcesForBackup(ctx context.Context) ([]resourceWithGroup, map[types.UID][]resourceWithGroup, error) {
 	logger := log.FromContext(ctx)
+
+	cloudoguCRDKinds, err := r.getCloudoguCRDKinds(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to get kinds of cloudogu resource group: %w", err)
+	}
 
 	apiResourceList, err := r.discoveryClient.ServerPreferredNamespacedResources()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list preferred namespaced resource groups: %w", err)
+		return nil, nil, fmt.Errorf("failed to list preferred namespaced resources: %w", err)
 	}
 
-	parentResources := make([]resourceWithGroup, 0, len(apiResourceList))
-	childResourceMap := make(map[types.UID][]resourceWithGroup)
+	// parentList contains resources that are considered top-level "parents"
+	// in the context of the Cloudogu ecosystem. These are typically custom
+	// resource types like Dogu, Component, or Backup, and are identified by
+	// checking whether the resource kind matches known Cloudogu CRD kinds.
+	//
+	// These parent resources will later be inspected to determine whether
+	// they are being referenced as owners by other Kubernetes resources.
+	parentList := make([]resourceWithGroup, 0, len(apiResourceList))
+
+	// childMap maps the UID of a parent resource to a list of other resources
+	// (children) that reference it via an OwnerReference in their metadata.
+	//
+	// This mapping enables the system to identify which child resources
+	// are associated with which parent, so that both can be considered
+	// during backup or restore operations.
+	childMap := make(map[types.UID][]resourceWithGroup)
 
 	for _, apiResourceGroup := range apiResourceList {
 		for _, apiResource := range apiResourceGroup.APIResources {
@@ -228,16 +288,16 @@ func (r Recreator) fetchBackupResources(ctx context.Context, parentKinds []strin
 				continue
 			}
 
-			if slices.Contains(parentKinds, apiResource.Kind) {
-				appendParents(gvr, &parentResources, res)
+			if slices.Contains(cloudoguCRDKinds, apiResource.Kind) {
+				appendResourceToParentList(gvr, &parentList, res)
 				continue
 			}
 
-			appendChildren(gvr, childResourceMap, res)
+			appendResourceToChildMap(gvr, childMap, res)
 		}
 	}
 
-	return parentResources, childResourceMap, nil
+	return parentList, childMap, nil
 }
 
 func (r Recreator) updateResources(ctx context.Context, resList []resourceWithGroup) error {
@@ -268,9 +328,9 @@ func (r Recreator) updateResources(ctx context.Context, resList []resourceWithGr
 	return nil
 }
 
-// worker processes tasks by checking for immediate child resources.
+// searchChildrenForParent processes tasks by checking for immediate child resources.
 //
-// worker iterates parent nodes which are provided by the parent channel. Basically it inspects top level resources like
+// searchChildrenForParent iterates parent nodes which are provided by the parent channel. Basically it inspects top level resources like
 // dogus, backups, components, etc. but only to the first level of its children in order to save metadata later-on.
 // The reconciling mechanism of the lower level children like ingress etc. are reconciled properly and will be overwritten
 // even if they will be restored with a previously saved owner reference. One can think of the inspected data structure
@@ -278,7 +338,7 @@ func (r Recreator) updateResources(ctx context.Context, resList []resourceWithGr
 //
 //	dogu --> service    --> ingress (not regarded)
 //	     \-> deployment --> replica set (not regarded)
-func worker(childMap map[types.UID][]resourceWithGroup, parentChan chan resourceWithGroup, resultChan chan<- backupResource, wg, tasks *sync.WaitGroup) {
+func searchChildrenForParent(childMap map[types.UID][]resourceWithGroup, parentChan chan resourceWithGroup, backupChan chan<- backupResource, wg, tasks *sync.WaitGroup) {
 	defer wg.Done()
 
 	for p := range parentChan {
@@ -290,7 +350,7 @@ func worker(childMap map[types.UID][]resourceWithGroup, parentChan chan resource
 		}
 
 		for _, child := range children {
-			resultChan <- backupResource{
+			backupChan <- backupResource{
 				resourceWithGroup: child,
 				isParent:          false,
 				isChild:           true,
@@ -303,7 +363,7 @@ func worker(childMap map[types.UID][]resourceWithGroup, parentChan chan resource
 			*/
 		}
 
-		resultChan <- backupResource{
+		backupChan <- backupResource{
 			resourceWithGroup: p,
 			isParent:          true,
 			isChild:           false,
@@ -313,16 +373,16 @@ func worker(childMap map[types.UID][]resourceWithGroup, parentChan chan resource
 	}
 }
 
-func appendParents(gvr schema.GroupVersionResource, resultList *[]resourceWithGroup, items *unstructured.UnstructuredList) {
+func appendResourceToParentList(gvr schema.GroupVersionResource, parentList *[]resourceWithGroup, items *unstructured.UnstructuredList) {
 	for _, item := range items.Items {
-		*resultList = append(*resultList, resourceWithGroup{
+		*parentList = append(*parentList, resourceWithGroup{
 			item:  item,
 			group: gvr,
 		})
 	}
 }
 
-func appendChildren(gvr schema.GroupVersionResource, resultMap map[types.UID][]resourceWithGroup, items *unstructured.UnstructuredList) {
+func appendResourceToChildMap(gvr schema.GroupVersionResource, resultMap map[types.UID][]resourceWithGroup, items *unstructured.UnstructuredList) {
 	for _, item := range items.Items {
 		for _, ownerRef := range item.GetOwnerReferences() {
 			resultMap[ownerRef.UID] = append(resultMap[ownerRef.UID], resourceWithGroup{
@@ -333,7 +393,7 @@ func appendChildren(gvr schema.GroupVersionResource, resultMap map[types.UID][]r
 	}
 }
 
-func backupOwnerRefForResource(res resourceWithGroup) (resourceWithGroup, error) {
+func setOwnerReferencesToAnnotations(res resourceWithGroup) (resourceWithGroup, error) {
 	ownerRefs := res.item.GetOwnerReferences()
 
 	if len(ownerRefs) == 0 {
@@ -356,7 +416,7 @@ func backupOwnerRefForResource(res resourceWithGroup) (resourceWithGroup, error)
 	return res, nil
 }
 
-func backupUidForParent(res resourceWithGroup) resourceWithGroup {
+func setResourceUIDToAnnotations(res resourceWithGroup) resourceWithGroup {
 	annotations := res.item.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
@@ -369,29 +429,41 @@ func backupUidForParent(res resourceWithGroup) resourceWithGroup {
 	return res
 }
 
+// RestoreOwnerReferences restores the OwnerReferences metadata on Kubernetes resources
+// within the configured namespace using backup annotations previously stored by
+// the BackupOwnerReferences method.
+//
+// This method performs the following steps:
+//  1. Fetches all relevant parent and child resources in the namespace that
+//     contain backup annotations.
+//  2. Reconstructs the original OwnerReferences for each child resource based
+//     on the annotation data and appends them to a list for update.
+//  3. Cleans up parent resource annotations (e.g., backup UIDs) to restore them
+//     to their pre-backup state.
+//  4. Applies the changes to the cluster by updating each resource.
 func (r Recreator) RestoreOwnerReferences(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 
-	rootGroups := []string{cloudoguGroup}
-	parentKinds, err := r.getKindsOfGroup(ctx, rootGroups)
-	if err != nil {
-		return fmt.Errorf("unable to get kinds of groups %s: %w", rootGroups, err)
-	}
-
-	// Pre-fetch all resources in a namespace
-	parents, children, err := r.fetchRestoreResources(ctx, parentKinds)
+	// Fetch parent resources (those that were marked with backup UID annotations)
+	// and child resources (those whose owner references were backed up into annotations)
+	parentMap, childList, err := r.fetchResourcesForRestore(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to fetch resources: %w", err)
 	}
 
-	restoreList := make([]resourceWithGroup, 0, len(children))
+	// restoreList accumulates all modified resources (parents and children)
+	// that need to be updated in the cluster after restoring owner references
+	restoreList := make([]resourceWithGroup, 0, len(childList))
 
-	for _, child := range children {
-		restoreList = append(restoreList, restoreOwnerRefForResource(ctx, child, parents))
+	// Rebuild the original owner references for each child from backup annotations
+	// and append them to the restore list
+	for _, child := range childList {
+		restoreList = append(restoreList, restoreOwnerReferencesFromAnnotations(ctx, child, parentMap))
 	}
 
-	for _, parent := range parents {
-		restoreList = append(restoreList, restoreParent(parent))
+	// Remove the backup UID annotations from parent resources to clean up metadata
+	for _, parent := range parentMap {
+		restoreList = append(restoreList, deleteBackupUIDFromAnnotations(parent))
 	}
 
 	if uErr := r.updateResources(ctx, restoreList); uErr != nil {
@@ -403,16 +475,23 @@ func (r Recreator) RestoreOwnerReferences(ctx context.Context) error {
 	return nil
 }
 
-func (r Recreator) fetchRestoreResources(ctx context.Context, parentKinds []string) (map[types.UID]resourceWithGroup, []restoreResource, error) {
+func (r Recreator) fetchResourcesForRestore(ctx context.Context) (map[types.UID]resourceWithGroup, []restoreResource, error) {
 	logger := log.FromContext(ctx)
+
+	cloudoguCRDKinds, err := r.getCloudoguCRDKinds(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to get kinds of cloudogu resource group: %w", err)
+	}
 
 	apiResourceList, err := r.discoveryClient.ServerPreferredNamespacedResources()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list preferred namespaced resource groups: %w", err)
 	}
 
-	childResourceList := make([]restoreResource, 0, len(apiResourceList))
-	parentResourcesMap := make(map[types.UID]resourceWithGroup)
+	// childList contains all resources with backed up owner references in their annotations
+	childList := make([]restoreResource, 0, len(apiResourceList))
+	// parentMap contains all resources with a backed up UID in their annotations
+	parentMap := make(map[types.UID]resourceWithGroup)
 
 	for _, apiResourceGroup := range apiResourceList {
 		for _, apiResource := range apiResourceGroup.APIResources {
@@ -441,22 +520,22 @@ func (r Recreator) fetchRestoreResources(ctx context.Context, parentKinds []stri
 				continue
 			}
 
-			if slices.Contains(parentKinds, apiResource.Kind) {
-				appendRestoreParents(gvr, parentResourcesMap, res)
+			if slices.Contains(cloudoguCRDKinds, apiResource.Kind) {
+				appendResourceToParentMap(gvr, parentMap, res)
 				continue
 			}
 
-			err = appendRestoreChildren(gvr, &childResourceList, res)
+			err = appendResourceToChildList(gvr, &childList, res)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to fetch children for group %s: %w", apiResourceGroup.GroupVersion, err)
 			}
 		}
 	}
 
-	return parentResourcesMap, childResourceList, nil
+	return parentMap, childList, nil
 }
 
-func appendRestoreChildren(gvr schema.GroupVersionResource, resultList *[]restoreResource, items *unstructured.UnstructuredList) error {
+func appendResourceToChildList(gvr schema.GroupVersionResource, childList *[]restoreResource, items *unstructured.UnstructuredList) error {
 	for _, item := range items.Items {
 		annotations := item.GetAnnotations()
 		if len(annotations) == 0 {
@@ -480,7 +559,7 @@ func appendRestoreChildren(gvr schema.GroupVersionResource, resultList *[]restor
 			ownerRefMap[ownerRef.UID] = ownerRef
 		}
 
-		*resultList = append(*resultList, restoreResource{
+		*childList = append(*childList, restoreResource{
 			resourceWithGroup: resourceWithGroup{
 				item:  item,
 				group: gvr,
@@ -492,7 +571,7 @@ func appendRestoreChildren(gvr schema.GroupVersionResource, resultList *[]restor
 	return nil
 }
 
-func appendRestoreParents(gvr schema.GroupVersionResource, parentMap map[types.UID]resourceWithGroup, items *unstructured.UnstructuredList) {
+func appendResourceToParentMap(gvr schema.GroupVersionResource, parentMap map[types.UID]resourceWithGroup, items *unstructured.UnstructuredList) {
 	for _, item := range items.Items {
 		annotations := item.GetAnnotations()
 		if len(annotations) == 0 {
@@ -511,7 +590,7 @@ func appendRestoreParents(gvr schema.GroupVersionResource, parentMap map[types.U
 	}
 }
 
-func restoreOwnerRefForResource(ctx context.Context, res restoreResource, parents map[types.UID]resourceWithGroup) resourceWithGroup {
+func restoreOwnerReferencesFromAnnotations(ctx context.Context, res restoreResource, parents map[types.UID]resourceWithGroup) resourceWithGroup {
 	logger := log.FromContext(ctx)
 
 	for _, ownerRef := range res.ownerRefs {
@@ -536,7 +615,7 @@ func restoreOwnerRefForResource(ctx context.Context, res restoreResource, parent
 	return res.resourceWithGroup
 }
 
-func restoreParent(res resourceWithGroup) resourceWithGroup {
+func deleteBackupUIDFromAnnotations(res resourceWithGroup) resourceWithGroup {
 	annotations := res.item.GetAnnotations()
 	delete(annotations, annotationBackupUIDKey)
 	res.item.SetAnnotations(annotations)
