@@ -6,7 +6,7 @@
       "kind": "Service",
       "metadata": {
         "annotations": {
-          "backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"cas\",\"uid\":\"96a3bb49-38b0-4b5c-a264-56e370bc08b6\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"cas\",\"uid\":\"96a3bb49-38b0-4b5c-a264-56e370bc08b6\",\"controller\":true,\"blockOwnerDeletion\":true}]",
           "k8s-dogu-operator.cloudogu.com/ces-services": "[{\"name\":\"cas\",\"port\":8080,\"location\":\"/cas\",\"pass\":\"/cas\"}]"
         },
         "creationTimestamp": "2025-03-24T13:10:52Z",
@@ -59,7 +59,7 @@
             "fieldsV1": {
               "f:metadata": {
                 "f:annotations": {
-                  "f:backup-owner-references": {}
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
                 }
               }
             },
@@ -436,7 +436,7 @@
       "kind": "Service",
       "metadata": {
         "annotations": {
-          "backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"ldap\",\"uid\":\"251e79cc-e50c-4225-9874-c4a16b46f0d7\",\"controller\":true,\"blockOwnerDeletion\":true}]"
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"ldap\",\"uid\":\"251e79cc-e50c-4225-9874-c4a16b46f0d7\",\"controller\":true,\"blockOwnerDeletion\":true}]"
         },
         "creationTimestamp": "2025-03-24T13:10:53Z",
         "labels": {
@@ -485,7 +485,7 @@
               "f:metadata": {
                 "f:annotations": {
                   ".": {},
-                  "f:backup-owner-references": {}
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
                 }
               }
             },
@@ -532,7 +532,7 @@
       "kind": "Service",
       "metadata": {
         "annotations": {
-          "backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"nginx-ingress\",\"uid\":\"21bed76c-4b39-4ebc-8071-6db8e19e8ab0\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"nginx-ingress\",\"uid\":\"21bed76c-4b39-4ebc-8071-6db8e19e8ab0\",\"controller\":true,\"blockOwnerDeletion\":true}]",
           "k8s-dogu-operator.cloudogu.com/ces-exposed-ports": "[{\"protocol\":\"tcp\",\"port\":80,\"targetPort\":80},{\"protocol\":\"tcp\",\"port\":443,\"targetPort\":443}]"
         },
         "creationTimestamp": "2025-03-24T13:10:53Z",
@@ -592,7 +592,7 @@
             "fieldsV1": {
               "f:metadata": {
                 "f:annotations": {
-                  "f:backup-owner-references": {}
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
                 }
               }
             },
@@ -645,7 +645,7 @@
       "kind": "Service",
       "metadata": {
         "annotations": {
-          "backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"nginx-static\",\"uid\":\"6f2c80f3-9bd4-435e-a35d-597be5d8e12f\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"nginx-static\",\"uid\":\"6f2c80f3-9bd4-435e-a35d-597be5d8e12f\",\"controller\":true,\"blockOwnerDeletion\":true}]",
           "k8s-dogu-operator.cloudogu.com/ces-services": "[{\"name\":\"nginx-static\",\"port\":80,\"location\":\"/\",\"pass\":\"/\"}]"
         },
         "creationTimestamp": "2025-03-24T13:10:53Z",
@@ -698,7 +698,7 @@
             "fieldsV1": {
               "f:metadata": {
                 "f:annotations": {
-                  "f:backup-owner-references": {}
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
                 }
               }
             },
@@ -745,7 +745,7 @@
       "kind": "Service",
       "metadata": {
         "annotations": {
-          "backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"postfix\",\"uid\":\"bfa80e89-54bb-4a68-a3c9-a0262b928de4\",\"controller\":true,\"blockOwnerDeletion\":true}]"
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"postfix\",\"uid\":\"bfa80e89-54bb-4a68-a3c9-a0262b928de4\",\"controller\":true,\"blockOwnerDeletion\":true}]"
         },
         "creationTimestamp": "2025-03-24T13:10:53Z",
         "labels": {
@@ -801,7 +801,7 @@
               "f:metadata": {
                 "f:annotations": {
                   ".": {},
-                  "f:backup-owner-references": {}
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
                 }
               }
             },

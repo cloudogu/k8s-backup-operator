@@ -19,10 +19,11 @@ import (
 	"sync"
 )
 
-const (
-	_CloudoguResourceGroup   = "k8s.cloudogu.com"
-	_BackupOwnerReferenceKey = "backup-owner-references"
-	_BackupUID               = "backup-uid"
+const cloudoguGroup = "k8s.cloudogu.com"
+
+var (
+	annotationBackupOwnerReferenceKey = fmt.Sprintf("%s/backup-owner-references", cloudoguGroup)
+	annotationBackupUIDKey            = fmt.Sprintf("%s/backup-uid", cloudoguGroup)
 )
 
 const workerCount = 5
@@ -78,7 +79,7 @@ func (r Recreator) BackupOwnerReferences(ctx context.Context) error {
 	taskChan := make(chan resourceWithGroup, 100)
 	resultChan := make(chan backupResource, 100)
 
-	rootGroups := []string{_CloudoguResourceGroup}
+	rootGroups := []string{cloudoguGroup}
 	parentKinds, err := r.getKindsOfGroup(ctx, rootGroups)
 	if err != nil {
 		return fmt.Errorf("unable to get kinds of groups %s: %w", rootGroups, err)
@@ -349,7 +350,7 @@ func backupOwnerRefForResource(res resourceWithGroup) (resourceWithGroup, error)
 		annotations = make(map[string]string)
 	}
 
-	annotations[_BackupOwnerReferenceKey] = string(jsonBackup)
+	annotations[annotationBackupOwnerReferenceKey] = string(jsonBackup)
 	res.item.SetAnnotations(annotations)
 
 	return res, nil
@@ -361,7 +362,7 @@ func backupUidForParent(res resourceWithGroup) resourceWithGroup {
 		annotations = make(map[string]string)
 	}
 
-	annotations[_BackupUID] = string(res.item.GetUID())
+	annotations[annotationBackupUIDKey] = string(res.item.GetUID())
 
 	res.item.SetAnnotations(annotations)
 
@@ -371,7 +372,7 @@ func backupUidForParent(res resourceWithGroup) resourceWithGroup {
 func (r Recreator) RestoreOwnerReferences(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 
-	rootGroups := []string{_CloudoguResourceGroup}
+	rootGroups := []string{cloudoguGroup}
 	parentKinds, err := r.getKindsOfGroup(ctx, rootGroups)
 	if err != nil {
 		return fmt.Errorf("unable to get kinds of groups %s: %w", rootGroups, err)
@@ -462,7 +463,7 @@ func appendRestoreChildren(gvr schema.GroupVersionResource, resultList *[]restor
 			continue
 		}
 
-		oRefs, ok := annotations[_BackupOwnerReferenceKey]
+		oRefs, ok := annotations[annotationBackupOwnerReferenceKey]
 		if !ok {
 			continue
 		}
@@ -498,7 +499,7 @@ func appendRestoreParents(gvr schema.GroupVersionResource, parentMap map[types.U
 			continue
 		}
 
-		restoredUID, ok := annotations[_BackupUID]
+		restoredUID, ok := annotations[annotationBackupUIDKey]
 		if !ok {
 			continue
 		}
@@ -528,7 +529,7 @@ func restoreOwnerRefForResource(ctx context.Context, res restoreResource, parent
 		}
 
 		annotations := res.item.GetAnnotations()
-		delete(annotations, _BackupOwnerReferenceKey)
+		delete(annotations, annotationBackupOwnerReferenceKey)
 		res.item.SetAnnotations(annotations)
 	}
 
@@ -537,7 +538,7 @@ func restoreOwnerRefForResource(ctx context.Context, res restoreResource, parent
 
 func restoreParent(res resourceWithGroup) resourceWithGroup {
 	annotations := res.item.GetAnnotations()
-	delete(annotations, _BackupUID)
+	delete(annotations, annotationBackupUIDKey)
 	res.item.SetAnnotations(annotations)
 
 	return res

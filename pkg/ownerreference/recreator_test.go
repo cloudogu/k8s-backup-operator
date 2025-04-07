@@ -39,7 +39,7 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 		validateBackup := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			// Deployments and Services should have backup of ownerReference
 			if slices.Contains([]string{"Deployment", "Service"}, obj.GetKind()) {
-				bRef, ok := obj.GetAnnotations()[_BackupOwnerReferenceKey]
+				bRef, ok := obj.GetAnnotations()[annotationBackupOwnerReferenceKey]
 				assert.True(t, ok)
 
 				oRef := obj.GetOwnerReferences()
@@ -54,14 +54,14 @@ func TestRecreator_BackupOwnerReferences(t *testing.T) {
 
 			// Dogu should have backup of UID
 			if obj.GetKind() == "Dogu" {
-				bUID, ok := obj.GetAnnotations()[_BackupUID]
+				bUID, ok := obj.GetAnnotations()[annotationBackupUIDKey]
 				assert.True(t, ok)
 
 				assert.Equal(t, string(obj.GetUID()), bUID)
 			}
 
 			if obj.GetKind() == "Ingress" {
-				_, ok := obj.GetAnnotations()[_BackupOwnerReferenceKey]
+				_, ok := obj.GetAnnotations()[annotationBackupOwnerReferenceKey]
 				assert.False(t, ok)
 			}
 
@@ -194,7 +194,7 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 		validateRestore := func(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 			// Deployments and Services should have backup of ownerReference
 			if slices.Contains([]string{"Deployment", "Service"}, obj.GetKind()) {
-				_, ok := obj.GetAnnotations()[_BackupOwnerReferenceKey]
+				_, ok := obj.GetAnnotations()[annotationBackupOwnerReferenceKey]
 				assert.False(t, ok)
 
 				oRef := obj.GetOwnerReferences()
@@ -204,12 +204,12 @@ func TestRecreator_RestoreOwnerReferences(t *testing.T) {
 
 			// Dogu should have backup of UID
 			if obj.GetKind() == "Dogu" {
-				_, ok := obj.GetAnnotations()[_BackupUID]
+				_, ok := obj.GetAnnotations()[annotationBackupUIDKey]
 				assert.False(t, ok)
 			}
 
 			if obj.GetKind() == "Ingress" {
-				_, ok := obj.GetAnnotations()[_BackupOwnerReferenceKey]
+				_, ok := obj.GetAnnotations()[annotationBackupOwnerReferenceKey]
 				assert.False(t, ok)
 			}
 

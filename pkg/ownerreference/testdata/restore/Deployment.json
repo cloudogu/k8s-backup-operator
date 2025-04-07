@@ -393,7 +393,7 @@
       "kind": "Deployment",
       "metadata": {
         "annotations": {
-          "backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"cas\",\"uid\":\"96a3bb49-38b0-4b5c-a264-56e370bc08b6\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"cas\",\"uid\":\"96a3bb49-38b0-4b5c-a264-56e370bc08b6\",\"controller\":true,\"blockOwnerDeletion\":true}]",
           "deployment.kubernetes.io/revision": "1"
         },
         "creationTimestamp": "2025-03-24T13:10:57Z",
@@ -817,7 +817,7 @@
             "fieldsV1": {
               "f:metadata": {
                 "f:annotations": {
-                  "f:backup-owner-references": {}
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
                 }
               }
             },
@@ -3777,7 +3777,7 @@
       "kind": "Deployment",
       "metadata": {
         "annotations": {
-          "backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"ldap\",\"uid\":\"251e79cc-e50c-4225-9874-c4a16b46f0d7\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"ldap\",\"uid\":\"251e79cc-e50c-4225-9874-c4a16b46f0d7\",\"controller\":true,\"blockOwnerDeletion\":true}]",
           "deployment.kubernetes.io/revision": "1"
         },
         "creationTimestamp": "2025-03-24T13:10:58Z",
@@ -4158,7 +4158,7 @@
             "fieldsV1": {
               "f:metadata": {
                 "f:annotations": {
-                  "f:backup-owner-references": {}
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
                 }
               }
             },
@@ -4486,7 +4486,7 @@
       "kind": "Deployment",
       "metadata": {
         "annotations": {
-          "backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"nginx-ingress\",\"uid\":\"21bed76c-4b39-4ebc-8071-6db8e19e8ab0\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"nginx-ingress\",\"uid\":\"21bed76c-4b39-4ebc-8071-6db8e19e8ab0\",\"controller\":true,\"blockOwnerDeletion\":true}]",
           "deployment.kubernetes.io/revision": "1"
         },
         "creationTimestamp": "2025-03-24T13:10:58Z",
@@ -4756,7 +4756,7 @@
             "fieldsV1": {
               "f:metadata": {
                 "f:annotations": {
-                  "f:backup-owner-references": {}
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
                 }
               }
             },
@@ -4980,7 +4980,7 @@
       "kind": "Deployment",
       "metadata": {
         "annotations": {
-          "backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"nginx-static\",\"uid\":\"6f2c80f3-9bd4-435e-a35d-597be5d8e12f\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"nginx-static\",\"uid\":\"6f2c80f3-9bd4-435e-a35d-597be5d8e12f\",\"controller\":true,\"blockOwnerDeletion\":true}]",
           "deployment.kubernetes.io/revision": "1"
         },
         "creationTimestamp": "2025-03-24T13:10:58Z",
@@ -5320,7 +5320,7 @@
             "fieldsV1": {
               "f:metadata": {
                 "f:annotations": {
-                  "f:backup-owner-references": {}
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
                 }
               }
             },
@@ -5688,7 +5688,7 @@
       "kind": "Deployment",
       "metadata": {
         "annotations": {
-          "backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"postfix\",\"uid\":\"bfa80e89-54bb-4a68-a3c9-a0262b928de4\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"postfix\",\"uid\":\"bfa80e89-54bb-4a68-a3c9-a0262b928de4\",\"controller\":true,\"blockOwnerDeletion\":true}]",
           "deployment.kubernetes.io/revision": "1"
         },
         "creationTimestamp": "2025-03-24T13:10:59Z",
@@ -5956,7 +5956,7 @@
             "fieldsV1": {
               "f:metadata": {
                 "f:annotations": {
-                  "f:backup-owner-references": {}
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
                 }
               }
             },
