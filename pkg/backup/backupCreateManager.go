@@ -25,13 +25,13 @@ type backupCreateManager struct {
 	globalConfigRepository globalConfigRepository
 	recorder               eventRecorder
 	maintenanceModeSwitch  MaintenanceModeSwitch
-	recreator              ownerReferenceBackup
+	ownerRefBackuper       ownerReferenceBackup
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, recreator ownerReferenceBackup) *backupCreateManager {
+func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupCreateManager {
 	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", clientSet.CoreV1().ConfigMaps(namespace))
-	return &backupCreateManager{clientSet: clientSet, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, recreator: recreator}
+	return &backupCreateManager{clientSet: clientSet, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, ownerRefBackuper: ownerRefBackuper}
 }
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {
@@ -57,7 +57,7 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 		}
 	}(backup)
 
-	err = bcm.recreator.BackupOwnerReferences(ctx)
+	err = bcm.ownerRefBackuper.BackupOwnerReferences(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to backup owner references: %w", err)
 	}
