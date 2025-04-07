@@ -59,8 +59,6 @@ type DynamicClientStub struct {
 }
 
 func (d *DynamicClientStub) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
-	d.resources = make(map[string]*unstructured.Unstructured)
-
 	switch resource.Resource {
 	case "customresourcedefinitions":
 		if d.listCRDErr {
