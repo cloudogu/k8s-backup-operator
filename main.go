@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/cloudogu/k8s-backup-operator/pkg/ownerreference"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"os"
@@ -299,6 +300,11 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("failed to update additional images in existing resources: %w", err)
 	}
 
+	ownerRefRecreator, err := ownerreference.NewRecreator(k8sManager.GetConfig(), namespace)
+	if err != nil {
+		return fmt.Errorf("unable to create owner reference client: %w", err)
+	}
+
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
 	cleanupManager := cleanup.NewManager(operatorConfig.Namespace, k8sManager.GetClient(), k8sClientSet)
 	restoreManager := restore.NewRestoreManager(
@@ -306,12 +312,13 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		operatorConfig.Namespace,
 		recorder,
 		cleanupManager,
+		ownerRefRecreator,
 	)
 	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
-	backupManager := backup.NewBackupManager(ecosystemClientSet, operatorConfig.Namespace, recorder, globalConfig)
+	backupManager := backup.NewBackupManager(ecosystemClientSet, operatorConfig.Namespace, recorder, globalConfig, ownerRefRecreator)
 	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}

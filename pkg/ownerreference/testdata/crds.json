@@ -1,0 +1,618 @@
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "items": [
+    {
+      "apiVersion": "apiextensions.k8s.io/v1",
+      "kind": "CustomResourceDefinition",
+      "metadata": {
+        "annotations": {
+          "controller-gen.kubebuilder.io/version": "v0.13.0",
+          "meta.helm.sh/release-name": "k8s-dogu-operator-crd",
+          "meta.helm.sh/release-namespace": "ecosystem"
+        },
+        "creationTimestamp": "2025-03-04T09:30:02Z",
+        "generation": 1,
+        "labels": {
+          "app": "ces",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "k8s-dogu-operator",
+          "k8s.cloudogu.com/component.name": "k8s-dogu-operator-crd",
+          "k8s.cloudogu.com/component.version": "2.4.0",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "apiextensions.k8s.io/v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:acceptedNames": {
+                  "f:kind": {},
+                  "f:listKind": {},
+                  "f:plural": {},
+                  "f:singular": {}
+                },
+                "f:conditions": {
+                  "k:{\"type\":\"Established\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  },
+                  "k:{\"type\":\"NamesAccepted\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "manager": "k3s",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-04T09:30:02Z"
+          },
+          {
+            "apiVersion": "apiextensions.k8s.io/v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:controller-gen.kubebuilder.io/version": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:k8s.cloudogu.com/component.name": {},
+                  "f:k8s.cloudogu.com/component.version": {}
+                }
+              },
+              "f:spec": {
+                "f:conversion": {
+                  ".": {},
+                  "f:strategy": {}
+                },
+                "f:group": {},
+                "f:names": {
+                  "f:kind": {},
+                  "f:listKind": {},
+                  "f:plural": {},
+                  "f:singular": {}
+                },
+                "f:scope": {},
+                "f:versions": {}
+              }
+            },
+            "manager": "k8s-component-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:30:02Z"
+          },
+          {
+            "apiVersion": "apiextensions.k8s.io/v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:velero.io/backup-name": {},
+                  "f:velero.io/restore-name": {}
+                }
+              }
+            },
+            "manager": "velero-server",
+            "operation": "Update",
+            "time": "2025-03-19T11:16:32Z"
+          }
+        ],
+        "name": "dogus.k8s.cloudogu.com",
+        "resourceVersion": "9077",
+        "uid": "b0b83c1e-e46e-4b2e-a956-6202fc32cbc4"
+      },
+      "spec": {
+        "conversion": {
+          "strategy": "None"
+        },
+        "group": "k8s.cloudogu.com",
+        "names": {
+          "kind": "Dogu",
+          "listKind": "DoguList",
+          "plural": "dogus",
+          "singular": "dogu"
+        },
+        "scope": "Namespaced",
+        "versions": [
+          {
+            "name": "v2",
+            "schema": {
+              "openAPIV3Schema": {
+                "description": "Dogu is the Schema for the dogus API",
+                "properties": {
+                  "apiVersion": {
+                    "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  },
+                  "spec": {
+                    "description": "DoguSpec defines the desired state of a Dogu",
+                    "properties": {
+                      "additionalIngressAnnotations": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "description": "AdditionalIngressAnnotations provides additional annotations that get included into the dogu's ingress rules.",
+                        "type": "object"
+                      },
+                      "name": {
+                        "description": "Name of the dogu (e.g. official/ldap)",
+                        "type": "string"
+                      },
+                      "resources": {
+                        "description": "Resources of the dogu (e.g. dataVolumeSize)",
+                        "properties": {
+                          "dataVolumeSize": {
+                            "description": "DataVolumeSize represents the current size of the volume. Increasing this value leads to an automatic volume expansion. This includes a downtime for the respective dogu. The default size for volumes is \"2Gi\". It is not possible to lower the volume size after an expansion. This will introduce an inconsistent state for the dogu.",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "security": {
+                        "description": "Security overrides security policies defined in the dogu descriptor. These fields can be used to further reduce a dogu's attack surface.",
+                        "properties": {
+                          "appArmorProfile": {
+                            "description": "AppArmorProfile is the AppArmor options to use by this container.",
+                            "properties": {
+                              "localhostProfile": {
+                                "description": "LocalhostProfile indicates a profile loaded on the node that should be used. The profile must be preconfigured on the node to work. Must match the loaded name of the profile. Must be set if and only if type is \"Localhost\".",
+                                "type": "string"
+                              },
+                              "type": {
+                                "description": "Type indicates which kind of AppArmor profile will be applied. Valid options are: Localhost - a profile pre-loaded on the node. RuntimeDefault - the container runtime's default profile. Unconfined - no AppArmor enforcement.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type"
+                            ],
+                            "type": "object"
+                          },
+                          "capabilities": {
+                            "description": "Capabilities sets the allowed and dropped capabilities for the dogu. The dogu should not use more than the configured capabilities here, otherwise failure may occur at start-up or at run-time.",
+                            "properties": {
+                              "add": {
+                                "description": "Add contains the capabilities that should be allowed to be used in a container. This list is optional.",
+                                "items": {
+                                  "description": "Capability represent POSIX capabilities type. \n See docs at https://manned.org/capabilities.7",
+                                  "type": "string"
+                                },
+                                "type": "array",
+                                "x-kubernetes-list-type": "atomic"
+                              },
+                              "drop": {
+                                "description": "Drop contains the capabilities that should be blocked from being used in a container. This list is optional.",
+                                "items": {
+                                  "description": "Capability represent POSIX capabilities type. \n See docs at https://manned.org/capabilities.7",
+                                  "type": "string"
+                                },
+                                "type": "array",
+                                "x-kubernetes-list-type": "atomic"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "readOnlyRootFileSystem": {
+                            "description": "ReadOnlyRootFileSystem mounts the container's root filesystem as read-only. The dogu must support accessing the root file system by only reading otherwise the dogu start may fail. This flag is optional and defaults to nil. If nil, the value defined in the dogu descriptor is used.",
+                            "type": "boolean"
+                          },
+                          "runAsNonRoot": {
+                            "description": "RunAsNonRoot indicates that the container must run as a non-root user. The dogu must support running as non-root user otherwise the dogu start may fail. This flag is optional and defaults to nil. If nil, the value defined in the dogu descriptor is used.",
+                            "type": "boolean"
+                          },
+                          "seLinuxOptions": {
+                            "description": "SELinuxOptions is the SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container, which is kubernetes default behaviour.",
+                            "properties": {
+                              "level": {
+                                "description": "Level is SELinux level label that applies to the container.",
+                                "type": "string"
+                              },
+                              "role": {
+                                "description": "Role is a SELinux role label that applies to the container.",
+                                "type": "string"
+                              },
+                              "type": {
+                                "description": "Type is a SELinux type label that applies to the container.",
+                                "type": "string"
+                              },
+                              "user": {
+                                "description": "User is a SELinux user label that applies to the container.",
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "seccompProfile": {
+                            "description": "SeccompProfile is the seccomp options to use by this container.",
+                            "properties": {
+                              "localhostProfile": {
+                                "description": "LocalhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is \"Localhost\". Must NOT be set for any other type.",
+                                "type": "string"
+                              },
+                              "type": {
+                                "description": "Type indicates which kind of seccomp profile will be applied. Valid options are: \n Localhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "stopped": {
+                        "description": "Stopped indicates whether the dogu should be running (stopped=false) or not (stopped=true).",
+                        "type": "boolean"
+                      },
+                      "supportMode": {
+                        "description": "SupportMode indicates whether the dogu should be restarted in the support mode (f. e. to recover manually from a crash loop).",
+                        "type": "boolean"
+                      },
+                      "upgradeConfig": {
+                        "description": "UpgradeConfig contains options to manipulate the upgrade process.",
+                        "properties": {
+                          "allowNamespaceSwitch": {
+                            "description": "AllowNamespaceSwitch lets a dogu switch its dogu namespace during an upgrade. The dogu must be technically the same dogu which did reside in a different namespace. The remote dogu's version must be equal to or greater than the version of the local dogu.",
+                            "type": "boolean"
+                          },
+                          "forceUpgrade": {
+                            "description": "ForceUpgrade allows to install the same or even lower dogu version than already is installed. Please note, that possible data loss may occur by inappropriate dogu downgrading.",
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "version": {
+                        "description": "Version of the dogu (e.g. 2.4.48-3)",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "status": {
+                    "description": "DoguStatus defines the observed state of a Dogu.",
+                    "properties": {
+                      "health": {
+                        "description": "Health describes the health status of the dogu",
+                        "type": "string"
+                      },
+                      "installedVersion": {
+                        "description": "InstalledVersion of the dogu (e.g. 2.4.48-3)",
+                        "type": "string"
+                      },
+                      "requeuePhase": {
+                        "description": "RequeuePhase is the actual phase of the dogu resource used for a currently running async process.",
+                        "type": "string"
+                      },
+                      "requeueTime": {
+                        "description": "RequeueTime contains time necessary to perform the next requeue",
+                        "format": "int64",
+                        "type": "integer"
+                      },
+                      "status": {
+                        "description": "Status represents the state of the Dogu in the ecosystem",
+                        "type": "string"
+                      },
+                      "stopped": {
+                        "description": "Stopped shows if the dogu has been stopped or not.",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "requeuePhase",
+                      "requeueTime",
+                      "status"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "served": true,
+            "storage": true,
+            "subresources": {
+              "status": {}
+            }
+          }
+        ]
+      },
+      "status": {
+        "acceptedNames": {
+          "kind": "Dogu",
+          "listKind": "DoguList",
+          "plural": "dogus",
+          "singular": "dogu"
+        },
+        "conditions": [
+          {
+            "lastTransitionTime": "2025-03-04T09:30:02Z",
+            "message": "no conflicts found",
+            "reason": "NoConflicts",
+            "status": "True",
+            "type": "NamesAccepted"
+          },
+          {
+            "lastTransitionTime": "2025-03-04T09:30:02Z",
+            "message": "the initial names have been accepted",
+            "reason": "InitialNamesAccepted",
+            "status": "True",
+            "type": "Established"
+          }
+        ],
+        "storedVersions": [
+          "v2"
+        ]
+      }
+    },
+    {
+      "apiVersion": "apiextensions.k8s.io/v1",
+      "kind": "CustomResourceDefinition",
+      "metadata": {
+        "annotations": {
+          "controller-gen.kubebuilder.io/version": "v0.14.0",
+          "meta.helm.sh/release-name": "k8s-component-operator-crd",
+          "meta.helm.sh/release-namespace": "ecosystem"
+        },
+        "creationTimestamp": "2025-03-04T09:22:58Z",
+        "generation": 1,
+        "labels": {
+          "app": "ces",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "k8s-component-operator",
+          "k8s.cloudogu.com/component.name": "k8s-component-operator-crd",
+          "k8s.cloudogu.com/component.version": "1.7.0",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "apiextensions.k8s.io/v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:acceptedNames": {
+                  "f:kind": {},
+                  "f:listKind": {},
+                  "f:plural": {},
+                  "f:singular": {}
+                },
+                "f:conditions": {
+                  "k:{\"type\":\"Established\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  },
+                  "k:{\"type\":\"NamesAccepted\"}": {
+                    ".": {},
+                    "f:lastTransitionTime": {},
+                    "f:message": {},
+                    "f:reason": {},
+                    "f:status": {},
+                    "f:type": {}
+                  }
+                }
+              }
+            },
+            "manager": "k3s",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-04T09:22:58Z"
+          },
+          {
+            "apiVersion": "apiextensions.k8s.io/v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:controller-gen.kubebuilder.io/version": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:k8s.cloudogu.com/component.name": {},
+                  "f:k8s.cloudogu.com/component.version": {}
+                }
+              },
+              "f:spec": {
+                "f:conversion": {
+                  ".": {},
+                  "f:strategy": {}
+                },
+                "f:group": {},
+                "f:names": {
+                  "f:kind": {},
+                  "f:listKind": {},
+                  "f:plural": {},
+                  "f:singular": {}
+                },
+                "f:scope": {},
+                "f:versions": {}
+              }
+            },
+            "manager": "k8s-ces-setup",
+            "operation": "Update",
+            "time": "2025-03-04T09:22:58Z"
+          },
+          {
+            "apiVersion": "apiextensions.k8s.io/v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:velero.io/backup-name": {},
+                  "f:velero.io/restore-name": {}
+                }
+              }
+            },
+            "manager": "velero-server",
+            "operation": "Update",
+            "time": "2025-03-19T11:16:32Z"
+          }
+        ],
+        "name": "components.k8s.cloudogu.com",
+        "resourceVersion": "9076",
+        "uid": "5cbf66a7-46bb-4723-b901-7799cae6ac15"
+      },
+      "spec": {
+        "conversion": {
+          "strategy": "None"
+        },
+        "group": "k8s.cloudogu.com",
+        "names": {
+          "kind": "Component",
+          "listKind": "ComponentList",
+          "plural": "components",
+          "singular": "component"
+        },
+        "scope": "Namespaced",
+        "versions": [
+          {
+            "name": "v1",
+            "schema": {
+              "openAPIV3Schema": {
+                "description": "Component is the Schema for the ces component API",
+                "properties": {
+                  "apiVersion": {
+                    "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  },
+                  "spec": {
+                    "description": "ComponentSpec defines the desired state of a component.",
+                    "properties": {
+                      "deployNamespace": {
+                        "description": "DeployNamespace is the namespace where the helm chart should be deployed in.\nThis value is optional. If it is empty the operator deploys the helm chart in the namespace where the operator is deployed.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "description": "Name of the component (e.g. k8s-dogu-operator)",
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "description": "Namespace of the component (e.g. k8s)",
+                        "type": "string"
+                      },
+                      "valuesYamlOverwrite": {
+                        "description": "ValuesYamlOverwrite is a multiline-yaml string that is applied alongside the original values.yaml-file of the component.\nIt can be used to overwrite specific configurations. Lists are overwritten, maps are merged.",
+                        "type": "string"
+                      },
+                      "version": {
+                        "description": "Desired version of the component (e.g. 2.4.48-3)",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "status": {
+                    "description": "ComponentStatus defines the observed state of a Component.",
+                    "properties": {
+                      "health": {
+                        "description": "Health describes the health status of the component.\nA component becomes 'available' if its Status is 'installed',\nand all its deployments, stateful sets, and daemon sets are available.",
+                        "type": "string"
+                      },
+                      "installedVersion": {
+                        "description": "Installed version of the component (e.g. 2.4.48-3)",
+                        "type": "string"
+                      },
+                      "requeueTimeNanos": {
+                        "description": "RequeueTimeNanos contains the time in nanoseconds to wait until the next requeue.",
+                        "format": "int64",
+                        "type": "integer"
+                      },
+                      "status": {
+                        "description": "Status represents the state of the component in the ecosystem.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "served": true,
+            "storage": true,
+            "subresources": {
+              "status": {}
+            }
+          }
+        ]
+      },
+      "status": {
+        "acceptedNames": {
+          "kind": "Component",
+          "listKind": "ComponentList",
+          "plural": "components",
+          "singular": "component"
+        },
+        "conditions": [
+          {
+            "lastTransitionTime": "2025-03-04T09:22:58Z",
+            "message": "no conflicts found",
+            "reason": "NoConflicts",
+            "status": "True",
+            "type": "NamesAccepted"
+          },
+          {
+            "lastTransitionTime": "2025-03-04T09:22:58Z",
+            "message": "the initial names have been accepted",
+            "reason": "InitialNamesAccepted",
+            "status": "True",
+            "type": "Established"
+          }
+        ],
+        "storedVersions": [
+          "v1"
+        ]
+      }
+    }
+  ],
+  "kind": "CustomResourceDefinitionList",
+  "metadata": {
+    "resourceVersion": "23130"
+  }
+}

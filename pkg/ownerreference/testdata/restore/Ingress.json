@@ -1,0 +1,205 @@
+{
+  "apiVersion": "networking.k8s.io/v1",
+  "items": [
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "Ingress",
+      "metadata": {
+        "annotations": {
+          "nginx.ingress.kubernetes.io/rewrite-target": "/errors/503.html"
+        },
+        "creationTimestamp": "2025-03-24T13:11:01Z",
+        "generation": 1,
+        "labels": {
+          "app": "ces",
+          "app.kubernetes.io/name": "k8s-service-discovery",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "networking.k8s.io/v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:loadBalancer": {
+                  "f:ingress": {}
+                }
+              }
+            },
+            "manager": "nginx-ingress-controller",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-04T09:32:37Z"
+          },
+          {
+            "apiVersion": "networking.k8s.io/v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:nginx.ingress.kubernetes.io/rewrite-target": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"79f6e933-19f9-4083-bc65-9d42bfad0cf1\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:ingressClassName": {},
+                "f:rules": {}
+              }
+            },
+            "manager": "manager",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:42Z"
+          }
+        ],
+        "name": "cas",
+        "namespace": "ecosystem",
+        "resourceVersion": "10788",
+        "uid": "81d1cb4a-d3dd-4fd0-807f-ddab7bd49302"
+      },
+      "spec": {
+        "ingressClassName": "k8s-ecosystem-ces-service",
+        "rules": [
+          {
+            "http": {
+              "paths": [
+                {
+                  "backend": {
+                    "service": {
+                      "name": "nginx-static",
+                      "port": {
+                        "number": 80
+                      }
+                    }
+                  },
+                  "path": "/cas",
+                  "pathType": "Prefix"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "status": {
+        "loadBalancer": {
+          "ingress": [
+            {
+              "ip": "10.43.150.210"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "Ingress",
+      "metadata": {
+        "annotations": {
+          "nginx.ingress.kubernetes.io/rewrite-target": "/errors/starting.html"
+        },
+        "creationTimestamp": "2025-03-24T13:11:01Z",
+        "generation": 1,
+        "labels": {
+          "app": "ces",
+          "app.kubernetes.io/name": "k8s-service-discovery",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "networking.k8s.io/v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                "f:loadBalancer": {
+                  "f:ingress": {}
+                }
+              }
+            },
+            "manager": "nginx-ingress-controller",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-04T09:31:37Z"
+          },
+          {
+            "apiVersion": "networking.k8s.io/v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:nginx.ingress.kubernetes.io/rewrite-target": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"0f60c8d6-9b1e-46c1-ad6c-9b36d027bf42\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:ingressClassName": {},
+                "f:rules": {}
+              }
+            },
+            "manager": "manager",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:42Z"
+          }
+        ],
+        "name": "nginx-static",
+        "namespace": "ecosystem",
+        "resourceVersion": "10795",
+        "uid": "bb919050-4d96-4d13-b33a-9fbe64d481d1"
+      },
+      "spec": {
+        "ingressClassName": "k8s-ecosystem-ces-service",
+        "rules": [
+          {
+            "http": {
+              "paths": [
+                {
+                  "backend": {
+                    "service": {
+                      "name": "nginx-static",
+                      "port": {
+                        "number": 80
+                      }
+                    }
+                  },
+                  "path": "/",
+                  "pathType": "Prefix"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "status": {
+        "loadBalancer": {
+          "ingress": [
+            {
+              "ip": "10.43.150.210"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "kind": "IngressList",
+  "metadata": {
+    "resourceVersion": "11104"
+  }
+}
