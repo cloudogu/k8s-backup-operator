@@ -1,8 +1,8 @@
 module github.com/cloudogu/k8s-backup-operator
 
-go 1.23
+go 1.24
 
-toolchain go1.23.1
+toolchain go1.24.2
 
 require (
 	github.com/Masterminds/semver/v3 v3.3.0
@@ -13,6 +13,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/vmware-tanzu/velero v1.12.1
 	k8s.io/api v0.31.1
+	k8s.io/apiextensions-apiserver v0.31.0
 	k8s.io/apimachinery v0.31.1
 	k8s.io/client-go v0.31.1
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6
@@ -68,7 +69,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.31.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240827152857-f7e401e7b4c2 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

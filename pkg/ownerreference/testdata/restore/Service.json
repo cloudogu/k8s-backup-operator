@@ -1,0 +1,985 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"cas\",\"uid\":\"96a3bb49-38b0-4b5c-a264-56e370bc08b6\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s-dogu-operator.cloudogu.com/ces-services": "[{\"name\":\"cas\",\"port\":8080,\"location\":\"/cas\",\"pass\":\"/cas\"}]"
+        },
+        "creationTimestamp": "2025-03-24T13:10:52Z",
+        "labels": {
+          "app": "ces",
+          "dogu.name": "cas",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:k8s-dogu-operator.cloudogu.com/ces-services": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8080,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:32:30Z"
+          },
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
+                }
+              }
+            },
+            "manager": "k8s-backup-operator",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:40Z"
+          }
+        ],
+        "name": "cas",
+        "namespace": "ecosystem",
+        "resourceVersion": "10341",
+        "uid": "c204781e-4c1b-4262-9de2-f66aa4348b51"
+      },
+      "spec": {
+        "clusterIP": "10.43.48.254",
+        "clusterIPs": [
+          "10.43.48.254"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "8080",
+            "port": 8080,
+            "protocol": "TCP",
+            "targetPort": 8080
+          }
+        ],
+        "selector": {
+          "dogu.name": "cas"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"docker-registry\"},\"name\":\"docker-registry\",\"namespace\":\"ecosystem\"},\"spec\":{\"ports\":[{\"name\":\"docker-api\",\"nodePort\":30099,\"port\":30099,\"protocol\":\"TCP\",\"targetPort\":\"docker-api\"},{\"name\":\"api-proxy\",\"nodePort\":30098,\"port\":30098,\"protocol\":\"TCP\",\"targetPort\":\"api-proxy\"}],\"selector\":{\"app\":\"docker-registry\"},\"type\":\"NodePort\"}}\n"
+        },
+        "creationTimestamp": "2025-03-04T09:16:17Z",
+        "labels": {
+          "app": "docker-registry",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {}
+                }
+              },
+              "f:spec": {
+                "f:externalTrafficPolicy": {},
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":30098,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:nodePort": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":30099,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:nodePort": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "kubectl-client-side-apply",
+            "operation": "Update",
+            "time": "2025-03-04T09:16:17Z"
+          },
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:velero.io/backup-name": {},
+                  "f:velero.io/restore-name": {}
+                }
+              }
+            },
+            "manager": "velero-server",
+            "operation": "Update",
+            "time": "2025-03-24T13:10:52Z"
+          }
+        ],
+        "name": "docker-registry",
+        "namespace": "ecosystem",
+        "resourceVersion": "10414",
+        "uid": "afa7e657-d1ca-4deb-a01f-d6e140849298"
+      },
+      "spec": {
+        "clusterIP": "10.43.98.30",
+        "clusterIPs": [
+          "10.43.98.30"
+        ],
+        "externalTrafficPolicy": "Cluster",
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "docker-api",
+            "nodePort": 30099,
+            "port": 30099,
+            "protocol": "TCP",
+            "targetPort": "docker-api"
+          },
+          {
+            "name": "api-proxy",
+            "nodePort": 30098,
+            "port": 30098,
+            "protocol": "TCP",
+            "targetPort": "api-proxy"
+          }
+        ],
+        "selector": {
+          "app": "docker-registry"
+        },
+        "sessionAffinity": "None",
+        "type": "NodePort"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "meta.helm.sh/release-name": "k8s-dogu-operator",
+          "meta.helm.sh/release-namespace": "ecosystem"
+        },
+        "creationTimestamp": "2025-03-24T13:10:52Z",
+        "labels": {
+          "app": "ces",
+          "app.kubernetes.io/instance": "k8s-dogu-operator",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "k8s-dogu-operator",
+          "app.kubernetes.io/version": "3.2.1",
+          "control-plane": "controller-manager",
+          "helm.sh/chart": "k8s-dogu-operator-3.2.1",
+          "k8s.cloudogu.com/component.name": "k8s-dogu-operator",
+          "k8s.cloudogu.com/component.version": "3.2.1",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:control-plane": {},
+                  "f:helm.sh/chart": {},
+                  "f:k8s.cloudogu.com/component.name": {},
+                  "f:k8s.cloudogu.com/component.version": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-component-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:30:29Z"
+          }
+        ],
+        "name": "k8s-dogu-operator-controller-manager-metrics-service",
+        "namespace": "ecosystem",
+        "resourceVersion": "10433",
+        "uid": "d1ce98a0-0953-4329-be5b-0d2c52c61c96"
+      },
+      "spec": {
+        "clusterIP": "10.43.16.63",
+        "clusterIPs": [
+          "10.43.16.63"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "https",
+            "port": 8443,
+            "protocol": "TCP",
+            "targetPort": "https"
+          }
+        ],
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "meta.helm.sh/release-name": "k8s-velero",
+          "meta.helm.sh/release-namespace": "ecosystem"
+        },
+        "creationTimestamp": "2025-03-24T12:52:45Z",
+        "labels": {
+          "app": "ces",
+          "app.kubernetes.io/instance": "k8s-velero",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "k8s-velero",
+          "helm.sh/chart": "velero-5.0.2",
+          "k8s.cloudogu.com/component.name": "k8s-velero",
+          "k8s.cloudogu.com/component.version": "5.0.2-9",
+          "k8s.cloudogu.com/part-of": "backup",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:helm.sh/chart": {},
+                  "f:k8s.cloudogu.com/component.name": {},
+                  "f:k8s.cloudogu.com/component.version": {},
+                  "f:k8s.cloudogu.com/part-of": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8085,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-component-operator",
+            "operation": "Update",
+            "time": "2025-03-24T12:52:45Z"
+          },
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  "f:velero.io/backup-name": {},
+                  "f:velero.io/restore-name": {}
+                }
+              }
+            },
+            "manager": "velero-server",
+            "operation": "Update",
+            "time": "2025-03-24T13:10:53Z"
+          }
+        ],
+        "name": "k8s-velero",
+        "namespace": "ecosystem",
+        "resourceVersion": "10447",
+        "uid": "447400f8-a8a7-417c-b9d6-1395999ce371"
+      },
+      "spec": {
+        "clusterIP": "10.43.26.203",
+        "clusterIPs": [
+          "10.43.26.203"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "http-monitoring",
+            "port": 8085,
+            "protocol": "TCP",
+            "targetPort": "http-monitoring"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "k8s-velero",
+          "app.kubernetes.io/name": "k8s-velero",
+          "name": "velero"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"ldap\",\"uid\":\"251e79cc-e50c-4225-9874-c4a16b46f0d7\",\"controller\":true,\"blockOwnerDeletion\":true}]"
+        },
+        "creationTimestamp": "2025-03-24T13:10:53Z",
+        "labels": {
+          "app": "ces",
+          "dogu.name": "ldap",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":389,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:31:41Z"
+          },
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
+                }
+              }
+            },
+            "manager": "k8s-backup-operator",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:39Z"
+          }
+        ],
+        "name": "ldap",
+        "namespace": "ecosystem",
+        "resourceVersion": "10456",
+        "uid": "1f939750-fea0-474c-ac12-76e790aadd95"
+      },
+      "spec": {
+        "clusterIP": "10.43.182.54",
+        "clusterIPs": [
+          "10.43.182.54"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "389",
+            "port": 389,
+            "protocol": "TCP",
+            "targetPort": 389
+          }
+        ],
+        "selector": {
+          "dogu.name": "ldap"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"nginx-ingress\",\"uid\":\"21bed76c-4b39-4ebc-8071-6db8e19e8ab0\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s-dogu-operator.cloudogu.com/ces-exposed-ports": "[{\"protocol\":\"tcp\",\"port\":80,\"targetPort\":80},{\"protocol\":\"tcp\",\"port\":443,\"targetPort\":443}]"
+        },
+        "creationTimestamp": "2025-03-24T13:10:53Z",
+        "labels": {
+          "app": "ces",
+          "dogu.name": "nginx-ingress",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:k8s-dogu-operator.cloudogu.com/ces-exposed-ports": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:30:52Z"
+          },
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
+                }
+              }
+            },
+            "manager": "k8s-backup-operator",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:39Z"
+          }
+        ],
+        "name": "nginx-ingress",
+        "namespace": "ecosystem",
+        "resourceVersion": "10463",
+        "uid": "d21ecec5-2355-4f41-a10f-54b268d27f05"
+      },
+      "spec": {
+        "clusterIP": "10.43.226.86",
+        "clusterIPs": [
+          "10.43.226.86"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "443",
+            "port": 443,
+            "protocol": "TCP",
+            "targetPort": 443
+          },
+          {
+            "name": "80",
+            "port": 80,
+            "protocol": "TCP",
+            "targetPort": 80
+          }
+        ],
+        "selector": {
+          "dogu.name": "nginx-ingress"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"nginx-static\",\"uid\":\"6f2c80f3-9bd4-435e-a35d-597be5d8e12f\",\"controller\":true,\"blockOwnerDeletion\":true}]",
+          "k8s-dogu-operator.cloudogu.com/ces-services": "[{\"name\":\"nginx-static\",\"port\":80,\"location\":\"/\",\"pass\":\"/\"}]"
+        },
+        "creationTimestamp": "2025-03-24T13:10:53Z",
+        "labels": {
+          "app": "ces",
+          "dogu.name": "nginx-static",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:k8s-dogu-operator.cloudogu.com/ces-services": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:31:12Z"
+          },
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
+                }
+              }
+            },
+            "manager": "k8s-backup-operator",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:42Z"
+          }
+        ],
+        "name": "nginx-static",
+        "namespace": "ecosystem",
+        "resourceVersion": "10471",
+        "uid": "daefae77-9e56-44d9-8743-9ca133d951d2"
+      },
+      "spec": {
+        "clusterIP": "10.43.144.87",
+        "clusterIPs": [
+          "10.43.144.87"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "80",
+            "port": 80,
+            "protocol": "TCP",
+            "targetPort": 80
+          }
+        ],
+        "selector": {
+          "dogu.name": "nginx-static"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "k8s.cloudogu.com/backup-owner-references": "[{\"apiVersion\":\"k8s.cloudogu.com/v2\",\"kind\":\"Dogu\",\"name\":\"postfix\",\"uid\":\"bfa80e89-54bb-4a68-a3c9-a0262b928de4\",\"controller\":true,\"blockOwnerDeletion\":true}]"
+        },
+        "creationTimestamp": "2025-03-24T13:10:53Z",
+        "labels": {
+          "app": "ces",
+          "dogu.name": "postfix",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":25,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":587,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:31:33Z"
+          },
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:k8s.cloudogu.com/backup-owner-references": {}
+                }
+              }
+            },
+            "manager": "k8s-backup-operator",
+            "operation": "Update",
+            "time": "2025-03-24T13:03:41Z"
+          }
+        ],
+        "name": "postfix",
+        "namespace": "ecosystem",
+        "resourceVersion": "10480",
+        "uid": "88b659ac-8885-4152-be8c-5b6c494eca21"
+      },
+      "spec": {
+        "clusterIP": "10.43.147.169",
+        "clusterIPs": [
+          "10.43.147.169"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "25",
+            "port": 25,
+            "protocol": "TCP",
+            "targetPort": 25
+          },
+          {
+            "name": "587",
+            "port": 587,
+            "protocol": "TCP",
+            "targetPort": 587
+          }
+        ],
+        "selector": {
+          "dogu.name": "postfix"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "creationTimestamp": "2025-03-24T13:10:52Z",
+        "finalizers": [
+          "service.kubernetes.io/load-balancer-cleanup"
+        ],
+        "labels": {
+          "app": "ces",
+          "velero.io/backup-name": "backup-sample",
+          "velero.io/restore-name": "restore-sample"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {}
+                }
+              },
+              "f:spec": {
+                "f:allocateLoadBalancerNodePorts": {},
+                "f:externalTrafficPolicy": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilies": {},
+                "f:ipFamilyPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-ces-setup",
+            "operation": "Update",
+            "time": "2025-03-04T09:22:47Z"
+          },
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"service.kubernetes.io/load-balancer-cleanup\"": {}
+                }
+              },
+              "f:status": {
+                "f:loadBalancer": {
+                  "f:ingress": {}
+                }
+              }
+            },
+            "manager": "k3s",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-24T13:10:54Z"
+          }
+        ],
+        "name": "ces-loadbalancer",
+        "namespace": "ecosystem",
+        "resourceVersion": "10546",
+        "uid": "66c51ecf-0984-4b5b-a7f0-6e785a252c6c"
+      },
+      "spec": {
+        "allocateLoadBalancerNodePorts": true,
+        "clusterIP": "10.43.104.95",
+        "clusterIPs": [
+          "10.43.104.95"
+        ],
+        "externalTrafficPolicy": "Cluster",
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "nginx-ingress-80",
+            "nodePort": 31181,
+            "port": 80,
+            "protocol": "TCP",
+            "targetPort": 80
+          },
+          {
+            "name": "nginx-ingress-443",
+            "nodePort": 32154,
+            "port": 443,
+            "protocol": "TCP",
+            "targetPort": 443
+          }
+        ],
+        "selector": {
+          "dogu.name": "nginx-ingress"
+        },
+        "sessionAffinity": "None",
+        "type": "LoadBalancer"
+      },
+      "status": {
+        "loadBalancer": {
+          "ingress": [
+            {
+              "ip": "192.168.56.2",
+              "ipMode": "VIP"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "kind": "ServiceList",
+  "metadata": {
+    "resourceVersion": "11088"
+  }
+}

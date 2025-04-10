@@ -1,0 +1,926 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"docker-registry\"},\"name\":\"docker-registry\",\"namespace\":\"ecosystem\"},\"spec\":{\"ports\":[{\"name\":\"docker-api\",\"nodePort\":30099,\"port\":30099,\"protocol\":\"TCP\",\"targetPort\":\"docker-api\"},{\"name\":\"api-proxy\",\"nodePort\":30098,\"port\":30098,\"protocol\":\"TCP\",\"targetPort\":\"api-proxy\"}],\"selector\":{\"app\":\"docker-registry\"},\"type\":\"NodePort\"}}\n"
+        },
+        "creationTimestamp": "2025-03-04T09:16:17Z",
+        "labels": {
+          "app": "docker-registry"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {}
+                }
+              },
+              "f:spec": {
+                "f:externalTrafficPolicy": {},
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":30098,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:nodePort": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":30099,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:nodePort": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "kubectl-client-side-apply",
+            "operation": "Update",
+            "time": "2025-03-04T09:16:17Z"
+          }
+        ],
+        "name": "docker-registry",
+        "namespace": "ecosystem",
+        "resourceVersion": "332",
+        "uid": "afa7e657-d1ca-4deb-a01f-d6e140849298"
+      },
+      "spec": {
+        "clusterIP": "10.43.98.30",
+        "clusterIPs": [
+          "10.43.98.30"
+        ],
+        "externalTrafficPolicy": "Cluster",
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "docker-api",
+            "nodePort": 30099,
+            "port": 30099,
+            "protocol": "TCP",
+            "targetPort": "docker-api"
+          },
+          {
+            "name": "api-proxy",
+            "nodePort": 30098,
+            "port": 30098,
+            "protocol": "TCP",
+            "targetPort": "api-proxy"
+          }
+        ],
+        "selector": {
+          "app": "docker-registry"
+        },
+        "sessionAffinity": "None",
+        "type": "NodePort"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "creationTimestamp": "2025-03-04T09:22:47Z",
+        "finalizers": [
+          "service.kubernetes.io/load-balancer-cleanup"
+        ],
+        "labels": {
+          "app": "ces"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {}
+                }
+              },
+              "f:spec": {
+                "f:allocateLoadBalancerNodePorts": {},
+                "f:externalTrafficPolicy": {},
+                "f:internalTrafficPolicy": {},
+                "f:ipFamilies": {},
+                "f:ipFamilyPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-ces-setup",
+            "operation": "Update",
+            "time": "2025-03-04T09:22:47Z"
+          },
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:finalizers": {
+                  ".": {},
+                  "v:\"service.kubernetes.io/load-balancer-cleanup\"": {}
+                }
+              },
+              "f:status": {
+                "f:loadBalancer": {
+                  "f:ingress": {}
+                }
+              }
+            },
+            "manager": "k3s",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2025-03-04T09:22:48Z"
+          }
+        ],
+        "name": "ces-loadbalancer",
+        "namespace": "ecosystem",
+        "resourceVersion": "872",
+        "uid": "e4f1cb7d-bc38-4592-9bc6-11711438e533"
+      },
+      "spec": {
+        "allocateLoadBalancerNodePorts": true,
+        "clusterIP": "10.43.45.217",
+        "clusterIPs": [
+          "10.43.45.217"
+        ],
+        "externalTrafficPolicy": "Cluster",
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "nginx-ingress-80",
+            "nodePort": 32138,
+            "port": 80,
+            "protocol": "TCP",
+            "targetPort": 80
+          },
+          {
+            "name": "nginx-ingress-443",
+            "nodePort": 30475,
+            "port": 443,
+            "protocol": "TCP",
+            "targetPort": 443
+          }
+        ],
+        "selector": {
+          "dogu.name": "nginx-ingress"
+        },
+        "sessionAffinity": "None",
+        "type": "LoadBalancer"
+      },
+      "status": {
+        "loadBalancer": {
+          "ingress": [
+            {
+              "ip": "192.168.56.2",
+              "ipMode": "VIP"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "meta.helm.sh/release-name": "k8s-dogu-operator",
+          "meta.helm.sh/release-namespace": "ecosystem"
+        },
+        "creationTimestamp": "2025-03-04T09:30:29Z",
+        "labels": {
+          "app": "ces",
+          "app.kubernetes.io/instance": "k8s-dogu-operator",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "k8s-dogu-operator",
+          "app.kubernetes.io/version": "3.2.1",
+          "control-plane": "controller-manager",
+          "helm.sh/chart": "k8s-dogu-operator-3.2.1",
+          "k8s.cloudogu.com/component.name": "k8s-dogu-operator",
+          "k8s.cloudogu.com/component.version": "3.2.1"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:app.kubernetes.io/version": {},
+                  "f:control-plane": {},
+                  "f:helm.sh/chart": {},
+                  "f:k8s.cloudogu.com/component.name": {},
+                  "f:k8s.cloudogu.com/component.version": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-component-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:30:29Z"
+          }
+        ],
+        "name": "k8s-dogu-operator-controller-manager-metrics-service",
+        "namespace": "ecosystem",
+        "resourceVersion": "2775",
+        "uid": "e7e781da-92b6-4817-9b2f-759ff7fc8941"
+      },
+      "spec": {
+        "clusterIP": "10.43.79.106",
+        "clusterIPs": [
+          "10.43.79.106"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "https",
+            "port": 8443,
+            "protocol": "TCP",
+            "targetPort": "https"
+          }
+        ],
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "k8s-dogu-operator.cloudogu.com/ces-exposed-ports": "[{\"protocol\":\"tcp\",\"port\":80,\"targetPort\":80},{\"protocol\":\"tcp\",\"port\":443,\"targetPort\":443}]"
+        },
+        "creationTimestamp": "2025-03-04T09:30:52Z",
+        "labels": {
+          "app": "ces",
+          "dogu.name": "nginx-ingress"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:k8s-dogu-operator.cloudogu.com/ces-exposed-ports": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"21bed76c-4b39-4ebc-8071-6db8e19e8ab0\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":443,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:30:52Z"
+          }
+        ],
+        "name": "nginx-ingress",
+        "namespace": "ecosystem",
+        "ownerReferences": [
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Dogu",
+            "name": "nginx-ingress",
+            "uid": "21bed76c-4b39-4ebc-8071-6db8e19e8ab0"
+          }
+        ],
+        "resourceVersion": "2861",
+        "uid": "4f6d25e9-ba16-436f-9727-5aba42c03f66"
+      },
+      "spec": {
+        "clusterIP": "10.43.150.210",
+        "clusterIPs": [
+          "10.43.150.210"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "443",
+            "port": 443,
+            "protocol": "TCP",
+            "targetPort": 443
+          },
+          {
+            "name": "80",
+            "port": 80,
+            "protocol": "TCP",
+            "targetPort": 80
+          }
+        ],
+        "selector": {
+          "dogu.name": "nginx-ingress"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "k8s-dogu-operator.cloudogu.com/ces-services": "[{\"name\":\"nginx-static\",\"port\":80,\"location\":\"/\",\"pass\":\"/\"}]"
+        },
+        "creationTimestamp": "2025-03-04T09:31:12Z",
+        "labels": {
+          "app": "ces",
+          "dogu.name": "nginx-static"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:k8s-dogu-operator.cloudogu.com/ces-services": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"6f2c80f3-9bd4-435e-a35d-597be5d8e12f\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:31:12Z"
+          }
+        ],
+        "name": "nginx-static",
+        "namespace": "ecosystem",
+        "ownerReferences": [
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Dogu",
+            "name": "nginx-static",
+            "uid": "6f2c80f3-9bd4-435e-a35d-597be5d8e12f"
+          }
+        ],
+        "resourceVersion": "2985",
+        "uid": "0f60c8d6-9b1e-46c1-ad6c-9b36d027bf42"
+      },
+      "spec": {
+        "clusterIP": "10.43.126.138",
+        "clusterIPs": [
+          "10.43.126.138"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "80",
+            "port": 80,
+            "protocol": "TCP",
+            "targetPort": 80
+          }
+        ],
+        "selector": {
+          "dogu.name": "nginx-static"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "creationTimestamp": "2025-03-04T09:31:33Z",
+        "labels": {
+          "app": "ces",
+          "dogu.name": "postfix"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"bfa80e89-54bb-4a68-a3c9-a0262b928de4\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":25,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  },
+                  "k:{\"port\":587,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:31:33Z"
+          }
+        ],
+        "name": "postfix",
+        "namespace": "ecosystem",
+        "ownerReferences": [
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Dogu",
+            "name": "postfix",
+            "uid": "bfa80e89-54bb-4a68-a3c9-a0262b928de4"
+          }
+        ],
+        "resourceVersion": "3074",
+        "uid": "bb9d00de-4917-437b-8383-f55f8caaf3c0"
+      },
+      "spec": {
+        "clusterIP": "10.43.46.241",
+        "clusterIPs": [
+          "10.43.46.241"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "25",
+            "port": 25,
+            "protocol": "TCP",
+            "targetPort": 25
+          },
+          {
+            "name": "587",
+            "port": 587,
+            "protocol": "TCP",
+            "targetPort": 587
+          }
+        ],
+        "selector": {
+          "dogu.name": "postfix"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "creationTimestamp": "2025-03-04T09:31:41Z",
+        "labels": {
+          "app": "ces",
+          "dogu.name": "ldap"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"251e79cc-e50c-4225-9874-c4a16b46f0d7\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":389,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:31:41Z"
+          }
+        ],
+        "name": "ldap",
+        "namespace": "ecosystem",
+        "ownerReferences": [
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Dogu",
+            "name": "ldap",
+            "uid": "251e79cc-e50c-4225-9874-c4a16b46f0d7"
+          }
+        ],
+        "resourceVersion": "3228",
+        "uid": "cb5ae752-d44a-4e8c-81e9-a1e37459c2cd"
+      },
+      "spec": {
+        "clusterIP": "10.43.182.214",
+        "clusterIPs": [
+          "10.43.182.214"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "389",
+            "port": 389,
+            "protocol": "TCP",
+            "targetPort": 389
+          }
+        ],
+        "selector": {
+          "dogu.name": "ldap"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "k8s-dogu-operator.cloudogu.com/ces-services": "[{\"name\":\"cas\",\"port\":8080,\"location\":\"/cas\",\"pass\":\"/cas\"}]"
+        },
+        "creationTimestamp": "2025-03-04T09:32:30Z",
+        "labels": {
+          "app": "ces",
+          "dogu.name": "cas"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:k8s-dogu-operator.cloudogu.com/ces-services": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:dogu.name": {}
+                },
+                "f:ownerReferences": {
+                  ".": {},
+                  "k:{\"uid\":\"96a3bb49-38b0-4b5c-a264-56e370bc08b6\"}": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8080,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-dogu-operator",
+            "operation": "Update",
+            "time": "2025-03-04T09:32:30Z"
+          }
+        ],
+        "name": "cas",
+        "namespace": "ecosystem",
+        "ownerReferences": [
+          {
+            "apiVersion": "k8s.cloudogu.com/v2",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Dogu",
+            "name": "cas",
+            "uid": "96a3bb49-38b0-4b5c-a264-56e370bc08b6"
+          }
+        ],
+        "resourceVersion": "3590",
+        "uid": "79f6e933-19f9-4083-bc65-9d42bfad0cf1"
+      },
+      "spec": {
+        "clusterIP": "10.43.167.63",
+        "clusterIPs": [
+          "10.43.167.63"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "8080",
+            "port": 8080,
+            "protocol": "TCP",
+            "targetPort": 8080
+          }
+        ],
+        "selector": {
+          "dogu.name": "cas"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "annotations": {
+          "meta.helm.sh/release-name": "k8s-velero",
+          "meta.helm.sh/release-namespace": "ecosystem"
+        },
+        "creationTimestamp": "2025-03-24T12:52:45Z",
+        "labels": {
+          "app": "ces",
+          "app.kubernetes.io/instance": "k8s-velero",
+          "app.kubernetes.io/managed-by": "Helm",
+          "app.kubernetes.io/name": "k8s-velero",
+          "helm.sh/chart": "velero-5.0.2",
+          "k8s.cloudogu.com/component.name": "k8s-velero",
+          "k8s.cloudogu.com/component.version": "5.0.2-9",
+          "k8s.cloudogu.com/part-of": "backup"
+        },
+        "managedFields": [
+          {
+            "apiVersion": "v1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:meta.helm.sh/release-name": {},
+                  "f:meta.helm.sh/release-namespace": {}
+                },
+                "f:labels": {
+                  ".": {},
+                  "f:app": {},
+                  "f:app.kubernetes.io/instance": {},
+                  "f:app.kubernetes.io/managed-by": {},
+                  "f:app.kubernetes.io/name": {},
+                  "f:helm.sh/chart": {},
+                  "f:k8s.cloudogu.com/component.name": {},
+                  "f:k8s.cloudogu.com/component.version": {},
+                  "f:k8s.cloudogu.com/part-of": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":8085,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:name": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            },
+            "manager": "k8s-component-operator",
+            "operation": "Update",
+            "time": "2025-03-24T12:52:45Z"
+          }
+        ],
+        "name": "k8s-velero",
+        "namespace": "ecosystem",
+        "resourceVersion": "7077",
+        "uid": "447400f8-a8a7-417c-b9d6-1395999ce371"
+      },
+      "spec": {
+        "clusterIP": "10.43.26.203",
+        "clusterIPs": [
+          "10.43.26.203"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "name": "http-monitoring",
+            "port": 8085,
+            "protocol": "TCP",
+            "targetPort": "http-monitoring"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "k8s-velero",
+          "app.kubernetes.io/name": "k8s-velero",
+          "name": "velero"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    }
+  ],
+  "kind": "ServiceList",
+  "metadata": {
+    "resourceVersion": "8324"
+  }
+}
