@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.3] - 2025-04-10
+### Fixed
+- [#44] Fixed resource ownerReferences after a restore of a previous backup
+  - subsequently, this fixes the failure to fully delete some resources after a restore
+
 ## [v1.3.2] - 2025-04-03
 ### Fixed
 - [#46] Fixed endless loop of reconciles because the image was not set in update manager and difference comparison 
