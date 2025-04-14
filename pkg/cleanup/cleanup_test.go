@@ -53,7 +53,10 @@ func TestCleanUp(t *testing.T) {
 		notFoundError := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
 		clientMock.EXPECT().Get(ctx, mock.Anything, mock.Anything).Return(notFoundError)
 
-		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
+		configMapClientMock := newMockConfigMapClient(t)
+		configMapClientMock.EXPECT().Get(ctx, "k8s-backup-operator-cleanup-exclude", mock.Anything).Return(nil, assert.AnError)
+
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock, configMapClient: configMapClientMock}
 
 		err := sut.Cleanup(ctx)
 		assert.NoError(t, err)
@@ -164,7 +167,10 @@ func TestFindObjects(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 		clientMock.EXPECT().List(ctx, objectList, &listOptions).Return(nil)
 
-		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
+		configMapClientMock := newMockConfigMapClient(t)
+		configMapClientMock.EXPECT().Get(ctx, "k8s-backup-operator-cleanup-exclude", mock.Anything).Return(nil, assert.AnError)
+
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock, configMapClient: configMapClientMock}
 
 		_, _ = sut.findObjects(ctx, defaultCleanupSelector)
 	})
@@ -199,7 +205,10 @@ func TestFindObjects(t *testing.T) {
 			return nil
 		})
 
-		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock}
+		configMapClientMock := newMockConfigMapClient(t)
+		configMapClientMock.EXPECT().Get(ctx, "k8s-backup-operator-cleanup-exclude", mock.Anything).Return(nil, assert.AnError)
+
+		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock, configMapClient: configMapClientMock}
 
 		objects, err := sut.findObjects(ctx, defaultCleanupSelector)
 
@@ -419,4 +428,85 @@ func TestWaitForObjectToBeDeleted(t *testing.T) {
 		sut.waitForObjectToBeDeleted(ctx, &object, &wg)
 		wg.Wait()
 	})
+}
+
+func Test_filterObjects(t *testing.T) {
+	type args struct {
+		objects       []unstructured.Unstructured
+		gvksToExclude []groupVersionKindName
+	}
+	tests := []struct {
+		name string
+		args args
+		want []unstructured.Unstructured
+	}{
+		{
+			name: "filter ces-loadbalancer service by kind and name",
+			args: args{
+				objects: []unstructured.Unstructured{
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer"}}},
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
+				},
+				gvksToExclude: []groupVersionKindName{
+					{
+						name: "ces-loadbalancer",
+						gvk: schema.GroupVersionKind{
+							Group:   "*",
+							Version: "*",
+							Kind:    "Service",
+						},
+					},
+				},
+			},
+			want: []unstructured.Unstructured{{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}}},
+		},
+		{
+			name: "filter ces-loadbalancer by name",
+			args: args{
+				objects: []unstructured.Unstructured{
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer"}}},
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
+				},
+				gvksToExclude: []groupVersionKindName{
+					{
+						name: "ces-loadbalancer",
+						gvk: schema.GroupVersionKind{
+							Group:   "*",
+							Version: "*",
+							Kind:    "*",
+						},
+					},
+				},
+			},
+			want: []unstructured.Unstructured{{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}}},
+		},
+		{
+			name: "gvks to exclude are not in objects",
+			args: args{
+				objects: []unstructured.Unstructured{
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer-service"}}},
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
+				},
+				gvksToExclude: []groupVersionKindName{
+					{
+						name: "ces-loadbalancer",
+						gvk: schema.GroupVersionKind{
+							Group:   "*",
+							Version: "*",
+							Kind:    "*",
+						},
+					},
+				},
+			},
+			want: []unstructured.Unstructured{
+				{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer-service"}}},
+				{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, filterObjects(tt.args.objects, tt.args.gvksToExclude), "filterObjects(%v, %v)", tt.args.objects, tt.args.gvksToExclude)
+		})
+	}
 }
