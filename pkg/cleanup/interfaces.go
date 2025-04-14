@@ -2,6 +2,7 @@ package cleanup
 
 import (
 	"context"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -18,4 +19,8 @@ type k8sClient interface {
 
 type discoveryInterface interface {
 	discovery.DiscoveryInterface
+}
+
+type configMapClient interface {
+	v1.ConfigMapInterface
 }

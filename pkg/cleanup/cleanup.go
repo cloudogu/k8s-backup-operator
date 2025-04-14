@@ -2,6 +2,7 @@ package cleanup
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +22,7 @@ const (
 	deleteVerb                   = "delete"
 	customResourceDefinitionKind = "CustomResourceDefinition"
 	veleroGroup                  = "velero.io"
+	configMapName                = "k8s-backup-operator-cleanup-exclude"
 )
 
 var defaultCleanupSelector = &metav1.LabelSelector{
@@ -38,15 +40,21 @@ var defaultCleanupSelector = &metav1.LabelSelector{
 	},
 }
 
+type groupVersionKindName struct {
+	gvk  schema.GroupVersionKind
+	name string
+}
+
 type defaultCleanupManager struct {
 	namespace       string
 	client          k8sClient
 	discoveryClient discoveryInterface
+	configMapClient configMapClient
 }
 
 // NewManager creates a new instance of defaultCleanupManager.
-func NewManager(namespace string, client k8sClient, discoveryClient discoveryInterface) Manager {
-	return &defaultCleanupManager{namespace: namespace, client: client, discoveryClient: discoveryClient}
+func NewManager(namespace string, client k8sClient, discoveryClient discoveryInterface, configMapClient configMapClient) Manager {
+	return &defaultCleanupManager{namespace: namespace, client: client, discoveryClient: discoveryClient, configMapClient: configMapClient}
 }
 
 // Cleanup deletes all components with labels app=ces and not k8s.cloudogu.com/part-of=backup.
@@ -107,9 +115,13 @@ func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *
 		if err != nil {
 			return []unstructured.Unstructured{}, fmt.Errorf("list objects of resource (%s): %w", gvk, err)
 		}
+		//exclude := resource.Kind == "Service" && resource.Name == "ces-loadbalancer"
 
 		result = append(result, objects.Items...)
 	}
+
+	gvksToExclude := c.readGvkToExclude(ctx)
+	result = filterObjects(result, gvksToExclude)
 
 	return result, nil
 }
@@ -140,6 +152,16 @@ func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 	}
 
 	return result, nil
+}
+
+func filterObjects(objects []unstructured.Unstructured, gvksToExclude []groupVersionKindName) []unstructured.Unstructured {
+	filtered := []unstructured.Unstructured{}
+	for _, obj := range objects {
+		if !isObjectExcluded(obj, gvksToExclude) {
+			filtered = append(filtered, obj)
+		}
+	}
+	return filtered
 }
 
 func (c *defaultCleanupManager) deleteObject(ctx context.Context, object client.Object) error {
@@ -202,4 +224,44 @@ func (c *defaultCleanupManager) removeFinalizers(ctx context.Context, object cli
 		return c.client.Update(ctx, object)
 	})
 	return err
+}
+
+func isObjectExcluded(resource unstructured.Unstructured, shouldBeExcluded []groupVersionKindName) bool {
+	resourceGvkn := groupVersionKind(resource)
+	for _, gvkn := range shouldBeExcluded {
+		if gvkn.matches(resourceGvkn) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *defaultCleanupManager) readGvkToExclude(ctx context.Context) []groupVersionKindName {
+	configMap, err := c.configMapClient.Get(ctx, configMapName, metav1.GetOptions{})
+	if err != nil {
+		log.FromContext(ctx).Info("No ConfigMap found: %s", "configmapName", "k8s-backup-operator-cleanup-exclude")
+		return []groupVersionKindName{}
+	}
+	shouldBeExcludedString := configMap.Data["cleanup.excluded"]
+	shouldBeExcluded := []groupVersionKindName{}
+	err = json.Unmarshal([]byte(shouldBeExcludedString), &shouldBeExcluded)
+	if err != nil {
+		log.FromContext(ctx).Info("No ConfigMap found: %s", "configmapName", "k8s-backup-operator-cleanup-exclude")
+		return []groupVersionKindName{}
+	}
+	return shouldBeExcluded
+}
+
+func (g groupVersionKindName) matches(gvkn groupVersionKindName) bool {
+	return (gvkn.gvk.Group == g.gvk.Group || g.gvk.Group == "*") &&
+		(gvkn.gvk.Version == g.gvk.Version || g.gvk.Version == "*") &&
+		(gvkn.gvk.Kind == g.gvk.Kind || g.gvk.Kind == "*") &&
+		(gvkn.name == g.name || g.name == "*")
+}
+
+func groupVersionKind(resource unstructured.Unstructured) groupVersionKindName {
+	return groupVersionKindName{
+		gvk:  resource.GroupVersionKind(),
+		name: resource.GetName(),
+	}
 }

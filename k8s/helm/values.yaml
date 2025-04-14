@@ -6,6 +6,12 @@ global:
 retention:
   strategy: keepAll
   garbageCollectionCron: "0 * * * *"
+#cleanup:
+#  exclude: # group, version, kind, name
+#    - crds:
+#        kind: "CustomResourceDefinition"
+#    - velero:
+#        group: "velero.io"
 manager:
   env:
     stage: production
