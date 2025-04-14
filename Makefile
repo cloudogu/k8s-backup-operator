@@ -6,6 +6,8 @@ GOTAG?=1.24
 LINT_VERSION=v1.64.8
 MAKEFILES_VERSION=9.3.2
 STAGE?=production
+MOCKERY_VERSION=v2.53.3
+MOCKERY_IGNORED=vendor,build,docs,generated
 
 ADDITIONAL_CLEAN=dist-clean
 
