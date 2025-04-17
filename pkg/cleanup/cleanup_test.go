@@ -441,16 +441,16 @@ func Test_filterObjects(t *testing.T) {
 		want []unstructured.Unstructured
 	}{
 		{
-			name: "filter ces-loadbalancer service by kind and name",
+			name: "filter ces-loadbalancer service by kind and Name",
 			args: args{
 				objects: []unstructured.Unstructured{
-					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer"}}},
-					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"Name": "ces-loadbalancer"}}},
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"Name": "test"}}},
 				},
 				gvksToExclude: []groupVersionKindName{
 					{
-						name: "ces-loadbalancer",
-						gvk: schema.GroupVersionKind{
+						Name: "ces-loadbalancer",
+						Gvk: schema.GroupVersionKind{
 							Group:   "*",
 							Version: "*",
 							Kind:    "Service",
@@ -458,19 +458,19 @@ func Test_filterObjects(t *testing.T) {
 					},
 				},
 			},
-			want: []unstructured.Unstructured{{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}}},
+			want: []unstructured.Unstructured{{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"Name": "test"}}}},
 		},
 		{
-			name: "filter ces-loadbalancer by name",
+			name: "filter ces-loadbalancer by Name",
 			args: args{
 				objects: []unstructured.Unstructured{
-					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer"}}},
-					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"Name": "ces-loadbalancer"}}},
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"Name": "test"}}},
 				},
 				gvksToExclude: []groupVersionKindName{
 					{
-						name: "ces-loadbalancer",
-						gvk: schema.GroupVersionKind{
+						Name: "ces-loadbalancer",
+						Gvk: schema.GroupVersionKind{
 							Group:   "*",
 							Version: "*",
 							Kind:    "*",
@@ -478,19 +478,19 @@ func Test_filterObjects(t *testing.T) {
 					},
 				},
 			},
-			want: []unstructured.Unstructured{{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}}},
+			want: []unstructured.Unstructured{{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"Name": "test"}}}},
 		},
 		{
 			name: "gvks to exclude are not in objects",
 			args: args{
 				objects: []unstructured.Unstructured{
-					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer-service"}}},
-					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"Name": "ces-loadbalancer-service"}}},
+					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"Name": "test"}}},
 				},
 				gvksToExclude: []groupVersionKindName{
 					{
-						name: "ces-loadbalancer",
-						gvk: schema.GroupVersionKind{
+						Name: "ces-loadbalancer",
+						Gvk: schema.GroupVersionKind{
 							Group:   "*",
 							Version: "*",
 							Kind:    "*",
@@ -499,8 +499,8 @@ func Test_filterObjects(t *testing.T) {
 				},
 			},
 			want: []unstructured.Unstructured{
-				{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer-service"}}},
-				{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
+				{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"Name": "ces-loadbalancer-service"}}},
+				{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"Name": "test"}}},
 			},
 		},
 	}

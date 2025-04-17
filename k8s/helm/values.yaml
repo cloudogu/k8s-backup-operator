@@ -6,12 +6,9 @@ global:
 retention:
   strategy: keepAll
   garbageCollectionCron: "0 * * * *"
-#cleanup:
-#  exclude: # group, version, kind, name
-#    - crds:
-#        kind: "CustomResourceDefinition"
-#    - velero:
-#        group: "velero.io"
+cleanup:
+  exclude: # group, version, kind, name
+    - name: "ces-loadbalancer"
 manager:
   env:
     stage: production

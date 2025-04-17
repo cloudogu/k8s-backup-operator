@@ -5,6 +5,7 @@ metadata:
   name: k8s-backup-operator-cleanup-exclude
   labels:
     {{- include "k8s-backup-operator.labels" . | nindent 4 }}
-data: {{ .Values.cleanup }}
+data:
+  cleanup: |
+      {{- toYaml .Values.cleanup | nindent 4 }}
 {{- end }}
-

@@ -2,9 +2,9 @@ package cleanup
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
+	"gopkg.in/yaml.v3"
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -40,9 +40,16 @@ var defaultCleanupSelector = &metav1.LabelSelector{
 	},
 }
 
+type ExcludeEntry struct {
+	Group   string `yaml:"group"`
+	Version string `yaml:"version"`
+	Kind    string `yaml:"kind"`
+	Name    string `yaml:"name"`
+}
+
 type groupVersionKindName struct {
-	gvk  schema.GroupVersionKind
-	name string
+	Gvk  schema.GroupVersionKind
+	Name string
 }
 
 type defaultCleanupManager struct {
@@ -82,7 +89,7 @@ func (c *defaultCleanupManager) Cleanup(ctx context.Context) error {
 }
 
 func objectErr(msg string, object unstructured.Unstructured, err error) error {
-	return fmt.Errorf("%s: namespace=%s, kind=%s, name=%s: %w", msg, object.GetNamespace(), object.GetKind(), object.GetName(), err)
+	return fmt.Errorf("%s: namespace=%s, kind=%s, Name=%s: %w", msg, object.GetNamespace(), object.GetKind(), object.GetName(), err)
 }
 
 func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *metav1.LabelSelector) ([]unstructured.Unstructured, error) {
@@ -121,6 +128,9 @@ func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *
 	}
 
 	gvksToExclude := c.readGvkToExclude(ctx)
+
+	log.FromContext(ctx).Info("-----Filter objects----")
+	log.FromContext(ctx).Info("Read configMap: ", "objects", result)
 	result = filterObjects(result, gvksToExclude)
 
 	return result, nil
@@ -185,7 +195,7 @@ func (c *defaultCleanupManager) waitForObjectToBeDeleted(ctx context.Context, ob
 			} else {
 				break
 			}
-			log.FromContext(ctx).Info("Wait for object to be deleted", "ns", object.GetNamespace(), "name", object.GetName(), "gvk", object.GetObjectKind().GroupVersionKind())
+			log.FromContext(ctx).Info("Wait for object to be deleted", "ns", object.GetNamespace(), "Name", object.GetName(), "Gvk", object.GetObjectKind().GroupVersionKind())
 		}
 	}()
 }
@@ -242,26 +252,42 @@ func (c *defaultCleanupManager) readGvkToExclude(ctx context.Context) []groupVer
 		log.FromContext(ctx).Info("No ConfigMap found: %s", "configmapName", "k8s-backup-operator-cleanup-exclude")
 		return []groupVersionKindName{}
 	}
-	shouldBeExcludedString := configMap.Data["cleanup.excluded"]
-	shouldBeExcluded := []groupVersionKindName{}
-	err = json.Unmarshal([]byte(shouldBeExcludedString), &shouldBeExcluded)
+
+	shouldBeExcludedString := configMap.Data["cleanup"]
+	var exclude struct {
+		Exclude []ExcludeEntry `yaml:"exclude"`
+	}
+
+	err = yaml.Unmarshal([]byte(shouldBeExcludedString), &exclude)
 	if err != nil {
 		log.FromContext(ctx).Info("No ConfigMap found: %s", "configmapName", "k8s-backup-operator-cleanup-exclude")
 		return []groupVersionKindName{}
+	}
+	var shouldBeExcluded []groupVersionKindName
+	for _, entry := range exclude.Exclude {
+		gvk := schema.GroupVersionKind{
+			Group:   entry.Group,
+			Version: entry.Version,
+			Kind:    entry.Kind,
+		}
+		shouldBeExcluded = append(shouldBeExcluded, groupVersionKindName{
+			Gvk:  gvk,
+			Name: entry.Name,
+		})
 	}
 	return shouldBeExcluded
 }
 
 func (g groupVersionKindName) matches(gvkn groupVersionKindName) bool {
-	return (gvkn.gvk.Group == g.gvk.Group || g.gvk.Group == "*") &&
-		(gvkn.gvk.Version == g.gvk.Version || g.gvk.Version == "*") &&
-		(gvkn.gvk.Kind == g.gvk.Kind || g.gvk.Kind == "*") &&
-		(gvkn.name == g.name || g.name == "*")
+	return (gvkn.Gvk.Group == g.Gvk.Group || g.Gvk.Group == "*") &&
+		(gvkn.Gvk.Version == g.Gvk.Version || g.Gvk.Version == "*") &&
+		(gvkn.Gvk.Kind == g.Gvk.Kind || g.Gvk.Kind == "*") &&
+		(gvkn.Name == g.Name || g.Name == "*")
 }
 
 func groupVersionKind(resource unstructured.Unstructured) groupVersionKindName {
 	return groupVersionKindName{
-		gvk:  resource.GroupVersionKind(),
-		name: resource.GetName(),
+		Gvk:  resource.GroupVersionKind(),
+		Name: resource.GetName(),
 	}
 }
