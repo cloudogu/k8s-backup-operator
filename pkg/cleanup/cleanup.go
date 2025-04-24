@@ -130,8 +130,11 @@ func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *
 	gvksToExclude := c.readGvkToExclude(ctx)
 
 	log.FromContext(ctx).Info("-----Filter objects----")
-	log.FromContext(ctx).Info("Read configMap: ", "objects", result)
-	result = filterObjects(result, gvksToExclude)
+	log.FromContext(ctx).Info("Exclude config: ", "config", gvksToExclude)
+	log.FromContext(ctx).Info("Prev result list: ", "objects", result)
+	result = filterObjects(ctx, result, gvksToExclude)
+
+	log.FromContext(ctx).Info("Prev result list: ", "objects", result)
 
 	return result, nil
 }
@@ -164,13 +167,18 @@ func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 	return result, nil
 }
 
-func filterObjects(objects []unstructured.Unstructured, gvksToExclude []groupVersionKindName) []unstructured.Unstructured {
+func filterObjects(ctx context.Context, objects []unstructured.Unstructured, gvksToExclude []groupVersionKindName) []unstructured.Unstructured {
 	filtered := []unstructured.Unstructured{}
+	excluded := []unstructured.Unstructured{}
 	for _, obj := range objects {
 		if !isObjectExcluded(obj, gvksToExclude) {
 			filtered = append(filtered, obj)
+		} else {
+			excluded = append(excluded, obj)
+			log.FromContext(ctx).Info("Excluded object: ", "obj", obj)
 		}
 	}
+
 	return filtered
 }
 
@@ -279,10 +287,10 @@ func (c *defaultCleanupManager) readGvkToExclude(ctx context.Context) []groupVer
 }
 
 func (g groupVersionKindName) matches(gvkn groupVersionKindName) bool {
-	return (gvkn.Gvk.Group == g.Gvk.Group || g.Gvk.Group == "*") &&
-		(gvkn.Gvk.Version == g.Gvk.Version || g.Gvk.Version == "*") &&
-		(gvkn.Gvk.Kind == g.Gvk.Kind || g.Gvk.Kind == "*") &&
-		(gvkn.Name == g.Name || g.Name == "*")
+	return (gvkn.Gvk.Group == g.Gvk.Group || g.Gvk.Group == "*" || g.Gvk.Group == "") &&
+		(gvkn.Gvk.Version == g.Gvk.Version || g.Gvk.Version == "*" || g.Gvk.Version == "") &&
+		(gvkn.Gvk.Kind == g.Gvk.Kind || g.Gvk.Kind == "*" || g.Gvk.Kind == "") &&
+		(gvkn.Name == g.Name || g.Name == "*" || g.Name == "")
 }
 
 func groupVersionKind(resource unstructured.Unstructured) groupVersionKindName {
