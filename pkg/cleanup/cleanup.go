@@ -21,6 +21,7 @@ import (
 const (
 	deleteVerb                   = "delete"
 	customResourceDefinitionKind = "CustomResourceDefinition"
+	endpointsKind                = "Endpoints"
 	veleroGroup                  = "velero.io"
 	configMapName                = "k8s-backup-operator-cleanup-exclude"
 )
@@ -157,7 +158,8 @@ func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 			resource.Version = gv.Version
 			include := len(resource.Verbs) != 0 && slices.Contains(resource.Verbs, deleteVerb)
 			exclude := resource.Kind == customResourceDefinitionKind || // Skip crd deletion because we need the component-crd.
-				resource.Group == veleroGroup // Skip velero resource deletion because we need those to restore.
+				resource.Group == veleroGroup || // Skip velero resource deletion because we need those to restore.
+				resource.Kind == endpointsKind // Skip endpoint resources deletion because they are deleted by services
 			if include && !exclude {
 				result = append(result, resource)
 			}
