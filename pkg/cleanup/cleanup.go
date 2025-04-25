@@ -123,19 +123,13 @@ func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *
 		if err != nil {
 			return []unstructured.Unstructured{}, fmt.Errorf("list objects of resource (%s): %w", gvk, err)
 		}
-		//exclude := resource.Kind == "Service" && resource.Name == "ces-loadbalancer"
 
 		result = append(result, objects.Items...)
 	}
 
 	gvksToExclude := c.readGvkToExclude(ctx)
 
-	log.FromContext(ctx).Info("-----Filter objects----")
-	log.FromContext(ctx).Info("Exclude config: ", "config", gvksToExclude)
-	log.FromContext(ctx).Info("Prev result list: ", "objects", result)
 	result = filterObjects(ctx, result, gvksToExclude)
-
-	log.FromContext(ctx).Info("Prev result list: ", "objects", result)
 
 	return result, nil
 }
@@ -171,13 +165,9 @@ func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 
 func filterObjects(ctx context.Context, objects []unstructured.Unstructured, gvksToExclude []groupVersionKindName) []unstructured.Unstructured {
 	filtered := []unstructured.Unstructured{}
-	excluded := []unstructured.Unstructured{}
 	for _, obj := range objects {
 		if !isObjectExcluded(obj, gvksToExclude) {
 			filtered = append(filtered, obj)
-		} else {
-			excluded = append(excluded, obj)
-			log.FromContext(ctx).Info("Excluded object: ", "obj", obj)
 		}
 	}
 
@@ -270,7 +260,7 @@ func (c *defaultCleanupManager) readGvkToExclude(ctx context.Context) []groupVer
 
 	err = yaml.Unmarshal([]byte(shouldBeExcludedString), &exclude)
 	if err != nil {
-		log.FromContext(ctx).Info("No ConfigMap found: %s", "configmapName", "k8s-backup-operator-cleanup-exclude")
+		log.FromContext(ctx).Info("failed to unmarshal config map")
 		return []groupVersionKindName{}
 	}
 	var shouldBeExcluded []groupVersionKindName
