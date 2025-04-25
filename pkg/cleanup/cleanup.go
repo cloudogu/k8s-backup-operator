@@ -129,7 +129,7 @@ func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *
 
 	gvksToExclude := c.readGvkToExclude(ctx)
 
-	result = filterObjects(ctx, result, gvksToExclude)
+	result = filterObjects(result, gvksToExclude)
 
 	return result, nil
 }
@@ -163,7 +163,7 @@ func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 	return result, nil
 }
 
-func filterObjects(ctx context.Context, objects []unstructured.Unstructured, gvksToExclude []groupVersionKindName) []unstructured.Unstructured {
+func filterObjects(objects []unstructured.Unstructured, gvksToExclude []groupVersionKindName) []unstructured.Unstructured {
 	filtered := []unstructured.Unstructured{}
 	for _, obj := range objects {
 		if !isObjectExcluded(obj, gvksToExclude) {
