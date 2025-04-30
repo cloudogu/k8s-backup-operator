@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- [#51] Set sensible resource requests and limits
+
 ## [v1.3.3] - 2025-04-10
 ### Fixed
 - [#44] Fixed resource ownerReferences after a restore of a previous backup
