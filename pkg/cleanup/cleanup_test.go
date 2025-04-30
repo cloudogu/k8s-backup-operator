@@ -2,16 +2,20 @@ package cleanup
 
 import (
 	"context"
+	"fmt"
+	"sync"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sync"
-	"testing"
 )
 
 func TestCleanUp(t *testing.T) {
@@ -53,8 +57,19 @@ func TestCleanUp(t *testing.T) {
 		notFoundError := errors.NewNotFound(schema.GroupResource{Group: "example.com", Resource: "Pod"}, "aName")
 		clientMock.EXPECT().Get(ctx, mock.Anything, mock.Anything).Return(notFoundError)
 
+		configMap := &corev1.ConfigMap{
+			Data: map[string]string{
+				"cleanup": `
+exclude:
+- group: k8s.example.com
+  version: v2
+  kind: MyKind
+  name: nothing
+`,
+			},
+		}
 		configMapClientMock := newMockConfigMapClient(t)
-		configMapClientMock.EXPECT().Get(ctx, "k8s-backup-operator-cleanup-exclude", mock.Anything).Return(nil, assert.AnError)
+		configMapClientMock.EXPECT().Get(ctx, "k8s-backup-operator-cleanup-exclude", mock.Anything).Return(configMap, nil)
 
 		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock, configMapClient: configMapClientMock}
 
@@ -205,8 +220,19 @@ func TestFindObjects(t *testing.T) {
 			return nil
 		})
 
+		configMap := &corev1.ConfigMap{
+			Data: map[string]string{
+				"cleanup": `
+exclude:
+- group: k8s.example.com
+  version: v2
+  kind: MyKind
+  name: nothing
+`,
+			},
+		}
 		configMapClientMock := newMockConfigMapClient(t)
-		configMapClientMock.EXPECT().Get(ctx, "k8s-backup-operator-cleanup-exclude", mock.Anything).Return(nil, assert.AnError)
+		configMapClientMock.EXPECT().Get(ctx, "k8s-backup-operator-cleanup-exclude", mock.Anything).Return(configMap, nil)
 
 		sut := &defaultCleanupManager{discoveryClient: discoveryMock, client: clientMock, configMapClient: configMapClientMock}
 
@@ -432,8 +458,8 @@ func TestWaitForObjectToBeDeleted(t *testing.T) {
 
 func Test_filterObjects(t *testing.T) {
 	type args struct {
-		objects       []unstructured.Unstructured
-		gvksToExclude []groupVersionKindName
+		objects   []unstructured.Unstructured
+		toExclude []ExcludeEntry
 	}
 	tests := []struct {
 		name string
@@ -447,14 +473,12 @@ func Test_filterObjects(t *testing.T) {
 					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer"}}},
 					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
 				},
-				gvksToExclude: []groupVersionKindName{
+				toExclude: []ExcludeEntry{
 					{
-						Name: "ces-loadbalancer",
-						Gvk: schema.GroupVersionKind{
-							Group:   "*",
-							Version: "*",
-							Kind:    "Service",
-						},
+						Name:    "ces-loadbalancer",
+						Group:   "*",
+						Version: "*",
+						Kind:    "Service",
 					},
 				},
 			},
@@ -467,14 +491,12 @@ func Test_filterObjects(t *testing.T) {
 					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer"}}},
 					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
 				},
-				gvksToExclude: []groupVersionKindName{
+				toExclude: []ExcludeEntry{
 					{
-						Name: "ces-loadbalancer",
-						Gvk: schema.GroupVersionKind{
-							Group:   "",
-							Version: "",
-							Kind:    "",
-						},
+						Name:    "ces-loadbalancer",
+						Group:   "*",
+						Version: "*",
+						Kind:    "*",
 					},
 				},
 			},
@@ -487,14 +509,12 @@ func Test_filterObjects(t *testing.T) {
 					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Service", "metadata": map[string]interface{}{"name": "ces-loadbalancer-service"}}},
 					{Object: map[string]interface{}{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]interface{}{"name": "test"}}},
 				},
-				gvksToExclude: []groupVersionKindName{
+				toExclude: []ExcludeEntry{
 					{
-						Name: "ces-loadbalancer",
-						Gvk: schema.GroupVersionKind{
-							Group:   "*",
-							Version: "*",
-							Kind:    "*",
-						},
+						Name:    "ces-loadbalancer",
+						Group:   "*",
+						Version: "*",
+						Kind:    "*",
 					},
 				},
 			},
@@ -506,7 +526,85 @@ func Test_filterObjects(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, filterObjects(tt.args.objects, tt.args.gvksToExclude), "filterObjects(%v, %v)", tt.args.objects, tt.args.gvksToExclude)
+			assert.Equalf(t, tt.want, filterObjects(tt.args.objects, tt.args.toExclude), "filterObjects(%v, %v)", tt.args.objects, tt.args.toExclude)
+		})
+	}
+}
+
+func Test_defaultCleanupManager_readEntriesToExclude(t *testing.T) {
+	tests := []struct {
+		name              string
+		configMapClientFn func(t *testing.T) configMapClient
+		want              []ExcludeEntry
+		wantErr           assert.ErrorAssertionFunc
+	}{
+		{
+			name: "should return nothing if configmap is not found",
+			configMapClientFn: func(t *testing.T) configMapClient {
+				cmMock := newMockConfigMapClient(t)
+				cmMock.EXPECT().Get(mock.Anything, "k8s-backup-operator-cleanup-exclude", metav1.GetOptions{}).
+					Return(nil, errors.NewNotFound(schema.GroupResource{}, "k8s-backup-operator-cleanup-exclude"))
+				return cmMock
+			},
+			want:    nil,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "should fail for any other error when getting configmap",
+			configMapClientFn: func(t *testing.T) configMapClient {
+				cmMock := newMockConfigMapClient(t)
+				cmMock.EXPECT().Get(mock.Anything, "k8s-backup-operator-cleanup-exclude", metav1.GetOptions{}).
+					Return(nil, assert.AnError)
+				return cmMock
+			},
+			want: nil,
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, assert.AnError, i) &&
+					assert.ErrorContains(t, err, "failed to get cleanup-exclude config", i)
+			},
+		},
+		{
+			name: "should fail to find cleanup key in configmap",
+			configMapClientFn: func(t *testing.T) configMapClient {
+				cmMock := newMockConfigMapClient(t)
+				configMap := &corev1.ConfigMap{}
+				cmMock.EXPECT().Get(mock.Anything, "k8s-backup-operator-cleanup-exclude", metav1.GetOptions{}).
+					Return(configMap, nil)
+				return cmMock
+			},
+			want: nil,
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorContains(t, err, "cleanup-exclude config did not contain key \"cleanup\"", i)
+			},
+		},
+		{
+			name: "should fail to unmarshal cleanup in configmap",
+			configMapClientFn: func(t *testing.T) configMapClient {
+				cmMock := newMockConfigMapClient(t)
+				configMap := &corev1.ConfigMap{
+					Data: map[string]string{"cleanup": "{{"},
+				}
+				cmMock.EXPECT().Get(mock.Anything, "k8s-backup-operator-cleanup-exclude", metav1.GetOptions{}).
+					Return(configMap, nil)
+				return cmMock
+			},
+			want: nil,
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorContains(t, err, "failed to unmarshal cleanup-exclude config", i)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &defaultCleanupManager{
+				configMapClient: tt.configMapClientFn(t),
+			}
+			ctx := context.TODO()
+			got, err := c.readEntriesToExclude(ctx)
+			if !tt.wantErr(t, err, fmt.Sprintf("readEntriesToExclude(%v)", ctx)) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "readEntriesToExclude(%v)", ctx)
 		})
 	}
 }

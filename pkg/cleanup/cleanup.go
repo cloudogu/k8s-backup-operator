@@ -3,8 +3,14 @@ package cleanup
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
+
 	"gopkg.in/yaml.v3"
+
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -13,9 +19,6 @@ import (
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -23,7 +26,7 @@ const (
 	customResourceDefinitionKind = "CustomResourceDefinition"
 	endpointsKind                = "Endpoints"
 	veleroGroup                  = "velero.io"
-	configMapName                = "k8s-backup-operator-cleanup-exclude"
+	excludeConfigMapName         = "k8s-backup-operator-cleanup-exclude"
 )
 
 var defaultCleanupSelector = &metav1.LabelSelector{
@@ -48,9 +51,16 @@ type ExcludeEntry struct {
 	Name    string `yaml:"name"`
 }
 
-type groupVersionKindName struct {
-	Gvk  schema.GroupVersionKind
-	Name string
+func (e ExcludeEntry) matches(item object) bool {
+	return (item.GroupVersionKind().Group == e.Group || e.Group == "*") &&
+		(item.GroupVersionKind().Version == e.Version || e.Version == "*") &&
+		(item.GroupVersionKind().Kind == e.Kind || e.Kind == "*") &&
+		(item.GetName() == e.Name || e.Name == "*")
+}
+
+type object interface {
+	GetName() string
+	GroupVersionKind() schema.GroupVersionKind
 }
 
 type defaultCleanupManager struct {
@@ -71,16 +81,17 @@ func (c *defaultCleanupManager) Cleanup(ctx context.Context) error {
 
 	objects, err := c.findObjects(ctx, defaultCleanupSelector)
 	if err != nil {
-		return fmt.Errorf("find object: %w", err)
+		return fmt.Errorf("failed to find object: %w", err)
 	}
+
 	for _, object := range objects {
 		err = c.removeFinalizers(ctx, &object)
 		if err != nil {
-			return objectErr("remove finalizer of object", object, err)
+			return objectErr("failed to remove finalizer of object", object, err)
 		}
 		err = c.deleteObject(ctx, &object)
 		if err != nil {
-			return objectErr("delete object namespace", object, err)
+			return objectErr("failed to delete object", object, err)
 		}
 		c.waitForObjectToBeDeleted(ctx, &object, &wg)
 	}
@@ -96,14 +107,14 @@ func objectErr(msg string, object unstructured.Unstructured, err error) error {
 func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *metav1.LabelSelector) ([]unstructured.Unstructured, error) {
 	resources, err := c.findResources()
 	if err != nil {
-		return []unstructured.Unstructured{}, fmt.Errorf("find resources: %w", err)
+		return []unstructured.Unstructured{}, fmt.Errorf("failed to find resources: %w", err)
 	}
 
 	var result []unstructured.Unstructured
 	for _, resource := range resources {
 		selector, err2 := metav1.LabelSelectorAsSelector(labelSelector)
 		if err2 != nil {
-			return []unstructured.Unstructured{}, fmt.Errorf("convert label selector: %w", err2)
+			return []unstructured.Unstructured{}, fmt.Errorf("failed to convert label selector: %w", err2)
 		}
 
 		objects := &unstructured.UnstructuredList{}
@@ -121,30 +132,31 @@ func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *
 
 		err = c.client.List(ctx, objects, &listOptions)
 		if err != nil {
-			return []unstructured.Unstructured{}, fmt.Errorf("list objects of resource (%s): %w", gvk, err)
+			return []unstructured.Unstructured{}, fmt.Errorf("failed to list objects of resource (%s): %w", gvk, err)
 		}
 
 		result = append(result, objects.Items...)
 	}
 
-	gvksToExclude := c.readGvkToExclude(ctx)
+	toExclude, err := c.readEntriesToExclude(ctx)
+	if err != nil {
+		return []unstructured.Unstructured{}, fmt.Errorf("failed to read entries to exclude objects: %w", err)
+	}
 
-	result = filterObjects(result, gvksToExclude)
-
-	return result, nil
+	return filterObjects(result, toExclude), nil
 }
 
 func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 	resourcesByGroupAndVersion, err := c.discoveryClient.ServerPreferredResources()
 	if err != nil {
-		return []metav1.APIResource{}, fmt.Errorf("fetching supported resources: %w", err)
+		return []metav1.APIResource{}, fmt.Errorf("failed fetching supported resources: %w", err)
 	}
 
 	var result []metav1.APIResource
 	for _, resourceList := range resourcesByGroupAndVersion {
 		gv, err2 := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err2 != nil {
-			return []metav1.APIResource{}, fmt.Errorf("parse group and version from string '%s': %w", resourceList.GroupVersion, err)
+			return []metav1.APIResource{}, fmt.Errorf("failed to parse group and version from string '%s': %w", resourceList.GroupVersion, err)
 		}
 
 		for _, resource := range resourceList.APIResources {
@@ -163,10 +175,10 @@ func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 	return result, nil
 }
 
-func filterObjects(objects []unstructured.Unstructured, gvksToExclude []groupVersionKindName) []unstructured.Unstructured {
-	filtered := []unstructured.Unstructured{}
+func filterObjects(objects []unstructured.Unstructured, toExclude []ExcludeEntry) []unstructured.Unstructured {
+	var filtered []unstructured.Unstructured
 	for _, obj := range objects {
-		if !isObjectExcluded(obj, gvksToExclude) {
+		if !isObjectExcluded(obj, toExclude) {
 			filtered = append(filtered, obj)
 		}
 	}
@@ -236,58 +248,36 @@ func (c *defaultCleanupManager) removeFinalizers(ctx context.Context, object cli
 	return err
 }
 
-func isObjectExcluded(resource unstructured.Unstructured, shouldBeExcluded []groupVersionKindName) bool {
-	resourceGvkn := groupVersionKind(resource)
-	for _, gvkn := range shouldBeExcluded {
-		if gvkn.matches(resourceGvkn) {
+func isObjectExcluded(resource unstructured.Unstructured, shouldBeExcluded []ExcludeEntry) bool {
+	for _, entry := range shouldBeExcluded {
+		if entry.matches(&resource) {
 			return true
 		}
 	}
 	return false
 }
 
-func (c *defaultCleanupManager) readGvkToExclude(ctx context.Context) []groupVersionKindName {
-	configMap, err := c.configMapClient.Get(ctx, configMapName, metav1.GetOptions{})
-	if err != nil {
-		log.FromContext(ctx).Info("No ConfigMap found: %s", "configmapName", "k8s-backup-operator-cleanup-exclude")
-		return []groupVersionKindName{}
+func (c *defaultCleanupManager) readEntriesToExclude(ctx context.Context) ([]ExcludeEntry, error) {
+	configMap, err := c.configMapClient.Get(ctx, excludeConfigMapName, metav1.GetOptions{})
+	if err != nil && k8sErr.IsNotFound(err) {
+		log.FromContext(ctx).Info("No ConfigMap found: %s", "configmapName", excludeConfigMapName)
+		return nil, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get cleanup-exclude config: %w", err)
 	}
 
-	shouldBeExcludedString := configMap.Data["cleanup"]
+	shouldBeExcludedString, ok := configMap.Data["cleanup"]
+	if !ok {
+		return nil, fmt.Errorf("cleanup-exclude config did not contain key \"cleanup\"")
+	}
+
 	var exclude struct {
 		Exclude []ExcludeEntry `yaml:"exclude"`
 	}
-
 	err = yaml.Unmarshal([]byte(shouldBeExcludedString), &exclude)
 	if err != nil {
-		log.FromContext(ctx).Info("failed to unmarshal config map")
-		return []groupVersionKindName{}
+		return nil, fmt.Errorf("failed to unmarshal cleanup-exclude config: %w", err)
 	}
-	var shouldBeExcluded []groupVersionKindName
-	for _, entry := range exclude.Exclude {
-		gvk := schema.GroupVersionKind{
-			Group:   entry.Group,
-			Version: entry.Version,
-			Kind:    entry.Kind,
-		}
-		shouldBeExcluded = append(shouldBeExcluded, groupVersionKindName{
-			Gvk:  gvk,
-			Name: entry.Name,
-		})
-	}
-	return shouldBeExcluded
-}
 
-func (g groupVersionKindName) matches(gvkn groupVersionKindName) bool {
-	return (gvkn.Gvk.Group == g.Gvk.Group || g.Gvk.Group == "*" || g.Gvk.Group == "") &&
-		(gvkn.Gvk.Version == g.Gvk.Version || g.Gvk.Version == "*" || g.Gvk.Version == "") &&
-		(gvkn.Gvk.Kind == g.Gvk.Kind || g.Gvk.Kind == "*" || g.Gvk.Kind == "") &&
-		(gvkn.Name == g.Name || g.Name == "*" || g.Name == "")
-}
-
-func groupVersionKind(resource unstructured.Unstructured) groupVersionKindName {
-	return groupVersionKindName{
-		Gvk:  resource.GroupVersionKind(),
-		Name: resource.GetName(),
-	}
+	return exclude.Exclude, nil
 }
