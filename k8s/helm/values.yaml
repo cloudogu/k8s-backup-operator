@@ -6,6 +6,11 @@ global:
 retention:
   strategy: keepAll
   garbageCollectionCron: "0 * * * *"
+cleanup:
+  exclude: # group, version, kind, name
+    - name: "ces-loadbalancer"
+      kind: "Service"
+      version: "v1"
 manager:
   env:
     stage: production
