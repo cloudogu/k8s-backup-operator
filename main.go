@@ -306,7 +306,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	}
 
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
-	cleanupManager := cleanup.NewManager(operatorConfig.Namespace, k8sManager.GetClient(), k8sClientSet)
+	cleanupManager := cleanup.NewManager(operatorConfig.Namespace, k8sManager.GetClient(), k8sClientSet, configMapClient)
 	restoreManager := restore.NewRestoreManager(
 		ecosystemClientSet,
 		operatorConfig.Namespace,

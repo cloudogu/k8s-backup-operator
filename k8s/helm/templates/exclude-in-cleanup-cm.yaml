@@ -1,0 +1,11 @@
+{{- if .Values.cleanup }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-backup-operator-cleanup-exclude
+  labels:
+    {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+data:
+  cleanup: |
+      {{- toYaml .Values.cleanup | nindent 4 }}
+{{- end }}

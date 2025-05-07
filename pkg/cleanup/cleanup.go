@@ -3,7 +3,14 @@ package cleanup
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
+
+	"gopkg.in/yaml.v3"
+
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -12,15 +19,14 @@ import (
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (
 	deleteVerb                   = "delete"
 	customResourceDefinitionKind = "CustomResourceDefinition"
+	endpointsKind                = "Endpoints"
 	veleroGroup                  = "velero.io"
+	excludeConfigMapName         = "k8s-backup-operator-cleanup-exclude"
 )
 
 var defaultCleanupSelector = &metav1.LabelSelector{
@@ -38,15 +44,35 @@ var defaultCleanupSelector = &metav1.LabelSelector{
 	},
 }
 
+type ExcludeEntry struct {
+	Group   string `yaml:"group"`
+	Version string `yaml:"version"`
+	Kind    string `yaml:"kind"`
+	Name    string `yaml:"name"`
+}
+
+func (e ExcludeEntry) matches(item object) bool {
+	return (item.GroupVersionKind().Group == e.Group || e.Group == "*") &&
+		(item.GroupVersionKind().Version == e.Version || e.Version == "*") &&
+		(item.GroupVersionKind().Kind == e.Kind || e.Kind == "*") &&
+		(item.GetName() == e.Name || e.Name == "*")
+}
+
+type object interface {
+	GetName() string
+	GroupVersionKind() schema.GroupVersionKind
+}
+
 type defaultCleanupManager struct {
 	namespace       string
 	client          k8sClient
 	discoveryClient discoveryInterface
+	configMapClient configMapClient
 }
 
 // NewManager creates a new instance of defaultCleanupManager.
-func NewManager(namespace string, client k8sClient, discoveryClient discoveryInterface) Manager {
-	return &defaultCleanupManager{namespace: namespace, client: client, discoveryClient: discoveryClient}
+func NewManager(namespace string, client k8sClient, discoveryClient discoveryInterface, configMapClient configMapClient) Manager {
+	return &defaultCleanupManager{namespace: namespace, client: client, discoveryClient: discoveryClient, configMapClient: configMapClient}
 }
 
 // Cleanup deletes all components with labels app=ces and not k8s.cloudogu.com/part-of=backup.
@@ -55,16 +81,17 @@ func (c *defaultCleanupManager) Cleanup(ctx context.Context) error {
 
 	objects, err := c.findObjects(ctx, defaultCleanupSelector)
 	if err != nil {
-		return fmt.Errorf("find object: %w", err)
+		return fmt.Errorf("failed to find object: %w", err)
 	}
+
 	for _, object := range objects {
 		err = c.removeFinalizers(ctx, &object)
 		if err != nil {
-			return objectErr("remove finalizer of object", object, err)
+			return objectErr("failed to remove finalizer of object", object, err)
 		}
 		err = c.deleteObject(ctx, &object)
 		if err != nil {
-			return objectErr("delete object namespace", object, err)
+			return objectErr("failed to delete object", object, err)
 		}
 		c.waitForObjectToBeDeleted(ctx, &object, &wg)
 	}
@@ -74,20 +101,20 @@ func (c *defaultCleanupManager) Cleanup(ctx context.Context) error {
 }
 
 func objectErr(msg string, object unstructured.Unstructured, err error) error {
-	return fmt.Errorf("%s: namespace=%s, kind=%s, name=%s: %w", msg, object.GetNamespace(), object.GetKind(), object.GetName(), err)
+	return fmt.Errorf("%s: namespace=%s, kind=%s, Name=%s: %w", msg, object.GetNamespace(), object.GetKind(), object.GetName(), err)
 }
 
 func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *metav1.LabelSelector) ([]unstructured.Unstructured, error) {
 	resources, err := c.findResources()
 	if err != nil {
-		return []unstructured.Unstructured{}, fmt.Errorf("find resources: %w", err)
+		return []unstructured.Unstructured{}, fmt.Errorf("failed to find resources: %w", err)
 	}
 
 	var result []unstructured.Unstructured
 	for _, resource := range resources {
 		selector, err2 := metav1.LabelSelectorAsSelector(labelSelector)
 		if err2 != nil {
-			return []unstructured.Unstructured{}, fmt.Errorf("convert label selector: %w", err2)
+			return []unstructured.Unstructured{}, fmt.Errorf("failed to convert label selector: %w", err2)
 		}
 
 		objects := &unstructured.UnstructuredList{}
@@ -105,26 +132,31 @@ func (c *defaultCleanupManager) findObjects(ctx context.Context, labelSelector *
 
 		err = c.client.List(ctx, objects, &listOptions)
 		if err != nil {
-			return []unstructured.Unstructured{}, fmt.Errorf("list objects of resource (%s): %w", gvk, err)
+			return []unstructured.Unstructured{}, fmt.Errorf("failed to list objects of resource (%s): %w", gvk, err)
 		}
 
 		result = append(result, objects.Items...)
 	}
 
-	return result, nil
+	toExclude, err := c.readEntriesToExclude(ctx)
+	if err != nil {
+		return []unstructured.Unstructured{}, fmt.Errorf("failed to read entries to exclude objects: %w", err)
+	}
+
+	return filterObjects(result, toExclude), nil
 }
 
 func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 	resourcesByGroupAndVersion, err := c.discoveryClient.ServerPreferredResources()
 	if err != nil {
-		return []metav1.APIResource{}, fmt.Errorf("fetching supported resources: %w", err)
+		return []metav1.APIResource{}, fmt.Errorf("failed fetching supported resources: %w", err)
 	}
 
 	var result []metav1.APIResource
 	for _, resourceList := range resourcesByGroupAndVersion {
 		gv, err2 := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err2 != nil {
-			return []metav1.APIResource{}, fmt.Errorf("parse group and version from string '%s': %w", resourceList.GroupVersion, err)
+			return []metav1.APIResource{}, fmt.Errorf("failed to parse group and version from string '%s': %w", resourceList.GroupVersion, err)
 		}
 
 		for _, resource := range resourceList.APIResources {
@@ -132,7 +164,8 @@ func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 			resource.Version = gv.Version
 			include := len(resource.Verbs) != 0 && slices.Contains(resource.Verbs, deleteVerb)
 			exclude := resource.Kind == customResourceDefinitionKind || // Skip crd deletion because we need the component-crd.
-				resource.Group == veleroGroup // Skip velero resource deletion because we need those to restore.
+				resource.Group == veleroGroup || // Skip velero resource deletion because we need those to restore.
+				resource.Kind == endpointsKind // Skip endpoint resources deletion because they are deleted by services
 			if include && !exclude {
 				result = append(result, resource)
 			}
@@ -140,6 +173,17 @@ func (c *defaultCleanupManager) findResources() ([]metav1.APIResource, error) {
 	}
 
 	return result, nil
+}
+
+func filterObjects(objects []unstructured.Unstructured, toExclude []ExcludeEntry) []unstructured.Unstructured {
+	var filtered []unstructured.Unstructured
+	for _, obj := range objects {
+		if !isObjectExcluded(obj, toExclude) {
+			filtered = append(filtered, obj)
+		}
+	}
+
+	return filtered
 }
 
 func (c *defaultCleanupManager) deleteObject(ctx context.Context, object client.Object) error {
@@ -163,7 +207,7 @@ func (c *defaultCleanupManager) waitForObjectToBeDeleted(ctx context.Context, ob
 			} else {
 				break
 			}
-			log.FromContext(ctx).Info("Wait for object to be deleted", "ns", object.GetNamespace(), "name", object.GetName(), "gvk", object.GetObjectKind().GroupVersionKind())
+			log.FromContext(ctx).Info("Wait for object to be deleted", "ns", object.GetNamespace(), "Name", object.GetName(), "Gvk", object.GetObjectKind().GroupVersionKind())
 		}
 	}()
 }
@@ -202,4 +246,38 @@ func (c *defaultCleanupManager) removeFinalizers(ctx context.Context, object cli
 		return c.client.Update(ctx, object)
 	})
 	return err
+}
+
+func isObjectExcluded(resource unstructured.Unstructured, shouldBeExcluded []ExcludeEntry) bool {
+	for _, entry := range shouldBeExcluded {
+		if entry.matches(&resource) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *defaultCleanupManager) readEntriesToExclude(ctx context.Context) ([]ExcludeEntry, error) {
+	configMap, err := c.configMapClient.Get(ctx, excludeConfigMapName, metav1.GetOptions{})
+	if err != nil && k8sErr.IsNotFound(err) {
+		log.FromContext(ctx).Info("No ConfigMap found: %s", "configmapName", excludeConfigMapName)
+		return nil, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get cleanup-exclude config: %w", err)
+	}
+
+	shouldBeExcludedString, ok := configMap.Data["cleanup"]
+	if !ok {
+		return nil, fmt.Errorf("cleanup-exclude config did not contain key \"cleanup\"")
+	}
+
+	var exclude struct {
+		Exclude []ExcludeEntry `yaml:"exclude"`
+	}
+	err = yaml.Unmarshal([]byte(shouldBeExcludedString), &exclude)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal cleanup-exclude config: %w", err)
+	}
+
+	return exclude.Exclude, nil
 }

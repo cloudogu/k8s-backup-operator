@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.4.0] - 2025-05-07
+### Added
+- [#50] Exclude resources in cleanup before restore
+
 ## [v1.3.4] - 2025-04-30
 
 ### Changed

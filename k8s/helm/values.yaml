@@ -6,6 +6,11 @@ global:
 retention:
   strategy: keepAll
   garbageCollectionCron: "0 * * * *"
+cleanup:
+  exclude: # group, version, kind, name
+    - name: "ces-loadbalancer"
+      kind: "Service"
+      version: "v1"
 manager:
   env:
     stage: production
@@ -13,7 +18,7 @@ manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-backup-operator
-    tag: 1.3.4
+    tag: 1.4.0
   imagePullPolicy: IfNotPresent
   resources:
     limits:
