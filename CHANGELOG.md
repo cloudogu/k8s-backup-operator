@@ -10,8 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Previously, the Velero deployment would get restored as well,
     which caused disruptions of the restore if the deployment is different
     from the one in the backup.
+- [#56] Cleanup of backup components lead to errors after restore
+  - This is because the component operator would detect a downgrade, which is not allowed.
+    Or worse, an upgrade during the restore operation would cause it to fail.
 ### Changed
 - [#54] Exclude all resources with label `k8s.cloudogu.com/part-of: backup` from restores.
+- [#56] Exclude all backup-related components from cleanup when restoring.
 
 ## [v1.4.0] - 2025-05-07
 ### Added
