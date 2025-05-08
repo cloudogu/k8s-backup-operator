@@ -188,10 +188,11 @@ func getExpectedVeleroRestore(restore *v1.Restore) *velerov1.Restore {
 			BackupName:             restore.Spec.BackupName,
 			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
 			RestoreStatus:          &velerov1.RestoreStatusSpec{IncludedResources: []string{"*"}},
-			LabelSelector: &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{Key: "app.kubernetes.io/name", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"k8s-backup-operator"}},
-					{Key: "app.kubernetes.io/part-of", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"k8s-backup-operator"}}}}}}
+			LabelSelector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+				{Key: "k8s.cloudogu.com/part-of", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"backup"}},
+			}},
+		},
+	}
 }
 
 func runVeleroStatusPhaseFailureTest(t *testing.T, phase velerov1.RestorePhase) {

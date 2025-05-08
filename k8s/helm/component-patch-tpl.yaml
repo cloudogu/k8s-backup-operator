@@ -1,7 +1,7 @@
 apiVersion: v1
 values:
   images:
-    backupOperator: cloudogu/k8s-backup-operator:1.4.0
+    backupOperator: cloudogu/k8s-backup-operator:1.4.1
 patches:
   values.yaml:
     manager:
