@@ -38,15 +38,11 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 				// Filter backup-operator from restore.
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
-						Key:      "app.kubernetes.io/name",
+						Key:      "k8s.cloudogu.com/part-of",
 						Operator: metav1.LabelSelectorOpNotIn,
-						Values:   []string{"k8s-backup-operator"},
+						Values:   []string{"backup"},
 					},
-					{
-						Key:      "app.kubernetes.io/part-of",
-						Operator: metav1.LabelSelectorOpNotIn,
-						Values:   []string{"k8s-backup-operator"},
-					}},
+				},
 			},
 		},
 	}
@@ -103,6 +99,8 @@ func waitForRestoreCompletionOrFailure(ctx context.Context, veleroRestoreChan <-
 			case velerov1.RestorePhaseCompleted:
 				return nil
 			}
+		case watch.Error:
+			return fmt.Errorf("")
 		}
 	}
 

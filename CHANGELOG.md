@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- [#54] Restore of the velero deployment disrupted the restore
+  - Previously, the Velero deployment would get restored as well,
+    which caused disruptions of the restore if the deployment is different
+    from the one in the backup.
+### Changed
+- [#54] Exclude all resources with label `k8s.cloudogu.com/part-of: backup` from restores.
 
 ## [v1.4.0] - 2025-05-07
 ### Added
