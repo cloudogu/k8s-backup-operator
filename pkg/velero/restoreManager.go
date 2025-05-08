@@ -99,8 +99,6 @@ func waitForRestoreCompletionOrFailure(ctx context.Context, veleroRestoreChan <-
 			case velerov1.RestorePhaseCompleted:
 				return nil
 			}
-		case watch.Error:
-			return fmt.Errorf("")
 		}
 	}
 
