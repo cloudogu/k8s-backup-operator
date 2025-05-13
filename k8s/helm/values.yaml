@@ -11,6 +11,9 @@ cleanup:
     - name: "ces-loadbalancer"
       kind: "Service"
       version: "*"
+    - name: "ecosystem-certificate"
+      kind: "Secret"
+      version: "*"
     - name: "k8s-backup-operator"
       kind: "Component"
       version: "*"
@@ -38,7 +41,7 @@ manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-backup-operator
-    tag: 1.4.1
+    tag: 1.4.2
   imagePullPolicy: IfNotPresent
   resources:
     limits:

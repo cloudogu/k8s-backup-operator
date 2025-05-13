@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.4.2] - 2025-05-13
+### Fixed
+- [#59] Restore of an old ecosystem-certificate could make the ecosystem unavailable
+### Changed
+- [#59] Exclude ecosystem-certificate from cleanup
+
 ## [v1.4.1] - 2025-05-08
 ### Fixed
 - [#54] Restore of the velero deployment disrupted the restore
