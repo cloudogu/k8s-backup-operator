@@ -151,7 +151,7 @@ func (_c *mockConfigMapClient_Create_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// Delete provides a mock function with given fields: ctx, Name, opts
+// Delete provides a mock function with given fields: ctx, name, opts
 func (_m *mockConfigMapClient) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	ret := _m.Called(ctx, name, opts)
 
@@ -176,7 +176,7 @@ type mockConfigMapClient_Delete_Call struct {
 
 // Delete is a helper method to define mock.On call
 //   - ctx context.Context
-//   - Name string
+//   - name string
 //   - opts metav1.DeleteOptions
 func (_e *mockConfigMapClient_Expecter) Delete(ctx interface{}, name interface{}, opts interface{}) *mockConfigMapClient_Delete_Call {
 	return &mockConfigMapClient_Delete_Call{Call: _e.mock.On("Delete", ctx, name, opts)}
@@ -247,7 +247,7 @@ func (_c *mockConfigMapClient_DeleteCollection_Call) RunAndReturn(run func(conte
 	return _c
 }
 
-// Get provides a mock function with given fields: ctx, Name, opts
+// Get provides a mock function with given fields: ctx, name, opts
 func (_m *mockConfigMapClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.ConfigMap, error) {
 	ret := _m.Called(ctx, name, opts)
 
@@ -284,7 +284,7 @@ type mockConfigMapClient_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - ctx context.Context
-//   - Name string
+//   - name string
 //   - opts metav1.GetOptions
 func (_e *mockConfigMapClient_Expecter) Get(ctx interface{}, name interface{}, opts interface{}) *mockConfigMapClient_Get_Call {
 	return &mockConfigMapClient_Get_Call{Call: _e.mock.On("Get", ctx, name, opts)}
@@ -366,7 +366,7 @@ func (_c *mockConfigMapClient_List_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
-// Patch provides a mock function with given fields: ctx, Name, pt, data, opts, subresources
+// Patch provides a mock function with given fields: ctx, name, pt, data, opts, subresources
 func (_m *mockConfigMapClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*corev1.ConfigMap, error) {
 	_va := make([]interface{}, len(subresources))
 	for _i := range subresources {
@@ -410,7 +410,7 @@ type mockConfigMapClient_Patch_Call struct {
 
 // Patch is a helper method to define mock.On call
 //   - ctx context.Context
-//   - Name string
+//   - name string
 //   - pt types.PatchType
 //   - data []byte
 //   - opts metav1.PatchOptions
