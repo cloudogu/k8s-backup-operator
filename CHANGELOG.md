@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.4.3] - 2025-05-14
+### Changed
+- [#57] Update k8s-io-libs to v0.33.0
+
 ## [v1.4.2] - 2025-05-13
 ### Fixed
 - [#59] Restore of an old ecosystem-certificate could make the ecosystem unavailable
