@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // EventRecorder provides functionality to commit events to kubernetes resources.
@@ -31,6 +31,6 @@ type Provider interface {
 	SyncBackupStatus(ctx context.Context, backup *v1.Backup) error
 }
 
-type EcosystemClientSet interface {
-	ecosystem.Interface
+type K8sClient interface {
+	client.WithWatch
 }

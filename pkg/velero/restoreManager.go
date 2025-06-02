@@ -8,18 +8,20 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type defaultRestoreManager struct {
-	veleroClientSet veleroClientSet
-	recorder        eventRecorder
+	k8sClient k8sWatchClient
+	recorder  eventRecorder
 }
 
 // newDefaultRestoreManager creates a new instance of defaultRestoreManager.
-func newDefaultRestoreManager(veleroClientSet veleroClientSet, recorder eventRecorder) *defaultRestoreManager {
-	return &defaultRestoreManager{veleroClientSet: veleroClientSet, recorder: recorder}
+func newDefaultRestoreManager(k8sClient k8sWatchClient, recorder eventRecorder) *defaultRestoreManager {
+	return &defaultRestoreManager{k8sClient: k8sClient, recorder: recorder}
 }
 
 // CreateRestore creates a restore according to the restore configuration in v1.Restore.
@@ -46,13 +48,17 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 			},
 		},
 	}
-
-	_, err := rm.veleroClientSet.VeleroV1().Restores(restore.Namespace).Create(ctx, veleroRestore, metav1.CreateOptions{})
+	err := rm.k8sClient.Create(ctx, veleroRestore)
 	if err != nil {
 		return rm.handleFailedRestore(restore, fmt.Errorf("failed to create velero restore [%s]: %w", veleroRestore.Name, err))
 	}
 
-	watcher, err := rm.veleroClientSet.VeleroV1().Restores(veleroRestore.Namespace).Watch(ctx, metav1.ListOptions{FieldSelector: restore.GetFieldSelectorWithName()})
+	selector, err := fields.ParseSelector(restore.GetFieldSelectorWithName())
+	if err != nil {
+		return rm.handleFailedRestore(restore, fmt.Errorf("failed to parse selector %q: %w", restore, err))
+	}
+
+	watcher, err := rm.k8sClient.Watch(ctx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: selector})
 	if err != nil {
 		return rm.handleFailedRestore(restore, fmt.Errorf("failed to create velero restore watch: %w", err))
 	}
@@ -110,7 +116,7 @@ func (rm *defaultRestoreManager) DeleteRestore(ctx context.Context, restore *v1.
 	logger := log.FromContext(ctx)
 	rm.recorder.Event(restore, corev1.EventTypeNormal, v1.DeleteEventReason, "Using velero as restore provider")
 
-	err := rm.veleroClientSet.VeleroV1().Restores(restore.Namespace).Delete(ctx, restore.Name, metav1.DeleteOptions{})
+	err := rm.k8sClient.Delete(ctx, restore)
 	if errors.IsNotFound(err) {
 		logger.Info(fmt.Sprintf("velero restore resource [%s] not found: ignore", restore.Name))
 		return nil

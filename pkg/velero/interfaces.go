@@ -2,27 +2,21 @@ package velero
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/record"
-
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 )
 
 type eventRecorder interface {
 	record.EventRecorder
 }
 
-type veleroClientSet interface {
-	versioned.Interface
-}
-
-type ecosystemClientSet interface {
-	ecosystem.Interface
+type k8sWatchClient interface {
+	client.WithWatch
 }
 
 type manager interface {
