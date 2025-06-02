@@ -3,7 +3,9 @@ package velero
 import (
 	"context"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 	"time"
 
@@ -40,16 +42,12 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 				DefaultVolumesToFsBackup: &volumeFsBackup,
 			},
 		}
-		mockVeleroBackupClient := newMockVeleroBackupInterface(t)
-		mockVeleroBackupClient.EXPECT().Create(testCtx, expectedVeleroBackup, metav1.CreateOptions{}).Return(nil, assert.AnError)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().Backups(testNamespace).Return(mockVeleroBackupClient)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroBackup).Return(assert.AnError)
 
 		sut := &defaultBackupManager{
-			recorder:        mockRecorder,
-			veleroClientSet: mockVeleroClient,
+			recorder:  mockRecorder,
+			k8sClient: mockK8sWatchClient,
 		}
 
 		// when
@@ -78,17 +76,16 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 				DefaultVolumesToFsBackup: &volumeFsBackup,
 			},
 		}
-		mockBackupInterface := newMockVeleroBackupInterface(t)
-		mockBackupInterface.EXPECT().Create(testCtx, expectedVeleroBackup, metav1.CreateOptions{}).Return(expectedVeleroBackup, nil)
-		mockBackupInterface.EXPECT().Watch(testCtx, metav1.ListOptions{FieldSelector: testBackup.GetFieldSelectorWithName()}).Return(nil, assert.AnError)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().Backups(testNamespace).Return(mockBackupInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroBackup).Return(nil)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.BackupList{},
+			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie(testBackup.GetFieldSelectorWithName()), Namespace: testNamespace}).
+			Return(nil, assert.AnError)
 
 		sut := &defaultBackupManager{
-			recorder:        mockRecorder,
-			veleroClientSet: mockVeleroClient,
+			recorder:  mockRecorder,
+			k8sClient: mockK8sWatchClient,
 		}
 
 		// when
@@ -119,22 +116,20 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		}
 
 		resultChan := make(chan watch.Event)
-		mockWatcher := newMockEcosystemWatch(t)
+		mockWatcher := newMockWatchInterface(t)
 		mockWatcher.EXPECT().ResultChan().Return(resultChan)
 		mockWatcher.EXPECT().Stop().Run(func() {
 			close(resultChan)
 		})
-		mockBackupInterface := newMockVeleroBackupInterface(t)
-		mockBackupInterface.EXPECT().Create(testCtx, expectedVeleroBackup, metav1.CreateOptions{}).Return(expectedVeleroBackup, nil)
-		mockBackupInterface.EXPECT().Watch(testCtx, metav1.ListOptions{FieldSelector: testBackup.GetFieldSelectorWithName()}).Return(mockWatcher, nil)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().Backups(testNamespace).Return(mockBackupInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroBackup).Return(nil)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.BackupList{},
+			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie(testBackup.GetFieldSelectorWithName()), Namespace: testNamespace}).
+			Return(mockWatcher, nil)
 
 		sut := &defaultBackupManager{
-			recorder:        mockRecorder,
-			veleroClientSet: mockVeleroClient,
+			recorder:  mockRecorder,
+			k8sClient: mockK8sWatchClient,
 		}
 
 		go func() {
@@ -174,22 +169,20 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		}
 
 		resultChan := make(chan watch.Event)
-		mockWatcher := newMockEcosystemWatch(t)
+		mockWatcher := newMockWatchInterface(t)
 		mockWatcher.EXPECT().ResultChan().Return(resultChan)
 		mockWatcher.EXPECT().Stop().Run(func() {
 			close(resultChan)
 		})
-		mockBackupInterface := newMockVeleroBackupInterface(t)
-		mockBackupInterface.EXPECT().Create(testCtx, expectedVeleroBackup, metav1.CreateOptions{}).Return(expectedVeleroBackup, nil)
-		mockBackupInterface.EXPECT().Watch(testCtx, metav1.ListOptions{FieldSelector: testBackup.GetFieldSelectorWithName()}).Return(mockWatcher, nil)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().Backups(testNamespace).Return(mockBackupInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroBackup).Return(nil)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.BackupList{},
+			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie(testBackup.GetFieldSelectorWithName()), Namespace: testNamespace}).
+			Return(mockWatcher, nil)
 
 		sut := &defaultBackupManager{
-			recorder:        mockRecorder,
-			veleroClientSet: mockVeleroClient,
+			recorder:  mockRecorder,
+			k8sClient: mockK8sWatchClient,
 		}
 
 		go func() {
@@ -230,22 +223,20 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		}
 
 		resultChan := make(chan watch.Event)
-		mockWatcher := newMockEcosystemWatch(t)
+		mockWatcher := newMockWatchInterface(t)
 		mockWatcher.EXPECT().ResultChan().Return(resultChan)
 		mockWatcher.EXPECT().Stop().Run(func() {
 			close(resultChan)
 		})
-		mockBackupInterface := newMockVeleroBackupInterface(t)
-		mockBackupInterface.EXPECT().Create(testCtx, expectedVeleroBackup, metav1.CreateOptions{}).Return(expectedVeleroBackup, nil)
-		mockBackupInterface.EXPECT().Watch(testCtx, metav1.ListOptions{FieldSelector: testBackup.GetFieldSelectorWithName()}).Return(mockWatcher, nil)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().Backups(testNamespace).Return(mockBackupInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroBackup).Return(nil)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.BackupList{},
+			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie(testBackup.GetFieldSelectorWithName()), Namespace: testNamespace}).
+			Return(mockWatcher, nil)
 
 		sut := &defaultBackupManager{
-			recorder:        mockRecorder,
-			veleroClientSet: mockVeleroClient,
+			recorder:  mockRecorder,
+			k8sClient: mockK8sWatchClient,
 		}
 
 		go func() {
@@ -286,22 +277,20 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		}
 
 		resultChan := make(chan watch.Event)
-		mockWatcher := newMockEcosystemWatch(t)
+		mockWatcher := newMockWatchInterface(t)
 		mockWatcher.EXPECT().ResultChan().Return(resultChan)
 		mockWatcher.EXPECT().Stop().Run(func() {
 			close(resultChan)
 		})
-		mockBackupInterface := newMockVeleroBackupInterface(t)
-		mockBackupInterface.EXPECT().Create(testCtx, expectedVeleroBackup, metav1.CreateOptions{}).Return(expectedVeleroBackup, nil)
-		mockBackupInterface.EXPECT().Watch(testCtx, metav1.ListOptions{FieldSelector: testBackup.GetFieldSelectorWithName()}).Return(mockWatcher, nil)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().Backups(testNamespace).Return(mockBackupInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroBackup).Return(nil)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.BackupList{},
+			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie(testBackup.GetFieldSelectorWithName()), Namespace: testNamespace}).
+			Return(mockWatcher, nil)
 
 		sut := &defaultBackupManager{
-			recorder:        mockRecorder,
-			veleroClientSet: mockVeleroClient,
+			recorder:  mockRecorder,
+			k8sClient: mockK8sWatchClient,
 		}
 
 		go func() {
@@ -547,6 +536,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to delete backup")
 	})
+
 }
 
 func getVeleroDeleteBackupRequest(name, namespace string) *velerov1.DeleteBackupRequest {

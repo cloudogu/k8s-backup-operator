@@ -16,9 +16,10 @@ func TestNewBackupManager(t *testing.T) {
 		corev1Client.EXPECT().ConfigMaps(mock.Anything).Return(configMapMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().CoreV1().Return(corev1Client)
+		clientMock := newMockK8sClient(t)
 
 		// when
-		manager := NewBackupManager(clientSetMock, testNamespace, nil, globalConfigRepositoryMock, ownerReferenceBackupMock)
+		manager := NewBackupManager(clientMock, clientSetMock, testNamespace, nil, globalConfigRepositoryMock, ownerReferenceBackupMock)
 
 		// then
 		require.NotNil(t, manager)

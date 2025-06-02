@@ -19,18 +19,18 @@ func Test_backupStatusSyncManager_syncStatus(t *testing.T) {
 
 		oldVeleroProviderFunc := provider.NewVeleroProvider
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderFunc }()
-		provider.NewVeleroProvider = func(_ provider.EcosystemClientSet, _ provider.EventRecorder, _ string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(_ provider.K8sClient, _ provider.EventRecorder, _ string) (provider.Provider, error) {
 			return nil, assert.AnError
 		}
 
-		clientSetMock := newMockEcosystemInterface(t)
+		clientMock := newMockK8sClient(t)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(testBackup, "Normal", "SyncStatus", "Syncing status of backup \"test-backup\" with its corresponding provider backup")
 
 		sut := &backupStatusSyncManager{
 			namespace: testNamespace,
-			clientSet: clientSetMock,
+			k8sClient: clientMock,
 			recorder:  recorderMock,
 		}
 
@@ -51,18 +51,18 @@ func Test_backupStatusSyncManager_syncStatus(t *testing.T) {
 		providerMock.EXPECT().SyncBackupStatus(testCtx, testBackup).Return(assert.AnError)
 		oldVeleroProviderFunc := provider.NewVeleroProvider
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderFunc }()
-		provider.NewVeleroProvider = func(_ provider.EcosystemClientSet, _ provider.EventRecorder, _ string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(_ provider.K8sClient, _ provider.EventRecorder, _ string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 
-		clientSetMock := newMockEcosystemInterface(t)
+		clientMock := newMockK8sClient(t)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(testBackup, "Normal", "SyncStatus", "Syncing status of backup \"test-backup\" with its corresponding provider backup")
 
 		sut := &backupStatusSyncManager{
 			namespace: testNamespace,
-			clientSet: clientSetMock,
+			k8sClient: clientMock,
 			recorder:  recorderMock,
 		}
 
@@ -83,11 +83,11 @@ func Test_backupStatusSyncManager_syncStatus(t *testing.T) {
 		providerMock.EXPECT().SyncBackupStatus(testCtx, testBackup).Return(nil)
 		oldVeleroProviderFunc := provider.NewVeleroProvider
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderFunc }()
-		provider.NewVeleroProvider = func(_ provider.EcosystemClientSet, _ provider.EventRecorder, _ string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(_ provider.K8sClient, _ provider.EventRecorder, _ string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 
-		clientSetMock := newMockEcosystemInterface(t)
+		clientMock := newMockK8sClient(t)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(testBackup, "Normal", "SyncStatus", "Syncing status of backup \"test-backup\" with its corresponding provider backup")
@@ -95,7 +95,7 @@ func Test_backupStatusSyncManager_syncStatus(t *testing.T) {
 
 		sut := &backupStatusSyncManager{
 			namespace: testNamespace,
-			clientSet: clientSetMock,
+			k8sClient: clientMock,
 			recorder:  recorderMock,
 		}
 

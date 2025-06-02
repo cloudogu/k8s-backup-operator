@@ -28,9 +28,10 @@ func TestNewBackupCreateManager(t *testing.T) {
 		corev1Client.EXPECT().ConfigMaps(mock.Anything).Return(configMapMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().CoreV1().Return(corev1Client)
+		clientMock := newMockK8sClient(t)
 
 		// when
-		manager := newBackupCreateManager(clientSetMock, "", nil, globalConfigRepositoryMock, ownerReferenceBackupMock)
+		manager := newBackupCreateManager(clientMock, clientSetMock, "", nil, globalConfigRepositoryMock, ownerReferenceBackupMock)
 
 		// then
 		require.NotNil(t, manager)
@@ -48,7 +49,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -97,7 +98,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -354,7 +355,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Spec: v1.BackupSpec{Provider: "velero"}}
 
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return nil, assert.AnError
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -403,7 +404,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -452,7 +453,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -501,7 +502,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -552,7 +553,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -600,7 +601,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -645,7 +646,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()
@@ -693,7 +694,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(clientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
 			return providerMock, nil
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProvider }()

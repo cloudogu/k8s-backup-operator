@@ -61,7 +61,7 @@ func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Bac
 		return bm.handleFailedBackup(backup, fmt.Errorf("failed to parse selector %q: %w", backup.GetFieldSelectorWithName(), err))
 	}
 
-	watcher, err := bm.k8sClient.Watch(ctx, &velerov1.BackupList{}, &client.ListOptions{FieldSelector: selector})
+	watcher, err := bm.k8sClient.Watch(ctx, &velerov1.BackupList{}, &client.ListOptions{FieldSelector: selector, Namespace: veleroBackup.Namespace})
 	if err != nil {
 		return bm.handleFailedBackup(backup, fmt.Errorf("failed to create watch for velero backup '%s/%s': %w", veleroBackup.Namespace, veleroBackup.Name, err))
 	}
@@ -132,7 +132,7 @@ func (bm *defaultBackupManager) DeleteBackup(ctx context.Context, backup *v1.Bac
 	}
 
 	watcher, err := bm.k8sClient.Watch(ctx, &velerov1.BackupList{},
-		&client.ListOptions{FieldSelector: selector, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}})
+		&client.ListOptions{FieldSelector: selector, Namespace: backup.Namespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}})
 	if err != nil {
 		return fmt.Errorf("failed to create watch for delete backup request %s: %w", backup.Name, err)
 	}

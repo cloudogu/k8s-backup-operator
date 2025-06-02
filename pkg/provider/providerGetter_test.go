@@ -28,7 +28,7 @@ func TestGetAll(t *testing.T) {
 		providerMock.EXPECT().CheckReady(testCtx).Once().Return(assert.AnError)
 		providerMock.EXPECT().CheckReady(testCtx).Once().Return(nil)
 		callCount := 0
-		NewVeleroProvider = func(ecosystemClientSet EcosystemClientSet, recorder EventRecorder, namespace string) (Provider, error) {
+		NewVeleroProvider = func(client K8sClient, recorder EventRecorder, namespace string) (Provider, error) {
 			callCount += 1
 
 			if callCount <= 2 {

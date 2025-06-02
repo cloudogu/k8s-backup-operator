@@ -17,6 +17,7 @@ const (
 )
 
 type defaultCreateManager struct {
+	k8sClient             k8sClient
 	ecosystemClientSet    ecosystemInterface
 	namespace             string
 	cleanup               cleanupManager
@@ -26,6 +27,7 @@ type defaultCreateManager struct {
 }
 
 func newCreateManager(
+	k8sClient k8sClient,
 	ecosystemClientSet ecosystemInterface,
 	namespace string,
 	recorder eventRecorder,
@@ -34,6 +36,7 @@ func newCreateManager(
 ) *defaultCreateManager {
 	maintenanceSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", ecosystemClientSet.CoreV1().ConfigMaps(namespace))
 	return &defaultCreateManager{
+		k8sClient:             k8sClient,
 		ecosystemClientSet:    ecosystemClientSet,
 		namespace:             namespace,
 		recorder:              recorder,
@@ -65,7 +68,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to add labels to restore resource [%s]: %w", restoreName, err)
 	}
 
-	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder, cm.ecosystemClientSet)
+	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder, cm.k8sClient)
 	if err != nil {
 		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
 	}

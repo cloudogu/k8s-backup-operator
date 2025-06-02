@@ -73,6 +73,21 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 		return fmt.Errorf("failed to add labels to backup resource: %w", err)
 	}
 
+	err = bcm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{
+		Title: maintenanceModeTitle,
+		Text:  maintenanceModeText,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to active maintenance mode: %w", err)
+	}
+
+	defer func() {
+		errDefer := bcm.maintenanceModeSwitch.Deactivate(ctx)
+		if errDefer != nil {
+			logger.Error(fmt.Errorf("failed to deactivate maintenance mode: [%w]", errDefer), "backup error")
+		}
+	}()
+
 	err = bcm.triggerBackup(ctx, backup)
 	if err != nil {
 		err = fmt.Errorf("failed to trigger backup provider: %w", err)

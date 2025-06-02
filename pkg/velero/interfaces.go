@@ -4,7 +4,6 @@ import (
 	"context"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 
 	"k8s.io/apimachinery/pkg/watch"
@@ -51,48 +50,6 @@ type syncManager interface {
 
 //nolint:unused
 //goland:noinspection GoUnusedType
-type ecosystemBackupInterface interface {
-	ecosystem.BackupInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type veleroInterface interface {
-	velerov1.VeleroV1Interface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type veleroBackupInterface interface {
-	velerov1.BackupInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type veleroRestoreInterface interface {
-	velerov1.RestoreInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type veleroBackupStorageLocationInterface interface {
-	velerov1.BackupStorageLocationInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type veleroDeleteBackupRequest interface {
-	velerov1.DeleteBackupRequestInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type ecosystemWatch interface {
+type watchInterface interface {
 	watch.Interface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type ecosystemV1Alpha1Interface interface {
-	ecosystem.V1Alpha1Interface
 }
