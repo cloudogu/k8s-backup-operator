@@ -288,7 +288,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 
 	globalConfig := repository.NewGlobalConfigRepository(configMapClient)
 
-	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, ecosystemClientSet)
+	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient)
 	if err != nil {
 		return fmt.Errorf("failed to sync backups with provider backups on startup: %w", err)
 	}
@@ -339,9 +339,9 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	return nil
 }
 
-func syncBackupsWithProviders(ctx context.Context, operatorConfig *config.OperatorConfig, recorder eventRecorder, ecosystemClientSet *ecosystem.ClientSet) error {
+func syncBackupsWithProviders(ctx context.Context, operatorConfig *config.OperatorConfig, recorder eventRecorder, k8sWatchclient provider.K8sClient) error {
 	var errs []error
-	allProviders := provider.GetAll(ctx, operatorConfig.Namespace, recorder, ecosystemClientSet)
+	allProviders := provider.GetAll(ctx, operatorConfig.Namespace, recorder, k8sWatchclient)
 	for _, prov := range allProviders {
 		err := prov.SyncBackups(ctx)
 		if err != nil {
