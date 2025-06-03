@@ -15,18 +15,27 @@ import (
 )
 
 type defaultRestoreManager struct {
-	k8sClient k8sWatchClient
-	recorder  eventRecorder
+	k8sClient       k8sWatchClient
+	discoveryClient discoveryClient
+	recorder        eventRecorder
 }
 
 // newDefaultRestoreManager creates a new instance of defaultRestoreManager.
-func newDefaultRestoreManager(k8sClient k8sWatchClient, recorder eventRecorder) *defaultRestoreManager {
-	return &defaultRestoreManager{k8sClient: k8sClient, recorder: recorder}
+func newDefaultRestoreManager(k8sClient k8sWatchClient, discoveryClient discoveryClient, recorder eventRecorder) *defaultRestoreManager {
+	return &defaultRestoreManager{discoveryClient: discoveryClient, k8sClient: k8sClient, recorder: recorder}
 }
 
 // CreateRestore creates a restore according to the restore configuration in v1.Restore.
 func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.Restore) error {
 	rm.recorder.Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as restore provider")
+
+	resources, err := rm.getResourcesForGroup("k8s.cloudogu.com")
+	if err != nil {
+		return rm.handleFailedRestore(restore, fmt.Errorf("failed to get group resources: %w", err))
+	}
+
+	logger := log.FromContext(ctx)
+	logger.Info(fmt.Sprintf("------->>>>>>>>>>>> %+v", resources))
 
 	veleroRestore := &velerov1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
@@ -35,7 +44,7 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 		Spec: velerov1.RestoreSpec{
 			BackupName:             restore.Spec.BackupName,
 			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
-			RestoreStatus:          &velerov1.RestoreStatusSpec{IncludedResources: []string{"*"}},
+			RestoreStatus:          &velerov1.RestoreStatusSpec{IncludedResources: resources},
 			LabelSelector: &metav1.LabelSelector{
 				// Filter backup-operator from restore.
 				MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -48,7 +57,7 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 			},
 		},
 	}
-	err := rm.k8sClient.Create(ctx, veleroRestore)
+	err = rm.k8sClient.Create(ctx, veleroRestore)
 	if err != nil {
 		return rm.handleFailedRestore(restore, fmt.Errorf("failed to create velero restore [%s]: %w", veleroRestore.Name, err))
 	}
@@ -78,6 +87,23 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 func (rm *defaultRestoreManager) handleFailedRestore(restore *v1.Restore, err error) error {
 	rm.recorder.Event(restore, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, err.Error())
 	return err
+}
+
+func (rm *defaultRestoreManager) getResourcesForGroup(group string) ([]string, error) {
+	apiResourceLists, err := rm.discoveryClient.ServerPreferredResources()
+	if err != nil {
+		return nil, fmt.Errorf("error getting api resource List")
+	}
+
+	var resources []string
+	for _, apiResourceList := range apiResourceLists {
+		for _, apiResource := range apiResourceList.APIResources {
+			if apiResource.Group == group {
+				resources = append(resources, apiResource.Name+"."+apiResource.Group)
+			}
+		}
+	}
+	return resources, nil
 }
 
 func waitForRestoreCompletionOrFailure(ctx context.Context, veleroRestoreChan <-chan watch.Event) error {

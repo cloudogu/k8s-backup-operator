@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,4 +34,8 @@ type Provider interface {
 
 type K8sClient interface {
 	client.WithWatch
+}
+
+type EcosystemClientSet interface {
+	ecosystem.Interface
 }

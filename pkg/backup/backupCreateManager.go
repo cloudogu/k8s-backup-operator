@@ -122,7 +122,7 @@ func (bcm *backupCreateManager) updateCompletionTimestamp(ctx context.Context, b
 }
 
 func (bcm *backupCreateManager) triggerBackup(ctx context.Context, backup *v1.Backup) error {
-	backupProvider, err := provider.Get(ctx, backup, backup.Spec.Provider, backup.Namespace, bcm.recorder, bcm.k8sClient)
+	backupProvider, err := provider.Get(ctx, backup, backup.Spec.Provider, backup.Namespace, bcm.recorder, bcm.k8sClient, bcm.clientSet)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}
