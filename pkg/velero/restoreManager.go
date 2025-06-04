@@ -34,9 +34,6 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 		return rm.handleFailedRestore(restore, fmt.Errorf("failed to get group resources: %w", err))
 	}
 
-	logger := log.FromContext(ctx)
-	logger.Info(fmt.Sprintf("------->>>>>>>>>>>> %+v", resources))
-
 	veleroRestore := &velerov1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: restore.Name, Namespace: restore.Namespace,
@@ -64,7 +61,7 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 
 	selector, err := fields.ParseSelector(restore.GetFieldSelectorWithName())
 	if err != nil {
-		return rm.handleFailedRestore(restore, fmt.Errorf("failed to parse selector %q: %w", restore, err))
+		return rm.handleFailedRestore(restore, fmt.Errorf("failed to parse selector %q: %w", restore.GetFieldSelectorWithName(), err))
 	}
 
 	watcher, err := rm.k8sClient.Watch(ctx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: selector})

@@ -334,7 +334,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 				Namespace: testNamespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}}).
 			Return(watchMock, nil)
 		mockK8sWatchClient.EXPECT().Get(testCtx, backup.GetNamespacedName(), expectedRequest).Run(func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) {
-			obj = expectedRequestProcessed
+			*obj.(*velerov1.DeleteBackupRequest) = *expectedRequestProcessed
 		}).Return(nil)
 
 		recorderMock := newMockEventRecorder(t)
@@ -506,8 +506,9 @@ func Test_provider_DeleteBackup(t *testing.T) {
 				Namespace: testNamespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}}).
 			Return(watchMock, nil)
 		mockK8sWatchClient.EXPECT().Get(testCtx, backup.GetNamespacedName(), expectedRequest).Run(func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) {
-			obj = expectedRequestProcessed
+			*obj.(*velerov1.DeleteBackupRequest) = *expectedRequestProcessed
 		}).Return(nil)
+		mockK8sWatchClient.EXPECT().Delete(testCtx, expectedRequestProcessed).Return(nil)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
