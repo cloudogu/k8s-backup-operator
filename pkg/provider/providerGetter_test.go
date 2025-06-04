@@ -25,26 +25,26 @@ func TestGetAll(t *testing.T) {
 		}()
 
 		providerMock := NewMockProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Once().Return(assert.AnError)
-		providerMock.EXPECT().CheckReady(testCtx).Once().Return(nil)
-		callCount := 0
-		NewVeleroProvider = func(client K8sClient, recorder EventRecorder, namespace string) (Provider, error) {
-			callCount += 1
-
-			if callCount <= 2 {
-				return providerMock, nil
+		called := false
+		providerMock.EXPECT().CheckReady(testCtx).RunAndReturn(func(ctx context.Context) error {
+			if called {
+				return nil
 			}
+			called = true
+			return assert.AnError
+		}).Twice()
 
-			return nil, assert.AnError
+		NewVeleroProvider = func(client K8sClient, ecoSystemClient EcosystemClientSet, recorder EventRecorder, namespace string) Provider {
+			return providerMock
 		}
 
 		recorderMock := NewMockEventRecorder(t)
 		recorderMock.EXPECT().Event(mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
-		knownProviders = []v1.Provider{"invalid", "", "velero", "", "k10"}
+		knownProviders = []v1.Provider{"invalid", "velero", "", "k10"}
 
 		// when
-		providers := GetAll(testCtx, testNamespace, recorderMock, nil)
+		providers := GetAll(testCtx, testNamespace, recorderMock, nil, nil)
 
 		// then
 		assert.Len(t, providers, 1)

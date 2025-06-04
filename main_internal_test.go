@@ -167,8 +167,8 @@ func Test_startOperator(t *testing.T) {
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().SyncBackups(testCtx).Return(assert.AnError)
-		provider.NewVeleroProvider = func(ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
-			return providerMock, nil
+		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+			return providerMock
 		}
 
 		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
@@ -215,8 +215,8 @@ func Test_startOperator(t *testing.T) {
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
-			return providerMock, nil
+		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+			return providerMock
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
@@ -274,8 +274,8 @@ func Test_startOperator(t *testing.T) {
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
-			return providerMock, nil
+		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+			return providerMock
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
@@ -320,11 +320,9 @@ func Test_startOperator(t *testing.T) {
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
-		k8sClientMock := newMockK8sClient(t)
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
-		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(runtime.NewScheme())
 
@@ -338,8 +336,8 @@ func Test_startOperator(t *testing.T) {
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
-			return providerMock, nil
+		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+			return providerMock
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
@@ -387,11 +385,9 @@ func Test_startOperator(t *testing.T) {
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
-		k8sClientMock := newMockK8sClient(t)
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
-		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
@@ -409,8 +405,8 @@ func Test_startOperator(t *testing.T) {
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
-			return providerMock, nil
+		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+			return providerMock
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
@@ -460,11 +456,9 @@ func Test_startOperator(t *testing.T) {
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
-		k8sClientMock := newMockK8sClient(t)
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
-		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
@@ -483,8 +477,8 @@ func Test_startOperator(t *testing.T) {
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
-			return providerMock, nil
+		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+			return providerMock
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
@@ -536,11 +530,9 @@ func Test_startOperator(t *testing.T) {
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
-		k8sClientMock := newMockK8sClient(t)
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
-		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
@@ -563,8 +555,8 @@ func Test_startOperator(t *testing.T) {
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
-			return providerMock, nil
+		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+			return providerMock
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
@@ -615,11 +607,9 @@ func Test_startOperator(t *testing.T) {
 
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
-		k8sClientMock := newMockK8sClient(t)
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
-		ctrlManMock.EXPECT().GetClient().Return(k8sClientMock)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
@@ -642,8 +632,8 @@ func Test_startOperator(t *testing.T) {
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
 		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) (provider.Provider, error) {
-			return providerMock, nil
+		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+			return providerMock
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)

@@ -61,7 +61,7 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 
 	selector, err := fields.ParseSelector(restore.GetFieldSelectorWithName())
 	if err != nil {
-		return rm.handleFailedRestore(restore, fmt.Errorf("failed to parse selector %q: %w", restore, err))
+		return rm.handleFailedRestore(restore, fmt.Errorf("failed to parse selector %q: %w", restore.GetFieldSelectorWithName(), err))
 	}
 
 	watcher, err := rm.k8sClient.Watch(ctx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: selector})
