@@ -1,26 +1,27 @@
 package velero
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 )
 
 func TestDefaultProvider_CheckReady(t *testing.T) {
 	t.Run("should fail to get bsl", func(t *testing.T) {
 		// given
-		mockBslInterface := newMockVeleroBackupStorageLocationInterface(t)
-		mockBslInterface.EXPECT().Get(testCtx, "default", metav1.GetOptions{}).Return(nil, assert.AnError)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().BackupStorageLocations(testNamespace).Return(mockBslInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Get(testCtx, types.NamespacedName{
+			Namespace: testNamespace,
+			Name:      "default",
+		}, &velerov1.BackupStorageLocation{}).Return(assert.AnError)
 
 		sut := &defaultProvider{
-			veleroClientSet: mockVeleroClient,
-			namespace:       testNamespace,
+			k8sClient: mockK8sWatchClient,
+			namespace: testNamespace,
 		}
 
 		// when
@@ -39,16 +40,18 @@ func TestDefaultProvider_CheckReady(t *testing.T) {
 				Message: "could not reach minio storage location",
 			},
 		}
-		mockBslInterface := newMockVeleroBackupStorageLocationInterface(t)
-		mockBslInterface.EXPECT().Get(testCtx, "default", metav1.GetOptions{}).Return(bsl, nil)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().BackupStorageLocations(testNamespace).Return(mockBslInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Get(testCtx, types.NamespacedName{
+			Namespace: testNamespace,
+			Name:      "default",
+		}, &velerov1.BackupStorageLocation{}).RunAndReturn(func(ctx context.Context, name types.NamespacedName, object client.Object, option ...client.GetOption) error {
+			*object.(*velerov1.BackupStorageLocation) = *bsl
+			return nil
+		})
 
 		sut := &defaultProvider{
-			veleroClientSet: mockVeleroClient,
-			namespace:       testNamespace,
+			k8sClient: mockK8sWatchClient,
+			namespace: testNamespace,
 		}
 
 		// when
@@ -66,16 +69,18 @@ func TestDefaultProvider_CheckReady(t *testing.T) {
 				Phase: velerov1.BackupStorageLocationPhaseAvailable,
 			},
 		}
-		mockBslInterface := newMockVeleroBackupStorageLocationInterface(t)
-		mockBslInterface.EXPECT().Get(testCtx, "default", metav1.GetOptions{}).Return(bsl, nil)
-		mockVeleroInterface := newMockVeleroInterface(t)
-		mockVeleroInterface.EXPECT().BackupStorageLocations(testNamespace).Return(mockBslInterface)
-		mockVeleroClient := newMockVeleroClientSet(t)
-		mockVeleroClient.EXPECT().VeleroV1().Return(mockVeleroInterface)
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Get(testCtx, types.NamespacedName{
+			Namespace: testNamespace,
+			Name:      "default",
+		}, &velerov1.BackupStorageLocation{}).RunAndReturn(func(ctx context.Context, name types.NamespacedName, object client.Object, option ...client.GetOption) error {
+			*object.(*velerov1.BackupStorageLocation) = *bsl
+			return nil
+		})
 
 		sut := &defaultProvider{
-			veleroClientSet: mockVeleroClient,
-			namespace:       testNamespace,
+			k8sClient: mockK8sWatchClient,
+			namespace: testNamespace,
 		}
 
 		// when

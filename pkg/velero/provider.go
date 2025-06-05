@@ -4,29 +4,27 @@ import (
 	"context"
 	"fmt"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type defaultProvider struct {
 	manager
-	veleroClientSet veleroClientSet
-	namespace       string
+	k8sClient k8sWatchClient
+	namespace string
 }
 
 // NewDefaultProvider creates a new instance of defaultProvider.
-func NewDefaultProvider(ecosystemClientSet ecosystemClientSet, namespace string, recorder eventRecorder) (*defaultProvider, error) {
-	factory := veleroclient.NewFactory("k8s-backup-operator", map[string]interface{}{"namespace": namespace})
-	veleroClientSet, err := factory.Client()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create velero clientset: %w", err)
-	}
-	return &defaultProvider{manager: NewDefaultManager(veleroClientSet, ecosystemClientSet, recorder, namespace), veleroClientSet: veleroClientSet, namespace: namespace}, nil
+func NewDefaultProvider(k8sClient k8sWatchClient, discoveryClient discoveryClient, namespace string, recorder eventRecorder) *defaultProvider {
+	return &defaultProvider{manager: NewDefaultManager(k8sClient, discoveryClient, recorder, namespace), k8sClient: k8sClient, namespace: namespace}
 }
 
 // CheckReady validates that velero is installed and can establish a connection to its backup store.
 func (p *defaultProvider) CheckReady(ctx context.Context) error {
-	defaultBsl, err := p.veleroClientSet.VeleroV1().BackupStorageLocations(p.namespace).Get(ctx, defaultStorageLocation, metav1.GetOptions{})
+	defaultBsl := &velerov1.BackupStorageLocation{}
+	err := p.k8sClient.Get(ctx, types.NamespacedName{
+		Namespace: p.namespace,
+		Name:      defaultStorageLocation,
+	}, defaultBsl)
 	if err != nil {
 		return fmt.Errorf("failed to get backup storage location from cluster: %w", err)
 	}

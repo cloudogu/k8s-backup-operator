@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.4.4] - 2025-06-05
+### Changed
+- [#61] Update velero dependency
+- [#61] Restore status only for resources in group k8s.cloudogu.com
+
 ## [v1.4.3] - 2025-05-14
 ### Changed
 - [#57] Update k8s-io-libs to v0.33.0

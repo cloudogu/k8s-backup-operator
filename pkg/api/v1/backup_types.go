@@ -4,6 +4,7 @@ import (
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"time"
 )
 
@@ -122,6 +123,13 @@ type RequeueableStatus interface {
 // GetStatus return the requeueable status.
 func (b *Backup) GetStatus() RequeueableStatus {
 	return b.Status
+}
+
+func (b *Backup) GetNamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: b.Namespace,
+		Name:      b.Name,
+	}
 }
 
 // GetStatus return the status from the status object.

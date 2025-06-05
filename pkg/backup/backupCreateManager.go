@@ -20,6 +20,7 @@ const (
 )
 
 type backupCreateManager struct {
+	k8sClient              k8sClient
 	clientSet              ecosystemInterface
 	namespace              string
 	globalConfigRepository globalConfigRepository
@@ -29,9 +30,9 @@ type backupCreateManager struct {
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupCreateManager {
+func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupCreateManager {
 	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", clientSet.CoreV1().ConfigMaps(namespace))
-	return &backupCreateManager{clientSet: clientSet, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, ownerRefBackuper: ownerRefBackuper}
+	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, ownerRefBackuper: ownerRefBackuper}
 }
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {
@@ -72,7 +73,10 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 		return fmt.Errorf("failed to add labels to backup resource: %w", err)
 	}
 
-	err = bcm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText})
+	err = bcm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{
+		Title: maintenanceModeTitle,
+		Text:  maintenanceModeText,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to active maintenance mode: %w", err)
 	}
@@ -118,7 +122,7 @@ func (bcm *backupCreateManager) updateCompletionTimestamp(ctx context.Context, b
 }
 
 func (bcm *backupCreateManager) triggerBackup(ctx context.Context, backup *v1.Backup) error {
-	backupProvider, err := provider.Get(ctx, backup, backup.Spec.Provider, backup.Namespace, bcm.recorder, bcm.clientSet)
+	backupProvider, err := provider.Get(ctx, backup, backup.Spec.Provider, backup.Namespace, bcm.recorder, bcm.k8sClient, bcm.clientSet)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}
