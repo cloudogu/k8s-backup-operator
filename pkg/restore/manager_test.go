@@ -16,9 +16,10 @@ func TestNewRestoreManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().CoreV1().Return(corev1Client)
 		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
+		clientMock := newMockK8sClient(t)
 
 		// when
-		manager := NewRestoreManager(clientSetMock, testNamespace, nil, nil, ownerReferenceRestoreMock)
+		manager := NewRestoreManager(clientMock, clientSetMock, testNamespace, nil, nil, ownerReferenceRestoreMock)
 
 		// then
 		require.NotNil(t, manager)

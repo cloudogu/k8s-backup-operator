@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
@@ -16,6 +17,10 @@ import (
 
 type ecosystemInterface interface {
 	ecosystem.Interface
+}
+
+type k8sClient interface {
+	client.WithWatch
 }
 
 type eventRecorder interface {

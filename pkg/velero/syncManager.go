@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	backupv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -13,17 +14,16 @@ import (
 )
 
 type defaultSyncManager struct {
-	veleroClientSet    veleroClientSet
-	ecosystemClientSet ecosystemClientSet
-	recorder           eventRecorder
-	namespace          string
+	k8sClient k8sWatchClient
+	recorder  eventRecorder
+	namespace string
 }
 
 // SyncBackups syncs backup CRs with velero CRs
 func (d *defaultSyncManager) SyncBackups(ctx context.Context) error {
 	// Get all Backup CRs from the cluster
-	backupsClient := d.ecosystemClientSet.EcosystemV1Alpha1().Backups(d.namespace)
-	backupsList, err := backupsClient.List(ctx, metav1.ListOptions{})
+	backupsList := &backupv1.BackupList{}
+	err := d.k8sClient.List(ctx, backupsList, &client.ListOptions{Namespace: d.namespace})
 	if err != nil {
 		return fmt.Errorf("could not list ecosystem backups: %w", err)
 	}
@@ -35,26 +35,26 @@ func (d *defaultSyncManager) SyncBackups(ctx context.Context) error {
 	}
 
 	// Get all Velero backups
-	veleroBackups := d.veleroClientSet.VeleroV1().Backups(d.namespace)
-	veleroBackupsList, err := veleroBackups.List(ctx, metav1.ListOptions{})
+	veleroBackups := &velerov1.BackupList{}
+	err = d.k8sClient.List(ctx, veleroBackups, &client.ListOptions{Namespace: d.namespace})
 	if err != nil {
 		return fmt.Errorf("could not list velero backups: %w", err)
 	}
 
 	// Create Velero backup map, so we don't have to loop through the Velero backups list
 	veleroBackupMap := make(map[string]*velerov1.Backup)
-	for _, veleroBackup := range veleroBackupsList.Items {
+	for _, veleroBackup := range veleroBackups.Items {
 		veleroBackupMap[veleroBackup.Name] = &veleroBackup
 	}
 
 	var errs []error
 
 	// Remove Backup CRs which have no corresponding Velero backup
-	removeErrs := removeBackupsWithoutVeleroBackup(ctx, backupsList, veleroBackupMap, backupsClient)
+	removeErrs := removeBackupsWithoutVeleroBackup(ctx, backupsList, veleroBackupMap, d.k8sClient)
 	errs = append(errs, removeErrs...)
 
 	// Create Backup CRs for Velero backups that have no counterpart in the cluster yet
-	createErrs := createBackupsForVeleroBackups(ctx, veleroBackupsList, backupMap, backupsClient)
+	createErrs := createBackupsForVeleroBackups(ctx, veleroBackups, backupMap, d.k8sClient)
 	errs = append(errs, createErrs...)
 
 	if len(errs) > 0 {
@@ -64,7 +64,7 @@ func (d *defaultSyncManager) SyncBackups(ctx context.Context) error {
 	return nil
 }
 
-func createBackupsForVeleroBackups(ctx context.Context, veleroBackupsList *velerov1.BackupList, backupMap map[string]*backupv1.Backup, backupsClient ecosystem.BackupInterface) []error {
+func createBackupsForVeleroBackups(ctx context.Context, veleroBackupsList *velerov1.BackupList, backupMap map[string]*backupv1.Backup, k8sClient k8sWatchClient) []error {
 	var errs []error
 	for _, veleroBackup := range veleroBackupsList.Items {
 		if _, exists := backupMap[veleroBackup.Name]; !exists {
@@ -78,7 +78,7 @@ func createBackupsForVeleroBackups(ctx context.Context, veleroBackupsList *veler
 					SyncedFromProvider: true,
 				},
 			}
-			_, err := backupsClient.Create(ctx, newBackup, metav1.CreateOptions{})
+			err := k8sClient.Create(ctx, newBackup)
 			if err != nil {
 				errs = append(errs, err)
 			}
@@ -87,16 +87,31 @@ func createBackupsForVeleroBackups(ctx context.Context, veleroBackupsList *veler
 	return errs
 }
 
-func removeBackupsWithoutVeleroBackup(ctx context.Context, backupsList *backupv1.BackupList, veleroBackupMap map[string]*velerov1.Backup, backupsClient ecosystem.BackupInterface) []error {
+func removeBackupsWithoutVeleroBackup(ctx context.Context, backupsList *backupv1.BackupList, veleroBackupMap map[string]*velerov1.Backup, k8sClient k8sWatchClient) []error {
 	var errs []error
 	for _, backup := range backupsList.Items {
 		if _, exists := veleroBackupMap[backup.Name]; !exists {
-			_, err := backupsClient.RemoveFinalizer(ctx, &backup, backupv1.BackupFinalizer)
+			backupPtr := &backup
+			err := retry.OnConflict(func() error {
+				err := k8sClient.Get(ctx, backup.GetNamespacedName(), backupPtr)
+				if err != nil {
+					return err
+				}
+
+				controllerutil.RemoveFinalizer(backupPtr, backupv1.BackupFinalizer)
+				err = k8sClient.Update(ctx, backupPtr)
+				if err != nil {
+					return err
+				}
+
+				return nil
+			})
 			if err != nil {
 				errs = append(errs, err)
 				break
 			}
-			err = backupsClient.Delete(ctx, backup.Name, metav1.DeleteOptions{})
+
+			err = k8sClient.Delete(ctx, backupPtr)
 			if err != nil {
 				errs = append(errs, err)
 			}
@@ -108,7 +123,9 @@ func removeBackupsWithoutVeleroBackup(ctx context.Context, backupsList *backupv1
 // SyncBackupStatus syncs the status of the backup CR with the corresponding velero backup.
 // The velero backup must be completed or an error is thrown.
 func (d *defaultSyncManager) SyncBackupStatus(ctx context.Context, backup *backupv1.Backup) error {
-	veleroBackup, err := d.veleroClientSet.VeleroV1().Backups(d.namespace).Get(ctx, backup.Name, metav1.GetOptions{})
+	veleroBackup := &velerov1.Backup{}
+	// we can use backup.GetNamespacedName() here because velero backups are named the same as their corresponding cloudogu backup
+	err := d.k8sClient.Get(ctx, backup.GetNamespacedName(), veleroBackup)
 	if err != nil {
 		return fmt.Errorf("failed to find corresponding velero backup for backup %q: %w", backup.Name, err)
 	}
@@ -118,8 +135,8 @@ func (d *defaultSyncManager) SyncBackupStatus(ctx context.Context, backup *backu
 	}
 
 	err = retry.OnConflict(func() error {
-		backupClient := d.ecosystemClientSet.EcosystemV1Alpha1().Backups(d.namespace)
-		updatedBackup, err := backupClient.Get(ctx, backup.Name, metav1.GetOptions{})
+		updatedBackup := &backupv1.Backup{}
+		err = d.k8sClient.Get(ctx, backup.GetNamespacedName(), updatedBackup)
 		if err != nil {
 			return err
 		}
@@ -128,7 +145,7 @@ func (d *defaultSyncManager) SyncBackupStatus(ctx context.Context, backup *backu
 		updatedBackup.Status.StartTimestamp = *veleroBackup.Status.StartTimestamp
 		updatedBackup.Status.CompletionTimestamp = *veleroBackup.Status.CompletionTimestamp
 
-		_, err = backupClient.UpdateStatus(ctx, updatedBackup, metav1.UpdateOptions{})
+		err = d.k8sClient.Status().Update(ctx, updatedBackup)
 		if err != nil {
 			return err
 		}
@@ -143,6 +160,6 @@ func (d *defaultSyncManager) SyncBackupStatus(ctx context.Context, backup *backu
 }
 
 // newDefaultSyncManager creates a new instance of defaultSyncManager.
-func newDefaultSyncManager(veleroClientSet veleroClientSet, ecosystemClientSet ecosystemClientSet, recorder eventRecorder, namespace string) *defaultSyncManager {
-	return &defaultSyncManager{veleroClientSet: veleroClientSet, ecosystemClientSet: ecosystemClientSet, recorder: recorder, namespace: namespace}
+func newDefaultSyncManager(k8sClient k8sWatchClient, recorder eventRecorder, namespace string) *defaultSyncManager {
+	return &defaultSyncManager{k8sClient: k8sClient, recorder: recorder, namespace: namespace}
 }

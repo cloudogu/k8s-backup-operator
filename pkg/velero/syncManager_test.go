@@ -1,11 +1,15 @@
 package velero
 
 import (
+	"context"
 	backupv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 	"time"
 )
@@ -13,14 +17,10 @@ import (
 func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 	t.Run("should fail to list backups", func(t *testing.T) {
 		// given
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(nil, assert.AnError)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		ecosystemClientSetMock := newMockEcosystemClientSet(t)
-		ecosystemClientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		k8sClient := newMockK8sWatchClient(t)
+		k8sClient.EXPECT().List(testCtx, &backupv1.BackupList{}, &client.ListOptions{Namespace: testNamespace}).Return(assert.AnError)
 
-		sut := &defaultSyncManager{namespace: testNamespace, ecosystemClientSet: ecosystemClientSetMock}
+		sut := &defaultSyncManager{namespace: testNamespace, k8sClient: k8sClient}
 
 		// when
 		err := sut.SyncBackups(testCtx)
@@ -33,21 +33,11 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 
 	t.Run("should fail to list velero backups", func(t *testing.T) {
 		// given
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(&backupv1.BackupList{}, nil)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		ecosystemClientSetMock := newMockEcosystemClientSet(t)
-		ecosystemClientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		k8sClient := newMockK8sWatchClient(t)
+		k8sClient.EXPECT().List(testCtx, &backupv1.BackupList{}, &client.ListOptions{Namespace: testNamespace}).Return(nil)
+		k8sClient.EXPECT().List(testCtx, &velerov1.BackupList{}, &client.ListOptions{Namespace: testNamespace}).Return(assert.AnError)
 
-		veleroClientSetMock := newMockVeleroClientSet(t)
-		v1VeleroMock := newMockVeleroInterface(t)
-		veleroBackupInterfaceMock := newMockVeleroBackupInterface(t)
-		veleroBackupInterfaceMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(nil, assert.AnError)
-		v1VeleroMock.EXPECT().Backups(testNamespace).Return(veleroBackupInterfaceMock)
-		veleroClientSetMock.EXPECT().VeleroV1().Return(v1VeleroMock)
-
-		sut := &defaultSyncManager{namespace: testNamespace, ecosystemClientSet: ecosystemClientSetMock, veleroClientSet: veleroClientSetMock}
+		sut := &defaultSyncManager{namespace: testNamespace, k8sClient: k8sClient}
 
 		// when
 		err := sut.SyncBackups(testCtx)
@@ -68,24 +58,24 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 				Status: "completed",
 			},
 		}
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(&backupv1.BackupList{
-			Items: []backupv1.Backup{backupMock},
-		}, nil)
-		backupClientMock.EXPECT().RemoveFinalizer(testCtx, &backupMock, backupv1.BackupFinalizer).Return(nil, assert.AnError)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		ecosystemClientSetMock := newMockEcosystemClientSet(t)
-		ecosystemClientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
 
-		veleroClientSetMock := newMockVeleroClientSet(t)
-		v1VeleroMock := newMockVeleroInterface(t)
-		veleroBackupInterfaceMock := newMockVeleroBackupInterface(t)
-		veleroBackupInterfaceMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(&velerov1.BackupList{}, nil)
-		v1VeleroMock.EXPECT().Backups(testNamespace).Return(veleroBackupInterfaceMock)
-		veleroClientSetMock.EXPECT().VeleroV1().Return(v1VeleroMock)
+		mockK8sClient := newMockK8sWatchClient(t)
+		backupList := &backupv1.BackupList{}
+		mockK8sClient.EXPECT().List(testCtx, backupList, &client.ListOptions{Namespace: testNamespace}).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			backupList = list.(*backupv1.BackupList)
+			backupList.Items = []backupv1.Backup{
+				backupMock,
+			}
+			return nil
+		})
 
-		sut := &defaultSyncManager{namespace: testNamespace, ecosystemClientSet: ecosystemClientSetMock, veleroClientSet: veleroClientSetMock}
+		mockK8sClient.EXPECT().List(testCtx, &velerov1.BackupList{}, &client.ListOptions{Namespace: testNamespace}).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			return nil
+		})
+
+		mockK8sClient.EXPECT().Get(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+
+		sut := &defaultSyncManager{namespace: testNamespace, k8sClient: mockK8sClient}
 
 		// when
 		err := sut.SyncBackups(testCtx)
@@ -95,7 +85,6 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to sync backups with velero")
 	})
-
 	t.Run("should fail to delete backup", func(t *testing.T) {
 		// given
 		backupName := "testBackup"
@@ -113,25 +102,24 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 			},
 		}
 
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(&backupv1.BackupList{
-			Items: []backupv1.Backup{backupMock},
-		}, nil)
-		backupClientMock.EXPECT().RemoveFinalizer(testCtx, &backupMock, backupv1.BackupFinalizer).Return(&backupv1.Backup{}, nil)
-		backupClientMock.EXPECT().Delete(testCtx, backupName, metav1.DeleteOptions{}).Return(assert.AnError)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		ecosystemClientSetMock := newMockEcosystemClientSet(t)
-		ecosystemClientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		mockK8sClient := newMockK8sWatchClient(t)
+		backupList := &backupv1.BackupList{}
+		mockK8sClient.EXPECT().List(testCtx, backupList, &client.ListOptions{Namespace: testNamespace}).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			backupList = list.(*backupv1.BackupList)
+			backupList.Items = []backupv1.Backup{
+				backupMock,
+			}
+			return nil
+		})
 
-		veleroClientSetMock := newMockVeleroClientSet(t)
-		v1VeleroMock := newMockVeleroInterface(t)
-		veleroBackupInterfaceMock := newMockVeleroBackupInterface(t)
-		veleroBackupInterfaceMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(&velerov1.BackupList{}, nil)
-		v1VeleroMock.EXPECT().Backups(testNamespace).Return(veleroBackupInterfaceMock)
-		veleroClientSetMock.EXPECT().VeleroV1().Return(v1VeleroMock)
+		mockK8sClient.EXPECT().List(testCtx, &velerov1.BackupList{}, &client.ListOptions{Namespace: testNamespace}).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			return nil
+		})
 
-		sut := &defaultSyncManager{namespace: testNamespace, ecosystemClientSet: ecosystemClientSetMock, veleroClientSet: veleroClientSetMock}
+		mockK8sClient.EXPECT().Get(testCtx, mock.Anything, mock.Anything).Return(nil)
+		mockK8sClient.EXPECT().Update(testCtx, mock.Anything).Return(assert.AnError)
+
+		sut := &defaultSyncManager{namespace: testNamespace, k8sClient: mockK8sClient}
 
 		// when
 		err := sut.SyncBackups(testCtx)
@@ -141,7 +129,6 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to sync backups with velero")
 	})
-
 	t.Run("should fail to create backup CR", func(t *testing.T) {
 		// given
 		backupName := "testBackup"
@@ -177,26 +164,32 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 			},
 		}
 
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(&backupv1.BackupList{
-			Items: []backupv1.Backup{backupMock},
-		}, nil)
-		backupClientMock.EXPECT().RemoveFinalizer(testCtx, &backupMock, backupv1.BackupFinalizer).Return(&backupv1.Backup{}, nil)
-		backupClientMock.EXPECT().Delete(testCtx, backupName, metav1.DeleteOptions{}).Return(nil)
-		backupClientMock.EXPECT().Create(testCtx, &createBackupMock, metav1.CreateOptions{}).Return(&backupv1.Backup{}, assert.AnError)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		ecosystemClientSetMock := newMockEcosystemClientSet(t)
-		ecosystemClientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		mockK8sClient := newMockK8sWatchClient(t)
+		backupList := &backupv1.BackupList{}
+		mockK8sClient.EXPECT().List(testCtx, backupList, &client.ListOptions{Namespace: testNamespace}).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			backupList = list.(*backupv1.BackupList)
+			backupList.Items = []backupv1.Backup{
+				backupMock,
+			}
+			return nil
+		})
 
-		veleroClientSetMock := newMockVeleroClientSet(t)
-		v1VeleroMock := newMockVeleroInterface(t)
-		veleroBackupInterfaceMock := newMockVeleroBackupInterface(t)
-		veleroBackupInterfaceMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(&velerov1.BackupList{Items: []velerov1.Backup{veleroBackupMock}}, nil)
-		v1VeleroMock.EXPECT().Backups(testNamespace).Return(veleroBackupInterfaceMock)
-		veleroClientSetMock.EXPECT().VeleroV1().Return(v1VeleroMock)
+		velerobackupList := &velerov1.BackupList{}
+		mockK8sClient.EXPECT().List(testCtx, velerobackupList, &client.ListOptions{Namespace: testNamespace}).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			velerobackupList = list.(*velerov1.BackupList)
+			velerobackupList.Items = []velerov1.Backup{
+				veleroBackupMock,
+			}
+			return nil
+		})
 
-		sut := &defaultSyncManager{namespace: testNamespace, ecosystemClientSet: ecosystemClientSetMock, veleroClientSet: veleroClientSetMock}
+		mockK8sClient.EXPECT().Get(testCtx, mock.Anything, mock.Anything).Return(nil)
+		mockK8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
+		mockK8sClient.EXPECT().Delete(testCtx, mock.Anything).Return(nil)
+
+		mockK8sClient.EXPECT().Create(testCtx, &createBackupMock).Return(assert.AnError)
+
+		sut := &defaultSyncManager{namespace: testNamespace, k8sClient: mockK8sClient}
 
 		// when
 		err := sut.SyncBackups(testCtx)
@@ -206,7 +199,6 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to sync backups with velero")
 	})
-
 	t.Run("should succeed syncing", func(t *testing.T) {
 		// given
 		backupName := "testBackup"
@@ -242,26 +234,32 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 			},
 		}
 
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(&backupv1.BackupList{
-			Items: []backupv1.Backup{backupMock},
-		}, nil)
-		backupClientMock.EXPECT().RemoveFinalizer(testCtx, &backupMock, backupv1.BackupFinalizer).Return(&backupv1.Backup{}, nil)
-		backupClientMock.EXPECT().Delete(testCtx, backupName, metav1.DeleteOptions{}).Return(nil)
-		backupClientMock.EXPECT().Create(testCtx, &createBackupMock, metav1.CreateOptions{}).Return(&backupv1.Backup{}, nil)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		ecosystemClientSetMock := newMockEcosystemClientSet(t)
-		ecosystemClientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		mockK8sClient := newMockK8sWatchClient(t)
+		backupList := &backupv1.BackupList{}
+		mockK8sClient.EXPECT().List(testCtx, backupList, &client.ListOptions{Namespace: testNamespace}).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			backupList = list.(*backupv1.BackupList)
+			backupList.Items = []backupv1.Backup{
+				backupMock,
+			}
+			return nil
+		})
 
-		veleroClientSetMock := newMockVeleroClientSet(t)
-		v1VeleroMock := newMockVeleroInterface(t)
-		veleroBackupInterfaceMock := newMockVeleroBackupInterface(t)
-		veleroBackupInterfaceMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(&velerov1.BackupList{Items: []velerov1.Backup{veleroBackupMock}}, nil)
-		v1VeleroMock.EXPECT().Backups(testNamespace).Return(veleroBackupInterfaceMock)
-		veleroClientSetMock.EXPECT().VeleroV1().Return(v1VeleroMock)
+		velerobackupList := &velerov1.BackupList{}
+		mockK8sClient.EXPECT().List(testCtx, velerobackupList, &client.ListOptions{Namespace: testNamespace}).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			velerobackupList = list.(*velerov1.BackupList)
+			velerobackupList.Items = []velerov1.Backup{
+				veleroBackupMock,
+			}
+			return nil
+		})
 
-		sut := &defaultSyncManager{namespace: testNamespace, ecosystemClientSet: ecosystemClientSetMock, veleroClientSet: veleroClientSetMock}
+		mockK8sClient.EXPECT().Get(testCtx, mock.Anything, mock.Anything).Return(nil)
+		mockK8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
+		mockK8sClient.EXPECT().Delete(testCtx, mock.Anything).Return(nil)
+
+		mockK8sClient.EXPECT().Create(testCtx, &createBackupMock).Return(nil)
+
+		sut := &defaultSyncManager{namespace: testNamespace, k8sClient: mockK8sClient}
 
 		// when
 		err := sut.SyncBackups(testCtx)
@@ -277,22 +275,16 @@ func Test_defaultSyncManager_SyncBackupStatus(t *testing.T) {
 		backupName := "test-backup"
 		testBackup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName}, Spec: backupv1.BackupSpec{Provider: "velero", SyncedFromProvider: true}}
 
-		veleroBackupClientMock := newMockVeleroBackupInterface(t)
-		veleroBackupClientMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(nil, assert.AnError)
-		veleroV1Mock := newMockVeleroInterface(t)
-		veleroV1Mock.EXPECT().Backups(testNamespace).Return(veleroBackupClientMock)
-		veleroClientMock := newMockVeleroClientSet(t)
-		veleroClientMock.EXPECT().VeleroV1().Return(veleroV1Mock)
+		mockK8sClient := newMockK8sWatchClient(t)
 
-		ecosystemClientMock := newMockEcosystemClientSet(t)
+		mockK8sClient.EXPECT().Get(testCtx, testBackup.GetNamespacedName(), &velerov1.Backup{}).Return(assert.AnError)
 
 		recorderMock := newMockEventRecorder(t)
 
 		sut := &defaultSyncManager{
-			veleroClientSet:    veleroClientMock,
-			ecosystemClientSet: ecosystemClientMock,
-			recorder:           recorderMock,
-			namespace:          testNamespace,
+			k8sClient: mockK8sClient,
+			recorder:  recorderMock,
+			namespace: testNamespace,
 		}
 
 		// when
@@ -308,25 +300,22 @@ func Test_defaultSyncManager_SyncBackupStatus(t *testing.T) {
 		backupName := "test-backup"
 		testBackup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName}, Spec: backupv1.BackupSpec{Provider: "velero", SyncedFromProvider: true}}
 
-		veleroBackup := &velerov1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName},
-			Status: velerov1.BackupStatus{Phase: velerov1.BackupPhaseFailed}}
+		mockK8sClient := newMockK8sWatchClient(t)
 
-		veleroBackupClientMock := newMockVeleroBackupInterface(t)
-		veleroBackupClientMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(veleroBackup, nil)
-		veleroV1Mock := newMockVeleroInterface(t)
-		veleroV1Mock.EXPECT().Backups(testNamespace).Return(veleroBackupClientMock)
-		veleroClientMock := newMockVeleroClientSet(t)
-		veleroClientMock.EXPECT().VeleroV1().Return(veleroV1Mock)
-
-		ecosystemClientMock := newMockEcosystemClientSet(t)
+		mockK8sClient.EXPECT().Get(testCtx, testBackup.GetNamespacedName(), &velerov1.Backup{}).RunAndReturn(func(ctx context.Context, name types.NamespacedName, object client.Object, option ...client.GetOption) error {
+			veleroBackupMock := object.(*velerov1.Backup)
+			veleroBackupMock.ObjectMeta = metav1.ObjectMeta{Name: backupName}
+			veleroBackupMock.Status = velerov1.BackupStatus{Phase: velerov1.BackupPhaseFailed}
+			return nil
+		},
+		)
 
 		recorderMock := newMockEventRecorder(t)
 
 		sut := &defaultSyncManager{
-			veleroClientSet:    veleroClientMock,
-			ecosystemClientSet: ecosystemClientMock,
-			recorder:           recorderMock,
-			namespace:          testNamespace,
+			k8sClient: mockK8sClient,
+			recorder:  recorderMock,
+			namespace: testNamespace,
 		}
 
 		// when
@@ -341,6 +330,8 @@ func Test_defaultSyncManager_SyncBackupStatus(t *testing.T) {
 		backupName := "test-backup"
 		testBackup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName}, Spec: backupv1.BackupSpec{Provider: "velero", SyncedFromProvider: true}}
 
+		mockK8sClient := newMockK8sWatchClient(t)
+
 		veleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: backupName},
 			Status: velerov1.BackupStatus{
@@ -350,27 +341,22 @@ func Test_defaultSyncManager_SyncBackupStatus(t *testing.T) {
 			},
 		}
 
-		veleroBackupClientMock := newMockVeleroBackupInterface(t)
-		veleroBackupClientMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(veleroBackup, nil)
-		veleroV1Mock := newMockVeleroInterface(t)
-		veleroV1Mock.EXPECT().Backups(testNamespace).Return(veleroBackupClientMock)
-		veleroClientMock := newMockVeleroClientSet(t)
-		veleroClientMock.EXPECT().VeleroV1().Return(veleroV1Mock)
+		mockK8sClient.EXPECT().Get(testCtx, testBackup.GetNamespacedName(), &velerov1.Backup{}).RunAndReturn(func(ctx context.Context, name types.NamespacedName, object client.Object, option ...client.GetOption) error {
+			veleroBackupMock := object.(*velerov1.Backup)
+			veleroBackupMock.ObjectMeta = veleroBackup.ObjectMeta
+			veleroBackupMock.Status = veleroBackup.Status
+			return nil
+		},
+		)
 
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(nil, assert.AnError)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		ecosystemClientMock := newMockEcosystemClientSet(t)
-		ecosystemClientMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		mockK8sClient.EXPECT().Get(testCtx, testBackup.GetNamespacedName(), &backupv1.Backup{}).Return(assert.AnError)
 
 		recorderMock := newMockEventRecorder(t)
 
 		sut := &defaultSyncManager{
-			veleroClientSet:    veleroClientMock,
-			ecosystemClientSet: ecosystemClientMock,
-			recorder:           recorderMock,
-			namespace:          testNamespace,
+			k8sClient: mockK8sClient,
+			recorder:  recorderMock,
+			namespace: testNamespace,
 		}
 
 		// when
@@ -386,6 +372,8 @@ func Test_defaultSyncManager_SyncBackupStatus(t *testing.T) {
 		backupName := "test-backup"
 		testBackup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName}, Spec: backupv1.BackupSpec{Provider: "velero", SyncedFromProvider: true}}
 
+		mockK8sClient := newMockK8sWatchClient(t)
+
 		veleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: backupName},
 			Status: velerov1.BackupStatus{
@@ -395,28 +383,30 @@ func Test_defaultSyncManager_SyncBackupStatus(t *testing.T) {
 			},
 		}
 
-		veleroBackupClientMock := newMockVeleroBackupInterface(t)
-		veleroBackupClientMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(veleroBackup, nil)
-		veleroV1Mock := newMockVeleroInterface(t)
-		veleroV1Mock.EXPECT().Backups(testNamespace).Return(veleroBackupClientMock)
-		veleroClientMock := newMockVeleroClientSet(t)
-		veleroClientMock.EXPECT().VeleroV1().Return(veleroV1Mock)
+		mockK8sClient.EXPECT().Get(testCtx, testBackup.GetNamespacedName(), &velerov1.Backup{}).RunAndReturn(func(ctx context.Context, name types.NamespacedName, object client.Object, option ...client.GetOption) error {
+			veleroBackupMock := object.(*velerov1.Backup)
+			veleroBackupMock.ObjectMeta = veleroBackup.ObjectMeta
+			veleroBackupMock.Status = veleroBackup.Status
+			return nil
+		},
+		)
 
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(testBackup, nil)
-		backupClientMock.EXPECT().UpdateStatus(testCtx, testBackup, metav1.UpdateOptions{}).Return(nil, assert.AnError)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		ecosystemClientMock := newMockEcosystemClientSet(t)
-		ecosystemClientMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		mockK8sClient.EXPECT().Get(testCtx, testBackup.GetNamespacedName(), &backupv1.Backup{}).RunAndReturn(func(ctx context.Context, name types.NamespacedName, object client.Object, option ...client.GetOption) error {
+			backupMock := object.(*backupv1.Backup)
+			backupMock.ObjectMeta = testBackup.ObjectMeta
+			backupMock.Spec = testBackup.Spec
+			return nil
+		})
+
+		mockSubResourceWriter := newMockSubResourceWriter(nil, assert.AnError)
+		mockK8sClient.EXPECT().Status().Return(mockSubResourceWriter)
 
 		recorderMock := newMockEventRecorder(t)
 
 		sut := &defaultSyncManager{
-			veleroClientSet:    veleroClientMock,
-			ecosystemClientSet: ecosystemClientMock,
-			recorder:           recorderMock,
-			namespace:          testNamespace,
+			k8sClient: mockK8sClient,
+			recorder:  recorderMock,
+			namespace: testNamespace,
 		}
 
 		// when
@@ -443,28 +433,32 @@ func Test_defaultSyncManager_SyncBackupStatus(t *testing.T) {
 			},
 		}
 
-		veleroBackupClientMock := newMockVeleroBackupInterface(t)
-		veleroBackupClientMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(veleroBackup, nil)
-		veleroV1Mock := newMockVeleroInterface(t)
-		veleroV1Mock.EXPECT().Backups(testNamespace).Return(veleroBackupClientMock)
-		veleroClientMock := newMockVeleroClientSet(t)
-		veleroClientMock.EXPECT().VeleroV1().Return(veleroV1Mock)
+		mockK8sClient := newMockK8sWatchClient(t)
 
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().Get(testCtx, backupName, metav1.GetOptions{}).Return(testBackup, nil)
-		backupClientMock.EXPECT().UpdateStatus(testCtx, testBackup, metav1.UpdateOptions{}).Return(testBackup, nil)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		ecosystemClientMock := newMockEcosystemClientSet(t)
-		ecosystemClientMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		mockK8sClient.EXPECT().Get(testCtx, testBackup.GetNamespacedName(), &velerov1.Backup{}).RunAndReturn(func(ctx context.Context, name types.NamespacedName, object client.Object, option ...client.GetOption) error {
+			veleroBackupMock := object.(*velerov1.Backup)
+			veleroBackupMock.ObjectMeta = veleroBackup.ObjectMeta
+			veleroBackupMock.Status = veleroBackup.Status
+			return nil
+		},
+		)
+
+		mockK8sClient.EXPECT().Get(testCtx, testBackup.GetNamespacedName(), &backupv1.Backup{}).RunAndReturn(func(ctx context.Context, name types.NamespacedName, object client.Object, option ...client.GetOption) error {
+			backupMock := object.(*backupv1.Backup)
+			backupMock.ObjectMeta = testBackup.ObjectMeta
+			backupMock.Spec = testBackup.Spec
+			return nil
+		})
+
+		mockSubResourceWriter := newMockSubResourceWriter(testBackup, nil)
+		mockK8sClient.EXPECT().Status().Return(mockSubResourceWriter)
 
 		recorderMock := newMockEventRecorder(t)
 
 		sut := &defaultSyncManager{
-			veleroClientSet:    veleroClientMock,
-			ecosystemClientSet: ecosystemClientMock,
-			recorder:           recorderMock,
-			namespace:          testNamespace,
+			k8sClient: mockK8sClient,
+			recorder:  recorderMock,
+			namespace: testNamespace,
 		}
 
 		// when
@@ -480,13 +474,37 @@ func Test_defaultSyncManager_SyncBackupStatus(t *testing.T) {
 
 func TestNewDefaultSyncManager(t *testing.T) {
 	// given
-	veleroClientMock := newMockVeleroClientSet(t)
-	ecosystemClientMock := newMockEcosystemClientSet(t)
+	mockK8sClient := newMockK8sWatchClient(t)
 	recorderMock := newMockEventRecorder(t)
 
 	// when
-	actual := newDefaultSyncManager(veleroClientMock, ecosystemClientMock, recorderMock, testNamespace)
+	actual := newDefaultSyncManager(mockK8sClient, recorderMock, testNamespace)
 
 	// then
 	assert.NotEmpty(t, actual)
+}
+
+type mockSubResourceWriter struct {
+	reterr error
+	backup *backupv1.Backup
+}
+
+func newMockSubResourceWriter(b *backupv1.Backup, err error) mockSubResourceWriter {
+	return mockSubResourceWriter{backup: b, reterr: err}
+}
+
+func (srw mockSubResourceWriter) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+	return srw.reterr
+}
+
+func (srw mockSubResourceWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	if srw.backup != nil {
+		backupObj := obj.(*backupv1.Backup)
+		srw.backup.Status = backupObj.Status
+	}
+	return srw.reterr
+}
+
+func (srw mockSubResourceWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	return srw.reterr
 }

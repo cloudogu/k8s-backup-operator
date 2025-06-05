@@ -8,14 +8,15 @@ import (
 )
 
 type backupDeleteManager struct {
+	k8sClient k8sClient
 	clientSet ecosystemInterface
 	namespace string
 	recorder  eventRecorder
 }
 
 // newBackupDeleteManager creates a new instance of backupDeleteManager.
-func newBackupDeleteManager(clientSet ecosystemInterface, namespace string, recorder eventRecorder) *backupDeleteManager {
-	return &backupDeleteManager{clientSet: clientSet, namespace: namespace, recorder: recorder}
+func newBackupDeleteManager(k8sClient k8sClient, clientSet ecosystemInterface, namespace string, recorder eventRecorder) *backupDeleteManager {
+	return &backupDeleteManager{k8sClient: k8sClient, clientSet: clientSet, namespace: namespace, recorder: recorder}
 }
 
 func (bdm *backupDeleteManager) delete(ctx context.Context, backup *k8sv1.Backup) error {
@@ -39,7 +40,7 @@ func (bdm *backupDeleteManager) delete(ctx context.Context, backup *k8sv1.Backup
 }
 
 func (bdm *backupDeleteManager) triggerBackupDelete(ctx context.Context, backup *k8sv1.Backup) error {
-	backupProvider, err := provider.Get(ctx, backup, backup.Spec.Provider, backup.Namespace, bdm.recorder, bdm.clientSet)
+	backupProvider, err := provider.Get(ctx, backup, backup.Spec.Provider, backup.Namespace, bdm.recorder, bdm.k8sClient, bdm.clientSet)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}

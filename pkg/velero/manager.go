@@ -7,10 +7,10 @@ type defaultManager struct {
 }
 
 // NewDefaultManager creates a new instance of defaultManager.
-func NewDefaultManager(veleroClientSet veleroClientSet, ecosystemClientSet ecosystemClientSet, recorder eventRecorder, namespace string) *defaultManager {
+func NewDefaultManager(k8sClient k8sWatchClient, discoveryClient discoveryClient, recorder eventRecorder, namespace string) *defaultManager {
 	return &defaultManager{
-		backupManager:  newDefaultBackupManager(veleroClientSet, recorder),
-		restoreManager: newDefaultRestoreManager(veleroClientSet, recorder),
-		syncManager:    newDefaultSyncManager(veleroClientSet, ecosystemClientSet, recorder, namespace),
+		backupManager:  newDefaultBackupManager(k8sClient, recorder),
+		restoreManager: newDefaultRestoreManager(k8sClient, discoveryClient, recorder),
+		syncManager:    newDefaultSyncManager(k8sClient, recorder, namespace),
 	}
 }
