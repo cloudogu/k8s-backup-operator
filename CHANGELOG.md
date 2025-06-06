@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.4.5] - 2025-06-06
+### Changed
+- [#63] Update version constraint to match latest velero version
+
 ## [v1.4.4] - 2025-06-05
 ### Changed
 - [#61] Update velero dependency
