@@ -1,10 +1,9 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-backup-operator
-VERSION=1.4.5
+VERSION=1.4.6
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.24
-LINT_VERSION=v1.64.8
-MAKEFILES_VERSION=9.9.1
+MAKEFILES_VERSION=10.1.1
 STAGE?=production
 MOCKERY_VERSION=v2.53.3
 MOCKERY_IGNORED=vendor,build,docs,generated

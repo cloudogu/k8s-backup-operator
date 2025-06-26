@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.4.6] - 2025-06-26
+### Fixed
+- [#65] Empty namespace when creating synced backups caused error
+
 ## [v1.4.5] - 2025-06-06
 ### Changed
 - [#63] Update version constraint to match latest velero version

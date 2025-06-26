@@ -156,8 +156,12 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 			Status: velerov1.BackupStatus{StartTimestamp: &metav1.Time{}, CompletionTimestamp: &metav1.Time{}},
 		}
 		createBackupMock := backupv1.Backup{
-			TypeMeta:   metav1.TypeMeta{},
-			ObjectMeta: metav1.ObjectMeta{Name: veleroBackupName, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
+			TypeMeta: metav1.TypeMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      veleroBackupName,
+				Namespace: testNamespace,
+				Labels:    map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+			},
 			Spec: backupv1.BackupSpec{
 				Provider:           backupv1.ProviderVelero,
 				SyncedFromProvider: true,
@@ -226,8 +230,12 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 			Status: velerov1.BackupStatus{StartTimestamp: &metav1.Time{}, CompletionTimestamp: &metav1.Time{}},
 		}
 		createBackupMock := backupv1.Backup{
-			TypeMeta:   metav1.TypeMeta{},
-			ObjectMeta: metav1.ObjectMeta{Name: veleroBackupName, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
+			TypeMeta: metav1.TypeMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      veleroBackupName,
+				Namespace: testNamespace,
+				Labels:    map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+			},
 			Spec: backupv1.BackupSpec{
 				Provider:           backupv1.ProviderVelero,
 				SyncedFromProvider: true,
