@@ -70,8 +70,9 @@ func createBackupsForVeleroBackups(ctx context.Context, veleroBackupsList *veler
 		if _, exists := backupMap[veleroBackup.Name]; !exists {
 			newBackup := &backupv1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   veleroBackup.Name,
-					Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+					Name:      veleroBackup.Name,
+					Namespace: veleroBackup.Namespace,
+					Labels:    map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
 				},
 				Spec: backupv1.BackupSpec{
 					Provider:           backupv1.ProviderVelero,
