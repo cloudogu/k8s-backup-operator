@@ -8,34 +8,27 @@ Theoretically, however, it should also be possible to configure other CSI-capabl
 
 MinIO is required on the host to store backups:
 ```shell
-docker run -d --name minio \
--p 9000:9000 -p 9090:9090 \
--e "MINIO_ROOT_USER=MINIOADMIN" \
--e "MINIO_ROOT_PASSWORD=MINIOADMINPW" \
-quay.io/minio/minio \
-server /data --console-address ":9090"
+../../samples/setup/run_local_minio.sh
 ```
-In the web interface (http://localhost:9090) two buckets `velero` and `longhorn`
-and an access key `longhorn-test-key` with the secret key `longhorn-test-secret-key` must be configured.
-(Longhorn and Velero are already preconfigured accordingly, so they do not need to be adjusted).
+You can log in to the MinIO web interface (http://localhost:9090) with the access data `admin123:admin123`
+. Then create two buckets `velero` and `longhorn`. Two access keys are also required:
+- Name: `MY-ACCESS-KEY` Secret: `MY-ACCESS-SECRET123`
+- Name: `MY-VELERO-ACCESS-KEY` Secret: `MY-VELERO.ACCESS-SECRET123`
+  Longhorn and Velero are already preconfigured accordingly and therefore do not need to be customised.
 
-Furthermore, [k8s-snapshot-controller][snapshot-ctrl-repo] and [k8s-velero][velero-repo] have to be installed as components.
-To do this, check out the repositories and execute the following commands inside:
+
+The following blueprint provides a basic configuration of the backup stack with all the necessary components:
+
 ```shell
-# only in k8s-velero
-cd k8s/helm/templates && helm dependency update
-# only in the snapshot-controller:
-make crd-component-apply
-# for snapshot-controller and velero:
-make component-apply
+kubectl apply -f ../../samples/setup/blueprint_configure_backup.yaml --namespace=ecosystem
 ```
 
-[snapshot-ctrl-repo]: https://github.com/cloudogu/k8s-snapshot-controller
-[velero-repo]: https://github.com/cloudogu/k8s-velero
-
-The [k8s-backup-operator][backup-op-repo] can be installed using the makefiles as well:
+Before a backup, check whether the backup storage location is accessible:
 ```shell
-make crd-component-apply component-apply
+kubectl get backupstoragelocation --namespace=ecosystem
 ```
 
-[backup-op-repo]: https://github.com/cloudogu/k8s-backup-operator
+A backup can then be performed:
+```shell
+kubectl apply -f ../../samples/backup.yaml --namespace=ecosystem
+```

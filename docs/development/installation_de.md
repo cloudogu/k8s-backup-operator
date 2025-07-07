@@ -8,34 +8,35 @@ Theoretisch sollten sich aber auch andere CSI-fähige Storage-Provider konfiguri
 
 Es wird MinIO auf dem Host benötigt, um Backups speichern zu können:
 ```shell
-docker run -d --name minio \
--p 9000:9000 -p 9090:9090 \
--e "MINIO_ROOT_USER=MINIOADMIN" \
--e "MINIO_ROOT_PASSWORD=MINIOADMINPW" \
-quay.io/minio/minio \
-server /data --console-address ":9090"
+../../samples/setup/run_local_minio.sh
 ```
-Dort in der Weboberfläche (http://localhost:9090) zwei Buckets `velero` und `longhorn`
-und einen Access Key `longhorn-test-key` mit dem Secret Key `longhorn-test-secret-key` anlegen.
-(Longhorn und Velero sind schon entsprechend vorkonfiguriert, müssen also nicht angepasst werden.)
 
-Des Weiteren müssen [k8s-snapshot-controller][snapshot-ctrl-repo] und [k8s-velero][velero-repo] als Komponenten installiert werden.
-Dazu die Repositories auschecken und darin folgende Befehle ausführen:
+Für die Kommunikation mit dem Minio werden Secrets benötigt. Diese können wie folgt ins Cluster eingespielt werden:
 ```shell
-# nur in k8s-velero
-cd k8s/helm/templates && helm dependency update
-# nur im snapshot-controller:
-make crd-component-apply
-# für snapshot-controller und velero:
-make component-apply
+../../samples/setup/create_backup_secrets.sh
 ```
 
-[snapshot-ctrl-repo]: https://github.com/cloudogu/k8s-snapshot-controller
-[velero-repo]: https://github.com/cloudogu/k8s-velero
 
-Auch der [k8s-backup-operator][backup-op-repo] kann mit unseren Makefiles installiert werden:
+
+In der Weboberfläche von MinIO (http://localhost:9090) kann sich mit den Zugangsdaten `admin123:admin123` angemeldet 
+werden. Anschließend zwei Buckets `velero` und `longhorn` erstellen. Zusätzlich werden zwei Access Keys benötigt:
+- Name: `MY-ACCESS-KEY` Secret: `MY-ACCESS-SECRET123`
+- Name: `MY-VELERO-ACCESS-KEY` Secret: `MY-VELERO.ACCESS-SECRET123`
+Longhorn und Velero sind schon entsprechend vorkonfiguriert, müssen also nicht angepasst werden.
+
+
+Das folgende Blueprint bietet eine grundlegende Konfiguration des Backup-Stacks mit allen nötigen Komponenten:
+
 ```shell
-make crd-component-apply component-apply
+kubectl apply -f ../../samples/setup/blueprint_configure_backup.yaml --namespace=ecosystem
 ```
 
-[backup-op-repo]: https://github.com/cloudogu/k8s-backup-operator
+Vor einem Backup überprüfen, ob die Backup Storage Location erreichbar ist:
+```shell
+kubectl get backupstoragelocation --namespace=ecosystem
+```
+
+Anschließend kann ein Backup durchgeführt werden:
+```shell
+kubectl apply -f ../../samples/backup.yaml --namespace=ecosystem
+```
