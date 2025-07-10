@@ -17,9 +17,9 @@ These resources are retained after the cleanup.
 ## Exclude resources in the restore process
 
 A [Plugin for excluding resources from the backup](https://github.com/cloudogu/velero-plugin-for-restore-exclude/) 
-exists for the restore provider `velero`. This plugin can be used with `velero` in the cluster and 
-configured with the attribute `excludedFromRestores`. The configuration options are the same as for
-Exclude from cleanup via the GVKN pattern. Resources that are excluded here and are present in the backup that is to be imported are ignored during this restore.
+exists for the restore provider `velero`. 
+This plugin can be applied and used with `velero` in the cluster to exclude resources during the
+restore process. For more information see [here](https://github.com/cloudogu/k8s-velero/blob/develop/docs/exclude_out_of_restore_en.md)
 
 ## Interaction
 
