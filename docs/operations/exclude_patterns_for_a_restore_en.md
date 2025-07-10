@@ -1,4 +1,4 @@
-# Exclude files during a restore
+# Exclude resources during a restore
 
 The restore is divided into two steps. Firstly, a cleanup is performed. This cleanup deletes all
 resources of the cluster that are not required for the backup. All resources required by the backup stack,
@@ -14,7 +14,7 @@ The resources only need to be specified in the GVKN pattern (group, version, kin
 all resources that are required for the backup, the ces load balancer and the certificate are excluded from the cleanup. 
 These resources are retained after the cleanup.
 
-## Exclude files in the restore process
+## Exclude resources in the restore process
 
 A [Plugin for excluding resources from the backup](https://github.com/cloudogu/velero-plugin-for-restore-exclude/) 
 exists for the restore provider `velero`. This plugin can be used with `velero` in the cluster and 

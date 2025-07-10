@@ -1,4 +1,4 @@
-# Ausschließen von Dateien während eines Restores
+# Ausschließen von Ressourcen während eines Restores
 
 Das Restore ist in zwei Schritte unterteilt. Als Erstes wird ein Cleanup durchgeführt. Dieses Cleanup löscht alle 
 Ressourcen des Clusters, die nicht für das Backup benötigt werden. Alle Ressourcen, die der Backup-Stack benötigt, 
