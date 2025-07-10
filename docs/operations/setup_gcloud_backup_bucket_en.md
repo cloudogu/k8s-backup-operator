@@ -1,4 +1,4 @@
-# Set up a backup bucket incl. access
+# Set up a backup bucket incl. access in the google cloud
 
 ## Setting up with Terraform
 

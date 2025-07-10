@@ -1,4 +1,4 @@
-# Aufsetzen eines Backup-Buckets inkl. Zugriff
+# Aufsetzen eines Backup-Buckets inkl. Zugriff in der Google Cloud
 
 ## Aufsetzen mit Terraform
 
