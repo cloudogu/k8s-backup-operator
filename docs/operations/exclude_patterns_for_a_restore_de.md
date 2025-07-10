@@ -25,5 +25,5 @@ vorhanden sind, das eingespielt werden soll, werden bei diesem Restore ignoriert
 
 ## Zusammenspiel
 
-Diese beiden Ausschließungsprozesse sollten zusammen verwendet werden. Dadurch ist es möglich Ressourcen, die sich 
-vor dem Einspielen eines Restores im Cluster zu behalten und im Nachhinein zu verwenden.
+Diese beiden Ausschließungsprozesse sollten zusammen verwendet werden. Dadurch ist es möglich Ressourcen
+vor dem Einspielen eines Restores im Cluster zu behalten und im Nachhinein weiter zu verwenden.

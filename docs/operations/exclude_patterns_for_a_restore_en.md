@@ -23,5 +23,5 @@ Exclude from cleanup via the GVKN pattern. Resources that are excluded here and 
 
 ## Interaction
 
-These two exclusion processes should be used together. This makes it possible to keep resources that are
-in the cluster before importing a restore and to use them afterwards.
+These two exclusion processes should be used together. This makes it possible to keep resources
+in the cluster before importing a restore and to continue using them afterwards.
