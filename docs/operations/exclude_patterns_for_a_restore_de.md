@@ -10,8 +10,21 @@ Backup dem Cluster hinzuzufügen.
 ## Dateien im Cleanup ausschließen
 
 Mit dem Attribute `cleanup.exclude` in der `values.yaml` lassen sich beliebige Ressourcen aus dem Cleanup ausschließen.
-Die Ressourcen müssen lediglich im GVKN-Pattern (Group, Version, Kind, Name) angegeben werden. Standardmäßig werden 
-alle Ressourcen, die für das Backup benötigt werden, der Ces-Loadbalancer und das Zertifikat beim Cleanup 
+Die Ressourcen müssen lediglich im GVKN-Pattern (Group, Version, Kind, Name) angegeben werden. 
+```yaml
+...
+cleanup:
+  exclude:
+    - name: "k8s-backup-operator"
+      kind: "Component"
+      version: "*"
+      group: "k8s.cloudogu.com"
+    - name: "test-certificate"
+      kind: "Secret"
+      version: "*"
+...
+```
+Standardmäßig werden alle Ressourcen, die für das Backup benötigt werden, der Ces-Loadbalancer und das Zertifikat beim Cleanup 
 ausgeschlossen. Diese Ressourcen bleiben nach dem Cleanup erhalten.
 
 ## Dateien im Restore-Prozess ausschließen

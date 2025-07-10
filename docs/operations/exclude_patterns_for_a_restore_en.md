@@ -10,8 +10,21 @@ backup to the cluster.
 ## Exclude files in the cleanup
 
 The `cleanup.exclude` attribute in `values.yaml` can be used to exclude any resources from the cleanup.
-The resources only need to be specified in the GVKN pattern (group, version, kind, name). By default,
-all resources that are required for the backup, the ces load balancer and the certificate are excluded from the cleanup. 
+The resources only need to be specified in the GVKN pattern (group, version, kind, name). 
+```yaml
+...
+cleanup:
+  exclude:
+    - name: "k8s-backup-operator"
+      kind: "Component"
+      version: "*"
+      group: "k8s.cloudogu.com"
+    - name: "test-certificate"
+      kind: "Secret"
+      version: "*"
+...
+```
+By default, all resources that are required for the backup, the ces load balancer and the certificate are excluded from the cleanup. 
 These resources are retained after the cleanup.
 
 ## Exclude resources in the restore process
