@@ -1,4 +1,4 @@
-# Installation of the backup operator
+# Getting started
 
 Prerequisite for the installation is a running [Multinode EcoSystem][mn-ecosystem-repo].
 With the default configuration, only Longhorn is supported as a storage provider in the Multinode EcoSystem.
@@ -10,11 +10,17 @@ MinIO is required on the host to store backups:
 ```shell
 ../../samples/setup/run_local_minio.sh
 ```
+
+Secrets are required for communication with the Minio. These can be imported into the cluster as follows:
+```shell
+../../samples/setup/create_backup_secrets.sh
+```
+
 You can log in to the MinIO web interface (http://localhost:9090) with the access data `admin123:admin123`
 . Then create two buckets `velero` and `longhorn`. Two access keys are also required:
 - Name: `MY-ACCESS-KEY` Secret: `MY-ACCESS-SECRET123`
 - Name: `MY-VELERO-ACCESS-KEY` Secret: `MY-VELERO.ACCESS-SECRET123`
-  Longhorn and Velero are already preconfigured accordingly and therefore do not need to be customised.
+Longhorn and Velero are already preconfigured accordingly and therefore do not need to be customised.
 
 
 The following blueprint provides a basic configuration of the backup stack with all the necessary components:

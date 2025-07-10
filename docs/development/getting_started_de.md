@@ -1,4 +1,4 @@
-# Installation des Backup-Operators
+# Getting started
 
 Voraussetzung für die Installation ist ein laufendes [Multinode-EcoSystem][mn-ecosystem-repo].
 Mit der Default-Konfiguration wird als Storage-Provider bisher nur Longhorn im Multinode-EcoSystem unterstützt.
@@ -15,8 +15,6 @@ Für die Kommunikation mit dem Minio werden Secrets benötigt. Diese können wie
 ```shell
 ../../samples/setup/create_backup_secrets.sh
 ```
-
-
 
 In der Weboberfläche von MinIO (http://localhost:9090) kann sich mit den Zugangsdaten `admin123:admin123` angemeldet 
 werden. Anschließend zwei Buckets `velero` und `longhorn` erstellen. Zusätzlich werden zwei Access Keys benötigt:
