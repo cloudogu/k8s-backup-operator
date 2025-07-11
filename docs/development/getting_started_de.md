@@ -6,7 +6,8 @@ Theoretisch sollten sich aber auch andere CSI-fähige Storage-Provider konfiguri
 
 [mn-ecosystem-repo]: https://github.com/cloudogu/k8s-ecosystem
 
-Es wird MinIO auf dem Host benötigt, um Backups speichern zu können:
+Es wird ein S3-kompatiblen Objektspeicher benötigt, um Backups speichern zu können.
+In diesem Beispiel wird dafür MinIO auf dem Host ausgeführt:
 ```shell
 ../../samples/setup/run_local_minio.sh
 ```
