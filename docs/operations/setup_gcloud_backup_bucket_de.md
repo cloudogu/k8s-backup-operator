@@ -9,7 +9,7 @@ ein Beispiel zu finden.
 ## Aufsetzen mit Google Cloud Benutzeroberfläche
 
 ### Voraussetzungen
-- Im Projekt muss die Cloud Key Management API aktiviert sein
+- Im Projekt muss die Cloud Key Management API aktiviert sein, wenn Verschlüsselung erwünscht
 - Ein Service Account / Dienstkonto muss vorhanden sein 
   - Muss die Rolle "cloudkms.cryptoKeyEncrypterDecrypter" besitzen, wenn Verschlüsselung erwünscht
   - Key zum Verschlüsseln, falls erwünscht
@@ -52,7 +52,7 @@ ein Beispiel zu finden.
 - Storage class: Standard
     - Oder Nearline/Coldline, wenn es selten Zugriff gibt
 - Prevent public access: Fine-grained
-- Data protection: Kein soft-delete!
+- Data protection: **Kein** soft-delete!
 - Data encryption: Cloud KMS key
     - Oben angelegten Key auswählen
 
