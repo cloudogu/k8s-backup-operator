@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.4.7] - 2025-07-11
+### Changed
+- [#67] Enhanced documentation and integrated other sources
+
 ## [v1.4.6] - 2025-06-26
 ### Fixed
 - [#65] Empty namespace when creating synced backups caused error
