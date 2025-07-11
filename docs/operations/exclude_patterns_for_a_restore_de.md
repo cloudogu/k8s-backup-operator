@@ -7,7 +7,7 @@ besitzen die Annotation `k8s.cloudogu.com/part-of: backup`.
 Im zweiten Schritt wird der Backup-Provider verwendet, um ein Restore durchzuführen und alle Ressourcen aus dem 
 Backup dem Cluster hinzuzufügen.
 
-## Dateien im Cleanup ausschließen
+## Ressourcen im Cleanup ausschließen
 
 Mit dem Attribute `cleanup.exclude` in der `values.yaml` lassen sich beliebige Ressourcen aus dem Cleanup ausschließen.
 Die Ressourcen müssen lediglich im GVKN-Pattern (Group, Version, Kind, Name) angegeben werden. 
@@ -27,7 +27,7 @@ cleanup:
 Standardmäßig werden alle Ressourcen, die für das Backup benötigt werden, der Ces-Loadbalancer und das Zertifikat beim Cleanup 
 ausgeschlossen. Diese Ressourcen bleiben nach dem Cleanup erhalten.
 
-## Dateien im Restore-Prozess ausschließen
+## Ressourcen im Restore-Prozess ausschließen
 
 Für den Restore-Provider `velero` existiert ein 
 [Plugin zum Ausschließen von Ressourcen aus dem Backup](https://github.com/cloudogu/velero-plugin-for-restore-exclude/). 

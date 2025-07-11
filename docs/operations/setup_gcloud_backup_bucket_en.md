@@ -9,10 +9,12 @@ An example of setting up a Google Cloud bucket with Terraform can be found at
 ## Setting up with Google Cloud user interface
 
 ### Prerequisites
-- The Cloud Key Management API must be activated in the project if encryption is required
 - A service account must be available
-  - Must have the role "cloudkms.cryptoKeyEncrypterDecrypter" if encryption is required
-  - Key for encryption, if desired
+
+Prerequisites for encrypting the bucket: 
+- The Cloud Key Management API must be activated in the project
+- The service account must have the role "cloudkms.cryptoKeyEncrypterDecrypter"
+- Key for encryption
 
 #### Activate Cloud Key Management Service API
 - Call up the KMS area of the project

@@ -1,10 +1,8 @@
-# Getting started
+# Local dev setup
 
-Prerequisite for the installation is a running [Multinode EcoSystem][mn-ecosystem-repo].
+Prerequisite for the installation is a running [Multinode EcoSystem](https://github.com/cloudogu/k8s-ecosystem).
 With the default configuration, only Longhorn is supported as a storage provider in the Multinode EcoSystem.
 Theoretically, however, it should also be possible to configure other CSI-capable storage providers.
-
-[mn-ecosystem-repo]: https://github.com/cloudogu/k8s-ecosystem
 
 A S3-compatible object storage is required to be able to save backups.
 In this example, MinIO is executed on the host for this purpose:

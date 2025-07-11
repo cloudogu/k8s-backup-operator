@@ -7,7 +7,7 @@ have the annotation `k8s.cloudogu.com/part-of: backup`.
 In the second step, the backup provider is used to perform a restore and add all resources from the
 backup to the cluster.
 
-## Exclude files in the cleanup
+## Exclude ressources in the cleanup
 
 The `cleanup.exclude` attribute in `values.yaml` can be used to exclude any resources from the cleanup.
 The resources only need to be specified in the GVKN pattern (group, version, kind, name). 

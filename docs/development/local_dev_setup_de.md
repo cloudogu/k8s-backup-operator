@@ -1,10 +1,8 @@
-# Getting started
+# Lokale Testumgebung
 
-Voraussetzung für die Installation ist ein laufendes [Multinode-EcoSystem][mn-ecosystem-repo].
+Voraussetzung für die Installation ist ein laufendes [Multinode-EcoSystem](https://github.com/cloudogu/k8s-ecosystem).
 Mit der Default-Konfiguration wird als Storage-Provider bisher nur Longhorn im Multinode-EcoSystem unterstützt.
 Theoretisch sollten sich aber auch andere CSI-fähige Storage-Provider konfigurieren lassen.
-
-[mn-ecosystem-repo]: https://github.com/cloudogu/k8s-ecosystem
 
 Es wird ein S3-kompatibler Objektspeicher benötigt, um Backups speichern zu können.
 In diesem Beispiel wird dafür MinIO auf dem Host ausgeführt:

@@ -9,10 +9,12 @@ ein Beispiel zu finden.
 ## Aufsetzen mit Google Cloud Benutzeroberfläche
 
 ### Voraussetzungen
+- Ein Service Account / Dienstkonto muss vorhanden sein
+
+Vorraussetzungen für eine Verschlüsselung des Buckets:
 - Im Projekt muss die Cloud Key Management API aktiviert sein, wenn Verschlüsselung erwünscht
-- Ein Service Account / Dienstkonto muss vorhanden sein 
-  - Muss die Rolle "cloudkms.cryptoKeyEncrypterDecrypter" besitzen, wenn Verschlüsselung erwünscht
-  - Key zum Verschlüsseln, falls erwünscht
+- Der Service Account (bzw. das Dienstkonto) muss die Rolle "cloudkms.cryptoKeyEncrypterDecrypter" besitzen
+- Key zum Verschlüsseln
 
 #### Cloud Key Management Service API aktivieren
 - KMS-Bereich des Projekts aufrufen
