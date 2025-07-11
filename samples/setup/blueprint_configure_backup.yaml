@@ -38,7 +38,7 @@ spec:
           "deployNamespace":"longhorn-system",
           "overwriteConfig":{
             "longhorn":{
-              "defaultSettings":{
+              "defaultBackupStore":{
                 "backupTarget":"s3://longhorn@dummyregion/",
                 "backupTargetCredentialSecret":"longhorn-backup-target"
               }
