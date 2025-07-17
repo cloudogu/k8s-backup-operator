@@ -46,7 +46,7 @@ func Test_parseFlags(t *testing.T) {
 		}
 
 		// when
-		newCtrlOpts, _ := parseManagerFlags(flags, []string{}, ctrlOpts)
+		newCtrlOpts := parseManagerFlags(flags, []string{}, ctrlOpts)
 
 		// then
 		require.NotEmpty(t, newCtrlOpts)
@@ -78,7 +78,7 @@ func Test_parseFlags(t *testing.T) {
 		}
 
 		// when
-		newCtrlOpts, _ := parseManagerFlags(flags, args, ctrlOpts)
+		newCtrlOpts := parseManagerFlags(flags, args, ctrlOpts)
 
 		// then
 		require.NotEmpty(t, newCtrlOpts)

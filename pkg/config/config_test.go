@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
@@ -82,4 +83,34 @@ func TestNewOperatorConfig(t *testing.T) {
 		}
 		assert.Equal(t, expected, actual)
 	})
+}
+
+func TestGetLogLevel(t *testing.T) {
+	tests := []struct {
+		name    string
+		want    string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name:    "test log level not set",
+			wantErr: assert.Error,
+		},
+		{
+			name:    "test log level set to debug",
+			want:    "debug",
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.want != "" {
+				t.Setenv(logLevelEnvVar, tt.want)
+			}
+			got, err := GetLogLevel()
+			if !tt.wantErr(t, err, fmt.Sprintf("GetLogLevel()")) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "GetLogLevel()")
+		})
+	}
 }

@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.5.0] - 2025-07-17
+### Added
+- [#69] add metadata mapping for logLevel
+
 ## [v1.4.7] - 2025-07-11
 ### Changed
 - [#67] Enhanced documentation and integrated other sources
