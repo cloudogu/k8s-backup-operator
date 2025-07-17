@@ -24,7 +24,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -79,6 +78,8 @@ func init() {
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	config.ConfigureLogger()
 
 	logger := log.FromContext(ctx).WithName("main")
 
@@ -231,14 +232,12 @@ func getK8sManagerOptions(flags *flag.FlagSet, args []string, operatorConfig *co
 		LeaseDuration:    &leaseDuration,
 		RenewDeadline:    &renewDeadline,
 	}
-	controllerOpts, zapOpts := parseManagerFlags(flags, args, controllerOpts)
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
+	controllerOpts = parseManagerFlags(flags, args, controllerOpts)
 
 	return controllerOpts
 }
 
-func parseManagerFlags(flags *flag.FlagSet, args []string, ctrlOpts ctrl.Options) (ctrl.Options, zap.Options) {
+func parseManagerFlags(flags *flag.FlagSet, args []string, ctrlOpts ctrl.Options) ctrl.Options {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -247,10 +246,7 @@ func parseManagerFlags(flags *flag.FlagSet, args []string, ctrlOpts ctrl.Options
 	flags.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	zapOpts := zap.Options{
-		Development: config.IsStageDevelopment(),
-	}
-	zapOpts.BindFlags(flags)
+
 	// Ignore errors; flags is set to exit on errors
 	_ = flags.Parse(args)
 
@@ -258,7 +254,7 @@ func parseManagerFlags(flags *flag.FlagSet, args []string, ctrlOpts ctrl.Options
 	ctrlOpts.HealthProbeBindAddress = probeAddr
 	ctrlOpts.LeaderElection = enableLeaderElection
 
-	return ctrlOpts, zapOpts
+	return ctrlOpts
 }
 
 func configureReconcilers(ctx context.Context, k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
