@@ -65,7 +65,7 @@ func TestBackupSchedule_CronJobPodTemplate(t *testing.T) {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name:            "backup-schedule-my-schedule",
-					Image:           "bitnami/kubectl:1.27.7",
+					Image:           "bitnamilegacy/kubectl:1.27.7",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Args:            []string{"scheduled-backup", "--name=my-schedule", "--provider=velero"},
 					Env: []corev1.EnvVar{
@@ -88,7 +88,7 @@ func TestBackupSchedule_CronJobPodTemplate(t *testing.T) {
 		}
 
 		// when
-		actual := sut.CronJobPodTemplate("bitnami/kubectl:1.27.7")
+		actual := sut.CronJobPodTemplate("bitnamilegacy/kubectl:1.27.7")
 
 		// then
 		assert.Equal(t, expected, actual)
@@ -116,7 +116,7 @@ func TestBackupSchedule_CronJobPodTemplate(t *testing.T) {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name:            "backup-schedule-my-schedule",
-					Image:           "bitnami/kubectl:1.27.7",
+					Image:           "bitnamilegacy/kubectl:1.27.7",
 					ImagePullPolicy: corev1.PullAlways,
 					Args:            []string{"scheduled-backup", "--name=my-schedule", "--provider=velero"},
 					Env: []corev1.EnvVar{
@@ -140,7 +140,7 @@ func TestBackupSchedule_CronJobPodTemplate(t *testing.T) {
 		}
 
 		// when
-		actual := sut.CronJobPodTemplate("bitnami/kubectl:1.27.7")
+		actual := sut.CronJobPodTemplate("bitnamilegacy/kubectl:1.27.7")
 
 		// then
 		assert.Equal(t, expected, actual)

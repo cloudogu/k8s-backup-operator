@@ -124,7 +124,7 @@ func Test_updater_Update(t *testing.T) {
 
 		scheduleOldImage := backupv1.BackupSchedule{
 			Status: backupv1.BackupScheduleStatus{
-				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnamilegacy/kubectl:1.1.0",
 			},
 		}
 		schedules := []backupv1.BackupSchedule{
@@ -174,7 +174,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "GetError",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnamilegacy/kubectl:1.1.0",
 			},
 		}
 		scheduleOldImage := backupv1.BackupSchedule{
@@ -182,7 +182,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "OldImage",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnamilegacy/kubectl:1.1.0",
 			},
 		}
 		schedules := []backupv1.BackupSchedule{
@@ -242,7 +242,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "GetError",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnamilegacy/kubectl:1.1.0",
 			},
 		}
 		scheduleOldImage := backupv1.BackupSchedule{
@@ -250,7 +250,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "OldImage",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnamilegacy/kubectl:1.1.0",
 			},
 		}
 		schedules := []backupv1.BackupSchedule{
@@ -313,7 +313,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "GetError",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnamilegacy/kubectl:1.1.0",
 			},
 		}
 		scheduleOldImage := backupv1.BackupSchedule{
@@ -321,7 +321,7 @@ func Test_updater_Update(t *testing.T) {
 				Name: "OldImage",
 			},
 			Status: backupv1.BackupScheduleStatus{
-				CurrentCronJobImage: "bitnami/kubectl:1.1.0",
+				CurrentCronJobImage: "bitnamilegacy/kubectl:1.1.0",
 			},
 		}
 		schedules := []backupv1.BackupSchedule{
