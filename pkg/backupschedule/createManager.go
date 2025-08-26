@@ -10,9 +10,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
+	"github.com/cloudogu/k8s-backup-lib/pkg/api/ecosystem"
+	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	"github.com/cloudogu/retry-lib/retry"
 )
 
 type defaultCreateManager struct {

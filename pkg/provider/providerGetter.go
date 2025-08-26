@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
 )
 
 var knownProviders = []k8sv1.Provider{k8sv1.ProviderVelero}

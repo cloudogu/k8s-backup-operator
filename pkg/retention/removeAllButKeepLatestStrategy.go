@@ -3,7 +3,7 @@ package retention
 import (
 	"slices"
 
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
 )
 
 type removeAllButKeepLatestStrategy struct{}

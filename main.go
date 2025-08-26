@@ -27,9 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/cloudogu/k8s-backup-lib/pkg/api/ecosystem"
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
-	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/backupschedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"

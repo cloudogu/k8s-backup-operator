@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"

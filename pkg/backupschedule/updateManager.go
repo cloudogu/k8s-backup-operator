@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
-	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
+	"github.com/cloudogu/retry-lib/retry"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
 )
 
 type defaultUpdateManager struct {

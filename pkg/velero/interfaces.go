@@ -5,7 +5,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
 
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/record"

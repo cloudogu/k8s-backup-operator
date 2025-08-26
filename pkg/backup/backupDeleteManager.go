@@ -3,7 +3,7 @@ package backup
 import (
 	"context"
 	"fmt"
-	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 

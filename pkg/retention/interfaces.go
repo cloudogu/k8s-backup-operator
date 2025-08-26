@@ -1,7 +1,7 @@
 package retention
 
 import (
-	k8sv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
 	time2 "github.com/cloudogu/k8s-backup-operator/pkg/time"
 )
 

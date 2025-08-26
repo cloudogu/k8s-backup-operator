@@ -42,7 +42,7 @@ import (
 
 	discoveryv1beta1 "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 
-	ecosystem "github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	ecosystem "github.com/cloudogu/k8s-backup-lib/pkg/api/ecosystem"
 
 	eventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 

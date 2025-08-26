@@ -10,8 +10,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-lib/pkg/api/ecosystem"
+	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 

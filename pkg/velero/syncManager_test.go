@@ -2,7 +2,7 @@ package velero
 
 import (
 	"context"
-	backupv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	backupv1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
