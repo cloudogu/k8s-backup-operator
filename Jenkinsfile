@@ -23,7 +23,6 @@ registry = "registry.cloudogu.com"
 registry_namespace = "k8s"
 helmTargetDir = "target/k8s"
 helmChartDir = "${helmTargetDir}/helm"
-helmCRDChartDir = "${helmTargetDir}/helm-crd"
 
 // Configuration of branches
 productionReleaseBranch = "main"
@@ -99,7 +98,6 @@ node('docker') {
             }
 
             stage('Deploy Manager') {
-                k3d.helm("install ${repositoryName}-crd ${helmCRDChartDir}")
                 k3d.helm("install ${repositoryName} ${helmChartDir}")
             }
 

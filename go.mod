@@ -1,12 +1,10 @@
 module github.com/cloudogu/k8s-backup-operator
 
-go 1.24.0
-
-toolchain go1.24.3
+go 1.24.3
 
 require (
 	github.com/Masterminds/semver/v3 v3.3.1
-	github.com/cloudogu/k8s-backup-lib v0.0.0-20250825122642-b31a3866bf6e
+	github.com/cloudogu/k8s-backup-lib v0.0.0-20250826152221-3bc5e31ff21c
 	github.com/cloudogu/k8s-registry-lib v0.5.0
 	github.com/cloudogu/retry-lib v0.1.0
 	github.com/dlclark/regexp2 v1.11.5

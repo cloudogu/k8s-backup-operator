@@ -1,7 +1,7 @@
 apiVersion: k8s.cloudogu.com/v1
 kind: BackupSchedule
 metadata:
-  name: backupschedule-sample
+  name: backupschedule-samplesss
 spec:
-  schedule: "20 11 * * *"
+  schedule: "*/10 * * * *"
   provider: "velero"
