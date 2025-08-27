@@ -64,7 +64,6 @@ node('docker') {
                             }
 
                             stage("Lint helm") {
-                                make 'crd-helm-lint'
                                 make 'helm-lint'
                             }
                         }
