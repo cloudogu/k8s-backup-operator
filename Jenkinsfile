@@ -85,7 +85,7 @@ node('docker') {
             stage('Deploy crd') {
                     withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD']]) {
                         k3d.helm("registry login ${registryUrl} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'")
-                        k3d.helm("install k8s-debug-mode-operator-crd oci://${registryUrl}/${registryNamespace}/k8s-backup-operator-crd --version ${backupCrdVersion}")
+                        k3d.helm("install k8s-backup-operator-crd oci://${registryUrl}/${registryNamespace}/k8s-backup-operator-crd --version ${backupCrdVersion}")
                 }
             }
 
