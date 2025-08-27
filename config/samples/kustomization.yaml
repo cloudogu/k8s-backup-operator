@@ -1,6 +1,0 @@
-## Append samples of your project ##
-resources:
-- k8s_v1_restore.yaml
-- k8s_v1_backup.yaml
-- k8s_v1_backupschedule.yaml
-#+kubebuilder:scaffold:manifestskustomizesamples
