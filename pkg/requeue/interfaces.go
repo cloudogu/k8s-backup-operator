@@ -1,7 +1,7 @@
 package requeue
 
 import (
-	"github.com/cloudogu/k8s-backup-lib/pkg/api/ecosystem"
+	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	"k8s.io/client-go/tools/record"
 	"time"
 )

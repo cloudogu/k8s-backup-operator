@@ -9,7 +9,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
 func Test_backupStatusSyncManager_syncStatus(t *testing.T) {

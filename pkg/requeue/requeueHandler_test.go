@@ -2,7 +2,7 @@ package requeue
 
 import (
 	"context"
-	k8sv1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"

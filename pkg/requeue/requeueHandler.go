@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	k8sv1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/retry-lib/retry"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -5,7 +5,7 @@ import (
 	typedbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	"k8s.io/client-go/tools/record"
 
-	"github.com/cloudogu/k8s-backup-lib/pkg/api/ecosystem"
+	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 )
 
 type ecosystemClientSet interface {

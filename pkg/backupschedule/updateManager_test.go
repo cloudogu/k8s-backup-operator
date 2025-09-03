@@ -1,7 +1,7 @@
 package backupschedule
 
 import (
-	k8sv1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

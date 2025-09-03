@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"strings"
 
-	k8sv1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
 type operation string

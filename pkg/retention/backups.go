@@ -1,6 +1,6 @@
 package retention
 
-import v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+import v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 
 // RemovedBackups hold backups that are removed from the backup repository.
 type RemovedBackups []v1.Backup

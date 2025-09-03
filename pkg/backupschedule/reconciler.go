@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	k8sv1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"github.com/cloudogu/retry-lib/retry"
 )

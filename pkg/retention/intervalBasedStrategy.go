@@ -3,7 +3,7 @@ package retention
 import (
 	"slices"
 
-	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
 func newIntervalBasedStrategy(name StrategyId, ic intervalCalendar, clock timeProvider) *intervalBasedStrategy {

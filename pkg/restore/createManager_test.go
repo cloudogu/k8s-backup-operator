@@ -1,7 +1,7 @@
 package restore
 
 import (
-	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"

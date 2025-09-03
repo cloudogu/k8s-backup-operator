@@ -14,8 +14,8 @@ github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK3
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
-github.com/cloudogu/k8s-backup-lib v0.0.0-20250827121159-0fc3a98b7427 h1:OfMVQt0eW49GKbknvpV9NCZaIZoI7QTPaz2FFiGfWCI=
-github.com/cloudogu/k8s-backup-lib v0.0.0-20250827121159-0fc3a98b7427/go.mod h1:6xeC7iIAbXrqBm85J69JbI+StSPRt9eMOTLcKahEUeU=
+github.com/cloudogu/k8s-backup-lib v0.0.0-20250903072308-91d60a58ed78 h1:wq8x5MJBToO9w9Z7y+uG8vAfI0/9MemCu6Myojaj6Z4=
+github.com/cloudogu/k8s-backup-lib v0.0.0-20250903072308-91d60a58ed78/go.mod h1:6xeC7iIAbXrqBm85J69JbI+StSPRt9eMOTLcKahEUeU=
 github.com/cloudogu/k8s-registry-lib v0.5.0 h1:mdo8+0cSLicCNyymc8GbTl8ku5sMGA3IR/n5ga2WIvI=
 github.com/cloudogu/k8s-registry-lib v0.5.0/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
 github.com/cloudogu/retry-lib v0.1.0 h1:gaAmtyjUqgHbxfCWMeUn0qnGbDH4TtZVSQkbZ1Nq6eI=

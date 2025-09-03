@@ -3,7 +3,7 @@
 package requeue
 
 import (
-	ecosystem "github.com/cloudogu/k8s-backup-lib/pkg/api/ecosystem"
+	ecosystem "github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	mock "github.com/stretchr/testify/mock"
 )
 

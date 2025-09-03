@@ -3,7 +3,7 @@ package garbagecollection
 import (
 	"context"
 
-	"github.com/cloudogu/k8s-backup-lib/pkg/api/ecosystem"
+	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retention"
 )
 

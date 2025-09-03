@@ -5,7 +5,7 @@ package backup
 import (
 	context "context"
 
-	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	mock "github.com/stretchr/testify/mock"
 )
 

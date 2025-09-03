@@ -8,8 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/cloudogu/k8s-backup-lib/pkg/api/ecosystem"
-	v1 "github.com/cloudogu/k8s-backup-lib/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
+	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/retention"
 )
 
