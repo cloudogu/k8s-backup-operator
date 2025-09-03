@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
-	"github.com/cloudogu/k8s-backup-operator/pkg/config"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,12 +97,6 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 				},
 			},
 		},
-	}
-
-	if config.Stage == config.StageDevelopment {
-		for _, container := range cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers {
-			container.ImagePullPolicy = corev1.PullAlways
-		}
 	}
 
 	err := retry.OnError(maxTries, retry.AlwaysRetryFunc, func() error {
