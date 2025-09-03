@@ -14,7 +14,7 @@ Docker docker = new Docker(this)
 gpg = new Gpg(this, docker)
 goVersion = "1.24"
 Makefile makefile = new Makefile(this)
-backupCrdVersion="1.5.0"
+backupCrdVersion="1.6.0"
 
 // Configuration of repository
 repositoryOwner = "cloudogu"
@@ -204,9 +204,8 @@ void stageAutomaticRelease(Makefile makefile) {
                     .mountJenkinsUser()
                     .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
                             {
-                                // Package operator-chart & crd-chart
+                                // Package operator-chart
                                 make 'helm-package'
-                                make 'crd-helm-package'
                                 archiveArtifacts "${helmTargetDir}/**/*"
 
                                 // Push charts
@@ -214,7 +213,6 @@ void stageAutomaticRelease(Makefile makefile) {
                                     sh ".bin/helm registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'"
 
                                     sh ".bin/helm push ${helmChartDir}/${repositoryName}-${controllerVersion}.tgz oci://${registry}/${registry_namespace}/"
-                                    sh ".bin/helm push ${helmCRDChartDir}/${repositoryName}-crd-${controllerVersion}.tgz oci://${registry}/${registry_namespace}/"
                                 }
                             }
         }
