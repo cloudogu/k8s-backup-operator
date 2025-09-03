@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
 var testCtx = context.Background()

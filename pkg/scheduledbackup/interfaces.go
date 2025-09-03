@@ -4,7 +4,7 @@ import (
 	"context"
 	time2 "github.com/cloudogu/k8s-backup-operator/pkg/time"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 )
 
 type Manager interface {

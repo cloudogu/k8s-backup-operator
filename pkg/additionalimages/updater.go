@@ -5,14 +5,15 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
+	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
 type updater struct {
@@ -98,7 +99,7 @@ func (bsu *updater) patchCronJob(ctx context.Context, schedule *v1.BackupSchedul
 		return fmt.Errorf("failed to get cron job %s: %w", schedule.CronJobName(), err)
 	}
 
-	(*cronJob).Spec.JobTemplate.Spec.Template = schedule.CronJobPodTemplate(image)
+	(*cronJob).Spec.JobTemplate.Spec.Template = schedule.CronJobPodTemplate(image, config.GetStagePullPolicy())
 	_, err = cronJobClient.Update(ctx, cronJob, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update image in backup schedule cron job %s: %w", schedule.CronJobName(), err)

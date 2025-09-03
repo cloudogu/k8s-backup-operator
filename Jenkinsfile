@@ -14,6 +14,7 @@ Docker docker = new Docker(this)
 gpg = new Gpg(this, docker)
 goVersion = "1.24"
 Makefile makefile = new Makefile(this)
+backupCrdVersion="1.5.0"
 
 // Configuration of repository
 repositoryOwner = "cloudogu"
@@ -23,7 +24,6 @@ registry = "registry.cloudogu.com"
 registry_namespace = "k8s"
 helmTargetDir = "target/k8s"
 helmChartDir = "${helmTargetDir}/helm"
-helmCRDChartDir = "${helmTargetDir}/helm-crd"
 
 // Configuration of branches
 productionReleaseBranch = "main"
@@ -60,13 +60,11 @@ node('docker') {
                             }
 
                             stage('Generate k8s Resources') {
-                                make 'crd-helm-generate'
                                 make 'helm-generate'
                                 archiveArtifacts "${helmTargetDir}/**/*"
                             }
 
                             stage("Lint helm") {
-                                make 'crd-helm-lint'
                                 make 'helm-lint'
                             }
                         }
@@ -84,6 +82,13 @@ node('docker') {
                 k3d.startK3d()
             }
 
+            stage('Deploy crd') {
+                    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD']]) {
+                        k3d.helm("registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'")
+                        k3d.helm("install k8s-backup-operator-crd oci://${registry}/${registry_namespace}/k8s-backup-operator-crd --version ${backupCrdVersion}")
+                }
+            }
+
             def imageName = ""
             stage('Build & Push Image') {
                 imageName = k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", controllerVersion)
@@ -99,7 +104,6 @@ node('docker') {
             }
 
             stage('Deploy Manager') {
-                k3d.helm("install ${repositoryName}-crd ${helmCRDChartDir}")
                 k3d.helm("install ${repositoryName} ${helmChartDir}")
             }
 

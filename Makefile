@@ -23,13 +23,9 @@ include build/make/mocks.mk
 
 K8S_COMPONENT_SOURCE_VALUES = ${HELM_SOURCE_DIR}/values.yaml
 K8S_COMPONENT_TARGET_VALUES = ${HELM_TARGET_DIR}/values.yaml
-CRD_BACKUP_SOURCE = ${HELM_CRD_SOURCE_DIR}/templates/k8s.cloudogu.com_backups.yaml
-CRD_RESTORE_SOURCE = ${HELM_CRD_SOURCE_DIR}/templates/k8s.cloudogu.com_restores.yaml
-CRD_SCHEDULE_SOURCE = ${HELM_CRD_SOURCE_DIR}/templates/k8s.cloudogu.com_backupschedules.yaml
 PRE_COMPILE=generate-deepcopy
 HELM_PRE_GENERATE_TARGETS = helm-values-update-image-version
 HELM_POST_GENERATE_TARGETS = helm-values-replace-image-repo template-stage template-log-level template-image-pull-policy
-CRD_POST_MANIFEST_TARGETS = crd-add-labels crd-add-backup-labels
 CHECK_VAR_TARGETS=check-all-vars
 IMAGE_IMPORT_TARGET=image-import
 
@@ -37,12 +33,6 @@ include build/make/k8s-controller.mk
 
 .PHONY: build-boot
 build-boot: helm-apply kill-operator-pod ## Builds a new version of the operator and deploys it into the K8s-EcoSystem.
-.PHONY: crd-add-backup-labels
-crd-add-backup-labels: $(BINARY_YQ)
-	@echo "Adding backup label to CRDs..."
-	@for file in ${HELM_CRD_SOURCE_DIR}/templates/*.yaml ; do \
-		$(BINARY_YQ) -i e ".metadata.labels.\"k8s.cloudogu.com/part-of\" = \"backup\"" $${file} ;\
-	done
 
 .PHONY: helm-values-update-image-version
 helm-values-update-image-version: $(BINARY_YQ)

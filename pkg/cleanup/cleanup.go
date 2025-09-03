@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
+	"github.com/cloudogu/retry-lib/retry"
 
 	"gopkg.in/yaml.v3"
 

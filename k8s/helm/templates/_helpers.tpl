@@ -26,5 +26,5 @@ k8s.cloudogu.com/part-of: backup
 
 {{/* Default image configuration, e.g. the operator image */}}
 {{- define "k8s-backup-operator.defaultImages"}}
-operatorImage: "{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag | default .Chart.AppVersion }}"
+operatorImage: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag | default .Chart.AppVersion }}"
 {{- end }}

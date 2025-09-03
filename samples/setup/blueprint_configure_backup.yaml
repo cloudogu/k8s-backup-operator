@@ -33,7 +33,7 @@ spec:
       {
         "name":"k8s/k8s-longhorn",
         "targetState":"present",
-        "version":"1.9.0-1",
+        "version":"1.9.0-3",
         "deployConfig":{
           "deployNamespace":"longhorn-system",
           "overwriteConfig":{
@@ -49,7 +49,7 @@ spec:
       {
         "name":"k8s/k8s-service-discovery",
         "targetState":"present",
-        "version":"2.0.0"
+        "version":"2.2.0"
       },
       {
         "name":"k8s/k8s-minio",
@@ -119,12 +119,12 @@ spec:
       {
         "name":"k8s/k8s-backup-operator",
         "targetState":"present",
-        "version":"1.4.6"
+        "version":"1.5.0"
       },
       {
         "name":"k8s/k8s-backup-operator-crd",
         "targetState":"present",
-        "version":"1.4.6"
+        "version":"1.5.0"
       },
       {
         "name":"k8s/k8s-promtail",
