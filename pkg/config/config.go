@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Masterminds/semver/v3"
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -38,6 +39,14 @@ var Stage = StageProduction
 
 func IsStageDevelopment() bool {
 	return Stage == StageDevelopment
+}
+
+func GetStagePullPolicy() corev1.PullPolicy {
+	pullPolicy := corev1.PullIfNotPresent
+	if IsStageDevelopment() {
+		pullPolicy = corev1.PullAlways
+	}
+	return pullPolicy
 }
 
 // NewOperatorConfig creates a new operator config by reading values from the environment variables

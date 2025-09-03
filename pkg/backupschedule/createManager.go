@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,7 +94,7 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 			Schedule: schedule.Spec.Schedule,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
-					Template: schedule.CronJobPodTemplate(cm.imageConfig.OperatorImage),
+					Template: schedule.CronJobPodTemplate(cm.imageConfig.OperatorImage, config.GetStagePullPolicy()),
 				},
 			},
 		},

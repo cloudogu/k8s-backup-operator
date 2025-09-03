@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/retry-lib/retry"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +43,7 @@ func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.B
 		}
 
 		cronJob.Spec.Schedule = backupSchedule.Spec.Schedule
-		cronJob.Spec.JobTemplate.Spec.Template = backupSchedule.CronJobPodTemplate(um.imageConfig.OperatorImage)
+		cronJob.Spec.JobTemplate.Spec.Template = backupSchedule.CronJobPodTemplate(um.imageConfig.OperatorImage, config.GetStagePullPolicy())
 
 		_, err = cronJobClient.Update(ctx, cronJob, metav1.UpdateOptions{})
 		if err != nil {
