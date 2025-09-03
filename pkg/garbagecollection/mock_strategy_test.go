@@ -3,7 +3,7 @@
 package garbagecollection
 
 import (
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	retention "github.com/cloudogu/k8s-backup-operator/pkg/retention"
 	mock "github.com/stretchr/testify/mock"
 )

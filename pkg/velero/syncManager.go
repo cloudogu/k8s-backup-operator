@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/cloudogu/k8s-backup-operator/pkg/retry"
+	"github.com/cloudogu/retry-lib/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	backupv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

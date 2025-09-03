@@ -3,11 +3,11 @@ package scheduledbackup
 import (
 	"context"
 	"fmt"
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
+	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	time2 "github.com/cloudogu/k8s-backup-operator/pkg/time"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	backupv1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
 const timeFormatK8sAcceptableName = "2006-01-02t15.04.05"

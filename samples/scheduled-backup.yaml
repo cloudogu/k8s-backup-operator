@@ -3,5 +3,5 @@ kind: BackupSchedule
 metadata:
   name: backupschedule-sample
 spec:
-  schedule: "20 11 * * *"
+  schedule: "*/3 * * * *"
   provider: "velero"

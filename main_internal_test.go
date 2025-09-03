@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
-	"github.com/cloudogu/k8s-backup-operator/pkg/api/ecosystem"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	v1 "github.com/cloudogu/k8s-backup-operator/pkg/api/v1"
+	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
 var testCtx = context.Background()
@@ -279,12 +279,12 @@ func Test_startOperator(t *testing.T) {
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
-		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnami/kubectl:1.27.7", nil)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnami/kubectl:1.27.7"}).Return(assert.AnError)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(assert.AnError)
 		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
@@ -341,12 +341,12 @@ func Test_startOperator(t *testing.T) {
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
-		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnami/kubectl:1.27.7", nil)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnami/kubectl:1.27.7"}).Return(nil)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
 		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
@@ -410,12 +410,12 @@ func Test_startOperator(t *testing.T) {
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
-		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnami/kubectl:1.27.7", nil)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnami/kubectl:1.27.7"}).Return(nil)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
 		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
@@ -482,12 +482,12 @@ func Test_startOperator(t *testing.T) {
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
-		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnami/kubectl:1.27.7", nil)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnami/kubectl:1.27.7"}).Return(nil)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
 		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
@@ -560,12 +560,12 @@ func Test_startOperator(t *testing.T) {
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
-		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnami/kubectl:1.27.7", nil)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnami/kubectl:1.27.7"}).Return(nil)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
 		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
@@ -637,12 +637,12 @@ func Test_startOperator(t *testing.T) {
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
-		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnami/kubectl:1.27.7", nil)
+		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnami/kubectl:1.27.7"}).Return(nil)
+		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
 		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
 		}
