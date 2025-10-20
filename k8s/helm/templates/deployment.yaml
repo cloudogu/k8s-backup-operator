@@ -21,6 +21,30 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
         {{- end }}
+      initContainers:
+        - name: default-schedule-cr
+          image: alpine/kubectl:1.34.1
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+          command:
+            - sh
+            - -c
+            - |
+              if ! kubectl get backupschedules.k8s.cloudogu.com {{ .Values.initContainer.schedule.name }} >/dev/null 2>&1; then
+              cat <<EOF | kubectl apply -f -
+              apiVersion: k8s.cloudogu.com/v1
+              kind: BackupSchedule
+              metadata:
+                name: {{ .Values.initContainer.schedule.name }}
+              spec:
+                schedule: {{ .Values.initContainer.schedule.cron }}
+                provider: "velero"
+              EOF
+              else
+                echo "CR '{{ .Values.initContainer.schedule.name }}' already exists, skipping creation"
+              fi
       containers:
       - args:
         - operator
