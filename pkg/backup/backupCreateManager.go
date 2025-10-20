@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
@@ -154,12 +155,16 @@ func (bcm *backupCreateManager) addAnnotations(ctx context.Context, backup *v1.B
 	}
 
 	// add blueprint id
-	blueprint, err := bcm.blueprintClient.Get(ctx, bcm.namespace, metav1.GetOptions{})
+	blueprintList, err := bcm.blueprintClient.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blueprint: %w", err)
 	}
-	// TODO is name the correct key?
-	an[blueprintIdAnnotation] = blueprint.Name
+	if len(blueprintList.Items) == 0 {
+		return nil, fmt.Errorf("no blueprint found")
+	}
+
+	blueprint := blueprintList.Items[0]
+	an[blueprintIdAnnotation] = blueprint.Spec.DisplayName
 
 	// add dogus
 	dogus, err := json.Marshal(blueprint.Spec.Blueprint.Dogus)
@@ -168,6 +173,11 @@ func (bcm *backupCreateManager) addAnnotations(ctx context.Context, backup *v1.B
 	}
 	an[dogusAnnotation] = string(dogus)
 
+	// update the resource to persist the annotations
 	backup.SetAnnotations(an)
+	err = bcm.k8sClient.Update(ctx, backup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update annotations on backup resource: %w", err)
+	}
 	return backup, nil
 }
