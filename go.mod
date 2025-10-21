@@ -5,6 +5,7 @@ go 1.24.3
 require (
 	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/cloudogu/k8s-backup-lib v1.6.0
+	github.com/cloudogu/k8s-blueprint-lib/v2 v2.0.0
 	github.com/cloudogu/k8s-registry-lib v0.5.0
 	github.com/cloudogu/retry-lib v0.1.0
 	github.com/dlclark/regexp2 v1.11.5
@@ -25,7 +26,6 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudogu/k8s-blueprint-lib/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
