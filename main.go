@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/cloudogu/k8s-backup-operator/pkg/ownerreference"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"os"
@@ -282,6 +283,11 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 
 	configMapClient := ecosystemClientSet.CoreV1().ConfigMaps(namespace)
 
+	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("unable to create dogu client: %w", err)
+	}
+
 	globalConfig := repository.NewGlobalConfigRepository(configMapClient)
 
 	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient, ecosystemClientSet)
@@ -309,7 +315,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	}
 
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
-	cleanupManager := cleanup.NewManager(operatorConfig.Namespace, k8sClient, k8sClientSet, configMapClient)
+	cleanupManager := cleanup.NewManager(doguClient.Dogus(namespace))
 	restoreManager := restore.NewRestoreManager(
 		k8sClient,
 		ecosystemClientSet,
