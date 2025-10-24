@@ -5,14 +5,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/ownerreference"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	blueprintv2 "github.com/cloudogu/k8s-blueprint-lib/v2/client"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -276,10 +278,17 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
 	}
 
+	blueprintClientSet, err := blueprintv2.NewClientSet(k8sManager.GetConfig(), k8sClientSet)
+	if err != nil {
+		return fmt.Errorf("unable to create blueprint clientset: %w", err)
+	}
+
 	namespace, err := config.GetNamespace()
 	if err != nil {
 		return fmt.Errorf("failed to get namespace: %w", err)
 	}
+
+	blueprintClient := blueprintClientSet.EcosystemV1Alpha1().Blueprints(namespace)
 
 	configMapClient := ecosystemClientSet.CoreV1().ConfigMaps(namespace)
 
@@ -328,7 +337,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
-	backupManager := backup.NewBackupManager(k8sClient, ecosystemClientSet, operatorConfig.Namespace, recorder, globalConfig, ownerRefRecreator)
+	backupManager := backup.NewBackupManager(k8sClient, ecosystemClientSet, blueprintClient, operatorConfig.Namespace, recorder, globalConfig, ownerRefRecreator)
 	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}

@@ -2,9 +2,11 @@ package backup
 
 import (
 	"context"
+
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	blueprintv2 "github.com/cloudogu/k8s-blueprint-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -93,4 +95,8 @@ type globalConfigRepository interface {
 
 type ownerReferenceBackup interface {
 	BackupOwnerReferences(ctx context.Context) error
+}
+
+type blueprintInterface interface {
+	blueprintv2.BlueprintInterface
 }
