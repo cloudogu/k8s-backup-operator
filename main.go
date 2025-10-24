@@ -10,7 +10,7 @@ import (
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/ownerreference"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
-	blueprintv2 "github.com/cloudogu/k8s-blueprint-lib/v2/client"
+	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -278,7 +278,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
 	}
 
-	blueprintClientSet, err := blueprintv2.NewClientSet(k8sManager.GetConfig(), k8sClientSet)
+	blueprintClientSet, err := blueprintv3.NewClientSet(k8sManager.GetConfig(), k8sClientSet)
 	if err != nil {
 		return fmt.Errorf("unable to create blueprint clientset: %w", err)
 	}

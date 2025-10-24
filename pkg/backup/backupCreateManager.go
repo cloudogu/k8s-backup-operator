@@ -8,7 +8,7 @@ import (
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
-	blueprintv2 "github.com/cloudogu/k8s-blueprint-lib/v2/client"
+	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/retry-lib/retry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +30,7 @@ const (
 type backupCreateManager struct {
 	k8sClient              k8sClient
 	clientSet              ecosystemInterface
-	blueprintClient        blueprintv2.BlueprintInterface
+	blueprintClient        blueprintv3.BlueprintInterface
 	namespace              string
 	globalConfigRepository globalConfigRepository
 	recorder               eventRecorder
@@ -39,7 +39,7 @@ type backupCreateManager struct {
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv2.BlueprintInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupCreateManager {
+func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv3.BlueprintInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupCreateManager {
 	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", clientSet.CoreV1().ConfigMaps(namespace))
 	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, blueprintClient: blueprintClient, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, ownerRefBackuper: ownerRefBackuper}
 }

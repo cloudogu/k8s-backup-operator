@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	v2 "github.com/cloudogu/k8s-blueprint-lib/v2/api/v2"
+	v3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/mock"
 
@@ -83,11 +83,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
@@ -148,11 +148,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
@@ -331,11 +331,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
@@ -387,11 +387,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
@@ -450,11 +450,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
@@ -514,11 +514,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
@@ -578,11 +578,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
@@ -644,11 +644,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
@@ -703,11 +703,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
@@ -766,11 +766,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
@@ -829,11 +829,11 @@ func Test_backupCreateManager_create(t *testing.T) {
 		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 
-		blueprint := &v2.BlueprintList{
-			Items: []v2.Blueprint{
+		blueprint := &v3.BlueprintList{
+			Items: []v3.Blueprint{
 				{
 					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       v2.BlueprintSpec{},
+					Spec:       v3.BlueprintSpec{},
 					Status:     nil,
 				},
 			},
