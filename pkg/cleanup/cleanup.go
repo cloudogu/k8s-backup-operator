@@ -12,6 +12,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const defaultWaitTime = time.Second * 3
+const defaultCleanupTimeout = time.Minute * 15
+
+var doguDeleteWaitTime = defaultWaitTime
+var cleanupTimeout = defaultCleanupTimeout
+
 type doguClient interface {
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*doguv2.Dogu, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*doguv2.DoguList, error)
@@ -27,9 +33,15 @@ func NewManager(doguClient doguClient) *DefaultCleanupManager {
 	return &DefaultCleanupManager{doguClient: doguClient}
 }
 
-// Cleanup deletes all components with labels app=ces and not k8s.cloudogu.com/part-of=backup.
+// Cleanup deletes all resources that need to be deleted before restoring the backup.
+// It waits for the deletion of all dogus to complete.
+// If the deletion of a dogu fails, the cleanup will fail.
 func (c *DefaultCleanupManager) Cleanup(ctx context.Context) error {
 	log.FromContext(ctx).Info("starting cleanup of dogus before restore...")
+
+	// Create a timeout context for the entire cleanup
+	ctx, cancel := context.WithTimeout(ctx, cleanupTimeout)
+	defer cancel()
 
 	var wg sync.WaitGroup
 
@@ -46,10 +58,20 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context) error {
 		c.waitForDoguToBeDeleted(ctx, &dogu, &wg)
 	}
 
-	wg.Wait()
-	log.FromContext(ctx).Info("... cleanup finished. All dogus were deleted successfully.")
+	// Wait for all goroutines OR timeout
+	allDeletesDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(allDeletesDone)
+	}()
 
-	return nil
+	select {
+	case <-allDeletesDone:
+		log.FromContext(ctx).Info("... cleanup finished. All dogus were deleted successfully.")
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("cleanup timed out: %w", ctx.Err())
+	}
 }
 
 func (c *DefaultCleanupManager) waitForDoguToBeDeleted(ctx context.Context, dogu *doguv2.Dogu, wg *sync.WaitGroup) {
@@ -63,7 +85,7 @@ func (c *DefaultCleanupManager) waitForDoguToBeDeleted(ctx context.Context, dogu
 			exists := !k8sErr.IsNotFound(err)
 			if exists {
 				// wait for 3 seconds and try again
-				time.Sleep(time.Second * 3)
+				time.Sleep(doguDeleteWaitTime)
 			} else {
 				log.FromContext(ctx).Info("dogu was deleted successfully", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
 				break
