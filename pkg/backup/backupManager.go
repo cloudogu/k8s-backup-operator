@@ -1,7 +1,5 @@
 package backup
 
-import blueprintv2 "github.com/cloudogu/k8s-blueprint-lib/v2/client"
-
 type backupManager struct {
 	createManager
 	deleteManager
@@ -9,7 +7,7 @@ type backupManager struct {
 }
 
 // NewBackupManager creates a new instance of backupManager containing a createManager, deleteManager and statusSyncManager.
-func NewBackupManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv2.BlueprintInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupManager {
+func NewBackupManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupManager {
 	creator := newBackupCreateManager(k8sClient, clientSet, blueprintClient, namespace, recorder, globalConfigRepository, ownerRefBackuper)
 	remover := newBackupDeleteManager(k8sClient, clientSet, namespace, recorder)
 	statusSyncManager := newBackupStatusSyncManager(k8sClient, clientSet, namespace, recorder)

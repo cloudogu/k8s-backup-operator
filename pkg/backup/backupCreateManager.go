@@ -148,9 +148,9 @@ func (bcm *backupCreateManager) triggerBackup(ctx context.Context, backup *v1.Ba
 // * blueprintIdAnnotation: the id of the blueprint
 // * dogusAnnotation: the dogus of the blueprint
 func (bcm *backupCreateManager) addAnnotations(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
-	an := backup.GetAnnotations()
-	if an == nil {
-		an = make(map[string]string)
+	annotations := backup.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
 	}
 
 	// add blueprint id
@@ -163,17 +163,17 @@ func (bcm *backupCreateManager) addAnnotations(ctx context.Context, backup *v1.B
 	}
 
 	blueprint := blueprintList.Items[0]
-	an[blueprintIdAnnotation] = blueprint.Spec.DisplayName
+	annotations[blueprintIdAnnotation] = blueprint.Spec.DisplayName
 
 	// add dogus
 	dogus, err := json.Marshal(blueprint.Spec.Blueprint.Dogus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal dogus: %w", err)
 	}
-	an[dogusAnnotation] = string(dogus)
+	annotations[dogusAnnotation] = string(dogus)
 
 	// update the resource to persist the annotations
-	backup.SetAnnotations(an)
+	backup.SetAnnotations(annotations)
 	err = bcm.k8sClient.Update(ctx, backup)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update annotations on backup resource: %w", err)
