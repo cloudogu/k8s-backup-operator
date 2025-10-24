@@ -5,6 +5,7 @@ go 1.24.3
 require (
 	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/cloudogu/k8s-backup-lib v1.6.1-0.20251007102736-58088a70ad58
+	github.com/cloudogu/k8s-blueprint-lib/v2 v2.0.0
 	github.com/cloudogu/k8s-registry-lib v0.5.0
 	github.com/cloudogu/retry-lib v0.1.0
 	github.com/dlclark/regexp2 v1.11.5
