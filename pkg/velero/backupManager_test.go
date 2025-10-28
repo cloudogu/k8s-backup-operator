@@ -2,13 +2,14 @@ package velero
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,13 @@ var testCtx = context.TODO()
 const testNamespace = "test-namespace"
 
 func Test_backupManager_CreateBackup(t *testing.T) {
+	selectors := []*metav1.LabelSelector{
+		{MatchLabels: map[string]string{"k8s.cloudogu.com/type": "global-config"}},
+		{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "dogu.name", Operator: metav1.LabelSelectorOpExists},
+		}},
+	}
+
 	t.Run("should fail to create velero backup", func(t *testing.T) {
 		// given
 		testBackup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace}}
@@ -37,6 +45,8 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
+				IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
+				OrLabelSelectors:         selectors,
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
@@ -71,6 +81,8 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
+				IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
+				OrLabelSelectors:         selectors,
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
@@ -109,6 +121,8 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
+				IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
+				OrLabelSelectors:         selectors,
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
@@ -162,6 +176,8 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
+				IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
+				OrLabelSelectors:         selectors,
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
@@ -216,6 +232,8 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
+				IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
+				OrLabelSelectors:         selectors,
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
@@ -270,6 +288,8 @@ func Test_backupManager_CreateBackup(t *testing.T) {
 		expectedVeleroBackup := &velerov1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Name: "testBackup", Namespace: testNamespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 			Spec: velerov1.BackupSpec{
+				IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
+				OrLabelSelectors:         selectors,
 				TTL:                      metav1.Duration{Duration: 87660 * time.Hour},
 				IncludedNamespaces:       []string{testNamespace},
 				StorageLocation:          "default",
