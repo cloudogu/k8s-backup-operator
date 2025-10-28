@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - [#80] Backups now only contain the following:
   - Dogus, Configmaps, Secrets and PVCs
+    - **This is a breaking change in the sense of how backups in general work.**
 
 ## [v1.6.0] - 2025-09-03
 ### Changed
