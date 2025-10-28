@@ -1,7 +1,7 @@
 apiVersion: k8s.cloudogu.com/v1
 kind: Restore
 metadata:
-  name: restore-sample2
+  name: restore-sample
 spec:
   provider: velero
-  backupName: backup-20251027-1358
+  backupName: backup-sample
