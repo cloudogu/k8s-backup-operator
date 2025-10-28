@@ -16,6 +16,9 @@ import (
 func TestCleanUp(t *testing.T) {
 	k8sNotFoundErr := k8sErr.NewNotFound(schema.GroupResource{Group: "k8s.cloudogu.com", Resource: "Dogu"}, "error")
 
+	propagationPolicyForeground := v1.DeletePropagationForeground
+	deleteOptions := v1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}
+
 	t.Run("should successfully clean up dogus", func(t *testing.T) {
 		mDoguClient := newMockDoguClient(t)
 		mDoguClient.EXPECT().List(mock.Anything, v1.ListOptions{}).Return(&v2.DoguList{
@@ -26,9 +29,9 @@ func TestCleanUp(t *testing.T) {
 			},
 		}, nil)
 
-		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-1", v1.DeleteOptions{}).Return(nil)
-		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-2", v1.DeleteOptions{}).Return(nil)
-		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-3", v1.DeleteOptions{}).Return(nil)
+		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-1", deleteOptions).Return(nil)
+		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-2", deleteOptions).Return(nil)
+		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-3", deleteOptions).Return(nil)
 
 		mDoguClient.EXPECT().Get(mock.Anything, "test-dogu-1", v1.GetOptions{}).Return(nil, k8sNotFoundErr)
 		mDoguClient.EXPECT().Get(mock.Anything, "test-dogu-2", v1.GetOptions{}).Return(nil, k8sNotFoundErr)
@@ -56,9 +59,9 @@ func TestCleanUp(t *testing.T) {
 			},
 		}, nil)
 
-		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-1", v1.DeleteOptions{}).Return(nil)
-		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-2", v1.DeleteOptions{}).Return(nil)
-		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-3", v1.DeleteOptions{}).Return(nil)
+		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-1", deleteOptions).Return(nil)
+		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-2", deleteOptions).Return(nil)
+		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-3", deleteOptions).Return(nil)
 
 		mDoguClient.EXPECT().Get(mock.Anything, "test-dogu-1", v1.GetOptions{}).Return(nil, k8sNotFoundErr)
 		mDoguClient.EXPECT().Get(mock.Anything, "test-dogu-3", v1.GetOptions{}).Return(nil, k8sNotFoundErr)
@@ -102,9 +105,9 @@ func TestCleanUp(t *testing.T) {
 			},
 		}, nil)
 
-		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-1", v1.DeleteOptions{}).Return(nil)
-		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-2", v1.DeleteOptions{}).Return(nil)
-		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-3", v1.DeleteOptions{}).Return(nil)
+		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-1", deleteOptions).Return(nil)
+		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-2", deleteOptions).Return(nil)
+		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-3", deleteOptions).Return(nil)
 
 		mDoguClient.EXPECT().Get(mock.Anything, "test-dogu-1", v1.GetOptions{}).Return(nil, k8sNotFoundErr)
 		mDoguClient.EXPECT().Get(mock.Anything, "test-dogu-3", v1.GetOptions{}).Return(nil, k8sNotFoundErr)
@@ -135,7 +138,7 @@ func TestCleanUp(t *testing.T) {
 			},
 		}, nil)
 
-		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-1", v1.DeleteOptions{}).Return(assert.AnError)
+		mDoguClient.EXPECT().Delete(mock.Anything, "test-dogu-1", deleteOptions).Return(assert.AnError)
 
 		sut := &DefaultCleanupManager{doguClient: mDoguClient}
 

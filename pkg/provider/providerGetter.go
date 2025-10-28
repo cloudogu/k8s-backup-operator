@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"github.com/cloudogu/k8s-backup-operator/pkg/velero"
 	v1 "k8s.io/api/core/v1"
@@ -15,7 +16,7 @@ import (
 var knownProviders = []k8sv1.Provider{k8sv1.ProviderVelero}
 
 var NewVeleroProvider = func(k8sClient K8sClient, ecosystemClientSet EcosystemClientSet, recorder EventRecorder, namespace string) Provider {
-	return velero.NewDefaultProvider(k8sClient, ecosystemClientSet.Discovery(), namespace, recorder)
+	return velero.NewDefaultProvider(k8sClient, namespace, recorder)
 }
 
 // Get returns the provider by the given name and calls a function on the provider object to check if it is ready.

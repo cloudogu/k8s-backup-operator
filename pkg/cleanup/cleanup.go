@@ -50,8 +50,11 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context) error {
 		return fmt.Errorf("failed to list dogus: %w", err)
 	}
 
+	// Delete dogus in foreground, so that all depending ressources are deleted before the dogu.
+	propagationPolicyForeground := metav1.DeletePropagationForeground
+
 	for _, dogu := range doguList.Items {
-		if err := c.doguClient.Delete(ctx, dogu.Name, metav1.DeleteOptions{}); err != nil {
+		if err := c.doguClient.Delete(ctx, dogu.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}); err != nil {
 			return fmt.Errorf("failed to delete dogu %s: %w", dogu.Name, err)
 		}
 
