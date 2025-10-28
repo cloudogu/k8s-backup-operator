@@ -1,9 +1,10 @@
 package backup
 
 import (
+	"testing"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/stretchr/testify/assert"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +23,7 @@ func Test_backupStatusSyncManager_syncStatus(t *testing.T) {
 		providerMock.EXPECT().SyncBackupStatus(testCtx, testBackup).Return(assert.AnError)
 		oldVeleroProviderFunc := provider.NewVeleroProvider
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderFunc }()
-		provider.NewVeleroProvider = func(client provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
 		}
 
@@ -54,7 +55,7 @@ func Test_backupStatusSyncManager_syncStatus(t *testing.T) {
 		providerMock.EXPECT().SyncBackupStatus(testCtx, testBackup).Return(nil)
 		oldVeleroProviderFunc := provider.NewVeleroProvider
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderFunc }()
-		provider.NewVeleroProvider = func(client provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
 		}
 

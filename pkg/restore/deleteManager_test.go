@@ -1,12 +1,13 @@
 package restore
 
 import (
+	"testing"
+
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func Test_defaultDeleteManager_delete(t *testing.T) {
@@ -39,7 +40,7 @@ func Test_newDeleteManager(t *testing.T) {
 		providerMock.EXPECT().DeleteRestore(testCtx, restore).Return(nil)
 
 		oldVeleroProviderGetter := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, ecosystemClient provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderGetter }()
@@ -95,7 +96,7 @@ func Test_newDeleteManager(t *testing.T) {
 		providerMock.EXPECT().DeleteRestore(testCtx, restore).Return(assert.AnError)
 
 		oldVeleroProviderGetter := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, ecosystemClient provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderGetter }()
@@ -129,7 +130,7 @@ func Test_newDeleteManager(t *testing.T) {
 		providerMock.EXPECT().DeleteRestore(testCtx, restore).Return(nil)
 
 		oldVeleroProviderGetter := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, ecosystemClient provider.EcosystemClientSet, recorder provider.EventRecorder, namespace string) provider.Provider {
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderGetter }()
