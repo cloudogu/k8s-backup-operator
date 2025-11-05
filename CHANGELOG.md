@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- [#79] Only cleanup dogus before restoring
 - [#80] Backups now only contain the following:
   - Dogus, Configmaps, Secrets and PVCs
     - **This is a breaking change in the sense of how backups in general work.**

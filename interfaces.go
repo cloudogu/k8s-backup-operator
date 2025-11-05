@@ -1,8 +1,9 @@
 package main
 
 import (
+	"context"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
-	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
@@ -62,5 +63,6 @@ type k8sClient interface {
 //nolint:unused
 //goland:noinspection GoUnusedType
 type cleanupManager interface {
-	cleanup.Manager
+	// Cleanup deletes all resources that need to be deleted before restoring the backup.
+	Cleanup(ctx context.Context) error
 }

@@ -10,6 +10,6 @@ type backupManager struct {
 func NewBackupManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupManager {
 	creator := newBackupCreateManager(k8sClient, clientSet, blueprintClient, namespace, recorder, globalConfigRepository, ownerRefBackuper)
 	remover := newBackupDeleteManager(k8sClient, clientSet, namespace, recorder)
-	statusSyncManager := newBackupStatusSyncManager(k8sClient, clientSet, namespace, recorder)
+	statusSyncManager := newBackupStatusSyncManager(k8sClient, namespace, recorder)
 	return &backupManager{createManager: creator, deleteManager: remover, statusSyncManager: statusSyncManager}
 }

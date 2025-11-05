@@ -6,7 +6,7 @@ import (
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
-	blueprintv2 "github.com/cloudogu/k8s-blueprint-lib/v2/client"
+	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -98,5 +98,5 @@ type ownerReferenceBackup interface {
 }
 
 type blueprintInterface interface {
-	blueprintv2.BlueprintInterface
+	blueprintv3.BlueprintInterface
 }

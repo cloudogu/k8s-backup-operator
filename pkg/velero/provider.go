@@ -3,6 +3,7 @@ package velero
 import (
 	"context"
 	"fmt"
+
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -14,8 +15,8 @@ type defaultProvider struct {
 }
 
 // NewDefaultProvider creates a new instance of defaultProvider.
-func NewDefaultProvider(k8sClient k8sWatchClient, discoveryClient discoveryClient, namespace string, recorder eventRecorder) *defaultProvider {
-	return &defaultProvider{manager: NewDefaultManager(k8sClient, discoveryClient, recorder, namespace), k8sClient: k8sClient, namespace: namespace}
+func NewDefaultProvider(k8sClient k8sWatchClient, namespace string, recorder eventRecorder) *defaultProvider {
+	return &defaultProvider{manager: NewDefaultManager(k8sClient, recorder, namespace), k8sClient: k8sClient, namespace: namespace}
 }
 
 // CheckReady validates that velero is installed and can establish a connection to its backup store.
