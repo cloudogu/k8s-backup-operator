@@ -41,7 +41,7 @@ manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-backup-operator
-    tag: 1.6.0
+    tag: 2.0.0
   imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -50,3 +50,7 @@ manager:
       cpu: 15m
       memory: 105M
   replicas: 1
+initContainer:
+  schedule:
+    name: ces-schedule
+    cron: "00 02 * * *"

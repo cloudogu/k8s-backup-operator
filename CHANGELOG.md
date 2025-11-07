@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.0.0] - 2025-11-07
+
+*Breaking Change ahead!*
+> Backups now only contain dogu-related data & config.
+
+### Changed
+- [#79] Only cleanup dogus before restoring
+- [#80] Backups now only contain the following:
+  - Dogus, Configmaps, Secrets and PVCs
+
 ## [v1.6.0] - 2025-09-03
 ### Changed
 - [#71] Move backup CRDs into k8s-backup-lib

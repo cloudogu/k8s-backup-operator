@@ -2,10 +2,13 @@ package backup
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/retry-lib/retry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,9 +22,15 @@ const (
 	maintenanceModeText  = "Backup in progress"
 )
 
+const (
+	blueprintIdAnnotation = "backup.cloudogu.com/blueprintId"
+	dogusAnnotation       = "backup.cloudogu.com/dogus"
+)
+
 type backupCreateManager struct {
 	k8sClient              k8sClient
 	clientSet              ecosystemInterface
+	blueprintClient        blueprintv3.BlueprintInterface
 	namespace              string
 	globalConfigRepository globalConfigRepository
 	recorder               eventRecorder
@@ -30,9 +39,9 @@ type backupCreateManager struct {
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupCreateManager {
+func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv3.BlueprintInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupCreateManager {
 	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", clientSet.CoreV1().ConfigMaps(namespace))
-	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, ownerRefBackuper: ownerRefBackuper}
+	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, blueprintClient: blueprintClient, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, ownerRefBackuper: ownerRefBackuper}
 }
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {
@@ -71,6 +80,11 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 	backup, err = backupClient.AddLabels(ctx, backup)
 	if err != nil {
 		return fmt.Errorf("failed to add labels to backup resource: %w", err)
+	}
+
+	backup, err = bcm.addAnnotations(ctx, backup)
+	if err != nil {
+		return fmt.Errorf("failed to add annotations to backup resource: %w", err)
 	}
 
 	err = bcm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{
@@ -122,10 +136,47 @@ func (bcm *backupCreateManager) updateCompletionTimestamp(ctx context.Context, b
 }
 
 func (bcm *backupCreateManager) triggerBackup(ctx context.Context, backup *v1.Backup) error {
-	backupProvider, err := provider.Get(ctx, backup, backup.Spec.Provider, backup.Namespace, bcm.recorder, bcm.k8sClient, bcm.clientSet)
+	backupProvider, err := provider.Get(ctx, backup, backup.Spec.Provider, backup.Namespace, bcm.recorder, bcm.k8sClient)
 	if err != nil {
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}
 
 	return backupProvider.CreateBackup(ctx, backup)
+}
+
+// addAnnotation adds annotations to the backup resource.
+// * blueprintIdAnnotation: the id of the blueprint
+// * dogusAnnotation: the dogus of the blueprint
+func (bcm *backupCreateManager) addAnnotations(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
+	annotations := backup.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	// add blueprint id
+	blueprintList, err := bcm.blueprintClient.List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blueprint: %w", err)
+	}
+	if len(blueprintList.Items) == 0 {
+		return nil, fmt.Errorf("no blueprint found")
+	}
+
+	blueprint := blueprintList.Items[0]
+	annotations[blueprintIdAnnotation] = blueprint.Spec.DisplayName
+
+	// add dogus
+	dogus, err := json.Marshal(blueprint.Spec.Blueprint.Dogus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal dogus: %w", err)
+	}
+	annotations[dogusAnnotation] = string(dogus)
+
+	// update the resource to persist the annotations
+	backup.SetAnnotations(annotations)
+	err = bcm.k8sClient.Update(ctx, backup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update annotations on backup resource: %w", err)
+	}
+	return backup, nil
 }

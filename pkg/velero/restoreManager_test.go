@@ -2,6 +2,9 @@ package velero
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,14 +17,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"testing"
-	"time"
 )
 
 func TestNewDefaultRestoreManager(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		// when
-		newDefaultRestoreManager := newDefaultRestoreManager(newMockK8sWatchClient(t), newMockDiscoveryClient(t), newMockEventRecorder(t))
+		newDefaultRestoreManager := newDefaultRestoreManager(newMockK8sWatchClient(t), newMockEventRecorder(t))
 
 		// then
 		require.NotEmpty(t, newDefaultRestoreManager)
@@ -55,10 +56,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 			channel <- watch.Event{Type: watch.Modified, Object: expectedVeleroRestore}
 		}()
 
-		mockDiscovery := newMockDiscoveryClient(t)
-		mockDiscovery.EXPECT().ServerPreferredResources().Return(apiResourceLists(), nil)
-
-		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock, discoveryClient: mockDiscovery}
+		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
 		// when
 		err := sut.CreateRestore(testCtx, restore)
@@ -83,29 +81,6 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		runVeleroStatusPhaseFailureTest(t, velerov1.RestorePhaseFailedValidation)
 	})
 
-	t.Run("should return error when getting apiResources", func(t *testing.T) {
-		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, "ErrCreation", "failed to get group resources: error getting api resource List")
-
-		mockK8sWatchClient := newMockK8sWatchClient(t)
-
-		mockDiscovery := newMockDiscoveryClient(t)
-		mockDiscovery.EXPECT().ServerPreferredResources().Return(nil, assert.AnError)
-
-		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock, discoveryClient: mockDiscovery}
-
-		// when
-		err := sut.CreateRestore(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to get group resources: error getting api resource List")
-	})
-
 	t.Run("should return error on create velero restore error", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
@@ -118,10 +93,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		mockK8sWatchClient := newMockK8sWatchClient(t)
 		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(assert.AnError)
 
-		mockDiscovery := newMockDiscoveryClient(t)
-		mockDiscovery.EXPECT().ServerPreferredResources().Return(apiResourceLists(), nil)
-
-		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock, discoveryClient: mockDiscovery}
+		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
 		// when
 		err := sut.CreateRestore(testCtx, restore)
@@ -144,10 +116,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(nil)
 		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore")}).Return(nil, assert.AnError)
 
-		mockDiscovery := newMockDiscoveryClient(t)
-		mockDiscovery.EXPECT().ServerPreferredResources().Return(apiResourceLists(), nil)
-
-		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock, discoveryClient: mockDiscovery}
+		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
 		// when
 		err := sut.CreateRestore(testCtx, restore)
@@ -183,10 +152,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 			channel <- watch.Event{Type: watch.Deleted, Object: expectedVeleroRestore}
 		}()
 
-		mockDiscovery := newMockDiscoveryClient(t)
-		mockDiscovery.EXPECT().ServerPreferredResources().Return(apiResourceLists(), nil)
-
-		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock, discoveryClient: mockDiscovery}
+		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
 		// when
 		err := sut.CreateRestore(testCtx, restore)
@@ -249,10 +215,6 @@ func getExpectedVeleroRestore(restore *v1.Restore) *velerov1.Restore {
 		Spec: velerov1.RestoreSpec{
 			BackupName:             restore.Spec.BackupName,
 			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
-			RestoreStatus:          &velerov1.RestoreStatusSpec{IncludedResources: []string{"backups.k8s.cloudogu.com", "backupschedules.k8s.cloudogu.com", "restores.k8s.cloudogu.com", "components.k8s.cloudogu.com", "blueprints.k8s.cloudogu.com", "dogus.k8s.cloudogu.com", "dogurestarts.k8s.cloudogu.com"}},
-			LabelSelector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
-				{Key: "k8s.cloudogu.com/part-of", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"backup"}},
-			}},
 		},
 	}
 }
@@ -283,10 +245,7 @@ func runVeleroStatusPhaseFailureTest(t *testing.T, phase velerov1.RestorePhase) 
 		channel <- watch.Event{Type: watch.Modified, Object: expectedVeleroRestore}
 	}()
 
-	mockDiscovery := newMockDiscoveryClient(t)
-	mockDiscovery.EXPECT().ServerPreferredResources().Return(apiResourceLists(), nil)
-
-	sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock, discoveryClient: mockDiscovery}
+	sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
 	// when
 	err := sut.CreateRestore(testCtx, restore)

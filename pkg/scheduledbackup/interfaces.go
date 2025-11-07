@@ -2,9 +2,9 @@ package scheduledbackup
 
 import (
 	"context"
-	time2 "github.com/cloudogu/k8s-backup-operator/pkg/time"
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
+	time2 "github.com/cloudogu/k8s-backup-operator/pkg/time"
 )
 
 type Manager interface {

@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,11 +42,21 @@ func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Bac
 	bm.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as backup provider")
 
 	volumeFsBackup := false
+
+	selectors := []*metav1.LabelSelector{
+		{MatchLabels: map[string]string{"k8s.cloudogu.com/type": "global-config"}},
+		{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "dogu.name", Operator: metav1.LabelSelectorOpExists},
+		}},
+	}
+
 	veleroBackup := &velerov1.Backup{
 		ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
 		Spec: velerov1.BackupSpec{
-			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
 			IncludedNamespaces:       []string{backup.Namespace},
+			IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
+			OrLabelSelectors:         selectors,
+			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
 			StorageLocation:          defaultStorageLocation,
 			DefaultVolumesToFsBackup: &volumeFsBackup,
 		},

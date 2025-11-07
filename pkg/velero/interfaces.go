@@ -2,7 +2,7 @@ package velero
 
 import (
 	"context"
-	"k8s.io/client-go/discovery"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -17,10 +17,6 @@ type eventRecorder interface {
 
 type k8sWatchClient interface {
 	client.WithWatch
-}
-
-type discoveryClient interface {
-	discovery.DiscoveryInterface
 }
 
 type manager interface {
