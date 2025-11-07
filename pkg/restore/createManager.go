@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/repository"
@@ -68,7 +69,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to add labels to restore resource [%s]: %w", restoreName, err)
 	}
 
-	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder, cm.k8sClient, cm.ecosystemClientSet)
+	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder, cm.k8sClient)
 	if err != nil {
 		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
 	}

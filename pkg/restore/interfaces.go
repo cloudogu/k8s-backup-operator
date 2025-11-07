@@ -2,7 +2,7 @@ package restore
 
 import (
 	"context"
-	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
+
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -56,7 +56,8 @@ type maintenanceModeSwitch interface {
 }
 
 type cleanupManager interface {
-	cleanup.Manager
+	// Cleanup deletes all resources that need to be deleted before restoring the backup.
+	Cleanup(ctx context.Context) error
 }
 
 // used for mocks

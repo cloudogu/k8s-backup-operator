@@ -34,7 +34,7 @@ func TestGetAll(t *testing.T) {
 			return assert.AnError
 		}).Twice()
 
-		NewVeleroProvider = func(client K8sClient, ecoSystemClient EcosystemClientSet, recorder EventRecorder, namespace string) Provider {
+		NewVeleroProvider = func(client K8sClient, recorder EventRecorder, namespace string) Provider {
 			return providerMock
 		}
 
@@ -44,7 +44,7 @@ func TestGetAll(t *testing.T) {
 		knownProviders = []v1.Provider{"invalid", "velero", "", "k10"}
 
 		// when
-		providers := GetAll(testCtx, testNamespace, recorderMock, nil, nil)
+		providers := GetAll(testCtx, testNamespace, recorderMock, nil)
 
 		// then
 		assert.Len(t, providers, 1)

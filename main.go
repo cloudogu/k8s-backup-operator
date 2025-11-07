@@ -5,13 +5,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/ownerreference"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
+	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -275,16 +278,28 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
 	}
 
+	blueprintClientSet, err := blueprintv3.NewClientSet(k8sManager.GetConfig(), k8sClientSet)
+	if err != nil {
+		return fmt.Errorf("unable to create blueprint clientset: %w", err)
+	}
+
 	namespace, err := config.GetNamespace()
 	if err != nil {
 		return fmt.Errorf("failed to get namespace: %w", err)
 	}
 
+	blueprintClient := blueprintClientSet.EcosystemV1Alpha1().Blueprints(namespace)
+
 	configMapClient := ecosystemClientSet.CoreV1().ConfigMaps(namespace)
+
+	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("unable to create dogu client: %w", err)
+	}
 
 	globalConfig := repository.NewGlobalConfigRepository(configMapClient)
 
-	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient, ecosystemClientSet)
+	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient)
 	if err != nil {
 		return fmt.Errorf("failed to sync backups with provider backups on startup: %w", err)
 	}
@@ -309,7 +324,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	}
 
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
-	cleanupManager := cleanup.NewManager(operatorConfig.Namespace, k8sClient, k8sClientSet, configMapClient)
+	cleanupManager := cleanup.NewManager(doguClient.Dogus(namespace))
 	restoreManager := restore.NewRestoreManager(
 		k8sClient,
 		ecosystemClientSet,
@@ -322,7 +337,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
-	backupManager := backup.NewBackupManager(k8sClient, ecosystemClientSet, operatorConfig.Namespace, recorder, globalConfig, ownerRefRecreator)
+	backupManager := backup.NewBackupManager(k8sClient, ecosystemClientSet, blueprintClient, operatorConfig.Namespace, recorder, globalConfig, ownerRefRecreator)
 	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
@@ -335,9 +350,9 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	return nil
 }
 
-func syncBackupsWithProviders(ctx context.Context, operatorConfig *config.OperatorConfig, recorder eventRecorder, k8sWatchclient provider.K8sClient, ecosystemClientSet provider.EcosystemClientSet) error {
+func syncBackupsWithProviders(ctx context.Context, operatorConfig *config.OperatorConfig, recorder eventRecorder, k8sWatchclient provider.K8sClient) error {
 	var errs []error
-	allProviders := provider.GetAll(ctx, operatorConfig.Namespace, recorder, k8sWatchclient, ecosystemClientSet)
+	allProviders := provider.GetAll(ctx, operatorConfig.Namespace, recorder, k8sWatchclient)
 	for _, prov := range allProviders {
 		err := prov.SyncBackups(ctx)
 		if err != nil {

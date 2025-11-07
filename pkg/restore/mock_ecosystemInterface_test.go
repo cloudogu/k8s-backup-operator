@@ -60,8 +60,6 @@ import (
 
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 
-	networkingv1alpha1 "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
-
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 
 	nodev1 "k8s.io/client-go/kubernetes/typed/node/v1"
@@ -79,6 +77,8 @@ import (
 	rbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
+
+	resourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1"
 
 	resourcev1beta1 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
 
@@ -1871,53 +1871,6 @@ func (_c *mockEcosystemInterface_NetworkingV1_Call) RunAndReturn(run func() netw
 	return _c
 }
 
-// NetworkingV1alpha1 provides a mock function with no fields
-func (_m *mockEcosystemInterface) NetworkingV1alpha1() networkingv1alpha1.NetworkingV1alpha1Interface {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for NetworkingV1alpha1")
-	}
-
-	var r0 networkingv1alpha1.NetworkingV1alpha1Interface
-	if rf, ok := ret.Get(0).(func() networkingv1alpha1.NetworkingV1alpha1Interface); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(networkingv1alpha1.NetworkingV1alpha1Interface)
-		}
-	}
-
-	return r0
-}
-
-// mockEcosystemInterface_NetworkingV1alpha1_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NetworkingV1alpha1'
-type mockEcosystemInterface_NetworkingV1alpha1_Call struct {
-	*mock.Call
-}
-
-// NetworkingV1alpha1 is a helper method to define mock.On call
-func (_e *mockEcosystemInterface_Expecter) NetworkingV1alpha1() *mockEcosystemInterface_NetworkingV1alpha1_Call {
-	return &mockEcosystemInterface_NetworkingV1alpha1_Call{Call: _e.mock.On("NetworkingV1alpha1")}
-}
-
-func (_c *mockEcosystemInterface_NetworkingV1alpha1_Call) Run(run func()) *mockEcosystemInterface_NetworkingV1alpha1_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *mockEcosystemInterface_NetworkingV1alpha1_Call) Return(_a0 networkingv1alpha1.NetworkingV1alpha1Interface) *mockEcosystemInterface_NetworkingV1alpha1_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockEcosystemInterface_NetworkingV1alpha1_Call) RunAndReturn(run func() networkingv1alpha1.NetworkingV1alpha1Interface) *mockEcosystemInterface_NetworkingV1alpha1_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // NetworkingV1beta1 provides a mock function with no fields
 func (_m *mockEcosystemInterface) NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface {
 	ret := _m.Called()
@@ -2337,6 +2290,53 @@ func (_c *mockEcosystemInterface_RbacV1beta1_Call) Return(_a0 rbacv1beta1.RbacV1
 }
 
 func (_c *mockEcosystemInterface_RbacV1beta1_Call) RunAndReturn(run func() rbacv1beta1.RbacV1beta1Interface) *mockEcosystemInterface_RbacV1beta1_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ResourceV1 provides a mock function with no fields
+func (_m *mockEcosystemInterface) ResourceV1() resourcev1.ResourceV1Interface {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResourceV1")
+	}
+
+	var r0 resourcev1.ResourceV1Interface
+	if rf, ok := ret.Get(0).(func() resourcev1.ResourceV1Interface); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(resourcev1.ResourceV1Interface)
+		}
+	}
+
+	return r0
+}
+
+// mockEcosystemInterface_ResourceV1_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResourceV1'
+type mockEcosystemInterface_ResourceV1_Call struct {
+	*mock.Call
+}
+
+// ResourceV1 is a helper method to define mock.On call
+func (_e *mockEcosystemInterface_Expecter) ResourceV1() *mockEcosystemInterface_ResourceV1_Call {
+	return &mockEcosystemInterface_ResourceV1_Call{Call: _e.mock.On("ResourceV1")}
+}
+
+func (_c *mockEcosystemInterface_ResourceV1_Call) Run(run func()) *mockEcosystemInterface_ResourceV1_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockEcosystemInterface_ResourceV1_Call) Return(_a0 resourcev1.ResourceV1Interface) *mockEcosystemInterface_ResourceV1_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockEcosystemInterface_ResourceV1_Call) RunAndReturn(run func() resourcev1.ResourceV1Interface) *mockEcosystemInterface_ResourceV1_Call {
 	_c.Call.Return(run)
 	return _c
 }

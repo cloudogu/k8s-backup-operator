@@ -50,3 +50,7 @@ manager:
       cpu: 15m
       memory: 105M
   replicas: 1
+initContainer:
+  schedule:
+    name: ces-schedule
+    cron: "00 02 * * *"

@@ -1,9 +1,10 @@
 package backup
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestNewBackupManager(t *testing.T) {
@@ -17,9 +18,10 @@ func TestNewBackupManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().CoreV1().Return(corev1Client)
 		clientMock := newMockK8sClient(t)
+		blueprintInterface := newMockBlueprintInterface(t)
 
 		// when
-		manager := NewBackupManager(clientMock, clientSetMock, testNamespace, nil, globalConfigRepositoryMock, ownerReferenceBackupMock)
+		manager := NewBackupManager(clientMock, clientSetMock, blueprintInterface, testNamespace, nil, globalConfigRepositoryMock, ownerReferenceBackupMock)
 
 		// then
 		require.NotNil(t, manager)
