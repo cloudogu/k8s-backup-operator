@@ -148,49 +148,77 @@ func (bm *defaultBackupManager) DeleteBackup(ctx context.Context, backup *v1.Bac
 		return fmt.Errorf("failed to parse selector %q: %w", backup.GetFieldSelectorWithName(), err)
 	}
 
-	watcher, err := bm.k8sClient.Watch(ctx, &velerov1.BackupList{},
-		&client.ListOptions{FieldSelector: selector, Namespace: backup.Namespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}})
+	watcher, err := bm.k8sClient.Watch(
+		ctx,
+		&velerov1.DeleteBackupRequestList{},
+		&client.ListOptions{
+			FieldSelector: selector,
+			Namespace:     backup.Namespace,
+			Raw:           &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout},
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create watch for delete backup request %s: %w", backup.Name, err)
 	}
 
+	// ensure the watcher is stopped
+	defer watcher.Stop()
+
 	for event := range watcher.ResultChan() {
-		if event.Type == watch.Modified {
-			cr, ok := event.Object.(*velerov1.DeleteBackupRequest)
-			if ok && cr.Status.Phase == velerov1.DeleteBackupRequestPhaseProcessed {
-				watcher.Stop()
-				break
-			}
+		req, ok := event.Object.(*velerov1.DeleteBackupRequest)
+		if !ok {
+			continue
 		}
-	}
 
-	err = bm.k8sClient.Get(ctx, backup.GetNamespacedName(), requestCR)
-	if err != nil {
-		return fmt.Errorf("failed to get delete backup request %s: %w", backup.Name, err)
-	}
+		shouldContinue, cErr := checkDeleteBackupRequestWatchEvent(req, event)
+		if shouldContinue {
+			continue
+		}
 
-	if requestCR.Status.Phase != velerov1.DeleteBackupRequestPhaseProcessed {
-		bm.cleanUpDeleteRequest(ctx, backup, requestCR)
-		return fmt.Errorf("failed to delete backup %s: timout waiting for backup delete request %s", backup.Name, requestCR.Name)
-	}
+		if cErr != nil {
+			bm.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnProviderDeleteEventReason, cErr.Error())
+			bm.cleanUpDeleteRequest(ctx, backup, req)
 
-	backUpErrors := requestCR.Status.Errors
-	if len(backUpErrors) == 0 {
+			return &requeue.GenericRequeueableError{ErrMsg: "failed to delete backup", Err: cErr}
+		}
+
+		// Delete request completed successfully
 		bm.recorder.Event(backup, corev1.EventTypeNormal, v1.ProviderDeleteEventReason, "Provider delete request successful.")
 		return nil
 	}
 
-	var multiErr error = nil
-	for _, errStr := range backUpErrors {
-		multiErr = errors.Join(multiErr, fmt.Errorf("velero backup delete request error: %s", errStr))
-	}
-	bm.recorder.Event(backup, corev1.EventTypeWarning, v1.ErrorOnProviderDeleteEventReason, multiErr.Error())
+	// Channel closed (likely due to timeout); best-effort cleanup and report timeout
 	bm.cleanUpDeleteRequest(ctx, backup, requestCR)
+	return fmt.Errorf("failed to delete backup %s: timeout waiting for backup delete request %s", backup.Name, requestCR.Name)
+}
 
-	return &requeue.GenericRequeueableError{
-		ErrMsg: "failed to delete backup",
-		Err:    multiErr,
+func checkDeleteBackupRequestWatchEvent(req *velerov1.DeleteBackupRequest, event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		// Velero removes the DeleteBackupRequest once it has been processed.
+		// If we observe a delete without having seen the processed phase, treat this as a success.
+		return false, nil
+	case watch.Added, watch.Modified:
+		if req.Status.Phase != velerov1.DeleteBackupRequestPhaseProcessed {
+			return true, nil
+		}
+
+		// processed: evaluate errors and return accordingly
+		backUpErrors := append([]string(nil), req.Status.Errors...)
+
+		if len(backUpErrors) == 0 {
+			return false, nil
+		}
+
+		var multiErr error
+		for _, errStr := range backUpErrors {
+			multiErr = errors.Join(multiErr, fmt.Errorf("velero DeleteBackupRequest error: %s", errStr))
+		}
+
+		return false, multiErr
 	}
+
+	return true, nil
 }
 
 func (bm *defaultBackupManager) cleanUpDeleteRequest(ctx context.Context, backup *v1.Backup, request *velerov1.DeleteBackupRequest) {

@@ -8,7 +8,6 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -365,13 +364,10 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		mockK8sWatchClient := newMockK8sWatchClient(t)
 		mockK8sWatchClient.EXPECT().Create(testCtx, expectedRequest).Return(nil)
-		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.BackupList{},
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.DeleteBackupRequestList{},
 			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=backup"),
 				Namespace: testNamespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}}).
 			Return(watchMock, nil)
-		mockK8sWatchClient.EXPECT().Get(testCtx, backup.GetNamespacedName(), expectedRequest).Run(func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) {
-			*obj.(*velerov1.DeleteBackupRequest) = *expectedRequestProcessed
-		}).Return(nil)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
@@ -379,11 +375,97 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
 
-		watchTimer := time.NewTimer(time.Second * 2)
+		watchTimer := time.NewTimer(time.Second * 1)
 		go func() {
 			<-watchTimer.C
 			event := watch.Event{Type: watch.Modified, Object: expectedRequestProcessed}
 			watchChannel <- event
+		}()
+
+		// when
+		err := sut.DeleteBackup(testCtx, backup)
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should succeed if DeleteBackupRequest is deleted", func(t *testing.T) {
+		// given
+		backup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: testNamespace}}
+
+		watchChannel := make(chan watch.Event)
+		watchMock := newMockWatchInterface(t)
+		watchMock.EXPECT().ResultChan().Return(watchChannel)
+		watchMock.EXPECT().Stop()
+
+		expectedRequest := getVeleroDeleteBackupRequest(backup.Name, testNamespace)
+		expectedRequestProcessed := getVeleroDeleteBackupRequest(backup.Name, testNamespace)
+		expectedRequestProcessed.Status.Phase = velerov1.DeleteBackupRequestPhaseProcessed
+
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Create(testCtx, expectedRequest).Return(nil)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.DeleteBackupRequestList{},
+			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=backup"),
+				Namespace: testNamespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}}).
+			Return(watchMock, nil)
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Provider delete request successful.")
+
+		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
+
+		watchTimer := time.NewTimer(time.Second * 1)
+		go func() {
+			<-watchTimer.C
+			event := watch.Event{Type: watch.Deleted, Object: expectedRequestProcessed}
+			watchChannel <- event
+		}()
+
+		// when
+		err := sut.DeleteBackup(testCtx, backup)
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should continue for wrong types and non completed requests", func(t *testing.T) {
+		// given
+		backup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: testNamespace}}
+
+		watchChannel := make(chan watch.Event)
+		watchMock := newMockWatchInterface(t)
+		watchMock.EXPECT().ResultChan().Return(watchChannel)
+		watchMock.EXPECT().Stop()
+
+		expectedRequest := getVeleroDeleteBackupRequest(backup.Name, testNamespace)
+		expectedRequestProcessed := getVeleroDeleteBackupRequest(backup.Name, testNamespace)
+		expectedRequestProcessed.Status.Phase = velerov1.DeleteBackupRequestPhaseProcessed
+
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		mockK8sWatchClient.EXPECT().Create(testCtx, expectedRequest).Return(nil)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.DeleteBackupRequestList{},
+			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=backup"),
+				Namespace: testNamespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}}).
+			Return(watchMock, nil)
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Provider delete request successful.")
+
+		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
+
+		watchTimer := time.NewTimer(time.Second * 1)
+		go func() {
+			<-watchTimer.C
+			event1 := watch.Event{Type: watch.Modified, Object: &velerov1.Backup{}}
+			watchChannel <- event1
+			event2 := watch.Event{Type: watch.Modified, Object: expectedRequest}
+			watchChannel <- event2
+			event3 := watch.Event{Type: watch.Error, Object: expectedRequest}
+			watchChannel <- event3
+			event4 := watch.Event{Type: watch.Modified, Object: expectedRequestProcessed}
+			watchChannel <- event4
 		}()
 
 		// when
@@ -424,7 +506,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		mockK8sWatchClient := newMockK8sWatchClient(t)
 		mockK8sWatchClient.EXPECT().Create(testCtx, expectedRequest).Return(nil)
-		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.BackupList{},
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.DeleteBackupRequestList{},
 			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=backup"),
 				Namespace: testNamespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}}).
 			Return(nil, assert.AnError)
@@ -443,13 +525,14 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		require.ErrorContains(t, err, "failed to create watch for delete backup request backup")
 	})
 
-	t.Run("should return error on get error after watch was successful", func(t *testing.T) {
+	t.Run("should return timeout error after watch channel closes without processed state", func(t *testing.T) {
 		// given
 		backup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: testNamespace}}
 
 		watchChannel := make(chan watch.Event)
 		watchMock := newMockWatchInterface(t)
 		watchMock.EXPECT().ResultChan().Return(watchChannel)
+		watchMock.EXPECT().Stop()
 
 		expectedRequest := getVeleroDeleteBackupRequest(backup.Name, testNamespace)
 		expectedRequestProcessed := getVeleroDeleteBackupRequest(backup.Name, testNamespace)
@@ -457,14 +540,15 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		mockK8sWatchClient := newMockK8sWatchClient(t)
 		mockK8sWatchClient.EXPECT().Create(testCtx, expectedRequest).Return(nil)
-		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.BackupList{},
+		mockK8sWatchClient.EXPECT().Delete(testCtx, expectedRequest).Return(nil)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.DeleteBackupRequestList{},
 			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=backup"),
 				Namespace: testNamespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}}).
 			Return(watchMock, nil)
-		mockK8sWatchClient.EXPECT().Get(testCtx, backup.GetNamespacedName(), expectedRequest).Return(assert.AnError)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeWarning, backupv1.ProviderDeleteEventReason, "Cleanup velero delete request.")
 
 		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
 
@@ -479,8 +563,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		require.ErrorIs(t, err, assert.AnError)
-		require.ErrorContains(t, err, "failed to get delete backup request backup")
+		require.ErrorContains(t, err, "failed to delete backup backup: timeout waiting for backup delete request backup")
 	})
 
 	t.Run("should return error and clean up if request status is not processed after timeout", func(t *testing.T) {
@@ -490,16 +573,16 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		watchChannel := make(chan watch.Event)
 		watchMock := newMockWatchInterface(t)
 		watchMock.EXPECT().ResultChan().Return(watchChannel)
+		watchMock.EXPECT().Stop()
 
 		expectedRequest := getVeleroDeleteBackupRequest(backup.Name, testNamespace)
 
 		mockK8sWatchClient := newMockK8sWatchClient(t)
 		mockK8sWatchClient.EXPECT().Create(testCtx, expectedRequest).Return(nil)
-		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.BackupList{},
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.DeleteBackupRequestList{},
 			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=backup"),
 				Namespace: testNamespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}}).
 			Return(watchMock, nil)
-		mockK8sWatchClient.EXPECT().Get(testCtx, backup.GetNamespacedName(), expectedRequest).Return(nil)
 		mockK8sWatchClient.EXPECT().Delete(testCtx, expectedRequest).Return(nil)
 
 		recorderMock := newMockEventRecorder(t)
@@ -519,7 +602,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to delete backup backup: timout waiting for backup delete request backup")
+		require.ErrorContains(t, err, "failed to delete backup backup: timeout waiting for backup delete request backup")
 	})
 
 	t.Run("should return all errors in multierror and clean up if request status has errors", func(t *testing.T) {
@@ -529,6 +612,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		watchChannel := make(chan watch.Event)
 		watchMock := newMockWatchInterface(t)
 		watchMock.EXPECT().ResultChan().Return(watchChannel)
+		watchMock.EXPECT().Stop()
 
 		expectedRequest := getVeleroDeleteBackupRequest(backup.Name, testNamespace)
 		expectedRequestProcessed := getVeleroDeleteBackupRequest(backup.Name, testNamespace)
@@ -537,25 +621,23 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		mockK8sWatchClient := newMockK8sWatchClient(t)
 		mockK8sWatchClient.EXPECT().Create(testCtx, expectedRequest).Return(nil)
-		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.BackupList{},
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.DeleteBackupRequestList{},
 			&client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=backup"),
 				Namespace: testNamespace, Raw: &metav1.ListOptions{TimeoutSeconds: &deleteWaitTimeout}}).
 			Return(watchMock, nil)
-		mockK8sWatchClient.EXPECT().Get(testCtx, backup.GetNamespacedName(), expectedRequest).Run(func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) {
-			*obj.(*velerov1.DeleteBackupRequest) = *expectedRequestProcessed
-		}).Return(nil)
 		mockK8sWatchClient.EXPECT().Delete(testCtx, expectedRequestProcessed).Return(nil)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeNormal, backupv1.ProviderDeleteEventReason, "Trigger velero provider to delete backup.")
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeWarning, backupv1.ProviderDeleteEventReason, "Cleanup velero delete request.")
-		recorderMock.EXPECT().Event(backup, corev1.EventTypeWarning, backupv1.ErrorOnProviderDeleteEventReason, "velero backup delete request error: error1\nvelero backup delete request error: error2")
+		recorderMock.EXPECT().Event(backup, corev1.EventTypeWarning, backupv1.ErrorOnProviderDeleteEventReason, "velero DeleteBackupRequest error: error1\nvelero DeleteBackupRequest error: error2")
 		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
 
 		watchTimer := time.NewTimer(time.Second * 1)
 		go func() {
 			<-watchTimer.C
-			close(watchChannel)
+			event := watch.Event{Type: watch.Modified, Object: expectedRequestProcessed}
+			watchChannel <- event
 		}()
 
 		// when
