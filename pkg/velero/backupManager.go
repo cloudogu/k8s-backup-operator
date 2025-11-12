@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -51,7 +52,12 @@ func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Bac
 	}
 
 	veleroBackup := &velerov1.Backup{
-		ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace, Labels: map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        backup.Name,
+			Namespace:   backup.Namespace,
+			Labels:      map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+			Annotations: annotations.GetBackupAnnotations(backup.ObjectMeta),
+		},
 		Spec: velerov1.BackupSpec{
 			IncludedNamespaces:       []string{backup.Namespace},
 			IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
