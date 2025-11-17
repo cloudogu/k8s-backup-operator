@@ -54,3 +54,8 @@ initContainer:
   schedule:
     name: ces-schedule
     cron: "00 02 * * *"
+metrics:
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: prometheus

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	corev1 "k8s.io/api/core/v1"
@@ -49,6 +50,7 @@ func newCreateManager(
 
 func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore) error {
 	logger := log.FromContext(ctx)
+	metrics.InitRestoreStatusMetrics(cm.namespace, restore.Name, restore.Spec.BackupName)
 	cm.recorder.Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
 
 	restoreClient := cm.ecosystemClientSet.EcosystemV1Alpha1().Restores(cm.namespace)
@@ -58,6 +60,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusInProgress, restoreName, err)
 	}
+	metrics.UpdateRestoreStatusMetrics(cm.namespace, restore.Name, restore.Spec.BackupName, v1.RestoreStatusInProgress)
 
 	restore, err = restoreClient.AddFinalizer(ctx, restore, v1.RestoreFinalizer)
 	if err != nil {
@@ -98,7 +101,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		if updateStatusErr != nil {
 			err = errors.Join(err, fmt.Errorf("failed to update restore status to '%s': %w", v1.RestoreStatusFailed, updateStatusErr))
 		}
-
+		metrics.UpdateRestoreStatusMetrics(cm.namespace, restore.Name, restore.Spec.BackupName, v1.RestoreStatusFailed)
 		return err
 	}
 
@@ -116,6 +119,6 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusCompleted, restoreName, err)
 	}
-
+	metrics.UpdateRestoreStatusMetrics(cm.namespace, restore.Name, restore.Spec.BackupName, v1.RestoreStatusCompleted)
 	return nil
 }

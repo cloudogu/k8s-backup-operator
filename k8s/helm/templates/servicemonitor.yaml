@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "k8s-backup-operator.name" . }}-servicemonitor
+  labels:
+    release: k8s-prometheus
+  {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "k8s-backup-operator.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metrics
+      scheme: http
+      path: /metrics
+      interval: 30s
+     # tlsConfig:
+     #   insecureSkipVerify: false
+     #   caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+     # bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token

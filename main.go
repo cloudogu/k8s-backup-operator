@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/ownerreference"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
@@ -83,6 +84,8 @@ func main() {
 	defer cancel()
 
 	config.ConfigureLogger()
+
+	metrics.RegisterMetrics()
 
 	logger := log.FromContext(ctx).WithName("main")
 
@@ -234,6 +237,7 @@ func getK8sManagerOptions(flags *flag.FlagSet, args []string, operatorConfig *co
 		LeaderElectionID: "e3f6c1a7.cloudogu.com",
 		LeaseDuration:    &leaseDuration,
 		RenewDeadline:    &renewDeadline,
+		Metrics:          server.Options{BindAddress: ":8080"},
 	}
 	controllerOpts = parseManagerFlags(flags, args, controllerOpts)
 

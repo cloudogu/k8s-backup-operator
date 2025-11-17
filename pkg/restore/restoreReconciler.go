@@ -3,13 +3,15 @@ package restore
 import (
 	"context"
 	"fmt"
+	"strings"
+
+	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
@@ -42,6 +44,7 @@ type restoreReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	metrics.UpdateRestoreReconcileTotalMetric()
 
 	restore, err := r.clientSet.EcosystemV1Alpha1().Restores(r.namespace).Get(ctx, req.Name, metav1.GetOptions{})
 	if err != nil {
