@@ -76,6 +76,7 @@ func createBackupsForVeleroBackups(ctx context.Context, veleroBackupsList *veler
 					Namespace:   veleroBackup.Namespace,
 					Labels:      map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
 					Annotations: annotations.GetBackupAnnotations(veleroBackup.ObjectMeta),
+					Finalizers:  []string{backupv1.BackupFinalizer},
 				},
 				Spec: backupv1.BackupSpec{
 					Provider:           backupv1.ProviderVelero,

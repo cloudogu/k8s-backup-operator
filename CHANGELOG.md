@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [#85] Save backup metadata in annotations also on velero backups.
   - This enables restoring backups in "new" clusters when using the Admin-UI.
 
+### Fixed
+- [#85] deleting backups.
+- [#85] adding finalizer to synchronized backups from velero-backups.
+
 ## [v2.0.0] - 2025-11-07
 
 *Breaking Change ahead!*

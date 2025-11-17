@@ -164,6 +164,7 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 				Namespace:   testNamespace,
 				Labels:      map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
 				Annotations: map[string]string{},
+				Finalizers:  []string{backupv1.BackupFinalizer},
 			},
 			Spec: backupv1.BackupSpec{
 				Provider:           backupv1.ProviderVelero,
@@ -246,6 +247,7 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 					annotations.BlueprintIdAnnotation: "test-blueprint-id",
 					annotations.DogusAnnotation:       "test-dogus",
 				},
+				Finalizers: []string{backupv1.BackupFinalizer},
 			},
 			Spec: backupv1.BackupSpec{
 				Provider:           backupv1.ProviderVelero,
