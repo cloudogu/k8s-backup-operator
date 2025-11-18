@@ -67,14 +67,14 @@ func UpdateBackupReconcileTotalMetric() {
 
 func UpdateRestoreStatusMetrics(namespace, name, backupName, newStatus string) {
 	// count transitions
-	RestoreStatusTransitionsTotal.WithLabelValues(namespace, name, newStatus).Inc()
+	RestoreStatusTransitionsTotal.WithLabelValues(namespace, name, newStatus, backupName).Inc()
 }
 
 // InitRestoreStatusMetrics initializes the metrics for a restore resource
 func InitRestoreStatusMetrics(namespace, name, backupName string) {
 	// all status values need to be initialized to 0 to monitor status increases
 	for _, status := range backupStatuses {
-		RestoreStatusTransitionsTotal.WithLabelValues(namespace, name, status).Add(0)
+		RestoreStatusTransitionsTotal.WithLabelValues(namespace, name, status, backupName).Add(0)
 	}
 
 	UpdateRestoreStatusMetrics(namespace, name, v1.BackupStatusNew, backupName)
