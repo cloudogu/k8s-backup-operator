@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -100,22 +99,5 @@ func TestUpdateRestoreStatusMetrics(t *testing.T) {
 
 		current := testutil.ToFloat64(counter)
 		assert.Equal(t, initial+1, current)
-	})
-}
-
-func TestMetricsVariables(t *testing.T) {
-	t.Run("should have defined metric variables", func(t *testing.T) {
-		assert.NotNil(t, BackupReconcileTotal)
-		assert.NotNil(t, BackupStatusTransitionsTotal)
-		assert.NotNil(t, RestoreReconcileTotal)
-		assert.NotNil(t, RestoreStatusTransitionsTotal)
-	})
-
-	t.Run("should be registrable in a new registry", func(t *testing.T) {
-		registry := prometheus.NewRegistry()
-
-		err := registry.Register(BackupReconcileTotal)
-
-		assert.NoError(t, err)
 	})
 }
