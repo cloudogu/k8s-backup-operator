@@ -34,9 +34,6 @@ var (
 	)
 )
 
-// backupStatuses possible states for backup resources
-var backupStatuses = []string{v1.BackupStatusInProgress, v1.BackupStatusCompleted, v1.BackupStatusFailed, v1.BackupStatusDeleting}
-
 // RegisterMetrics registers custom metrics with the global prometheus registry
 func RegisterMetrics() {
 	metrics.Registry.MustRegister(BackupReconcileTotal, BackupStatusTransitionsTotal, RestoreReconcileTotal, RestoreStatusTransitionsTotal)
@@ -44,6 +41,7 @@ func RegisterMetrics() {
 
 // ### Backup ###
 
+// UpdateBackupStatusMetrics updates the metrics for a backup resource with the new status
 func UpdateBackupStatusMetrics(namespace, name, newStatus string) {
 	// count transitions
 	BackupStatusTransitionsTotal.WithLabelValues(namespace, name, newStatus).Inc()
@@ -52,6 +50,7 @@ func UpdateBackupStatusMetrics(namespace, name, newStatus string) {
 // InitBackupStatusMetrics initializes the metrics for a backup resource
 func InitBackupStatusMetrics(namespace, name string) {
 	// all status values need to be initialized to 0 to monitor status increases
+	backupStatuses := []string{v1.BackupStatusInProgress, v1.BackupStatusCompleted, v1.BackupStatusFailed, v1.BackupStatusDeleting}
 	for _, status := range backupStatuses {
 		BackupStatusTransitionsTotal.WithLabelValues(namespace, name, status).Add(0)
 	}
@@ -59,12 +58,14 @@ func InitBackupStatusMetrics(namespace, name string) {
 	UpdateBackupStatusMetrics(namespace, name, v1.BackupStatusNew)
 }
 
+// UpdateBackupReconcileTotalMetric increments the metric for the total number of reconciles of the backup resource
 func UpdateBackupReconcileTotalMetric() {
 	BackupReconcileTotal.Inc()
 }
 
 // ### Restore ###
 
+// UpdateRestoreStatusMetrics updates the metrics for a restore resource with the new status
 func UpdateRestoreStatusMetrics(namespace, name, backupName, newStatus string) {
 	// count transitions
 	RestoreStatusTransitionsTotal.WithLabelValues(namespace, name, newStatus, backupName).Inc()
@@ -73,13 +74,15 @@ func UpdateRestoreStatusMetrics(namespace, name, backupName, newStatus string) {
 // InitRestoreStatusMetrics initializes the metrics for a restore resource
 func InitRestoreStatusMetrics(namespace, name, backupName string) {
 	// all status values need to be initialized to 0 to monitor status increases
-	for _, status := range backupStatuses {
+	restoreStatuses := []string{v1.RestoreStatusInProgress, v1.RestoreStatusCompleted, v1.RestoreStatusFailed, v1.RestoreStatusDeleting}
+	for _, status := range restoreStatuses {
 		RestoreStatusTransitionsTotal.WithLabelValues(namespace, name, status, backupName).Add(0)
 	}
 
-	UpdateRestoreStatusMetrics(namespace, name, v1.BackupStatusNew, backupName)
+	UpdateRestoreStatusMetrics(namespace, name, backupName, v1.RestoreStatusNew)
 }
 
+// UpdateRestoreReconcileTotalMetric increments the metric for the total number of reconciles of the restore resource
 func UpdateRestoreReconcileTotalMetric() {
 	RestoreReconcileTotal.Inc()
 }
