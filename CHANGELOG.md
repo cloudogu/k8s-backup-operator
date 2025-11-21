@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- [#85] Save backup metadata in annotations also on velero backups.
+  - This enables restoring backups in "new" clusters when using the Admin-UI.
+
+### Fixed
+- [#85] deleting backups.
+- [#85] adding finalizer to synchronized backups from velero-backups.
 
 ## [v2.0.0] - 2025-11-07
 
