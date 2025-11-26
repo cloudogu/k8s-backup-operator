@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "k8s-backup-operator.labels" . | nindent 4 }}
 data:
-  cleanup: |
+  dogu-modifier: |
     resourceModifierRules:
       - conditions:
           groupResource: dogus.k8s.cloudogu.com
@@ -15,4 +15,3 @@ data:
           - operation: add
             path: "/metadata/annotations/k8s.cloudogu.com~1was-restored"
             value: "true"
-
