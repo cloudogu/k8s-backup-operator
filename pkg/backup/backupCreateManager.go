@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	annotationsPkg "github.com/cloudogu/k8s-backup-operator/pkg/annotations"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
@@ -21,11 +22,6 @@ import (
 const (
 	maintenanceModeTitle = "Service temporary unavailable"
 	maintenanceModeText  = "Backup in progress"
-)
-
-const (
-	blueprintIdAnnotation = "backup.cloudogu.com/blueprintId"
-	dogusAnnotation       = "backup.cloudogu.com/dogus"
 )
 
 type backupCreateManager struct {
@@ -168,14 +164,14 @@ func (bcm *backupCreateManager) addAnnotations(ctx context.Context, backup *v1.B
 	}
 
 	blueprint := blueprintList.Items[0]
-	annotations[blueprintIdAnnotation] = blueprint.Spec.DisplayName
+	annotations[annotationsPkg.BlueprintIdAnnotation] = blueprint.Spec.DisplayName
 
 	// add dogus
 	dogus, err := json.Marshal(blueprint.Spec.Blueprint.Dogus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal dogus: %w", err)
 	}
-	annotations[dogusAnnotation] = string(dogus)
+	annotations[annotationsPkg.DogusAnnotation] = string(dogus)
 
 	// update the resource to persist the annotations
 	backup.SetAnnotations(annotations)

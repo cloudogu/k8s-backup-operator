@@ -2,7 +2,11 @@ package velero
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -10,8 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"testing"
-	"time"
 )
 
 func Test_defaultSyncManager_SyncBackups(t *testing.T) {
@@ -158,9 +160,11 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 		createBackupMock := backupv1.Backup{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      veleroBackupName,
-				Namespace: testNamespace,
-				Labels:    map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+				Name:        veleroBackupName,
+				Namespace:   testNamespace,
+				Labels:      map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+				Annotations: map[string]string{},
+				Finalizers:  []string{backupv1.BackupFinalizer},
 			},
 			Spec: backupv1.BackupSpec{
 				Provider:           backupv1.ProviderVelero,
@@ -225,6 +229,10 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      veleroBackupName,
 				Namespace: testNamespace,
+				Annotations: map[string]string{
+					annotations.BlueprintIdAnnotation: "test-blueprint-id",
+					annotations.DogusAnnotation:       "test-dogus",
+				},
 			},
 			Spec:   velerov1.BackupSpec{},
 			Status: velerov1.BackupStatus{StartTimestamp: &metav1.Time{}, CompletionTimestamp: &metav1.Time{}},
@@ -235,6 +243,11 @@ func Test_defaultSyncManager_SyncBackups(t *testing.T) {
 				Name:      veleroBackupName,
 				Namespace: testNamespace,
 				Labels:    map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+				Annotations: map[string]string{
+					annotations.BlueprintIdAnnotation: "test-blueprint-id",
+					annotations.DogusAnnotation:       "test-dogus",
+				},
+				Finalizers: []string{backupv1.BackupFinalizer},
 			},
 			Spec: backupv1.BackupSpec{
 				Provider:           backupv1.ProviderVelero,
