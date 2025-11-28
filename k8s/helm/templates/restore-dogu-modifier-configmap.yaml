@@ -2,10 +2,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: k8s-backup-operator-restore-dogu-modifier
-  labels:
-    {{- include "k8s-backup-operator.labels" . | nindent 4 }}
 data:
   dogu-modifier: |
+    version: v1
     resourceModifierRules:
       - conditions:
           groupResource: dogus.k8s.cloudogu.com
@@ -13,5 +12,8 @@ data:
             - {{ .Release.Namespace }}
         patches:
           - operation: add
-            path: "/metadata/annotations/k8s.cloudogu.com~1was-restored"
-            value: "true"
+            path: "/metadata/annotations"
+            value: "{}"
+          - operation: add
+            path: "/metadata/annotations/wasRestored"
+            value: "yes"
