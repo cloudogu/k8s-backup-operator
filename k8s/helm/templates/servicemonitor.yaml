@@ -14,7 +14,3 @@ spec:
       scheme: http
       path: /metrics
       interval: 30s
-     # tlsConfig:
-     #   insecureSkipVerify: false
-     #   caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-     # bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
