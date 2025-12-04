@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
+	"sync"
+
 	"github.com/cloudogu/retry-lib/retry"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,10 +17,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
-	"maps"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"slices"
-	"sync"
 )
 
 // cloudoguResourceGroup is the group in which CRDs from Cloudogu are defined
@@ -120,10 +121,10 @@ func (r Recreator) BackupOwnerReferences(ctx context.Context) error {
 
 	// parentChan queues parent resources to be processed by worker goroutines
 	// Each parent will be checked for any child resources referencing it via OwnerReferences
-	parentChan := make(chan resourceWithGroup, 100)
+	parentChan := make(chan resourceWithGroup, 10000)
 	// backupChan receives parent and child resources that need their owner reference
 	// data backed up into annotations
-	backupChan := make(chan backupResource, 100)
+	backupChan := make(chan backupResource, 10000)
 
 	// Pre-fetch all resources in the namespace
 	parentList, childMap, err := r.fetchResourcesForBackup(ctx)

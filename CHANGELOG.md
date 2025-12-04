@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.6.1] - 2025-12-04
+### Fixed
+- [#89] Deadlock in backup for owner-references
+
 ## [v1.6.0] - 2025-09-03
 ### Changed
 - [#71] Move backup CRDs into k8s-backup-lib
