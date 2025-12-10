@@ -1,0 +1,64 @@
+skipPreconditionValidation: false
+components:
+  k8s-ces-control:
+    disabled: true
+  k8s-service-discovery:
+    version: "4.0.0"
+    valuesObject:
+      loadBalancerService:
+        internalTrafficPolicy: Cluster
+        externalTrafficPolicy: Cluster
+  k8s-dogu-operator:
+    version: "3.16.0"
+  k8s-dogu-operator-crd:
+    version: "2.10.0"
+#  k8s-longhorn:
+#    version: "1.9.0-3"
+#    deployNamespace: "longhorn-system"
+  k8s-minio:
+    disabled: true
+    version: "2025.6.13-3"
+  k8s-loki:
+    disabled: true
+    version: "3.3.2-6"
+  k8s-prometheus:
+    disabled: true
+    version: "75.3.5-3"
+#  k8s-snapshot-controller-crd:
+#    version: "8.2.1-3"
+#  k8s-snapshot-controller:
+#    version: "8.2.1-3"
+  k8s-cert-manager:
+    disabled: true
+    version: "1.13.1-5"
+  k8s-promtail:
+    disabled: true
+    version: "2.9.17-1"
+backup:
+  enabled: true
+  components:
+    k8s-backup-operator:
+      version: "2.1.0"
+    k8s-backup-operator-crd:
+      version: "1.7.0"
+    k8s-velero:
+      version: "10.0.1-5"
+      valuesObject:
+        velero:
+          credentials:
+            useSecret: true
+            existingSecret: "velero-backup-target"
+          configuration:
+            backupStorageLocation:
+              - name: "default"
+                provider: "aws"
+                bucket: "velero"
+                accessMode: "ReadWrite"
+                config:
+                  region: "minio-default"
+                  s3ForcePathStyle: true
+                  s3Url: "http://192.168.56.1:9000"
+                  publicUrl: "http://localhost:9000"
+
+monitoring:
+  enabled: false

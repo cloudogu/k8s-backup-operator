@@ -18,10 +18,37 @@ Secrets are required for communication with the Minio. These can be imported int
 ../../samples/setup/create_backup_secrets.sh
 ```
 
-The following blueprint provides a basic configuration of the backup stack with all the necessary components:
+You can use the configuration in `../../samples/setup/additionalValues.yaml` to install and configure the Backup/Restore stack
+inside a CES test cluster by executing the following commands:
 
 ```shell
-kubectl apply -f ../../samples/setup/blueprint_configure_backup.yaml --namespace=ecosystem
+helm get values ecosystem-core -o yaml -n ecosystem > original.yaml
+
+if yq --version 2>&1 | grep -qi "mikefarah"; then
+  # mikefarah version of yq installed
+  yq eval-all 'select(fi==0) * select(fi==1)' original.yaml ../../samples/setup/additionalValues.yaml > merge.yaml
+else
+  # kislyuk version of yq installed
+  yq -y --sort-keys '. *= input' original.yaml ../../samples/setup/additionalValues.yaml > merge.yaml
+fi
+
+helm upgrade ecosystem-core oci://registry.cloudogu.com/k8s/ecosystem-core --version 2.0.2 -n ecosystem -f merge.yaml
+```
+
+Additionally, Longhorn needs to be configured:
+
+```shell
+helm get values longhorn -o yaml -n longhorn-system > longhorn_original.yaml
+
+if yq --version 2>&1 | grep -qi "mikefarah"; then
+  # mikefarah version of yq installed
+  yq eval-all 'select(fi==0) * select(fi==1)' longhorn_original.yaml ../../samples/setup/longhornAdditionalValues.yaml > longhorn_merge.yaml
+else
+  # kislyuk version of yq installed
+  yq -y --sort-keys '. *= input' original.yaml ../../samples/setup/longhornAdditionalValues.yaml > longhorn_merge.yaml
+fi
+
+helm upgrade longhorn longhorn/longhorn --version 1.10.0 -n longhorn-system -f longhorn_merge.yaml
 ```
 
 In order for the `k8s-backup-operator` to be able to communicate with `k8s-longhorn`, the network policies must be removed from the namespace
