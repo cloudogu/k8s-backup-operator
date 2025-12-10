@@ -12,9 +12,6 @@ components:
     version: "3.16.0"
   k8s-dogu-operator-crd:
     version: "2.10.0"
-#  k8s-longhorn:
-#    version: "1.9.0-3"
-#    deployNamespace: "longhorn-system"
   k8s-minio:
     disabled: true
     version: "2025.6.13-3"
@@ -24,10 +21,6 @@ components:
   k8s-prometheus:
     disabled: true
     version: "75.3.5-3"
-#  k8s-snapshot-controller-crd:
-#    version: "8.2.1-3"
-#  k8s-snapshot-controller:
-#    version: "8.2.1-3"
   k8s-cert-manager:
     disabled: true
     version: "1.13.1-5"
