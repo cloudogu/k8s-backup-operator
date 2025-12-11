@@ -18,15 +18,41 @@ Für die Kommunikation mit dem Minio werden Secrets benötigt. Diese können wie
 ../../samples/setup/create_backup_secrets.sh
 ```
 
-Das folgende Blueprint bietet eine grundlegende Konfiguration des Backup-Stacks mit allen nötigen Komponenten:
+Die Erweiterung von `ecosystem-core` in `../../samples/setup/additionalValues.yaml` bietet eine grundlegende Konfiguration des Backup-Stacks mit allen nötigen Komponenten.
+Sie kann in einem Testcluster folgendermaßen eingespielt werden:
 
 ```shell
-kubectl apply -f ../../samples/setup/blueprint_configure_backup.yaml --namespace=ecosystem
+helm get values ecosystem-core -o yaml -n ecosystem > original.yaml
+
+if yq --version 2>&1 | grep -qi "mikefarah"; then
+  # mikefarah version of yq installed
+  yq eval-all 'select(fi==0) * select(fi==1)' original.yaml ../../samples/setup/additionalValues.yaml > merge.yaml
+else
+  # kislyuk version of yq installed
+  yq -y --sort-keys '. *= input' original.yaml ../../samples/setup/additionalValues.yaml > merge.yaml
+fi
+
+helm upgrade ecosystem-core oci://registry.cloudogu.com/k8s/ecosystem-core --version 2.0.2 -n ecosystem -f merge.yaml
+```
+Außerdem muss Longhorn korrekt konfiguriert werden:
+
+```shell
+helm get values longhorn -o yaml -n longhorn-system > longhorn_original.yaml
+
+if yq --version 2>&1 | grep -qi "mikefarah"; then
+  # mikefarah version of yq installed
+  yq eval-all 'select(fi==0) * select(fi==1)' longhorn_original.yaml ../../samples/setup/longhornAdditionalValues.yaml > longhorn_merge.yaml
+else
+  # kislyuk version of yq installed
+  yq -y --sort-keys '. *= input' longhorn_original.yaml ../../samples/setup/longhornAdditionalValues.yaml > longhorn_merge.yaml
+fi
+
+helm upgrade longhorn longhorn/longhorn --version 1.10.0 -n longhorn-system -f longhorn_merge.yaml
 ```
 
 Damit der `k8s-backup-operator` mit `k8s-longhorn` kommunizieren kann, müssen die Network Policies aus dem Namespace 
-`longhorn-system` entfernt werden. Sonst ist es dem `k8s-backup-operator` nicht möglich den `admission-controller` 
-von `k8s-longhorn` zu erreichen. 
+`longhorn-system` entfernt werden, sofern vorhanden. Sonst ist es dem `k8s-backup-operator` nicht möglich
+den `admission-controller `von `k8s-longhorn` zu erreichen.
 
 Vor einem Backup überprüfen, ob die Backup Storage Location erreichbar ist:
 ```shell
