@@ -44,7 +44,7 @@ if yq --version 2>&1 | grep -qi "mikefarah"; then
   yq eval-all 'select(fi==0) * select(fi==1)' longhorn_original.yaml ../../samples/setup/longhornAdditionalValues.yaml > longhorn_merge.yaml
 else
   # kislyuk version of yq installed
-  yq -y --sort-keys '. *= input' original.yaml ../../samples/setup/longhornAdditionalValues.yaml > longhorn_merge.yaml
+  yq -y --sort-keys '. *= input' longhorn_original.yaml ../../samples/setup/longhornAdditionalValues.yaml > longhorn_merge.yaml
 fi
 
 helm upgrade longhorn longhorn/longhorn --version 1.10.0 -n longhorn-system -f longhorn_merge.yaml
