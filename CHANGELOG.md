@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.2.0] - 2025-12-12
+### Added
+- [#87] Add metrics for backups and restores.
+
 ## [v2.1.0] - 2025-11-21
 ### Changed
 - [#85] Save backup metadata in annotations also on velero backups.

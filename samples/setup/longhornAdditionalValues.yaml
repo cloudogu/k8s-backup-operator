@@ -1,0 +1,3 @@
+defaultBackupStore:
+  backupTarget: s3://longhorn@dummyregion/
+  backupTargetCredentialSecret: longhorn-backup-target

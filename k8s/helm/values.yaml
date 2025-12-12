@@ -41,7 +41,7 @@ manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-backup-operator
-    tag: 2.1.0
+    tag: 2.2.0
   imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -54,3 +54,8 @@ initContainer:
   schedule:
     name: ces-schedule
     cron: "00 02 * * *"
+metrics:
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: prometheus
