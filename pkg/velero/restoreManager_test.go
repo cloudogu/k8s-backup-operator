@@ -207,6 +207,7 @@ func apiResourceLists() []*metav1.APIResourceList {
 }
 
 func getExpectedVeleroRestore(restore *v1.Restore) *velerov1.Restore {
+	apiGroup := ""
 	return &velerov1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      restore.Name,
@@ -215,6 +216,7 @@ func getExpectedVeleroRestore(restore *v1.Restore) *velerov1.Restore {
 		Spec: velerov1.RestoreSpec{
 			BackupName:             restore.Spec.BackupName,
 			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
+			ResourceModifier:       &corev1.TypedLocalObjectReference{APIGroup: &apiGroup, Kind: "ConfigMap", Name: "k8s-backup-operator-restore-dogu-modifier"},
 		},
 	}
 }

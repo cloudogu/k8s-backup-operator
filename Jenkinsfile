@@ -85,7 +85,10 @@ node('docker') {
             stage('Deploy crd') {
                     withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD']]) {
                         k3d.helm("registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'")
-                        k3d.helm("install k8s-backup-operator-crd oci://${registry}/${registry_namespace}/k8s-backup-operator-crd --version ${backupCrdVersion}")
+                        k3d.helm("repo add prometheus-community https://prometheus-community.github.io/helm-charts")
+                        k3d.helm("repo update")
+                        k3d.helm("install kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace")
+                        k3d.helm("install k8s-backup-operator-crd oci://${registry}/${registry_namespace}/k8s-backup-operator-crd --version ${backupCrdVersion} --set metrics.serviceMonitor.enabled=false")
                 }
             }
 

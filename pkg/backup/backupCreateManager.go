@@ -8,6 +8,7 @@ import (
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	annotationsPkg "github.com/cloudogu/k8s-backup-operator/pkg/annotations"
+	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
@@ -42,6 +43,7 @@ func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, b
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {
 	logger := log.FromContext(ctx)
+	metrics.InitBackupStatusMetrics(bcm.namespace, backup.Name)
 	bcm.recorder.Event(backup, corev1.EventTypeNormal, v1.CreateEventReason, "Start backup process")
 	backupClient := bcm.clientSet.EcosystemV1Alpha1().Backups(bcm.namespace)
 
@@ -49,6 +51,7 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in backup resource: %w", v1.BackupStatusInProgress, err)
 	}
+	metrics.UpdateBackupStatusMetrics(bcm.namespace, backup.Name, v1.BackupStatusInProgress)
 
 	backup.Status.StartTimestamp = metav1.Now()
 	backup, err = backupClient.UpdateStatus(ctx, backup, metav1.UpdateOptions{})
@@ -105,6 +108,7 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 		if updateStatusErr != nil {
 			err = errors.Join(err, fmt.Errorf("failed to update backups status to 'Failed': %w", updateStatusErr))
 		}
+		metrics.UpdateBackupStatusMetrics(bcm.namespace, backup.Name, v1.BackupStatusFailed)
 
 		return err
 	}
@@ -113,6 +117,7 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in backup resource: %w", v1.BackupStatusCompleted, err)
 	}
+	metrics.UpdateBackupStatusMetrics(bcm.namespace, backup.Name, v1.BackupStatusCompleted)
 
 	return nil
 }

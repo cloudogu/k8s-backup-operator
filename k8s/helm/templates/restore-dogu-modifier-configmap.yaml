@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-backup-operator-restore-dogu-modifier
+data:
+  dogu-modifier: |
+    version: v1
+    resourceModifierRules:
+      - conditions:
+          groupResource: dogus.k8s.cloudogu.com
+          namespaces:
+            - {{ .Release.Namespace }}
+        patches:
+          - operation: add
+            path: "/metadata/annotations"
+            value: "{}"
+          - operation: add
+            path: "/metadata/annotations/wasRestored"
+            value: "yes"

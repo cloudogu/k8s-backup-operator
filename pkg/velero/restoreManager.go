@@ -29,6 +29,7 @@ func newDefaultRestoreManager(k8sClient k8sWatchClient, recorder eventRecorder) 
 func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.Restore) error {
 	rm.recorder.Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as restore provider")
 
+	apiGroup := ""
 	veleroRestore := &velerov1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: restore.Name, Namespace: restore.Namespace,
@@ -36,6 +37,11 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 		Spec: velerov1.RestoreSpec{
 			BackupName:             restore.Spec.BackupName,
 			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
+			ResourceModifier: &corev1.TypedLocalObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     "ConfigMap",
+				Name:     "k8s-backup-operator-restore-dogu-modifier",
+			},
 		},
 	}
 	err := rm.k8sClient.Create(ctx, veleroRestore)

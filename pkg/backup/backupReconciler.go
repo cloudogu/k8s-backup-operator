@@ -3,9 +3,11 @@ package backup
 import (
 	"context"
 	"fmt"
+	"strings"
+
+	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,6 +49,7 @@ func NewBackupReconciler(clientSet ecosystemInterface, recorder eventRecorder, n
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	metrics.UpdateBackupReconcileTotalMetric()
 
 	backup, err := r.clientSet.EcosystemV1Alpha1().Backups(r.namespace).Get(ctx, req.Name, metav1.GetOptions{})
 	if err != nil {
