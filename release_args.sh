@@ -11,6 +11,11 @@ update_versions_modify_files() {
 
   ./.bin/yq -i ".manager.image.tag = \"${newReleaseVersion}\"" "${valuesYAML}"
   ./.bin/yq -i ".values.images.backupOperator |= sub(\":(([0-9]+)\.([0-9]+)\.([0-9]+)((?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))|(?:\+[0-9A-Za-z-]+))?)\", \":${newReleaseVersion}\")" "${componentPatchTplYAML}"
+
+  # set kubectl-version in component-patch-tpl.yaml
+  local kubectlVersion
+  kubectlVersion=$(./.bin/yq '.initContainer.image.tag' < ${valuesYAML})
+  ./.bin/yq -i ".values.images.kubectl |= sub(\":(([0-9]+)\.([0-9]+)\.([0-9]+)((?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))|(?:\+[0-9A-Za-z-]+))?)\", \":${kubectlVersion}\")" "${componentPatchTplYAML}"
 }
 
 update_versions_stage_modified_files() {
