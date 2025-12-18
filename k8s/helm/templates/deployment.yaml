@@ -23,7 +23,7 @@ spec:
         {{- end }}
       initContainers:
         - name: default-schedule-cr
-          image: alpine/kubectl:1.34.1
+          image: "{{ .Values.initContainer.image.registry }}/{{ .Values.initContainer.image.repository }}:{{ .Values.initContainer.image.tag }}"
           securityContext:
             runAsUser: 1000
             runAsGroup: 1000
