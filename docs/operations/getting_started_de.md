@@ -8,6 +8,9 @@ auszuführen. Die einzelnen Schritte sollten nacheinander ausgeführt werden und
     * [Google Cloud](./setup_gcloud_backup_bucket_de.md)
     * AWS
     * Mattermost
+    * Minio
+      * benötigt [Longhorn](./use_longhorn_storage_provisioner_de.md)
+      * Installation und Konfiguration siehe [Minio Dokumentation](https://github.com/cloudogu/k8s-minio/blob/develop/docs/operations/operations_de.md)
 2. [Velero installieren](./installing_velero_de.md)
 3. [Backup-Operator installieren](./backup_operator_installation_de.md)
 4. [Backup erstellen](./backup_de.md)
@@ -16,3 +19,4 @@ auszuführen. Die einzelnen Schritte sollten nacheinander ausgeführt werden und
 ## weiterführende Anleitungen
 - [Backups planen](./scheduled_backups_de.md)
 - [Aufbewahrungsstrategien für Backups](./automated_backup_deletion_and_retention_de.md)
+- [Longhorn als Storage-Provisioner verwenden](./use_longhorn_storage_provisioner_de.md)
