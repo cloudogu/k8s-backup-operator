@@ -1,6 +1,6 @@
-# Backup creation
+# Erstellung eines Backups
 
-To back up the Cloudogu EcoSystem one has to apply a backup custom resource:
+Für ein Backup des Cloudogu EcoSystem ist die Erstellung einer Backup-Ressource notwendig:
 
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
@@ -8,5 +8,5 @@ kind: Backup
 metadata:
   name: backup-sample
 spec:
-  provider: velero # only velero and "" (defaults to velero) is supported.
+  provider: velero # aktuell wird nur Velero unterstützt ("" ist ein Spezialfall und wählt Velero als Provider aus)
 ```
