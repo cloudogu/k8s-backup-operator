@@ -1,4 +1,4 @@
-# Installation Backup-Operator
+# Installation des Backup-Operators
 
 Den Backup-Operator mit seinen Komponenten-CRs installieren:
 

@@ -7,10 +7,10 @@ auszuführen. Die einzelnen Schritte sollten nacheinander ausgeführt werden und
 1. Backup-Bucket konfigurieren
     * [Google Cloud](./setup_gcloud_backup_bucket_de.md)
     * AWS
-    * Mattermost
+    * Metalstack
     * Minio
       * benötigt [Longhorn](./use_longhorn_storage_provisioner_de.md)
-      * Installation und Konfiguration siehe [Minio Dokumentation](https://github.com/cloudogu/k8s-minio/blob/develop/docs/operations/operations_de.md)
+      * Installation und Konfiguration siehe [Lokale Testumgebung](../development/local_dev_setup_de.md)
 2. [Velero installieren](./installing_velero_de.md)
 3. [Backup-Operator installieren](./backup_operator_installation_de.md)
 4. [Backup erstellen](./backup_de.md)

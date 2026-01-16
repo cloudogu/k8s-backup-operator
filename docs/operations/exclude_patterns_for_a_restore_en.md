@@ -1,8 +1,6 @@
 # Exclude resources during a restore
 
-The restore is divided into two steps. Firstly, a cleanup is performed. This cleanup deletes all
-resources of the cluster that are not required for the backup. All resources required by the backup stack,
-have the annotation `k8s.cloudogu.com/part-of: backup`.
+The restore is divided into two steps. Firstly, a cleanup is performed. This cleanup deletes all dogus.
 
 In the second step, the backup provider is used to perform a restore and add all resources from the
 backup to the cluster.
@@ -33,8 +31,3 @@ A [Plugin for excluding resources from the backup](https://github.com/cloudogu/v
 exists for the restore provider `velero`. 
 This plugin can be applied and used with `velero` in the cluster to exclude resources during the
 restore process. For more information see [here](https://github.com/cloudogu/k8s-velero/blob/develop/docs/exclude_out_of_restore_en.md)
-
-## Interaction
-
-These two exclusion processes should be used together. This makes it possible to keep resources
-in the cluster before importing a restore and to continue using them afterwards.

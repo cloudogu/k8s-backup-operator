@@ -60,6 +60,7 @@ Vorraussetzungen für eine Verschlüsselung des Buckets:
     - Oben angelegten Key auswählen
 
 ### Serviceaccount auf den Bucket berechtigen
+Diese Schritte müssen von einem Google-Cloud-Administrator durchgeführt werden.
 
 - Email des Service Accounts auslesen
 
