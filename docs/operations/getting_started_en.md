@@ -23,7 +23,7 @@ The individual steps should be performed in sequence and are described in the fo
 
 ## Backup architecture
 
-Placeholder architecture diagram
+<img src="../resources/backup.svg" alt="Backup Architektur">
 
 The diagram shows all components and their interactions. The ``k8s-backup-operator`` monitors the
 creation of ``k8s.cloudogu.com/Backup`` resources. These are created either by the user or via a backup schedule. When
