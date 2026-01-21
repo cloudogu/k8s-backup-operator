@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
+	"sync"
+
 	"github.com/cloudogu/retry-lib/retry"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,10 +17,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
-	"maps"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"slices"
-	"sync"
 )
 
 // cloudoguResourceGroup is the group in which CRDs from Cloudogu are defined
@@ -280,7 +281,7 @@ func (r Recreator) fetchResourcesForBackup(ctx context.Context) ([]resourceWithG
 				List(ctx, metav1.ListOptions{})
 
 			if lErr != nil {
-				logger.Info("failed to list resources for group", "resource", apiResource.Name, "group", apiResource.Group)
+				logger.Info("failed to list resources for group", "resource", apiResource.Name, "group", apiResource.Group, "error", lErr.Error())
 				continue
 			}
 
@@ -512,7 +513,7 @@ func (r Recreator) fetchResourcesForRestore(ctx context.Context) (map[types.UID]
 				List(ctx, metav1.ListOptions{})
 
 			if lErr != nil {
-				logger.Info("failed to list resources for group", "resource", apiResource.Name, "group", apiResource.Group)
+				logger.Info("failed to list resources for group", "resource", apiResource.Name, "group", apiResource.Group, "error", lErr.Error())
 				continue
 			}
 
