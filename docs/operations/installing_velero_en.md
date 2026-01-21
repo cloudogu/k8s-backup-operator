@@ -65,6 +65,14 @@ spec:
 
 The file can be applied with the Kubecontext set using `kubectl apply -f velero.yaml -n ecosystem`.
 
+#### backupStorageLocation and volumeSnapshotLocation
+
+When creating velero, the backupStorageLocation and volumeSnapshotLocation must be specified.
+The ``backupStorageLocation`` determines where the metadata of the Velero backup is stored. This is always an S3 bucket.
+The ``volumeSnapshotLocation`` determines where the snapshots of the volumes are stored. Depending on which CSI is used,
+the data is stored in different locations. Volume snapshots are created in Google Cloud. If ``longhorn`` is used,
+an additional S3 bucket is required here.
+
 ## Customize VolumeSnapshotClass
 The existing volume snapshot class must be extended. The labels are required to assign the snapshots to the backups.
 The labels are required to assign the snapshots to the backups.
