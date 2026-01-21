@@ -2,13 +2,14 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
 )
 
 func TestNewOperatorConfig(t *testing.T) {
@@ -105,6 +106,8 @@ func TestGetLogLevel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.want != "" {
 				t.Setenv(logLevelEnvVar, tt.want)
+			} else {
+				_ = os.Unsetenv(logLevelEnvVar)
 			}
 			got, err := GetLogLevel()
 			if !tt.wantErr(t, err, fmt.Sprintf("GetLogLevel()")) {
