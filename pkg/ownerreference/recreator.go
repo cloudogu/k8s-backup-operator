@@ -281,7 +281,7 @@ func (r Recreator) fetchResourcesForBackup(ctx context.Context) ([]resourceWithG
 				List(ctx, metav1.ListOptions{})
 
 			if lErr != nil {
-				logger.Info("failed to list resources for group", "resource", apiResource.Name, "group", apiResource.Group, "error", lErr.Error())
+				logger.Error(lErr, "failed to list resources for group", "resource", apiResource.Name, "group", apiResource.Group)
 				continue
 			}
 
@@ -513,7 +513,7 @@ func (r Recreator) fetchResourcesForRestore(ctx context.Context) (map[types.UID]
 				List(ctx, metav1.ListOptions{})
 
 			if lErr != nil {
-				logger.Info("failed to list resources for group", "resource", apiResource.Name, "group", apiResource.Group, "error", lErr.Error())
+				logger.Error(lErr, "failed to list resources for group", "resource", apiResource.Name, "group", apiResource.Group)
 				continue
 			}
 
