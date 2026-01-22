@@ -5,26 +5,6 @@ The restore is divided into two steps. Firstly, a cleanup is performed. This cle
 In the second step, the backup provider is used to perform a restore and add all resources from the
 backup to the cluster.
 
-## Exclude ressources in the cleanup
-
-The `cleanup.exclude` attribute in `values.yaml` can be used to exclude any resources from the cleanup.
-The resources only need to be specified in the GVKN pattern (group, version, kind, name). 
-```yaml
-...
-cleanup:
-  exclude:
-    - name: "k8s-backup-operator"
-      kind: "Component"
-      version: "*"
-      group: "k8s.cloudogu.com"
-    - name: "test-certificate"
-      kind: "Secret"
-      version: "*"
-...
-```
-By default, all resources that are required for the backup, the ces load balancer and the certificate are excluded from the cleanup. 
-These resources are retained after the cleanup.
-
 ## Exclude resources in the restore process
 
 A [Plugin for excluding resources from the backup](https://github.com/cloudogu/velero-plugin-for-restore-exclude/) 
