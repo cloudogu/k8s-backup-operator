@@ -15,6 +15,7 @@ Vorraussetzungen für eine Verschlüsselung des Buckets:
 - Im Projekt muss die Cloud Key Management API aktiviert sein, wenn Verschlüsselung erwünscht
 - Der Service Account (bzw. das Dienstkonto) muss die Rolle "cloudkms.cryptoKeyEncrypterDecrypter" besitzen
 - Key zum Verschlüsseln
+- die Verschlüsselung ist optional
 
 #### Cloud Key Management Service API aktivieren
 - KMS-Bereich des Projekts aufrufen
@@ -58,6 +59,53 @@ Vorraussetzungen für eine Verschlüsselung des Buckets:
 - Data encryption: Cloud KMS key
     - Oben angelegten Key auswählen
 
+### Serviceaccount auf den Bucket berechtigen
+Diese Schritte müssen von einem Google-Cloud-Administrator durchgeführt werden.
+
+- Email des Service Accounts auslesen
+
+```
+SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list --project $PROJECT_ID --filter="displayName:Velero service account" --format 'value(email)')
+```
+  - oder in der Dienstkonten-Seite in der Google Cloud
+
+- Berechtigungen zum Serviceaccount hinzufügen
+```bash
+ROLE_PERMISSIONS=(
+    compute.disks.get
+    compute.disks.create
+    compute.disks.createSnapshot
+    compute.projects.get
+    compute.snapshots.get
+    compute.snapshots.create
+    compute.snapshots.useReadOnly
+    compute.snapshots.delete
+    compute.zones.get
+    storage.objects.create
+    storage.objects.delete
+    storage.objects.get
+    storage.objects.list
+    iam.serviceAccounts.signBlob
+)
+```
+  - diese Berechtigungen werden z.B. in der Rolle velero.server.2 zusammengefasst
+    - sonst: Rolle erstellen
+
+```
+gcloud iam roles create velero.server --project $PROJECT_ID --title "Velero Server" --permissions "$(IFS=","; echo "${ROLE_PERMISSIONS[*]}")"```
+```
+- Rolle dem Serviceaccount zuweisen
+
+```
+gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:$SERVICE_ACCOUNT_EMAIL --role projects/$PROJECT_ID/roles/velero.server
+```
+
+- Serviceaccount mit Bucket verknüpfen
+
+```
+gsutil iam ch serviceAccount:$SERVICE_ACCOUNT_EMAIL:objectAdmin gs://${BUCKET_NAME}
+```
+
 ### Zugriff aus einem anderen Projekt konfigurieren (optional)
 - Erstellten Bucket öffnen
 - "Berechtigung" öffnen
@@ -65,3 +113,45 @@ Vorraussetzungen für eine Verschlüsselung des Buckets:
 - In dem Eingabefeld "Neue Hauptkonten" die E-Mail des Service Accounts aus dem anderen Projekt einfügen
 - Im Feld "Rolle auswählen" die Rolle "Storage Object User" auswählen
 
+### Bucket in velero hinterlegen
+
+```yaml
+apiVersion: k8s.cloudogu.com/v1
+kind: Component
+metadata:
+  name: k8s-velero
+  labels:
+    app: ces
+    app.kubernetes.io/name: k8s-velero
+spec:
+  name: k8s-velero
+  namespace: k8s
+  version: 10.0.1-5
+  valuesYamlOverwrite: |
+    volumesnapshotclass:
+      driver: "pd.csi.storage.gke.io"
+      parameters:
+        type: ""
+    velero:
+      credentials:
+        useSecret: true
+        existingSecret: velero-backup-target
+      initContainers:
+        - name: "velero-plugin-for-gcp"
+          image: "velero/velero-plugin-for-gcp:v1.12.1"
+          volumeMounts:
+            - "mountPath": "/target"
+              "name": "plugins"
+      configuration:
+        backupStorageLocation:
+          - name: default
+            provider: "velero.io/gcp"
+            bucket: "<my-bucket-name>"
+            config:
+              serviceAccount: "<my-service-account>"
+        volumeSnapshotLocation:
+          - name: default
+            provider: velero.io/gcp
+            config:
+              snapshotLocation: europe-west3
+```

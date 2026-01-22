@@ -15,6 +15,7 @@ Prerequisites for encrypting the bucket:
 - The Cloud Key Management API must be activated in the project
 - The service account must have the role "cloudkms.cryptoKeyEncrypterDecrypter"
 - Key for encryption
+- encryption is optional
 
 #### Activate Cloud Key Management Service API
 - Call up the KMS area of the project
@@ -59,9 +60,99 @@ Prerequisites for encrypting the bucket:
 - Data encryption: Cloud KMS key
   - Select the key created above
 
+### Serviceaccount auf den Bucket berechtigen
+These steps need to be performed by a google cloud aministrator.
+
+- get the serviceaccounts email
+
+```
+SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list --project $PROJECT_ID --filter="displayName:Velero service account" --format 'value(email)')
+```
+- or use the serviceaccount page in google cloud
+
+- add permissions to the serviceaccount
+```bash
+ROLE_PERMISSIONS=(
+    compute.disks.get
+    compute.disks.create
+    compute.disks.createSnapshot
+    compute.projects.get
+    compute.snapshots.get
+    compute.snapshots.create
+    compute.snapshots.useReadOnly
+    compute.snapshots.delete
+    compute.zones.get
+    storage.objects.create
+    storage.objects.delete
+    storage.objects.get
+    storage.objects.list
+    iam.serviceAccounts.signBlob
+)
+```
+- the role "velero.server.2" already has all permissions
+    - otherwise: create the role
+
+```
+gcloud iam roles create velero.server --project $PROJECT_ID --title "Velero Server" --permissions "$(IFS=","; echo "${ROLE_PERMISSIONS[*]}")"```
+```
+- Add the role to the serviceaccount
+
+```
+gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:$SERVICE_ACCOUNT_EMAIL --role projects/$PROJECT_ID/roles/velero.server
+```
+
+- connect the serviceaccount to the bucket
+
+```
+gsutil iam ch serviceAccount:$SERVICE_ACCOUNT_EMAIL:objectAdmin gs://${BUCKET_NAME}
+```
+
 ### Configure access from another project (optional)
 - Open the created bucket
 - Open "Authorisation"
 - Click on "Grant access rights"
 - Insert the email of the service account from the other project in the "New main accounts" input field
 - Select the "Storage Object User" role in the "Select role" field
+
+### Configure bucket in velero
+
+```yaml
+apiVersion: k8s.cloudogu.com/v1
+kind: Component
+metadata:
+  name: k8s-velero
+  labels:
+    app: ces
+    app.kubernetes.io/name: k8s-velero
+spec:
+  name: k8s-velero
+  namespace: k8s
+  version: 10.0.1-5
+  valuesYamlOverwrite: |
+    volumesnapshotclass:
+      driver: "pd.csi.storage.gke.io"
+      parameters:
+        type: ""
+    velero:
+      credentials:
+        useSecret: true
+        existingSecret: velero-backup-target
+      initContainers:
+        - name: "velero-plugin-for-gcp"
+          image: "velero/velero-plugin-for-gcp:v1.12.1"
+          volumeMounts:
+            - "mountPath": "/target"
+              "name": "plugins"
+      configuration:
+        backupStorageLocation:
+          - name: default
+            provider: "velero.io/gcp"
+            bucket: "<my-bucket-name>"
+            config:
+              serviceAccount: "<my-service-account>"
+        volumeSnapshotLocation:
+          - name: default
+            provider: velero.io/gcp
+            config:
+              snapshotLocation: europe-west3
+```
