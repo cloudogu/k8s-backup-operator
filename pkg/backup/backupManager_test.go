@@ -10,7 +10,6 @@ import (
 func TestNewBackupManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
 		configMapMock := newMockBackupConfigMapInterface(t)
 		corev1Client := newMockBackupCoreV1Interface(t)
@@ -21,7 +20,7 @@ func TestNewBackupManager(t *testing.T) {
 		blueprintInterface := newMockBlueprintInterface(t)
 
 		// when
-		manager := NewBackupManager(clientMock, clientSetMock, blueprintInterface, testNamespace, nil, globalConfigRepositoryMock, ownerReferenceBackupMock)
+		manager := NewBackupManager(clientMock, clientSetMock, blueprintInterface, testNamespace, nil, globalConfigRepositoryMock)
 
 		// then
 		require.NotNil(t, manager)

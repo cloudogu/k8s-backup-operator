@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Removed
+- [#97], [#89] Backup & restore of owner references
+  - This is not needed anymore, because we only back up Dogu-specific data.
+    The dogu-operator is able to restore owner references itself now.
 
 ## [v2.2.2] - 2026-01-22
 ### Changed

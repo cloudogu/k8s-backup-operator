@@ -22,10 +22,9 @@ func Test_newCreateManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().CoreV1().Return(corev1Client)
 		clientMock := newMockK8sClient(t)
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
 
 		// when
-		manager := newCreateManager(clientMock, clientSetMock, testNamespace, nil, nil, ownerReferenceRestoreMock)
+		manager := newCreateManager(clientMock, clientSetMock, testNamespace, nil, nil)
 
 		// then
 		require.NotEmpty(t, manager)
@@ -69,10 +68,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
-		ownerReferenceRestoreMock.EXPECT().RestoreOwnerReferences(testCtx).Return(nil)
-
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace, ownerRefRestorer: ownerReferenceRestoreMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -115,9 +111,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
-
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace, ownerRefRestorer: ownerReferenceRestoreMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -143,9 +137,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
-
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace, ownerRefRestorer: ownerReferenceRestoreMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -172,9 +164,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
-
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace, ownerRefRestorer: ownerReferenceRestoreMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -202,9 +192,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
-
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace, ownerRefRestorer: ownerReferenceRestoreMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -251,10 +239,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
-		ownerReferenceRestoreMock.EXPECT().RestoreOwnerReferences(testCtx).Return(nil)
-
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace, ownerRefRestorer: ownerReferenceRestoreMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -294,9 +279,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
-
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace, ownerRefRestorer: ownerReferenceRestoreMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -340,9 +323,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
-
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace, ownerRefRestorer: ownerReferenceRestoreMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -386,9 +367,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
-
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace, ownerRefRestorer: ownerReferenceRestoreMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -434,10 +413,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
-		ownerReferenceRestoreMock.EXPECT().RestoreOwnerReferences(testCtx).Return(nil)
-
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace, ownerRefRestorer: ownerReferenceRestoreMock}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
