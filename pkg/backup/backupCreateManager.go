@@ -32,13 +32,12 @@ type backupCreateManager struct {
 	globalConfigRepository globalConfigRepository
 	recorder               eventRecorder
 	maintenanceModeSwitch  MaintenanceModeSwitch
-	ownerRefBackuper       ownerReferenceBackup
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv3.BlueprintInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, ownerRefBackuper ownerReferenceBackup) *backupCreateManager {
+func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv3.BlueprintInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository) *backupCreateManager {
 	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", clientSet.CoreV1().ConfigMaps(namespace))
-	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, blueprintClient: blueprintClient, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, ownerRefBackuper: ownerRefBackuper}
+	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, blueprintClient: blueprintClient, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch}
 }
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {
@@ -65,11 +64,6 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 			logger.Error(fmt.Errorf("failed to update completion time in status of backup resource: %w", err), "backup error")
 		}
 	}(backup)
-
-	err = bcm.ownerRefBackuper.BackupOwnerReferences(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to backup owner references: %w", err)
-	}
 
 	backup, err = backupClient.AddFinalizer(ctx, backup, v1.BackupFinalizer)
 	if err != nil {

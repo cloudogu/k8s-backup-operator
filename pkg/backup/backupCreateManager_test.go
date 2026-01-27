@@ -23,7 +23,6 @@ var testCtx = context.TODO()
 func TestNewBackupCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
 		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
 		configMapMock := newMockBackupConfigMapInterface(t)
 		corev1Client := newMockBackupCoreV1Interface(t)
@@ -34,7 +33,7 @@ func TestNewBackupCreateManager(t *testing.T) {
 		blueprintInterface := newMockBlueprintInterface(t)
 
 		// when
-		manager := newBackupCreateManager(clientMock, clientSetMock, blueprintInterface, "", nil, globalConfigRepositoryMock, ownerReferenceBackupMock)
+		manager := newBackupCreateManager(clientMock, clientSetMock, blueprintInterface, "", nil, globalConfigRepositoryMock)
 
 		// then
 		require.NotNil(t, manager)
@@ -80,9 +79,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -98,7 +94,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -145,9 +141,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -163,7 +156,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -250,10 +243,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -288,10 +278,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -328,9 +315,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -346,7 +330,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -384,9 +368,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -402,7 +383,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -447,9 +428,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -465,7 +443,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -511,9 +489,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -529,7 +504,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -575,9 +550,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -593,7 +565,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -641,9 +613,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -659,7 +628,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -700,9 +669,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		v1Alpha1Client.EXPECT().Backups(testNamespace).Return(clientMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
-
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -718,7 +684,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -763,9 +729,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -781,7 +744,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -826,9 +789,6 @@ func Test_backupCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		ownerReferenceBackupMock := newMockOwnerReferenceBackup(t)
-		ownerReferenceBackupMock.EXPECT().BackupOwnerReferences(testCtx).Return(nil)
-
 		blueprint := &v3.BlueprintList{
 			Items: []v3.Blueprint{
 				{
@@ -844,7 +804,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, ownerRefBackuper: ownerReferenceBackupMock, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
 
 		// when
 		err := sut.create(testCtx, backup)
