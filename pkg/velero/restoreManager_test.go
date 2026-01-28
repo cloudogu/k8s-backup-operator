@@ -47,7 +47,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		watchMock.EXPECT().Stop().Run(func() {
 			close(channel)
 		})
-		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore")}).Return(watchMock, nil)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore"), Namespace: testNamespace}).Return(watchMock, nil)
 
 		timer := time.NewTimer(time.Second)
 		go func() {
@@ -114,7 +114,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 
 		mockK8sWatchClient := newMockK8sWatchClient(t)
 		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(nil)
-		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore")}).Return(nil, assert.AnError)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore"), Namespace: testNamespace}).Return(nil, assert.AnError)
 
 		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
@@ -143,7 +143,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		watchMock.EXPECT().Stop().Run(func() {
 			close(channel)
 		})
-		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore")}).Return(watchMock, nil)
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore"), Namespace: testNamespace}).Return(watchMock, nil)
 
 		go func() {
 			time.Sleep(time.Second)
@@ -161,49 +161,6 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to complete velero restore [restore]: the restore got deleted")
 	})
-}
-
-func apiResourceLists() []*metav1.APIResourceList {
-	return []*metav1.APIResourceList{
-		{
-			GroupVersion: "k8s.cloudogu.com/v1",
-			APIResources: []metav1.APIResource{
-				{
-					Name:  "backups",
-					Group: "k8s.cloudogu.com",
-				},
-				{
-					Name:  "backupschedules",
-					Group: "k8s.cloudogu.com",
-				},
-				{
-					Name:  "restores",
-					Group: "k8s.cloudogu.com",
-				},
-				{
-					Name:  "components",
-					Group: "k8s.cloudogu.com",
-				},
-				{
-					Name:  "blueprints",
-					Group: "k8s.cloudogu.com",
-				},
-			},
-		},
-		{
-			GroupVersion: "k8s.cloudogu.com/v2",
-			APIResources: []metav1.APIResource{
-				{
-					Name:  "dogus",
-					Group: "k8s.cloudogu.com",
-				},
-				{
-					Name:  "dogurestarts",
-					Group: "k8s.cloudogu.com",
-				},
-			},
-		},
-	}
 }
 
 func getExpectedVeleroRestore(restore *v1.Restore) *velerov1.Restore {
@@ -238,7 +195,7 @@ func runVeleroStatusPhaseFailureTest(t *testing.T, phase velerov1.RestorePhase) 
 	watchMock.EXPECT().Stop().Run(func() {
 		close(channel)
 	})
-	mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore")}).Return(watchMock, nil)
+	mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore"), Namespace: testNamespace}).Return(watchMock, nil)
 
 	timer := time.NewTimer(time.Second)
 	go func() {

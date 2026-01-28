@@ -12,10 +12,9 @@ func NewRestoreManager(
 	namespace string,
 	recorder eventRecorder,
 	cleanup cleanupManager,
-	ownerRefRestorer ownerReferenceRestore,
 ) *defaultManager {
 	return &defaultManager{
-		createManager: newCreateManager(k8sClient, clientSet, namespace, recorder, cleanup, ownerRefRestorer),
+		createManager: newCreateManager(k8sClient, clientSet, namespace, recorder, cleanup),
 		deleteManager: newDeleteManager(k8sClient, clientSet, namespace, recorder),
 	}
 }

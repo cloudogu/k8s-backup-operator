@@ -1,8 +1,9 @@
 package restore
 
 import (
-	"github.com/stretchr/testify/mock"
 	"testing"
+
+	"github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/require"
 )
@@ -15,11 +16,10 @@ func TestNewRestoreManager(t *testing.T) {
 		corev1Client.EXPECT().ConfigMaps(mock.Anything).Return(configMapMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().CoreV1().Return(corev1Client)
-		ownerReferenceRestoreMock := newMockOwnerReferenceRestore(t)
 		clientMock := newMockK8sClient(t)
 
 		// when
-		manager := NewRestoreManager(clientMock, clientSetMock, testNamespace, nil, nil, ownerReferenceRestoreMock)
+		manager := NewRestoreManager(clientMock, clientSetMock, testNamespace, nil, nil)
 
 		// then
 		require.NotNil(t, manager)
