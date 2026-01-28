@@ -34,7 +34,7 @@ RUN make compile-generic
 FROM gcr.io/distroless/static:nonroot
 LABEL maintainer="hello@cloudogu.com" \
       NAME="k8s-backup-operator" \
-      VERSION="2.2.2"
+      VERSION="2.2.3"
 
 WORKDIR /
 COPY --from=builder /workspace/target/k8s-backup-operator .
