@@ -36,7 +36,7 @@ type backupCreateManager struct {
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
 func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv3.BlueprintInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository) *backupCreateManager {
-	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", clientSet.CoreV1().ConfigMaps(namespace))
+	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
 	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, blueprintClient: blueprintClient, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch}
 }
 

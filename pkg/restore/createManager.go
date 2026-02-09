@@ -34,7 +34,7 @@ func newCreateManager(
 	recorder eventRecorder,
 	cleanup cleanupManager,
 ) *defaultCreateManager {
-	maintenanceSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", ecosystemClientSet.CoreV1().ConfigMaps(namespace))
+	maintenanceSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
 	return &defaultCreateManager{
 		k8sClient:             k8sClient,
 		ecosystemClientSet:    ecosystemClientSet,
