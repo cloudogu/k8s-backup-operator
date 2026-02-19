@@ -83,13 +83,13 @@ func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) e
 	err = bcm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{
 		Title: maintenanceModeTitle,
 		Text:  maintenanceModeText,
-	})
+	}, false)
 	if err != nil {
 		return fmt.Errorf("failed to active maintenance mode: %w", err)
 	}
 
 	defer func() {
-		errDefer := bcm.maintenanceModeSwitch.Deactivate(ctx)
+		errDefer := bcm.maintenanceModeSwitch.Deactivate(ctx, false)
 		if errDefer != nil {
 			logger.Error(fmt.Errorf("failed to deactivate maintenance mode: [%w]", errDefer), "backup error")
 		}

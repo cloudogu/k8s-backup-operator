@@ -36,8 +36,8 @@ type eventRecorder interface {
 }
 
 type MaintenanceModeSwitch interface {
-	Activate(ctx context.Context, description repository.MaintenanceModeDescription) error
-	Deactivate(ctx context.Context) error
+	Activate(ctx context.Context, description repository.MaintenanceModeDescription, force bool) error
+	Deactivate(ctx context.Context, force bool) error
 }
 
 type backupControllerManager interface {
