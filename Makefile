@@ -7,6 +7,7 @@ MAKEFILES_VERSION=10.6.0
 STAGE?=production
 MOCKERY_VERSION=v2.53.5
 MOCKERY_IGNORED=vendor,build,docs,generated
+LINT_VERSION=v2.10.1
 
 ADDITIONAL_CLEAN=dist-clean
 
