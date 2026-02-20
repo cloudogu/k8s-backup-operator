@@ -12,7 +12,7 @@ github = new GitHub(this, git)
 changelog = new Changelog(this)
 Docker docker = new Docker(this)
 gpg = new Gpg(this, docker)
-goVersion = "1.25.7"
+goVersion = "1.26.0"
 Makefile makefile = new Makefile(this)
 backupCrdVersion="1.6.0"
 
