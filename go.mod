@@ -7,7 +7,7 @@ require (
 	github.com/cloudogu/k8s-backup-lib v1.7.0
 	github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0
 	github.com/cloudogu/k8s-dogu-lib/v2 v2.11.0
-	github.com/cloudogu/k8s-registry-lib v0.6.0
+	github.com/cloudogu/k8s-registry-lib v1.0.0
 	github.com/cloudogu/retry-lib v0.1.0
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/go-logr/logr v1.4.3
@@ -20,8 +20,6 @@ require (
 	k8s.io/client-go v0.35.1
 	sigs.k8s.io/controller-runtime v0.23.1
 )
-
-replace github.com/cloudogu/k8s-registry-lib v0.6.0 => github.com/cloudogu/k8s-registry-lib v0.2.2-0.20260219140143-05cf54f445aa
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
