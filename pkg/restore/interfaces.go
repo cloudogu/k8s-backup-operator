@@ -50,9 +50,9 @@ type requeueHandler interface {
 
 type maintenanceModeSwitch interface {
 	// Activate activates the maintenance mode.
-	Activate(ctx context.Context, description repository.MaintenanceModeDescription) error
+	Activate(ctx context.Context, description repository.MaintenanceModeDescription, force bool) error
 	// Deactivate deactivates the maintenance mode.
-	Deactivate(ctx context.Context) error
+	Deactivate(ctx context.Context, force bool) error
 }
 
 type cleanupManager interface {

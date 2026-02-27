@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+> [!IMPORTANT]
+> Breaking change!
+> New compatible versions of k8s-service-discovery and k8s-ces-assets are required.
+
+### Changed
+- [#99] Write maintenance mode to special `maintenance` ConfigMap
+    - Previously, the maintenance mode was stored in the global config,
+      which caused Dogus to restart unnecessarily.
 
 ## [v2.2.3] - 2026-01-28
 ### Removed
