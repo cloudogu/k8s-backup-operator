@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v3.0.0] - 2026-02-27
+> [!IMPORTANT]
+> Breaking change!
+> New compatible versions of k8s-service-discovery and k8s-ces-assets are required.
+
+### Changed
+- [#99] Write maintenance mode to special `maintenance` ConfigMap
+    - Previously, the maintenance mode was stored in the global config,
+      which caused Dogus to restart unnecessarily.
+
 ## [v2.2.3] - 2026-01-28
 ### Removed
 - [#97], [#89] Backup & restore of owner references

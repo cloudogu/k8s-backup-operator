@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -514,11 +515,11 @@ func newMockSubResourceWriter(b *backupv1.Backup, err error) mockSubResourceWrit
 	return mockSubResourceWriter{backup: b, reterr: err}
 }
 
-func (srw mockSubResourceWriter) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+func (srw mockSubResourceWriter) Create(context.Context, client.Object, client.Object, ...client.SubResourceCreateOption) error {
 	return srw.reterr
 }
 
-func (srw mockSubResourceWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+func (srw mockSubResourceWriter) Update(_ context.Context, obj client.Object, _ ...client.SubResourceUpdateOption) error {
 	if srw.backup != nil {
 		backupObj := obj.(*backupv1.Backup)
 		srw.backup.Status = backupObj.Status
@@ -526,6 +527,10 @@ func (srw mockSubResourceWriter) Update(ctx context.Context, obj client.Object, 
 	return srw.reterr
 }
 
-func (srw mockSubResourceWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+func (srw mockSubResourceWriter) Patch(context.Context, client.Object, client.Patch, ...client.SubResourcePatchOption) error {
+	return srw.reterr
+}
+
+func (srw mockSubResourceWriter) Apply(context.Context, runtime.ApplyConfiguration, ...client.SubResourceApplyOption) error {
 	return srw.reterr
 }

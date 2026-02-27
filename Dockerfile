@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.25.6 AS builder
+FROM golang:1.26.0 AS builder
 
 WORKDIR /workspace
 
@@ -34,7 +34,7 @@ RUN make compile-generic
 FROM gcr.io/distroless/static:nonroot
 LABEL maintainer="hello@cloudogu.com" \
       NAME="k8s-backup-operator" \
-      VERSION="2.2.3"
+      VERSION="3.0.0"
 
 WORKDIR /
 COPY --from=builder /workspace/target/k8s-backup-operator .
