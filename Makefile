@@ -1,14 +1,13 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-backup-operator
-VERSION=2.2.3
+VERSION=3.0.0
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.26.0
-LINT_VERSION=v2.9.0
-
-MAKEFILES_VERSION=10.4.0
+MAKEFILES_VERSION=10.6.0
 STAGE?=production
-MOCKERY_VERSION=v2.53.3
+MOCKERY_VERSION=v2.53.5
 MOCKERY_IGNORED=vendor,build,docs,generated
+LINT_VERSION=v2.10.1
 
 ADDITIONAL_CLEAN=dist-clean
 
@@ -22,6 +21,7 @@ include build/make/static-analysis.mk
 include build/make/clean.mk
 include build/make/digital-signature.mk
 include build/make/mocks.mk
+include build/make/release.mk
 
 K8S_COMPONENT_SOURCE_VALUES = ${HELM_SOURCE_DIR}/values.yaml
 K8S_COMPONENT_TARGET_VALUES = ${HELM_TARGET_DIR}/values.yaml
