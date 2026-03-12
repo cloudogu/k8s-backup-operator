@@ -13,7 +13,7 @@ manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-backup-operator
-    tag: 3.0.0
+    tag: 3.0.1
   imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -29,7 +29,7 @@ initContainer:
   image:
     registry: docker.io
     repository: alpine/kubectl
-    tag: 1.34.1
+    tag: 1.35.2
 metrics:
   serviceMonitor:
     enabled: true

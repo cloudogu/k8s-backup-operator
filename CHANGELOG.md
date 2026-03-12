@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v3.0.1] - 2026-03-05
+### Security
+- [#101] Fix Go stdlib CVE-2025-68121
+
 ## [v3.0.0] - 2026-02-27
 > [!IMPORTANT]
 > Breaking change!
