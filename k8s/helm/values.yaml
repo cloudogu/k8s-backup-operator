@@ -32,6 +32,8 @@ initContainer:
     tag: 1.35.2
 metrics:
   serviceMonitor:
-    enabled: true
+    enabled: false
     additionalLabels:
       release: prometheus
+backup:
+  retryTimeLimit: "60"

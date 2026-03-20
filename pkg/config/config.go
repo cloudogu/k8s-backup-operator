@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -10,11 +11,12 @@ import (
 )
 
 const (
-	StageDevelopment = "development"
-	StageProduction  = "production"
-	StageEnvVar      = "STAGE"
-	namespaceEnvVar  = "NAMESPACE"
-	logLevelEnvVar   = "LOG_LEVEL"
+	StageDevelopment     = "development"
+	StageProduction      = "production"
+	StageEnvVar          = "STAGE"
+	namespaceEnvVar      = "NAMESPACE"
+	logLevelEnvVar       = "LOG_LEVEL"
+	backupRetryTimeLimit = "BACKUP_RETRY_TIME_LIMIT"
 )
 
 const (
@@ -99,6 +101,16 @@ func GetNamespace() (string, error) {
 	}
 
 	return namespace, nil
+}
+
+func GetRetryLimit() (int, error) {
+	backupRetryTimeLimitStr, err := getEnvVar(backupRetryTimeLimit)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get env var [%s]: %w", backupRetryTimeLimit, err)
+	}
+	retryLimit, err := strconv.Atoi(backupRetryTimeLimitStr)
+
+	return retryLimit, nil
 }
 
 func getEnvVar(name string) (string, error) {
