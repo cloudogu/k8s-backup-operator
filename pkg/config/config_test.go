@@ -117,3 +117,37 @@ func TestGetLogLevel(t *testing.T) {
 		})
 	}
 }
+
+func TestGetRetryLimit(t *testing.T) {
+	t.Run("should succeed", func(t *testing.T) {
+		// given
+		t.Setenv(backupRetryTimeLimit, "10")
+
+		// when
+		limit, err := GetRetryLimit()
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, 10, limit)
+	})
+	t.Run("should fail getting env var", func(t *testing.T) {
+		// given
+		// do nothing
+
+		// when
+		_, err := GetRetryLimit()
+
+		// then
+		require.Error(t, err, "failed to read env var [BACKUP_RETRY_TIME_LIMIT]: environment variable BACKUP_RETRY_TIME_LIMIT must be set")
+	})
+	t.Run("should fail converting env var", func(t *testing.T) {
+		// given
+		t.Setenv(backupRetryTimeLimit, "thisIsNoNumber")
+
+		// when
+		_, err := GetRetryLimit()
+
+		// then
+		require.Error(t, err, "failed to convert env var [BACKUP_RETRY_TIME_LIMIT]:")
+	})
+}

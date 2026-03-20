@@ -110,7 +110,7 @@ func GetRetryLimit() (int, error) {
 	}
 	retryLimit, err := strconv.Atoi(backupRetryTimeLimitStr)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get env var [%s]: %w", backupRetryTimeLimit, err)
+		return 0, fmt.Errorf("failed to convert env var [%s]: %w", backupRetryTimeLimit, err)
 	}
 	return retryLimit, nil
 }
