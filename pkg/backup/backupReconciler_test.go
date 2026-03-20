@@ -2,6 +2,9 @@ package backup
 
 import (
 	"errors"
+	"testing"
+	"time"
+
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -14,8 +17,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"testing"
-	"time"
 )
 
 var testNamespace = "ecosystem-test"
@@ -23,7 +24,7 @@ var testNamespace = "ecosystem-test"
 func TestNewBackupReconciler(t *testing.T) {
 	t.Run("should create backup reconciler", func(t *testing.T) {
 		// when
-		actual := NewBackupReconciler(nil, nil, "default", nil, nil)
+		actual := NewBackupReconciler(nil, nil, "default", nil, nil, 10)
 
 		// then
 		assert.NotNil(t, actual)
@@ -39,7 +40,7 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 			Namespace: testNamespace,
 			Name:      backupName,
 		}}
-		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}}
+		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace, CreationTimestamp: metav1.Now()}}
 
 		clientSetMock := newMockEcosystemInterface(t)
 		backupInterfaceMock := newMockEcosystemBackupInterface(t)
@@ -56,7 +57,7 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		requeueHandlerMock := newMockRequeueHandler(t)
 		requeueHandlerMock.EXPECT().Handle(testCtx, "Creation failed with backup backup", backup, nil, "").Return(ctrl.Result{}, nil)
 
-		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock, retryTimeLimit: 10}
 
 		// when
 		actual, err := sut.Reconcile(testCtx, request)
@@ -74,7 +75,7 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 			Namespace: testNamespace,
 			Name:      backupName,
 		}}
-		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace}, Status: v1.BackupStatus{Status: "completed"}}
+		backup := &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace, CreationTimestamp: metav1.Now()}, Status: v1.BackupStatus{Status: "completed"}}
 
 		clientSetMock := newMockEcosystemInterface(t)
 		backupInterfaceMock := newMockEcosystemBackupInterface(t)
@@ -83,7 +84,7 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
 
-		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace}
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, retryTimeLimit: 10}
 
 		// when
 		actual, err := sut.Reconcile(testCtx, request)
@@ -102,7 +103,7 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 			Name:      backupName,
 		}}
 		backup := &v1.Backup{
-			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace},
+			ObjectMeta: metav1.ObjectMeta{Name: backupName, Namespace: testNamespace, CreationTimestamp: metav1.Now()},
 			Spec:       v1.BackupSpec{SyncedFromProvider: true},
 		}
 
@@ -128,6 +129,7 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 			manager:        managerMock,
 			recorder:       recorderMock,
 			requeueHandler: requeueHandlerMock,
+			retryTimeLimit: 10,
 		}
 
 		// when
@@ -335,23 +337,24 @@ func createScheme(t *testing.T) *runtime.Scheme {
 func Test_evaluateRequiredOperation(t *testing.T) {
 	now := metav1.NewTime(time.Now())
 	type args struct {
-		backup *v1.Backup
+		backup               *v1.Backup
+		backupRetryTimeLimit int
 	}
 	tests := []struct {
 		name string
 		args args
 		want operation
 	}{
-		{name: "should return create operation on empty status", args: args{backup: &v1.Backup{Status: v1.BackupStatus{Status: ""}}}, want: operationCreate},
-		{name: "should return ignore on completed status", args: args{backup: &v1.Backup{Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}}, want: operationIgnore},
-		{name: "should return ignore on in progress status", args: args{backup: &v1.Backup{Status: v1.BackupStatus{Status: v1.BackupStatusInProgress}}}, want: operationIgnore},
-		{name: "should return ignore on deleting status", args: args{backup: &v1.Backup{Status: v1.BackupStatus{Status: v1.BackupStatusDeleting}}}, want: operationIgnore},
+		{name: "should return create operation on empty status", args: args{backupRetryTimeLimit: 10, backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.Now()}, Status: v1.BackupStatus{Status: ""}}}, want: operationCreate},
+		{name: "should return ignore on completed status", args: args{backupRetryTimeLimit: 10, backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.Now()}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}}, want: operationIgnore},
+		{name: "should return ignore on in progress status", args: args{backupRetryTimeLimit: 10, backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.Now()}, Status: v1.BackupStatus{Status: v1.BackupStatusInProgress}}}, want: operationIgnore},
+		{name: "should return ignore on deleting status", args: args{backupRetryTimeLimit: 10, backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.Now()}, Status: v1.BackupStatus{Status: v1.BackupStatusDeleting}}}, want: operationIgnore},
 		{name: "should return ignore on failed status", args: args{backup: &v1.Backup{Status: v1.BackupStatus{Status: v1.BackupStatusFailed}}}, want: operationIgnore},
 		{name: "should return delete with deletionTimestamp", args: args{backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &now}, Status: v1.BackupStatus{Status: v1.BackupStatusCompleted}}}, want: operationDelete},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, evaluateRequiredOperation(tt.args.backup), "evaluateRequiredOperation(%v)", tt.args.backup)
+			assert.Equalf(t, tt.want, evaluateRequiredOperation(tt.args.backup, tt.args.backupRetryTimeLimit), "evaluateRequiredOperation(%v)", tt.args.backup)
 		})
 	}
 }

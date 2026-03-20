@@ -12,10 +12,12 @@ func TestNewBackupManager(t *testing.T) {
 		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientMock := newMockK8sClient(t)
+		backupRetryTimeLimit := 10
+
 		blueprintInterface := newMockBlueprintInterface(t)
 
 		// when
-		manager := NewBackupManager(clientMock, clientSetMock, blueprintInterface, testNamespace, nil, globalConfigRepositoryMock)
+		manager := NewBackupManager(clientMock, clientSetMock, blueprintInterface, testNamespace, nil, globalConfigRepositoryMock, backupRetryTimeLimit)
 
 		// then
 		require.NotNil(t, manager)
