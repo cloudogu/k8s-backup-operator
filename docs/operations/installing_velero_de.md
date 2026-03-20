@@ -61,9 +61,9 @@ spec:
         backupStorageLocation:
           - name: default
             provider: "velero.io/gcp"
-            bucket: "<my-bucket-name>"
+            bucket: "backup-restore-test-lfriebe"
             config:
-              serviceAccount: "<my-service-account>"
+              serviceAccount: "backup-restore-test-lfriebe@ces-coder-workspaces.iam.gserviceaccount.com"
         volumeSnapshotLocation:
           - name: default
             provider: velero.io/gcp
