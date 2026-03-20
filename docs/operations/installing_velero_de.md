@@ -63,7 +63,7 @@ spec:
             provider: "velero.io/gcp"
             bucket: "<my-bucket-name>"
             config:
-              serviceAccount: "<my-service-account>"
+              serviceAccount: "<my-service-account-email>"
         volumeSnapshotLocation:
           - name: default
             provider: velero.io/gcp

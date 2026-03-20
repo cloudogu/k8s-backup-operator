@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
@@ -26,6 +27,7 @@ const (
 	operationDelete     = operation("delete")
 	operationIgnore     = operation("ignore")
 	operationSyncStatus = operation("syncStatus")
+	operationTimeout    = operation("timeout")
 )
 
 // backupReconciler reconciles a Backup object
@@ -35,11 +37,12 @@ type backupReconciler struct {
 	namespace      string
 	manager        backupControllerManager
 	requeueHandler requeueHandler
+	retryTimeLimit int
 }
 
 // NewBackupReconciler creates a new instance of backupReconciler.
-func NewBackupReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, manager backupControllerManager, handler requeueHandler) *backupReconciler {
-	return &backupReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager, requeueHandler: handler}
+func NewBackupReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, manager backupControllerManager, handler requeueHandler, backupRetryTimeLimit int) *backupReconciler {
+	return &backupReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager, requeueHandler: handler, retryTimeLimit: backupRetryTimeLimit}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -59,7 +62,7 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	logger.Info(fmt.Sprintf("found backup resource %s", req.NamespacedName))
 
-	requiredOperation := evaluateRequiredOperation(backup)
+	requiredOperation := evaluateRequiredOperation(backup, r.retryTimeLimit)
 	logger.Info(fmt.Sprintf("required operation for backup %s is %s", req.NamespacedName, requiredOperation))
 
 	switch requiredOperation {
@@ -69,6 +72,8 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return r.performDeleteOperation(ctx, backup)
 	case operationSyncStatus:
 		return r.performSyncStatusOperation(ctx, backup)
+	case operationTimeout:
+		return r.performTimeoutOperation(ctx, backup)
 	case operationIgnore:
 		return ctrl.Result{}, nil
 	default:
@@ -86,6 +91,10 @@ func (r *backupReconciler) performDeleteOperation(ctx context.Context, backup *k
 
 func (r *backupReconciler) performSyncStatusOperation(ctx context.Context, backup *k8sv1.Backup) (ctrl.Result, error) {
 	return r.performOperation(ctx, backup, k8sv1.SyncStatusEventReason, backup.Status.Status, r.manager.syncStatus)
+}
+
+func (r *backupReconciler) performTimeoutOperation(ctx context.Context, backup *k8sv1.Backup) (ctrl.Result, error) {
+	return r.performOperation(ctx, backup, k8sv1.ErrorOnCreateEventReason, k8sv1.BackupStatusFailed, r.manager.timeout)
 }
 
 // performOperation executes the given operationFn and requeues if necessary.
@@ -122,9 +131,18 @@ func (r *backupReconciler) performOperation(
 	return result, nil
 }
 
-func evaluateRequiredOperation(backup *k8sv1.Backup) operation {
+func evaluateRequiredOperation(backup *k8sv1.Backup, retryTimeLimit int) operation {
 	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.IsZero() {
 		return operationDelete
+	}
+
+	// failed status cannot be recovered from
+	if backup.Status.Status == k8sv1.BackupStatusFailed {
+		return operationIgnore
+	}
+
+	if time.Since(backup.CreationTimestamp.Time) > time.Duration(retryTimeLimit)*time.Minute && backup.Status.Status != k8sv1.BackupStatusFailed {
+		return operationTimeout
 	}
 
 	if backup.Spec.SyncedFromProvider {
@@ -132,8 +150,6 @@ func evaluateRequiredOperation(backup *k8sv1.Backup) operation {
 	}
 
 	switch backup.Status.Status {
-	case k8sv1.BackupStatusFailed:
-		return operationIgnore
 	case k8sv1.BackupStatusNew:
 		return operationCreate
 	default:
