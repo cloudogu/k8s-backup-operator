@@ -115,9 +115,10 @@ func GetNamespace() (string, error) {
 
 func GetImagePullSecrets() ([]corev1.LocalObjectReference, error) {
 	var secrets []corev1.LocalObjectReference
-	envVar, err := getEnvVar(imagePullSecretsEnvVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get env var [%s]: %w", imagePullSecretsEnvVar, err)
+	// imagePullSecrets should be set but are not always mandatory
+	envVar, found := os.LookupEnv(imagePullSecretsEnvVar)
+	if !found {
+		return secrets, nil
 	}
 
 	split := strings.Split(envVar, ",")
