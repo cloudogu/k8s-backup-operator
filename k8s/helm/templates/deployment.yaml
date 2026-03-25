@@ -62,7 +62,7 @@ spec:
         {{- with .Values.global.imagePullSecrets }}
         - name: IMAGE_PULL_SECRETS
           {{- $names := list -}}
-          {{- range .Values.global.imagePullSecrets -}}
+          {{- range . -}}
             {{- $names = append $names .name -}}
           {{- end }}
           value: {{ join "," $names | quote }}
