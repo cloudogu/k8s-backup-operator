@@ -12,7 +12,6 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
-	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -293,14 +292,10 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 
 	blueprintClient := blueprintClientSet.EcosystemV1Alpha1().Blueprints(namespace)
 
-	configMapClient := ecosystemClientSet.CoreV1().ConfigMaps(namespace)
-
 	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create dogu client: %w", err)
 	}
-
-	globalConfig := repository.NewGlobalConfigRepository(configMapClient)
 
 	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient)
 	if err != nil {
@@ -334,7 +329,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
-	backupManager := backup.NewBackupManager(k8sClient, ecosystemClientSet, blueprintClient, operatorConfig.Namespace, recorder, globalConfig)
+	backupManager := backup.NewBackupManager(k8sClient, ecosystemClientSet, blueprintClient, operatorConfig.Namespace, recorder)
 	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
