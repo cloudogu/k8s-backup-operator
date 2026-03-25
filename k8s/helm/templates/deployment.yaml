@@ -59,6 +59,12 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: IMAGE_PULL_SECRETS
+          {{- $names := list -}}
+          {{- range .Values.global.imagePullSecrets -}}
+            {{- $names = append $names .name -}}
+          {{- end }}
+          value: {{ join "," $names | quote }}
         image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
         imagePullPolicy: {{ .Values.manager.imagePullPolicy | default "IfNotPresent" }}
         livenessProbe:

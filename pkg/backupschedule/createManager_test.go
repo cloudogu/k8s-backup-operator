@@ -22,7 +22,7 @@ func TestNewCreateManager(t *testing.T) {
 		// given
 
 		// when
-		manager := newCreateManager(nil, nil, "test", additionalimages.ImageConfig{})
+		manager := newCreateManager(nil, nil, "test", additionalimages.ImageConfig{}, nil)
 
 		// then
 		require.NotEmpty(t, manager)
@@ -101,6 +101,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 								}},
 								RestartPolicy:      corev1.RestartPolicyOnFailure,
 								ServiceAccountName: "k8s-backup-operator-scheduled-backup-creator-manager",
+								ImagePullSecrets:   []corev1.LocalObjectReference{{Name: "ces-container-registries"}},
 							},
 						},
 					},
@@ -110,10 +111,11 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		cronJobMock.EXPECT().Create(testCtx, expectedCreatedCronJob, metav1.CreateOptions{}).Return(&batchv1.CronJob{}, nil)
 
 		sut := &defaultCreateManager{
-			recorder:    recorderMock,
-			clientSet:   clientMock,
-			namespace:   testNamespace,
-			imageConfig: additionalimages.ImageConfig{OperatorImage: "my-backup-operator:1.2.3"},
+			recorder:         recorderMock,
+			clientSet:        clientMock,
+			namespace:        testNamespace,
+			imageConfig:      additionalimages.ImageConfig{OperatorImage: "my-backup-operator:1.2.3"},
+			imagePullSecrets: []corev1.LocalObjectReference{{Name: "ces-container-registries"}},
 		}
 
 		// when

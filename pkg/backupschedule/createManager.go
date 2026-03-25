@@ -17,14 +17,15 @@ import (
 )
 
 type defaultCreateManager struct {
-	clientSet   ecosystemInterface
-	recorder    eventRecorder
-	namespace   string
-	imageConfig additionalimages.ImageConfig
+	clientSet        ecosystemInterface
+	recorder         eventRecorder
+	namespace        string
+	imageConfig      additionalimages.ImageConfig
+	imagePullSecrets []corev1.LocalObjectReference
 }
 
-func newCreateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string, imageConfig additionalimages.ImageConfig) *defaultCreateManager {
-	return &defaultCreateManager{clientSet: clientSet, recorder: recorder, namespace: namespace, imageConfig: imageConfig}
+func newCreateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string, imageConfig additionalimages.ImageConfig, imagePullSecrets []corev1.LocalObjectReference) *defaultCreateManager {
+	return &defaultCreateManager{clientSet: clientSet, recorder: recorder, namespace: namespace, imageConfig: imageConfig, imagePullSecrets: imagePullSecrets}
 }
 
 func (cm *defaultCreateManager) create(ctx context.Context, backupSchedule *v1.BackupSchedule) error {
@@ -78,6 +79,16 @@ func (cm *defaultCreateManager) setCurrentCronJobImage(ctx context.Context, clie
 	return client.UpdateStatus(ctx, schedule, metav1.UpdateOptions{})
 }
 
+func getCronJobTemplate(schedule *v1.BackupSchedule, operatorImage string, pullPolicy corev1.PullPolicy, imagePullSecrets []corev1.LocalObjectReference) corev1.PodTemplateSpec {
+	podTemplateSpec := schedule.CronJobPodTemplate(operatorImage, pullPolicy)
+
+	if len(imagePullSecrets) > 0 {
+		podTemplateSpec.Spec.ImagePullSecrets = imagePullSecrets
+	}
+
+	return podTemplateSpec
+}
+
 func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.BackupSchedule) error {
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -94,7 +105,7 @@ func (cm *defaultCreateManager) createCronJob(ctx context.Context, schedule *v1.
 			Schedule: schedule.Spec.Schedule,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
-					Template: schedule.CronJobPodTemplate(cm.imageConfig.OperatorImage, config.GetStagePullPolicy()),
+					Template: getCronJobTemplate(schedule, cm.imageConfig.OperatorImage, config.GetStagePullPolicy(), cm.imagePullSecrets),
 				},
 			},
 		},
