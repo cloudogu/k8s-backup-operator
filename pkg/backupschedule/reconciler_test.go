@@ -2,6 +2,9 @@ package backupschedule
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/stretchr/testify/assert"
@@ -17,8 +20,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"testing"
-	"time"
 )
 
 const testNamespace = "test-ns"
@@ -28,7 +29,7 @@ func TestNewReconciler(t *testing.T) {
 	// given
 
 	// when
-	actual := NewReconciler(nil, nil, testNamespace, nil, additionalimages.ImageConfig{})
+	actual := NewReconciler(nil, nil, testNamespace, nil, additionalimages.ImageConfig{}, nil)
 
 	// then
 	assert.NotEmpty(t, actual)
