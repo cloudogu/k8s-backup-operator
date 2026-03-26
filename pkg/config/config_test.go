@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestNewOperatorConfig(t *testing.T) {
@@ -62,6 +63,7 @@ func TestNewOperatorConfig(t *testing.T) {
 		// given
 		t.Setenv(StageEnvVar, StageDevelopment)
 		t.Setenv(namespaceEnvVar, "ecosystem")
+		t.Setenv(imagePullSecretsEnvVar, "ces-container-registries,other")
 
 		oldLog := log
 		defer func() { log = oldLog }()
@@ -71,6 +73,7 @@ func TestNewOperatorConfig(t *testing.T) {
 		logMock.EXPECT().Info(0, "Version: [0.1.0]").Return()
 		logMock.EXPECT().Info(0, "Starting in development mode! This is not recommended for production!").Return()
 		logMock.EXPECT().Info(0, "Deploying the k8s dogu operator in namespace ecosystem").Return()
+		logMock.EXPECT().Info(0, "Using image pull secrets: [{ces-container-registries} {other}]").Return()
 		log = logr.New(logMock)
 
 		// when
@@ -81,6 +84,10 @@ func TestNewOperatorConfig(t *testing.T) {
 		expected := &OperatorConfig{
 			Version:   semver.MustParse("0.1.0"),
 			Namespace: "ecosystem",
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{Name: "ces-container-registries"},
+				{Name: "other"},
+			},
 		}
 		assert.Equal(t, expected, actual)
 	})

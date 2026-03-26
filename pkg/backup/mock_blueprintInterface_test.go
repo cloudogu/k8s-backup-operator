@@ -5,13 +5,10 @@ package backup
 import (
 	context "context"
 
-	mock "github.com/stretchr/testify/mock"
-	types "k8s.io/apimachinery/pkg/types"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	v3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
-
+	mock "github.com/stretchr/testify/mock"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 )
 
