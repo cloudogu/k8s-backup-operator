@@ -27,33 +27,19 @@ Das Secret muss im selben Kubernetes-Namespace wie `longhorn` angelegt werden.
 
 ### Longhorn konfigurieren
 
-Mit dem Attribut `valuesYamlOverwrite` können für die Backups URL und Credentials zu dem Backup-Speicher konfiguriert werden.
+Die Helm-Values von Longhorn um folgende Werte erweitern:
 
 ```yaml
-apiVersion: k8s.cloudogu.com/v1
-kind: Component
-metadata:
-  name: k8s-longhorn
-spec:
-  name: k8s-longhorn
-  deployNamespace: longhorn-system
-  namespace: k8s
-  valuesYamlOverwrite: |
-    longhorn:
-      defaultSettings:
-        backupTarget: s3://longhorn@dummyregion/
-        backupTargetCredentialSecret: longhorn-backup-target
+defaultBackupStore:
+  backupTarget: s3://longhorn@dummyregion/
+  backupTargetCredentialSecret: longhorn-backup-target
 ```
-Für das Backup sind folgende Parameter in der `valuesYamlOverwrite` relevant:
+Für das Backup sind folgende Parameter in den Values relevant:
 
-| Parameter                                               | Beschreibung                                                                                         |
-|---------------------------------------------------------|------------------------------------------------------------------------------------------------------|
-| `longhorn.defaultSettings.backupTarget`                 | Die Adresse des Speicherorts (Buckets) innerhalb des Backup-Speichers: `s3://<BUCKET_NAME>@<REGION>` |
-| `longhorn.defaultSettings.backupTargetCredentialSecret` | Der Name des oben erstellten Secrets, dass die Zugangsdaten zum Backup-Speicher enthält               |
-
-Die erstellte `yaml`-Datei für die Longhorn-Komponente kann mit folgendem Befehl angewendet werden:
-
-`kubectl --namespace ecosystem apply -f k8s-longhorn.yaml`
+| Parameter                                         | Beschreibung                                                                                         |
+|---------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| `defaultBackupStore.backupTarget`                 | Die Adresse des Speicherorts (Buckets) innerhalb des Backup-Speichers: `s3://<BUCKET_NAME>@<REGION>` |
+| `defaultBackupStore.backupTargetCredentialSecret` | Der Name des oben erstellten Secrets, dass die Zugangsdaten zum Backup-Speicher enthält              |
 
 ### Snapshot-API
 
