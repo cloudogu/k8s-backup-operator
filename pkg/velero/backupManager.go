@@ -49,6 +49,10 @@ func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Bac
 		{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: "dogu.name", Operator: metav1.LabelSelectorOpExists},
 		}},
+		// everything besides dogu-specific config that should be included in the backup, e.g., PVCs of components etc.
+		{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
+		}},
 	}
 
 	veleroBackup := &velerov1.Backup{
@@ -60,7 +64,7 @@ func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Bac
 		},
 		Spec: velerov1.BackupSpec{
 			IncludedNamespaces:       []string{backup.Namespace},
-			IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
+			IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "persistentvolumes", "dogus.k8s.cloudogu.com"},
 			OrLabelSelectors:         selectors,
 			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
 			StorageLocation:          defaultStorageLocation,
