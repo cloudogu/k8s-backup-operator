@@ -64,7 +64,7 @@ func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Bac
 		},
 		Spec: velerov1.BackupSpec{
 			IncludedNamespaces:       []string{backup.Namespace},
-			IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
+			IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "persistentvolumes", "dogus.k8s.cloudogu.com"},
 			OrLabelSelectors:         selectors,
 			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
 			StorageLocation:          defaultStorageLocation,
