@@ -26,29 +26,19 @@ The secret must be created in the same Kubernetes namespace as `longhorn`.
 
 #### Configure Longhorn
 
-The attribute `valuesYamlOverwrite` can be used to configure the URL and credentials for backups to an S3 storage.
+The Helm values of longhorn can be used to configure the URL and credentials for backups to an S3 storage.
 
 ```yaml
-apiVersion: k8s.cloudogu.com/v1
-kind: Component
-metadata:
-  name: k8s-longhorn
-spec:
-  name: k8s-longhorn
-  deployNamespace: longhorn-system
-  namespace: k8s
-  valuesYamlOverwrite: |
-    longhorn:
-      defaultSettings:
-        backupTarget: s3://longhorn@dummyregion/
-        backupTargetCredentialSecret: longhorn-backup-target
+defaultBackupStore:
+  backupTarget: s3://longhorn@dummyregion/
+  backupTargetCredentialSecret: longhorn-backup-target
 ```
-The following parameters in the `valuesYamlOverwrite` are relevant for the backup:
+The following parameters in the values are relevant for the backup:
 
-| Parameter                                               | Description                                                                                           |
-|---------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `longhorn.defaultSettings.backupTarget`                 | The address of the storage location (bucket) within the backup storage: `s3://<BUCKET_NAME>@<REGION>` |
-| `longhorn.defaultSettings.backupTargetCredentialSecret` | The name of the secret created above that contains the access data to the backup storage              |
+| Parameter                                         | Description                                                                                            |
+|---------------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `defaultBackupStore.backupTarget`                 | The address of the storage location (bucket) within the backup storage: `s3://<BUCKET_NAME>@<REGION>`  |
+| `defaultBackupStore.backupTargetCredentialSecret` | The name of the secret created above that contains the access data to the backup storage               |
 
 The `yaml` file created for the Longhorn component can be used with the following command:
 
