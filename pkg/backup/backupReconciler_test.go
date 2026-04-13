@@ -358,3 +358,25 @@ func Test_evaluateRequiredOperation(t *testing.T) {
 		})
 	}
 }
+
+func Test_isFinalStatus(t *testing.T) {
+	tests := []struct {
+		name   string
+		status string
+		want   bool
+	}{
+		{"completed status returns true", v1.BackupStatusCompleted, true},
+		{"failed status returns true", v1.BackupStatusFailed, true},
+		{"in-progress status returns false", v1.BackupStatusInProgress, false},
+		{"deleting status returns false", v1.BackupStatusDeleting, false},
+		{"new status returns false", v1.BackupStatusNew, false},
+		{"empty status returns false", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			backup := &v1.Backup{Status: v1.BackupStatus{Status: tt.status}}
+			assert.Equal(t, tt.want, isFinalStatus(backup))
+		})
+	}
+}

@@ -18,7 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var testCtx = context.TODO()
+var testCtx, _ = context.WithTimeout(context.TODO(), 1)
 
 func TestNewBackupCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
@@ -29,7 +29,7 @@ func TestNewBackupCreateManager(t *testing.T) {
 		blueprintInterface := newMockBlueprintInterface(t)
 
 		// when
-		manager := newBackupCreateManager(clientMock, clientSetMock, blueprintInterface, "", nil, globalConfigRepositoryMock)
+		manager := newBackupCreateManager(clientMock, clientSetMock, blueprintInterface, "", nil, globalConfigRepositoryMock, 1)
 
 		// then
 		require.NotNil(t, manager)
@@ -44,7 +44,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
+		providerMock.EXPECT().CreateBackup(mock.Anything, backup).Return(nil)
 
 		oldVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
@@ -106,7 +106,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
+		providerMock.EXPECT().CreateBackup(mock.Anything, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
@@ -456,7 +456,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
+		providerMock.EXPECT().CreateBackup(mock.Anything, backup).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
@@ -517,7 +517,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(assert.AnError)
+		providerMock.EXPECT().CreateBackup(mock.Anything, backup).Return(assert.AnError)
 		oldVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
@@ -580,7 +580,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
+		providerMock.EXPECT().CreateBackup(mock.Anything, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
@@ -640,7 +640,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
+		providerMock.EXPECT().CreateBackup(mock.Anything, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
@@ -696,7 +696,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
+		providerMock.EXPECT().CreateBackup(mock.Anything, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
@@ -756,7 +756,7 @@ func Test_backupCreateManager_create(t *testing.T) {
 
 		providerMock := newMockBackupProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().CreateBackup(testCtx, backup).Return(nil)
+		providerMock.EXPECT().CreateBackup(mock.Anything, backup).Return(nil)
 		oldVeleroProvider := provider.NewVeleroProvider
 		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock

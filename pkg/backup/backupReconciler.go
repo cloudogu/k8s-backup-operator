@@ -141,7 +141,7 @@ func evaluateRequiredOperation(backup *k8sv1.Backup, retryTimeLimit int) operati
 		return operationIgnore
 	}
 
-	if time.Since(backup.CreationTimestamp.Time) > time.Duration(retryTimeLimit)*time.Minute && backup.Status.Status != k8sv1.BackupStatusFailed {
+	if time.Since(backup.CreationTimestamp.Time) > time.Duration(retryTimeLimit)*time.Minute && !isFinalStatus(backup) {
 		return operationTimeout
 	}
 
@@ -155,6 +155,11 @@ func evaluateRequiredOperation(backup *k8sv1.Backup, retryTimeLimit int) operati
 	default:
 		return operationIgnore
 	}
+}
+
+// isFinalStatus checks if the backup is either failed or completed
+func isFinalStatus(backup *k8sv1.Backup) bool {
+	return backup.Status.Status == k8sv1.BackupStatusFailed || backup.Status.Status == k8sv1.BackupStatusCompleted
 }
 
 // SetupWithManager sets up the controller with the Manager.
