@@ -49,6 +49,10 @@ func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Bac
 		{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: "dogu.name", Operator: metav1.LabelSelectorOpExists},
 		}},
+		// everything besides dogu-specific config that should be included in the backup, e.g., PVCs of components etc.
+		{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
+		}},
 	}
 
 	veleroBackup := &velerov1.Backup{
@@ -60,7 +64,7 @@ func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Bac
 		},
 		Spec: velerov1.BackupSpec{
 			IncludedNamespaces:       []string{backup.Namespace},
-			IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"},
+			IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "persistentvolumes", "dogus.k8s.cloudogu.com"},
 			OrLabelSelectors:         selectors,
 			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
 			StorageLocation:          defaultStorageLocation,
@@ -86,7 +90,7 @@ func (bm *defaultBackupManager) CreateBackup(ctx context.Context, backup *v1.Bac
 	veleroBackupChan := watcher.ResultChan()
 	defer watcher.Stop()
 
-	err = waitForBackupCompletionOrFailure(veleroBackupChan)
+	err = waitForBackupCompletionOrFailure(ctx, veleroBackupChan)
 	if err != nil {
 		return bm.handleFailedBackup(backup, err)
 	}
@@ -100,37 +104,44 @@ func (bm *defaultBackupManager) handleFailedBackup(backup *v1.Backup, err error)
 	return err
 }
 
-func waitForBackupCompletionOrFailure(veleroBackupChan <-chan watch.Event) error {
-	for veleroChange := range veleroBackupChan {
-		changedBackup, ok := veleroChange.Object.(*velerov1.Backup)
-		if !ok {
-			return fmt.Errorf("got event with wrong object type when watching velero backup")
-		}
-
-		switch veleroChange.Type {
-		case watch.Deleted:
-			return fmt.Errorf("failed to complete velero backup '%s/%s': the backup got deleted", changedBackup.Namespace, changedBackup.Name)
-		case watch.Modified:
-			switch changedBackup.Status.Phase {
-			case velerov1.BackupPhaseFailedValidation:
-				fallthrough
-			case velerov1.BackupPhaseWaitingForPluginOperationsPartiallyFailed:
-				fallthrough
-			case velerov1.BackupPhaseFinalizingPartiallyFailed:
-				fallthrough
-			case velerov1.BackupPhasePartiallyFailed:
-				fallthrough
-			case velerov1.BackupPhaseFailed:
-				return fmt.Errorf("failed to complete velero backup '%s/%s': has status phase '%s'", changedBackup.Namespace, changedBackup.Name, changedBackup.Status.Phase)
-			case velerov1.BackupPhaseDeleting:
-				return fmt.Errorf("failed to complete velero backup '%s/%s': invalid status phase 'Deleting'", changedBackup.Namespace, changedBackup.Name)
-			case velerov1.BackupPhaseCompleted:
+func waitForBackupCompletionOrFailure(ctx context.Context, veleroBackupChan <-chan watch.Event) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("backup creation time limit reached: %w", ctx.Err())
+		case veleroChange, ok := <-veleroBackupChan:
+			if !ok {
 				return nil
+			}
+
+			changedBackup, ok := veleroChange.Object.(*velerov1.Backup)
+			if !ok {
+				return fmt.Errorf("got event with wrong object type when watching velero backup")
+			}
+
+			switch veleroChange.Type {
+			case watch.Deleted:
+				return fmt.Errorf("failed to complete velero backup '%s/%s': the backup got deleted", changedBackup.Namespace, changedBackup.Name)
+			case watch.Modified:
+				switch changedBackup.Status.Phase {
+				case velerov1.BackupPhaseFailedValidation:
+					fallthrough
+				case velerov1.BackupPhaseWaitingForPluginOperationsPartiallyFailed:
+					fallthrough
+				case velerov1.BackupPhaseFinalizingPartiallyFailed:
+					fallthrough
+				case velerov1.BackupPhasePartiallyFailed:
+					fallthrough
+				case velerov1.BackupPhaseFailed:
+					return fmt.Errorf("failed to complete velero backup '%s/%s': has status phase '%s'", changedBackup.Namespace, changedBackup.Name, changedBackup.Status.Phase)
+				case velerov1.BackupPhaseDeleting:
+					return fmt.Errorf("failed to complete velero backup '%s/%s': invalid status phase 'Deleting'", changedBackup.Namespace, changedBackup.Name)
+				case velerov1.BackupPhaseCompleted:
+					return nil
+				}
 			}
 		}
 	}
-
-	return nil
 }
 
 // DeleteBackup deletes a velero backup with a delete backup request.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	annotationsPkg "github.com/cloudogu/k8s-backup-operator/pkg/annotations"
@@ -31,12 +32,13 @@ type backupCreateManager struct {
 	namespace             string
 	recorder              eventRecorder
 	maintenanceModeSwitch MaintenanceModeSwitch
+	backupTimeout          int
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv3.BlueprintInterface, namespace string, recorder eventRecorder) *backupCreateManager {
+func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv3.BlueprintInterface, namespace string, recorder eventRecorder, backupTimeout int) *backupCreateManager {
 	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
-	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, blueprintClient: blueprintClient, namespace: namespace, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch}
+	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, blueprintClient: blueprintClient, namespace: namespace, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, backupTimeout: backupTimeout}
 }
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {
@@ -135,7 +137,11 @@ func (bcm *backupCreateManager) triggerBackup(ctx context.Context, backup *v1.Ba
 		return fmt.Errorf("failed to get backup provider: %w", err)
 	}
 
-	return backupProvider.CreateBackup(ctx, backup)
+	// stop the backup creation after the configured timeout
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(bcm.backupTimeout)*time.Minute)
+	defer cancel()
+
+	return backupProvider.CreateBackup(timeoutCtx, backup)
 }
 
 // addAnnotation adds annotations to the backup resource.

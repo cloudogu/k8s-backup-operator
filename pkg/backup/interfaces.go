@@ -44,6 +44,7 @@ type backupControllerManager interface {
 	createManager
 	deleteManager
 	statusSyncManager
+	timeoutManager
 }
 
 type createManager interface {
@@ -56,6 +57,10 @@ type deleteManager interface {
 
 type statusSyncManager interface {
 	syncStatus(ctx context.Context, backup *v1.Backup) error
+}
+
+type timeoutManager interface {
+	timeout(ctx context.Context, backup *v1.Backup) error
 }
 
 type requeueHandler interface {
