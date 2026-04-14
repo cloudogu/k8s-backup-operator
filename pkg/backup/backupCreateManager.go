@@ -26,20 +26,19 @@ const (
 )
 
 type backupCreateManager struct {
-	k8sClient              k8sClient
-	clientSet              ecosystemInterface
-	blueprintClient        blueprintv3.BlueprintInterface
-	namespace              string
-	globalConfigRepository globalConfigRepository
-	recorder               eventRecorder
-	maintenanceModeSwitch  MaintenanceModeSwitch
+	k8sClient             k8sClient
+	clientSet             ecosystemInterface
+	blueprintClient       blueprintv3.BlueprintInterface
+	namespace             string
+	recorder              eventRecorder
+	maintenanceModeSwitch MaintenanceModeSwitch
 	backupTimeout          int
 }
 
 // newBackupCreateManager creates a new instance of backupCreateManager.
-func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv3.BlueprintInterface, namespace string, recorder eventRecorder, globalConfigRepository globalConfigRepository, backupTimeout int) *backupCreateManager {
+func newBackupCreateManager(k8sClient k8sClient, clientSet ecosystemInterface, blueprintClient blueprintv3.BlueprintInterface, namespace string, recorder eventRecorder, backupTimeout int) *backupCreateManager {
 	maintenanceModeSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
-	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, blueprintClient: blueprintClient, namespace: namespace, globalConfigRepository: globalConfigRepository, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, backupTimeout: backupTimeout}
+	return &backupCreateManager{k8sClient: k8sClient, clientSet: clientSet, blueprintClient: blueprintClient, namespace: namespace, recorder: recorder, maintenanceModeSwitch: maintenanceModeSwitch, backupTimeout: backupTimeout}
 }
 
 func (bcm *backupCreateManager) create(ctx context.Context, backup *v1.Backup) error {

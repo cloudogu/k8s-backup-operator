@@ -23,13 +23,12 @@ var testCtx, _ = context.WithTimeout(context.TODO(), 1)
 func TestNewBackupCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		globalConfigRepositoryMock := newMockGlobalConfigRepository(t)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientMock := newMockK8sClient(t)
 		blueprintInterface := newMockBlueprintInterface(t)
 
 		// when
-		manager := newBackupCreateManager(clientMock, clientSetMock, blueprintInterface, "", nil, globalConfigRepositoryMock, 1)
+		manager := newBackupCreateManager(clientMock, clientSetMock, blueprintInterface, "", nil, 1)
 
 		// then
 		require.NotNil(t, manager)

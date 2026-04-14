@@ -15,14 +15,15 @@ import (
 )
 
 type defaultUpdateManager struct {
-	clientSet   ecosystemInterface
-	recorder    eventRecorder
-	namespace   string
-	imageConfig additionalimages.ImageConfig
+	clientSet        ecosystemInterface
+	recorder         eventRecorder
+	namespace        string
+	imageConfig      additionalimages.ImageConfig
+	imagePullSecrets []corev1.LocalObjectReference
 }
 
-func newUpdateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string, imageConfig additionalimages.ImageConfig) *defaultUpdateManager {
-	return &defaultUpdateManager{clientSet: clientSet, recorder: recorder, namespace: namespace, imageConfig: imageConfig}
+func newUpdateManager(clientSet ecosystemInterface, recorder eventRecorder, namespace string, imageConfig additionalimages.ImageConfig, imagePullSecrets []corev1.LocalObjectReference) *defaultUpdateManager {
+	return &defaultUpdateManager{clientSet: clientSet, recorder: recorder, namespace: namespace, imageConfig: imageConfig, imagePullSecrets: imagePullSecrets}
 }
 
 func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.BackupSchedule) error {
@@ -43,7 +44,7 @@ func (um *defaultUpdateManager) update(ctx context.Context, backupSchedule *v1.B
 		}
 
 		cronJob.Spec.Schedule = backupSchedule.Spec.Schedule
-		cronJob.Spec.JobTemplate.Spec.Template = backupSchedule.CronJobPodTemplate(um.imageConfig.OperatorImage, config.GetStagePullPolicy())
+		cronJob.Spec.JobTemplate.Spec.Template = getCronJobTemplate(backupSchedule, um.imageConfig.OperatorImage, config.GetStagePullPolicy(), um.imagePullSecrets)
 
 		_, err = cronJobClient.Update(ctx, cronJob, metav1.UpdateOptions{})
 		if err != nil {

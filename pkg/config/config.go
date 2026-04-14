@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -11,11 +12,12 @@ import (
 )
 
 const (
-	StageDevelopment     = "development"
-	StageProduction      = "production"
-	StageEnvVar          = "STAGE"
-	namespaceEnvVar      = "NAMESPACE"
-	logLevelEnvVar       = "LOG_LEVEL"
+	StageDevelopment       = "development"
+	StageProduction        = "production"
+	StageEnvVar            = "STAGE"
+	namespaceEnvVar        = "NAMESPACE"
+	logLevelEnvVar         = "LOG_LEVEL"
+	imagePullSecretsEnvVar = "IMAGE_PULL_SECRETS"
 	backupRetryTimeLimit = "BACKUP_RETRY_TIME_LIMIT"
 )
 
@@ -35,6 +37,9 @@ type OperatorConfig struct {
 	Version *semver.Version
 	// Namespace specifies the namespace that the operator is deployed to.
 	Namespace string
+	// ImagePullSecrets contains the secrets that are used to pull container images from external registries.
+	// It is used for the creation of the backup schedule cronjob.
+	ImagePullSecrets []corev1.LocalObjectReference
 }
 
 var Stage = StageProduction
@@ -67,9 +72,16 @@ func NewOperatorConfig(version string) (*OperatorConfig, error) {
 	}
 	log.Info(fmt.Sprintf("Deploying the k8s dogu operator in namespace %s", namespace))
 
+	imagePullSecrets, err := GetImagePullSecrets()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read image pull secrets: %w", err)
+	}
+	log.Info(fmt.Sprintf("Using image pull secrets: %v", imagePullSecrets))
+
 	return &OperatorConfig{
-		Version:   parsedVersion,
-		Namespace: namespace,
+		Version:          parsedVersion,
+		Namespace:        namespace,
+		ImagePullSecrets: imagePullSecrets,
 	}, nil
 }
 
@@ -101,6 +113,22 @@ func GetNamespace() (string, error) {
 	}
 
 	return namespace, nil
+}
+
+func GetImagePullSecrets() ([]corev1.LocalObjectReference, error) {
+	var secrets []corev1.LocalObjectReference
+	// imagePullSecrets should be set but are not always mandatory
+	envVar, found := os.LookupEnv(imagePullSecretsEnvVar)
+	if !found {
+		return secrets, nil
+	}
+
+	split := strings.Split(envVar, ",")
+	for _, secretName := range split {
+		secrets = append(secrets, corev1.LocalObjectReference{Name: secretName})
+	}
+
+	return secrets, nil
 }
 
 func GetRetryLimit() (int, error) {

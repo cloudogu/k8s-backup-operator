@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - [#104] add a retry time limit for backup reconciliation, default 1h
+- [#109] Backup additional resources with the `k8s.cloudogu.com/backup-scope` label key
+
+## [v3.0.3] - 2026-03-26
+### Fixed
+- [#106] Add missing RBAC for maintenance handling
+- [#107] Add imagePullSecrets to cronjobs created from backupschedules to fix image pull errors in airgapped environments
 
 ## [v3.0.2] - 2026-03-12
 ### Changed
