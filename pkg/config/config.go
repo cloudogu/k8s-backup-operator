@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -17,6 +18,7 @@ const (
 	namespaceEnvVar        = "NAMESPACE"
 	logLevelEnvVar         = "LOG_LEVEL"
 	imagePullSecretsEnvVar = "IMAGE_PULL_SECRETS"
+	backupRetryTimeLimit = "BACKUP_RETRY_TIME_LIMIT"
 )
 
 const (
@@ -127,6 +129,18 @@ func GetImagePullSecrets() ([]corev1.LocalObjectReference, error) {
 	}
 
 	return secrets, nil
+}
+
+func GetRetryLimit() (int, error) {
+	backupRetryTimeLimitStr, err := getEnvVar(backupRetryTimeLimit)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get env var [%s]: %w", backupRetryTimeLimit, err)
+	}
+	retryLimit, err := strconv.Atoi(backupRetryTimeLimitStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert env var [%s]: %w", backupRetryTimeLimit, err)
+	}
+	return retryLimit, nil
 }
 
 func getEnvVar(name string) (string, error) {

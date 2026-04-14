@@ -163,6 +163,53 @@ func (_c *mockBackupControllerManager_syncStatus_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// timeout provides a mock function with given fields: ctx, backup
+func (_m *mockBackupControllerManager) timeout(ctx context.Context, backup *v1.Backup) error {
+	ret := _m.Called(ctx, backup)
+
+	if len(ret) == 0 {
+		panic("no return value specified for timeout")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) error); ok {
+		r0 = rf(ctx, backup)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockBackupControllerManager_timeout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'timeout'
+type mockBackupControllerManager_timeout_Call struct {
+	*mock.Call
+}
+
+// timeout is a helper method to define mock.On call
+//   - ctx context.Context
+//   - backup *v1.Backup
+func (_e *mockBackupControllerManager_Expecter) timeout(ctx interface{}, backup interface{}) *mockBackupControllerManager_timeout_Call {
+	return &mockBackupControllerManager_timeout_Call{Call: _e.mock.On("timeout", ctx, backup)}
+}
+
+func (_c *mockBackupControllerManager_timeout_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockBackupControllerManager_timeout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Backup))
+	})
+	return _c
+}
+
+func (_c *mockBackupControllerManager_timeout_Call) Return(_a0 error) *mockBackupControllerManager_timeout_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockBackupControllerManager_timeout_Call) RunAndReturn(run func(context.Context, *v1.Backup) error) *mockBackupControllerManager_timeout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // newMockBackupControllerManager creates a new instance of mockBackupControllerManager. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func newMockBackupControllerManager(t interface {

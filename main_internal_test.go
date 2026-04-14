@@ -142,6 +142,7 @@ func Test_startOperator(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
 		t.Setenv("STAGE", "development")
+		t.Setenv("BACKUP_RETRY_TIME_LIMIT", "10")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -186,6 +187,7 @@ func Test_startOperator(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
 		t.Setenv("STAGE", "development")
+		t.Setenv("BACKUP_RETRY_TIME_LIMIT", "10")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -245,6 +247,7 @@ func Test_startOperator(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
 		t.Setenv("STAGE", "development")
+		t.Setenv("BACKUP_RETRY_TIME_LIMIT", "10")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -305,6 +308,7 @@ func Test_startOperator(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
 		t.Setenv("STAGE", "development")
+		t.Setenv("BACKUP_RETRY_TIME_LIMIT", "10")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -365,6 +369,7 @@ func Test_startOperator(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
 		t.Setenv("STAGE", "development")
+		t.Setenv("BACKUP_RETRY_TIME_LIMIT", "10")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -436,6 +441,7 @@ func Test_startOperator(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
 		t.Setenv("STAGE", "development")
+		t.Setenv("BACKUP_RETRY_TIME_LIMIT", "10")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -508,6 +514,7 @@ func Test_startOperator(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
 		t.Setenv("STAGE", "development")
+		t.Setenv("BACKUP_RETRY_TIME_LIMIT", "10")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
@@ -585,6 +592,7 @@ func Test_startOperator(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
 		t.Setenv("STAGE", "development")
+		t.Setenv("BACKUP_RETRY_TIME_LIMIT", "10")
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
