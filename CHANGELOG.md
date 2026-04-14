@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v3.1.0] - 2026-04-14
 ### Added
 - [#104] add a retry time limit for backup reconciliation, default 1h
 - [#109] Backup additional resources with the `k8s.cloudogu.com/backup-scope` label key
