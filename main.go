@@ -13,6 +13,7 @@ import (
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -285,17 +286,14 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create blueprint clientset: %w", err)
 	}
 
-	namespace, err := config.GetNamespace()
-	if err != nil {
-		return fmt.Errorf("failed to get namespace: %w", err)
-	}
-
-	blueprintClient := blueprintClientSet.EcosystemV1Alpha1().Blueprints(namespace)
+	blueprintClient := blueprintClientSet.EcosystemV1Alpha1().Blueprints(operatorConfig.Namespace)
 
 	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create dogu client: %w", err)
 	}
+
+	dynamicClient, err := dynamic.NewForConfig(k8sManager.GetConfig())
 
 	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient)
 	if err != nil {
@@ -317,7 +315,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	}
 
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
-	cleanupManager := cleanup.NewManager(doguClient.Dogus(namespace))
+	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
 	restoreManager := restore.NewRestoreManager(
 		k8sClient,
 		ecosystemClientSet,
