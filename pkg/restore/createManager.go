@@ -23,6 +23,7 @@ type defaultCreateManager struct {
 	ecosystemClientSet    ecosystemInterface
 	namespace             string
 	cleanup               cleanupManager
+	scaleManager          scaleManager
 	recorder              eventRecorder
 	maintenanceModeSwitch maintenanceModeSwitch
 }
@@ -33,6 +34,7 @@ func newCreateManager(
 	namespace string,
 	recorder eventRecorder,
 	cleanup cleanupManager,
+	scaleManager scaleManager,
 ) *defaultCreateManager {
 	maintenanceSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
 	return &defaultCreateManager{
@@ -42,6 +44,7 @@ func newCreateManager(
 		recorder:              recorder,
 		maintenanceModeSwitch: maintenanceSwitch,
 		cleanup:               cleanup,
+		scaleManager:          scaleManager,
 	}
 }
 
@@ -86,6 +89,11 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		}
 	}()
 
+	err = cm.scaleManager.ScaleDown(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to scale down workloads before restore: %w", err)
+	}
+
 	err = cm.cleanup.Cleanup(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup before restore: %w", err)
@@ -105,6 +113,11 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	err = provider.SyncBackups(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to sync backups with provider: %w", err)
+	}
+
+	err = cm.scaleManager.ScaleUp(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to scale up workloads after restore: %w", err)
 	}
 
 	_, err = restoreClient.UpdateStatusCompleted(ctx, restore)
