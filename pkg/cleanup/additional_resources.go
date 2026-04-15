@@ -73,29 +73,25 @@ func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx contex
 				return fmt.Errorf("failed to delete %s %s: %w", resource.GetKind(), resource.GetName(), err)
 			}
 
-			c.waitForResourceToBeDeleted(ctx, client, &resource, wg)
+			wg.Go(func() { c.deleteResource(ctx, client, &resource) })
 		}
 	}
 
 	return nil
 }
 
-func (c *defaultAdditionalResourceManager) waitForResourceToBeDeleted(ctx context.Context, client unstructuredClient, resource *unstructured.Unstructured, wg *sync.WaitGroup) {
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			log.FromContext(ctx).Info("waiting for resource to be deleted", "ns", resource.GetNamespace(), "kind", resource.GetKind(), "Name", resource.GetName())
-			_, err := client.Get(ctx, resource.GetName(), metav1.GetOptions{})
+func (c *defaultAdditionalResourceManager) deleteResource(ctx context.Context, client unstructuredClient, resource *unstructured.Unstructured) {
+	for {
+		log.FromContext(ctx).Info("waiting for resource to be deleted", "ns", resource.GetNamespace(), "kind", resource.GetKind(), "Name", resource.GetName())
+		_, err := client.Get(ctx, resource.GetName(), metav1.GetOptions{})
 
-			exists := !k8sErr.IsNotFound(err)
-			if exists {
-				// wait for 3 seconds and try again
-				time.Sleep(additionalResourceDeleteWaitTime)
-			} else {
-				log.FromContext(ctx).Info("resource was deleted successfully", "ns", resource.GetNamespace(), "kind", resource.GetKind(), "Name", resource.GetName())
-				break
-			}
+		exists := !k8sErr.IsNotFound(err)
+		if exists {
+			// wait for 3 seconds and try again
+			time.Sleep(additionalResourceDeleteWaitTime)
+		} else {
+			log.FromContext(ctx).Info("resource was deleted successfully", "ns", resource.GetNamespace(), "kind", resource.GetKind(), "Name", resource.GetName())
+			break
 		}
-	}()
+	}
 }

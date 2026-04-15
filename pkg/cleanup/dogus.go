@@ -47,28 +47,24 @@ func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGrou
 			return fmt.Errorf("failed to delete dogu %s: %w", dogu.Name, err)
 		}
 
-		c.waitForDoguToBeDeleted(ctx, &dogu, wg)
+		wg.Go(func() { c.deleteDogu(ctx, &dogu) })
 	}
 
 	return nil
 }
 
-func (c *defaultDoguManager) waitForDoguToBeDeleted(ctx context.Context, dogu *doguv2.Dogu, wg *sync.WaitGroup) {
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			log.FromContext(ctx).Info("waiting for dogu to be deleted", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
-			_, err := c.doguClient.Get(ctx, dogu.GetName(), metav1.GetOptions{})
+func (c *defaultDoguManager) deleteDogu(ctx context.Context, dogu *doguv2.Dogu) {
+	for {
+		log.FromContext(ctx).Info("waiting for dogu to be deleted", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
+		_, err := c.doguClient.Get(ctx, dogu.GetName(), metav1.GetOptions{})
 
-			exists := !k8sErr.IsNotFound(err)
-			if exists {
-				// wait for 3 seconds and try again
-				time.Sleep(doguDeleteWaitTime)
-			} else {
-				log.FromContext(ctx).Info("dogu was deleted successfully", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
-				break
-			}
+		exists := !k8sErr.IsNotFound(err)
+		if exists {
+			// wait for 3 seconds and try again
+			time.Sleep(doguDeleteWaitTime)
+		} else {
+			log.FromContext(ctx).Info("dogu was deleted successfully", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
+			break
 		}
-	}()
+	}
 }
