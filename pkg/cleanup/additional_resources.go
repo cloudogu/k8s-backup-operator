@@ -3,6 +3,9 @@ package cleanup
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,9 +13,7 @@ import (
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -55,12 +56,14 @@ func newAdditionalResourceManager(dynamicClient dynamicClient, namespace string)
 func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup) error {
 	log.FromContext(ctx).Info("starting cleanup of additional resources before restore...")
 
-	for gvr, client := range c.clients {
+	sortedKeys := slices.SortedFunc(maps.Keys(c.clients), func(a schema.GroupVersionResource, b schema.GroupVersionResource) int {
+		return strings.Compare(a.Group+a.Version+a.Resource, b.Group+b.Version+b.Resource)
+	})
+	for _, gvr := range sortedKeys {
 		log.FromContext(ctx).Info("listing additional resources", "gvr", gvr.String())
-		labelSelector := labels.NewSelector()
-		requireBackupScopeExists, _ := labels.NewRequirement(backupScopeLabelKey, selection.Exists, nil)
-		labelSelector.Add(*requireBackupScopeExists)
-		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
+
+		client := c.clients[gvr]
+		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: backupScopeLabelKey})
 		if err != nil {
 			return fmt.Errorf("failed to list %s: %w", gvr.Resource, err)
 		}
@@ -70,17 +73,17 @@ func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx contex
 
 		for _, resource := range list.Items {
 			if err := client.Delete(ctx, resource.GetName(), metav1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}); err != nil {
-				return fmt.Errorf("failed to delete %s %s: %w", resource.GetKind(), resource.GetName(), err)
+				return fmt.Errorf("failed to delete %s %q: %w", resource.GetKind(), resource.GetName(), err)
 			}
 
-			wg.Go(func() { c.deleteResource(ctx, client, &resource) })
+			wg.Go(func() { c.waitForResourceDeletion(ctx, client, &resource) })
 		}
 	}
 
 	return nil
 }
 
-func (c *defaultAdditionalResourceManager) deleteResource(ctx context.Context, client unstructuredClient, resource *unstructured.Unstructured) {
+func (c *defaultAdditionalResourceManager) waitForResourceDeletion(ctx context.Context, client unstructuredClient, resource *unstructured.Unstructured) {
 	for {
 		log.FromContext(ctx).Info("waiting for resource to be deleted", "ns", resource.GetNamespace(), "kind", resource.GetKind(), "Name", resource.GetName())
 		_, err := client.Get(ctx, resource.GetName(), metav1.GetOptions{})

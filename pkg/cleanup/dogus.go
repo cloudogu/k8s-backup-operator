@@ -44,16 +44,16 @@ func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGrou
 
 	for _, dogu := range doguList.Items {
 		if err := c.doguClient.Delete(ctx, dogu.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}); err != nil {
-			return fmt.Errorf("failed to delete dogu %s: %w", dogu.Name, err)
+			return fmt.Errorf("failed to delete dogu %q: %w", dogu.Name, err)
 		}
 
-		wg.Go(func() { c.deleteDogu(ctx, &dogu) })
+		wg.Go(func() { c.waitForDoguDeletion(ctx, &dogu) })
 	}
 
 	return nil
 }
 
-func (c *defaultDoguManager) deleteDogu(ctx context.Context, dogu *doguv2.Dogu) {
+func (c *defaultDoguManager) waitForDoguDeletion(ctx context.Context, dogu *doguv2.Dogu) {
 	for {
 		log.FromContext(ctx).Info("waiting for dogu to be deleted", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
 		_, err := c.doguClient.Get(ctx, dogu.GetName(), metav1.GetOptions{})
