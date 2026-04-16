@@ -42,7 +42,6 @@ func newAdditionalResourceManager(dynamicClient dynamicClient, namespace string)
 		corev1.SchemeGroupVersion.WithResource("configmaps"),
 		corev1.SchemeGroupVersion.WithResource("secrets"),
 		corev1.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
-		corev1.SchemeGroupVersion.WithResource("persistentvolumes"),
 	}
 	clients := make(map[schema.GroupVersionResource]unstructuredClient, len(gvrs))
 	for _, gvr := range gvrs {
