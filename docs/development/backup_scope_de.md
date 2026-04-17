@@ -44,7 +44,7 @@ metadata:
 ### `k8s.cloudogu.com/restore-scaledown-scope`
 
 Dieses Label wird auf Workloads gesetzt, die Ressourcen mit `k8s.cloudogu.com/backup-scope` mounten oder anderweitig davon abhängen.
-Der Label-Wert muss mit dem Wert der zugehörigen Backup-Ressourcen übereinstimmen.
+Der Operator prüft derzeit nur, ob dieses Label vorhanden ist. Der konkrete Label-Wert wird beim Herunter- und Hochskalieren nicht ausgewertet.
 
 Beispiel:
 
@@ -54,12 +54,12 @@ metadata:
     k8s.cloudogu.com/restore-scaledown-scope: component-a
 ```
 
-Dadurch entsteht folgende Zuordnung:
+Das bedeutet:
 
 - Ressourcen mit `k8s.cloudogu.com/backup-scope: component-a` werden in diesem Scope gelöscht und wiederhergestellt.
-- Workloads mit `k8s.cloudogu.com/restore-scaledown-scope: component-a` werden vor dem Restore herunterskaliert und danach wieder hochskaliert.
+- Workloads mit `k8s.cloudogu.com/restore-scaledown-scope` werden vor dem Restore herunterskaliert und danach wieder hochskaliert.
 
-Damit ein Komponenten-Restore sicher funktioniert, müssen beide Seiten konsistent gelabelt sein.
+In der Praxis kann derselbe Wert weiterhin zur Dokumentation und zur besseren Nachvollziehbarkeit verwendet werden, er wird vom Backup-Operator aktuell aber nicht interpretiert.
 
 ### `k8s.cloudogu.com/restore-scaledown-replicas`
 
@@ -75,3 +75,5 @@ Wenn eine Komponente ein PVC verwendet, das gesichert und wiederhergestellt werd
 1. Das PVC mit `k8s.cloudogu.com/backup-scope: component-a` labeln.
 2. Jeden Workload, der dieses PVC mountet, mit `k8s.cloudogu.com/restore-scaledown-scope: component-a` labeln.
 3. `k8s.cloudogu.com/restore-scaledown-replicas` nicht selbst setzen; dieses Label wird während des Restores vom Operator geschrieben und wieder entfernt.
+
+Im Beispiel wird derselbe Wert aus Gründen der Lesbarkeit verwendet. Die aktuelle Implementierung verlangt für `k8s.cloudogu.com/restore-scaledown-scope` jedoch nur die Existenz des Labels.

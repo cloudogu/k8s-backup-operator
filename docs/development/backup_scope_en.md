@@ -44,7 +44,7 @@ metadata:
 ### `k8s.cloudogu.com/restore-scaledown-scope`
 
 Use this label on workloads that mount or otherwise depend on resources labeled with `k8s.cloudogu.com/backup-scope`.
-The label value must match the value used on the corresponding backup-scoped resources.
+The operator currently only checks whether this label exists. The concrete label value is not evaluated during scale-down or scale-up.
 
 Example:
 
@@ -54,12 +54,12 @@ metadata:
     k8s.cloudogu.com/restore-scaledown-scope: component-a
 ```
 
-This creates the relation:
+This means:
 
 - resources with `k8s.cloudogu.com/backup-scope: component-a` are deleted and restored as part of that scope
-- workloads with `k8s.cloudogu.com/restore-scaledown-scope: component-a` are scaled down before the restore and scaled up afterwards
+- workloads with `k8s.cloudogu.com/restore-scaledown-scope` are scaled down before the restore and scaled up afterwards
 
-To restore a component safely, both sides must be labeled consistently.
+In practice, the value can still be used for documentation and operational clarity, but it is not interpreted by the backup operator.
 
 ### `k8s.cloudogu.com/restore-scaledown-replicas`
 
@@ -75,3 +75,5 @@ If a component uses a PVC that should be backed up and restored:
 1. Label the PVC with `k8s.cloudogu.com/backup-scope: component-a`.
 2. Label every workload that mounts this PVC with `k8s.cloudogu.com/restore-scaledown-scope: component-a`.
 3. Do not set `k8s.cloudogu.com/restore-scaledown-replicas` yourself; it is written and removed by the operator during restore.
+
+The example uses the same value on both labels for readability, but the current implementation only requires the presence of `k8s.cloudogu.com/restore-scaledown-scope`.
