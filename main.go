@@ -295,6 +295,9 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	}
 
 	dynamicClient, err := dynamic.NewForConfig(k8sManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("unable to create dynamic client: %w", err)
+	}
 
 	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient)
 	if err != nil {
