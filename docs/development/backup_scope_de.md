@@ -15,6 +15,7 @@ Während eines Restores löscht der Operator zunächst alle Ressourcen, die zum 
 Das gilt sowohl für Dogus als auch für zusätzliche Ressourcen, die über `k8s.cloudogu.com/backup-scope` ausgewählt wurden.
 
 Wenn ein Workload eine solche zusätzliche Ressource mountet oder anderweitig verwendet, muss er vor dem Restore herunter- und nach dem Restore wieder hochskaliert werden.
+Dafür muss der Workload mit `k8s.cloudogu.com/restore-scaledown-scope` gelabelt sein.
 Andernfalls können Pods weiter auf Ressourcen zugreifen, die gerade gelöscht und neu erstellt werden.
 
 Der Restore-Ablauf ist:

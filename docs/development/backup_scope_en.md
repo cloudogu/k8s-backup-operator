@@ -14,7 +14,8 @@ Be aware that the limitation to the aforementioned kinds of resources still appl
 During restore, the operator deletes all resources that belong to the restore scope before recreating them from the backup.
 This applies both to Dogus and to additional resources selected via `k8s.cloudogu.com/backup-scope`.
 
-If a workload mounts one of those additional resources, it must be scaled down before the restore starts and scaled up again after the restore finishes.
+If a workload mounts one of those additional resources, it must be scaled down before the restore starts and scaled up again after the restore finishes. 
+To participate in this behavior, the workload must be labeled with `k8s.cloudogu.com/restore-scaledown-scope`.
 Otherwise, Pods may continue to access resources that are being deleted and recreated.
 
 The restore flow is:
