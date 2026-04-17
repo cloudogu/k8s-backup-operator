@@ -36,4 +36,4 @@ metrics:
     additionalLabels:
       release: prometheus
 backup:
-  retryTimeLimit: "30"
+  retryTimeLimit: "60"
