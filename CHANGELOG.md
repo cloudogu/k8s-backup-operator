@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v3.2.0] - 2026-04-17
+### Changed
+- [#111] Restore now cleans up additional backup-scoped resources before recreating them from the backup
+  - Workloads that depend on those resources can be labeled for temporary scale-down during restore, and their previous replica count is restored afterwards.
+
+### Fixed
+- set retry time limit for backup reconciliation to default 1h (60 minutes)
+
 ## [v3.1.0] - 2026-04-14
 ### Added
 - [#104] add a retry time limit for backup reconciliation, default 1h
