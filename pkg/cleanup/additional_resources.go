@@ -87,8 +87,11 @@ func (c *defaultAdditionalResourceManager) waitForResourceDeletion(ctx context.C
 		log.FromContext(ctx).Info("waiting for resource to be deleted", "ns", resource.GetNamespace(), "kind", resource.GetKind(), "Name", resource.GetName())
 		_, err := client.Get(ctx, resource.GetName(), metav1.GetOptions{})
 
-		exists := !k8sErr.IsNotFound(err)
-		if exists {
+		if ctx.Err() != nil {
+			log.FromContext(context.WithoutCancel(ctx)).Info("context was cancelled or deadline exceeded, stop waiting for resource deletion",
+				"ns", resource.GetNamespace(), "kind", resource.GetKind(), "Name", resource.GetName())
+			break
+		} else if exists := !k8sErr.IsNotFound(err); exists {
 			// wait for 3 seconds and try again
 			time.Sleep(additionalResourceDeleteWaitTime)
 		} else {

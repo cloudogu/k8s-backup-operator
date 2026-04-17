@@ -58,8 +58,11 @@ func (c *defaultDoguManager) waitForDoguDeletion(ctx context.Context, dogu *dogu
 		log.FromContext(ctx).Info("waiting for dogu to be deleted", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
 		_, err := c.doguClient.Get(ctx, dogu.GetName(), metav1.GetOptions{})
 
-		exists := !k8sErr.IsNotFound(err)
-		if exists {
+		if ctx.Err() != nil {
+			log.FromContext(context.WithoutCancel(ctx)).Info("context was cancelled or deadline exceeded, stop waiting for dogu deletion",
+				"ns", dogu.GetNamespace(), "Name", dogu.GetName())
+			break
+		} else if exists := !k8sErr.IsNotFound(err); exists {
 			// wait for 3 seconds and try again
 			time.Sleep(doguDeleteWaitTime)
 		} else {
