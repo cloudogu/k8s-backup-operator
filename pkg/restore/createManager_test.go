@@ -19,7 +19,7 @@ func Test_newCreateManager(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 
 		// when
-		manager := newCreateManager(clientMock, clientSetMock, testNamespace, nil, nil)
+		manager := newCreateManager(clientMock, clientSetMock, testNamespace, nil, nil, nil)
 
 		// then
 		require.NotEmpty(t, manager)
@@ -58,12 +58,16 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
 
+		scaleMock := newMockScaleManager(t)
+		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
+		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
+
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -101,12 +105,15 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
 
+		scaleMock := newMockScaleManager(t)
+		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
+
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -229,12 +236,16 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
 
+		scaleMock := newMockScaleManager(t)
+		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
+		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
+
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -267,6 +278,9 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
+		scaleManagerMock := newMockScaleManager(t)
+		scaleManagerMock.EXPECT().ScaleDown(testCtx).Return(nil)
+
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(assert.AnError)
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
@@ -274,7 +288,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleManagerMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -313,12 +327,16 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+
+		scaleMock := newMockScaleManager(t)
+		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
+
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -357,12 +375,16 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+
+		scaleMock := newMockScaleManager(t)
+		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
+
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -403,12 +425,16 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
 
+		scaleMock := newMockScaleManager(t)
+		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
+		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
+
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, namespace: testNamespace}
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -416,6 +442,100 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to set status [completed] in restore resource [restore]")
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+
+	t.Run("should return error on scaledown error", func(t *testing.T) {
+		// given
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
+
+		restoreClientMock := newMockEcosystemRestoreInterface(t)
+		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
+		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
+
+		providerMock := newMockRestoreProvider(t)
+		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+		oldNewVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
+			return providerMock
+		}
+		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
+
+		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
+
+		cleanupMock := newMockCleanupManager(t)
+
+		scaleMock := newMockScaleManager(t)
+		scaleMock.EXPECT().ScaleDown(testCtx).Return(assert.AnError)
+
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+
+		// when
+		err := sut.create(testCtx, restore)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to scale down workloads before restore")
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+
+	t.Run("should return error on scaleup error", func(t *testing.T) {
+		// given
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
+
+		restoreClientMock := newMockEcosystemRestoreInterface(t)
+		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
+		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
+		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
+
+		providerMock := newMockRestoreProvider(t)
+		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+		providerMock.EXPECT().CreateRestore(testCtx, restore).Return(nil)
+		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
+		oldNewVeleroProvider := provider.NewVeleroProvider
+		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
+			return providerMock
+		}
+		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
+
+		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
+		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
+		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
+
+		cleanupMock := newMockCleanupManager(t)
+		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
+
+		scaleMock := newMockScaleManager(t)
+		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
+		scaleMock.EXPECT().ScaleUp(testCtx).Return(assert.AnError)
+
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultCreateManager{recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+
+		// when
+		err := sut.create(testCtx, restore)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to scale up workloads after restore")
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 }

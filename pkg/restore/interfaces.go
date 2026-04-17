@@ -60,6 +60,15 @@ type cleanupManager interface {
 	Cleanup(ctx context.Context) error
 }
 
+type scaleManager interface {
+	// ScaleDown finds all resources labeled with the scaledown scope label,
+	// stores their current replica count, and scales them to zero.
+	ScaleDown(ctx context.Context) error
+	// ScaleUp finds all resources labeled with the scaledown scope label,
+	// reads the stored replica count, restores it, and removes the replicas label.
+	ScaleUp(ctx context.Context) error
+}
+
 // used for mocks
 
 //nolint:unused

@@ -10,9 +10,11 @@ import (
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	"github.com/cloudogu/k8s-backup-operator/pkg/scale"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -285,16 +287,16 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create blueprint clientset: %w", err)
 	}
 
-	namespace, err := config.GetNamespace()
-	if err != nil {
-		return fmt.Errorf("failed to get namespace: %w", err)
-	}
-
-	blueprintClient := blueprintClientSet.EcosystemV1Alpha1().Blueprints(namespace)
+	blueprintClient := blueprintClientSet.EcosystemV1Alpha1().Blueprints(operatorConfig.Namespace)
 
 	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create dogu client: %w", err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(k8sManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("unable to create dynamic client: %w", err)
 	}
 
 	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient)
@@ -317,13 +319,16 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	}
 
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
-	cleanupManager := cleanup.NewManager(doguClient.Dogus(namespace))
+	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
+	scaleManager := scale.NewManager(k8sClient, operatorConfig.Namespace)
+
 	restoreManager := restore.NewRestoreManager(
 		k8sClient,
 		ecosystemClientSet,
 		operatorConfig.Namespace,
 		recorder,
 		cleanupManager,
+		scaleManager,
 	)
 	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
