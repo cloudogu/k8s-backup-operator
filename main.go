@@ -334,7 +334,9 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
-	backupRetryTimeLimit, err := config.GetRetryLimit()
+	configGetter := config.NewGetter(k8sClientSet, operatorConfig.Namespace)
+
+	backupRetryTimeLimit, err := configGetter.GetRetryLimit(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get backup retry time limit: %w", err)
 	}
