@@ -20,7 +20,6 @@ type ConfigMapInterface interface {
 
 type getter struct {
 	configmapClient ConfigMapInterface
-	namespace       string
 }
 
 func NewGetter(client ConfigMapInterface) Getter {
