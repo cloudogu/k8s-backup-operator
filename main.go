@@ -70,6 +70,7 @@ var (
 	newAdditionalImageUpdater   = additionalimages.NewUpdater
 	newGarbageCollectionManager = garbagecollection.NewManager
 	newScheduledBackupManager   = scheduledbackup.NewManager
+	newBackupTimeoutGetter      = config.NewGetter
 )
 
 func init() {
@@ -334,7 +335,8 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
-	configGetter := config.NewGetter(k8sClientSet, operatorConfig.Namespace)
+	configMapClient := k8sClientSet.CoreV1().ConfigMaps(operatorConfig.Namespace)
+	configGetter := newBackupTimeoutGetter(configMapClient)
 
 	backupRetryTimeLimit, err := configGetter.GetRetryLimit(ctx)
 	if err != nil {

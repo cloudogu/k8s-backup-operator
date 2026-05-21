@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -14,13 +14,17 @@ const (
 	retryTimeLimitKey = "retryTimeLimit"
 )
 
+type ConfigMapInterface interface {
+	v1.ConfigMapInterface
+}
+
 type getter struct {
-	configmapClient kubernetes.Interface
+	configmapClient ConfigMapInterface
 	namespace       string
 }
 
-func NewGetter(client kubernetes.Interface, namespace string) Getter {
-	return &getter{configmapClient: client, namespace: namespace}
+func NewGetter(client ConfigMapInterface) Getter {
+	return &getter{configmapClient: client}
 }
 
 type Getter interface {
@@ -29,7 +33,7 @@ type Getter interface {
 }
 
 func (g *getter) GetRetryLimit(ctx context.Context) (int, error) {
-	cm, err := g.configmapClient.CoreV1().ConfigMaps(g.namespace).Get(ctx, configMapName, metav1.GetOptions{})
+	cm, err := g.configmapClient.Get(ctx, configMapName, metav1.GetOptions{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to get config map [%s]: %w", configMapName, err)
 	}
@@ -38,7 +42,7 @@ func (g *getter) GetRetryLimit(ctx context.Context) (int, error) {
 
 	retryLimit, err := strconv.Atoi(backupRetryTimeLimitStr)
 	if err != nil {
-		return 0, fmt.Errorf("failed to convert [%s]: %w", retryLimit, err)
+		return 0, fmt.Errorf("failed to convert [%s]: %w", backupRetryTimeLimitStr, err)
 	}
 	return retryLimit, nil
 }
