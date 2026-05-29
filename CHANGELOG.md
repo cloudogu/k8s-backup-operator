@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v3.3.0] - 2026-05-29
+### Changed
+- [#113] Store backup retry time via config map
+
 ## [v3.2.0] - 2026-04-17
 ### Changed
 - [#111] Restore now cleans up additional backup-scoped resources before recreating them from the backup
