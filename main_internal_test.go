@@ -7,6 +7,7 @@ import (
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
+	backupconfig "github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
@@ -424,6 +425,12 @@ func Test_startOperator(t *testing.T) {
 		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
 		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
 			return additionalImageUpdaterMock
+		}
+
+		configGetterMock := newMockConfigGetter(t)
+		configGetterMock.EXPECT().GetRetryLimit(testCtx).Return(10, nil)
+		newBackupTimeoutGetter = func(_ backupconfig.ConfigMapInterface) backupconfig.Getter {
+			return configGetterMock
 		}
 
 		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
