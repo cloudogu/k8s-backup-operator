@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	backupconfig "github.com/cloudogu/k8s-backup-operator/pkg/config"
 	v3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/mock"
@@ -28,7 +29,7 @@ func TestNewBackupCreateManager(t *testing.T) {
 		blueprintInterface := newMockBlueprintInterface(t)
 
 		// when
-		manager := newBackupCreateManager(clientMock, clientSetMock, blueprintInterface, "", nil, 1)
+		manager := newBackupCreateManager(clientMock, clientSetMock, blueprintInterface, "", nil, nil)
 
 		// then
 		require.NotNil(t, manager)
@@ -89,7 +90,12 @@ func Test_backupCreateManager_create(t *testing.T) {
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -148,10 +154,15 @@ func Test_backupCreateManager_create(t *testing.T) {
 		blueprintClient := newMockBlueprintInterface(t)
 		blueprintClient.EXPECT().List(testCtx, metav1.ListOptions{}).Return(blueprint, nil)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -496,10 +507,15 @@ func Test_backupCreateManager_create(t *testing.T) {
 		blueprintClient := newMockBlueprintInterface(t)
 		blueprintClient.EXPECT().List(testCtx, metav1.ListOptions{}).Return(blueprint, nil)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -557,10 +573,15 @@ func Test_backupCreateManager_create(t *testing.T) {
 		blueprintClient := newMockBlueprintInterface(t)
 		blueprintClient.EXPECT().List(testCtx, metav1.ListOptions{}).Return(blueprint, nil)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -620,10 +641,15 @@ func Test_backupCreateManager_create(t *testing.T) {
 		blueprintClient := newMockBlueprintInterface(t)
 		blueprintClient.EXPECT().List(testCtx, metav1.ListOptions{}).Return(blueprint, nil)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -676,10 +702,15 @@ func Test_backupCreateManager_create(t *testing.T) {
 		blueprintClient := newMockBlueprintInterface(t)
 		blueprintClient.EXPECT().List(testCtx, metav1.ListOptions{}).Return(blueprint, nil)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -736,10 +767,15 @@ func Test_backupCreateManager_create(t *testing.T) {
 		blueprintClient := newMockBlueprintInterface(t)
 		blueprintClient.EXPECT().List(testCtx, metav1.ListOptions{}).Return(blueprint, nil)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		err := sut.create(testCtx, backup)
@@ -796,10 +832,15 @@ func Test_backupCreateManager_create(t *testing.T) {
 		blueprintClient := newMockBlueprintInterface(t)
 		blueprintClient.EXPECT().List(testCtx, metav1.ListOptions{}).Return(blueprint, nil)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		k8sClient := newMockK8sClient(t)
 		k8sClient.EXPECT().Update(testCtx, mock.Anything).Return(nil)
 
-		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient}
+		sut := &backupCreateManager{recorder: recorderMock, clientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, namespace: testNamespace, blueprintClient: blueprintClient, k8sClient: k8sClient, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		err := sut.create(testCtx, backup)
