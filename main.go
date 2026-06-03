@@ -338,13 +338,8 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	configMapClient := k8sClientSet.CoreV1().ConfigMaps(operatorConfig.Namespace)
 	configGetter := newBackupTimeoutGetter(configMapClient)
 
-	backupRetryTimeLimit, err := configGetter.GetRetryLimit(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get backup retry time limit: %w", err)
-	}
-
-	backupManager := backup.NewBackupManager(k8sClient, ecosystemClientSet, blueprintClient, operatorConfig.Namespace, recorder, backupRetryTimeLimit)
-	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler, backupRetryTimeLimit)).SetupWithManager(k8sManager); err != nil {
+	backupManager := backup.NewBackupManager(k8sClient, ecosystemClientSet, blueprintClient, operatorConfig.Namespace, recorder, configGetter)
+	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler, configGetter)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
 

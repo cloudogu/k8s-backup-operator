@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,17 +33,17 @@ const (
 
 // backupReconciler reconciles a Backup object
 type backupReconciler struct {
-	clientSet      ecosystem.Interface
-	recorder       eventRecorder
-	namespace      string
-	manager        backupControllerManager
-	requeueHandler requeueHandler
-	retryTimeLimit int
+	clientSet           ecosystem.Interface
+	recorder            eventRecorder
+	namespace           string
+	manager             backupControllerManager
+	requeueHandler      requeueHandler
+	backupTimeoutGetter config.Getter
 }
 
 // NewBackupReconciler creates a new instance of backupReconciler.
-func NewBackupReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, manager backupControllerManager, handler requeueHandler, backupRetryTimeLimit int) *backupReconciler {
-	return &backupReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager, requeueHandler: handler, retryTimeLimit: backupRetryTimeLimit}
+func NewBackupReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, manager backupControllerManager, handler requeueHandler, backupTimeoutGetter config.Getter) *backupReconciler {
+	return &backupReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager, requeueHandler: handler, backupTimeoutGetter: backupTimeoutGetter}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -62,7 +63,12 @@ func (r *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	logger.Info(fmt.Sprintf("found backup resource %s", req.NamespacedName))
 
-	requiredOperation := evaluateRequiredOperation(backup, r.retryTimeLimit)
+	backupTimeout, err := r.backupTimeoutGetter.GetRetryLimit(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get backup timeout: %w", err)
+	}
+
+	requiredOperation := evaluateRequiredOperation(backup, backupTimeout)
 	logger.Info(fmt.Sprintf("required operation for backup %s is %s", req.NamespacedName, requiredOperation))
 
 	switch requiredOperation {

@@ -11,12 +11,11 @@ func TestNewBackupManager(t *testing.T) {
 		// given
 		clientSetMock := newMockEcosystemInterface(t)
 		clientMock := newMockK8sClient(t)
-		backupRetryTimeLimit := 10
 
 		blueprintInterface := newMockBlueprintInterface(t)
 
 		// when
-		manager := NewBackupManager(clientMock, clientSetMock, blueprintInterface, testNamespace, nil, backupRetryTimeLimit)
+		manager := NewBackupManager(clientMock, clientSetMock, blueprintInterface, testNamespace, nil, nil)
 
 		// then
 		require.NotNil(t, manager)

@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	backupconfig "github.com/cloudogu/k8s-backup-operator/pkg/config"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,13 +20,15 @@ func TestNewBackupTimeoutManager(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 		recorderMock := newMockEventRecorder(t)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+
 		// when
-		manager := newBackupTimeoutManager(clientMock, clientSetMock, testNamespace, recorderMock, 30)
+		manager := newBackupTimeoutManager(clientMock, clientSetMock, testNamespace, recorderMock, retryGetterMock)
 
 		// then
 		require.NotNil(t, manager)
 		assert.Equal(t, testNamespace, manager.namespace)
-		assert.Equal(t, 30, manager.backupRetryTimeLimit)
 	})
 }
 
@@ -55,12 +59,17 @@ func Test_backupTimeoutManager_timeout(t *testing.T) {
 		k8sClientMock := newMockK8sClient(t)
 		recorderMock := newMockEventRecorder(t)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "30"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		sut := &backupTimeoutManager{
-			k8sClient:            k8sClientMock,
-			clientSet:            clientSetMock,
-			namespace:            testNamespace,
-			recorder:             recorderMock,
-			backupRetryTimeLimit: 30,
+			k8sClient:           k8sClientMock,
+			clientSet:           clientSetMock,
+			namespace:           testNamespace,
+			recorder:            recorderMock,
+			backupTimeoutGetter: retryGetterMock,
 		}
 
 		// when
@@ -92,12 +101,15 @@ func Test_backupTimeoutManager_timeout(t *testing.T) {
 		k8sClientMock := newMockK8sClient(t)
 		recorderMock := newMockEventRecorder(t)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+
 		sut := &backupTimeoutManager{
-			k8sClient:            k8sClientMock,
-			clientSet:            clientSetMock,
-			namespace:            testNamespace,
-			recorder:             recorderMock,
-			backupRetryTimeLimit: 30,
+			k8sClient:           k8sClientMock,
+			clientSet:           clientSetMock,
+			namespace:           testNamespace,
+			recorder:            recorderMock,
+			backupTimeoutGetter: retryGetterMock,
 		}
 
 		// when
@@ -129,12 +141,17 @@ func Test_backupTimeoutManager_timeout(t *testing.T) {
 		k8sClientMock := newMockK8sClient(t)
 		recorderMock := newMockEventRecorder(t)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "45"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		sut := &backupTimeoutManager{
-			k8sClient:            k8sClientMock,
-			clientSet:            clientSetMock,
-			namespace:            testNamespace,
-			recorder:             recorderMock,
-			backupRetryTimeLimit: 45,
+			k8sClient:           k8sClientMock,
+			clientSet:           clientSetMock,
+			namespace:           testNamespace,
+			recorder:            recorderMock,
+			backupTimeoutGetter: retryGetterMock,
 		}
 
 		// when
@@ -176,12 +193,17 @@ func Test_backupTimeoutManager_timeout(t *testing.T) {
 		k8sClientMock := newMockK8sClient(t)
 		recorderMock := newMockEventRecorder(t)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "60"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		sut := &backupTimeoutManager{
-			k8sClient:            k8sClientMock,
-			clientSet:            clientSetMock,
-			namespace:            testNamespace,
-			recorder:             recorderMock,
-			backupRetryTimeLimit: 60,
+			k8sClient:           k8sClientMock,
+			clientSet:           clientSetMock,
+			namespace:           testNamespace,
+			recorder:            recorderMock,
+			backupTimeoutGetter: retryGetterMock,
 		}
 
 		// when

@@ -428,7 +428,6 @@ func Test_startOperator(t *testing.T) {
 		}
 
 		configGetterMock := newMockConfigGetter(t)
-		configGetterMock.EXPECT().GetRetryLimit(testCtx).Return(10, nil)
 		newBackupTimeoutGetter = func(_ backupconfig.ConfigMapInterface) backupconfig.Getter {
 			return configGetterMock
 		}
