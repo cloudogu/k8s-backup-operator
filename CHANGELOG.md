@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v3.3.1] - 2026-06-03
+- [#113] Load backupRetryTimeLimit dynamically on each backup creation
+
 ## [v3.3.0] - 2026-05-29
 ### Changed
 - [#113] Store backup retry time via config map

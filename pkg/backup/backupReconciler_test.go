@@ -6,9 +6,11 @@ import (
 	"time"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	backupconfig "github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	v12 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,7 +26,7 @@ var testNamespace = "ecosystem-test"
 func TestNewBackupReconciler(t *testing.T) {
 	t.Run("should create backup reconciler", func(t *testing.T) {
 		// when
-		actual := NewBackupReconciler(nil, nil, "default", nil, nil, 10)
+		actual := NewBackupReconciler(nil, nil, "default", nil, nil, nil)
 
 		// then
 		assert.NotNil(t, actual)
@@ -57,7 +59,12 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		requeueHandlerMock := newMockRequeueHandler(t)
 		requeueHandlerMock.EXPECT().Handle(testCtx, "Creation failed with backup backup", backup, nil, "").Return(ctrl.Result{}, nil)
 
-		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock, retryTimeLimit: 10}
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		actual, err := sut.Reconcile(testCtx, request)
@@ -84,7 +91,12 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
 
-		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, retryTimeLimit: 10}
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		actual, err := sut.Reconcile(testCtx, request)
@@ -123,13 +135,18 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		backupClientGetterMock.EXPECT().Backups(testNamespace).Return(backupInterfaceMock)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
 
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
 		sut := &backupReconciler{
-			clientSet:      clientSetMock,
-			namespace:      testNamespace,
-			manager:        managerMock,
-			recorder:       recorderMock,
-			requeueHandler: requeueHandlerMock,
-			retryTimeLimit: 10,
+			clientSet:           clientSetMock,
+			namespace:           testNamespace,
+			manager:             managerMock,
+			recorder:            recorderMock,
+			requeueHandler:      requeueHandlerMock,
+			backupTimeoutGetter: retryGetterMock,
 		}
 
 		// when
@@ -167,7 +184,12 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		requeueHandlerMock := newMockRequeueHandler(t)
 		requeueHandlerMock.EXPECT().Handle(testCtx, "Delete failed with backup backup", backup, nil, v1.BackupStatusCompleted).Return(ctrl.Result{}, nil)
 
-		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		actual, err := sut.Reconcile(testCtx, request)
@@ -205,7 +227,12 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		requeueHandlerMock := newMockRequeueHandler(t)
 		requeueHandlerMock.EXPECT().Handle(testCtx, "Delete failed with backup backup", backup, testErr, v1.BackupStatusCompleted).Return(ctrl.Result{}, nil)
 
-		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		actual, err := sut.Reconcile(testCtx, request)
@@ -244,7 +271,12 @@ func Test_backupReconciler_Reconcile(t *testing.T) {
 		requeueHandlerMock := newMockRequeueHandler(t)
 		requeueHandlerMock.EXPECT().Handle(testCtx, "Delete failed with backup backup", backup, testErr, v1.BackupStatusCompleted).Return(ctrl.Result{}, assert.AnError)
 
-		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock}
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "10"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &backupReconciler{clientSet: clientSetMock, namespace: testNamespace, manager: managerMock, recorder: recorderMock, requeueHandler: requeueHandlerMock, backupTimeoutGetter: retryGetterMock}
 
 		// when
 		actual, err := sut.Reconcile(testCtx, request)
