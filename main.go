@@ -319,7 +319,10 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("failed to update additional images in existing resources: %w", err)
 	}
 
-	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace)
+	configMapClient := k8sClientSet.CoreV1().ConfigMaps(operatorConfig.Namespace)
+	configGetter := newBackupTimeoutGetter(configMapClient)
+
+	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace, configGetter)
 	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
 	scaleManager := scale.NewManager(k8sClient, operatorConfig.Namespace)
 
@@ -334,9 +337,6 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
-
-	configMapClient := k8sClientSet.CoreV1().ConfigMaps(operatorConfig.Namespace)
-	configGetter := newBackupTimeoutGetter(configMapClient)
 
 	backupManager := backup.NewBackupManager(k8sClient, ecosystemClientSet, blueprintClient, operatorConfig.Namespace, recorder, configGetter)
 	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler, configGetter)).SetupWithManager(k8sManager); err != nil {

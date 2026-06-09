@@ -1,9 +1,11 @@
 package requeue
 
 import (
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
-	"k8s.io/client-go/tools/record"
 	"time"
+
+	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 type ecosystemInterface interface {
@@ -43,4 +45,10 @@ type requeuableError interface {
 
 type eventRecorder interface {
 	record.EventRecorder
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type backupConfigMapInterface interface {
+	corev1.ConfigMapInterface
 }
