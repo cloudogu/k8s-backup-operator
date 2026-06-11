@@ -326,7 +326,7 @@ func TestNormalizeRequeueTime(t *testing.T) {
 		require.NotNil(t, res)
 		assert.Equal(t, res.Seconds(), float64(10))
 	})
-	t.Run("durration exeeded", func(t *testing.T) {
+	t.Run("duration exceeded", func(t *testing.T) {
 
 		// given
 		backup := createBackup("ecosystem-restore-1", "ecosystem")
