@@ -2,11 +2,14 @@ package requeue
 
 import (
 	"context"
-	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"
 	"time"
+
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	backupconfig "github.com/cloudogu/k8s-backup-operator/pkg/config"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -59,7 +62,12 @@ func Test_backupRequeueHandler_Handle(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
 
-		sut := &defaultRequeueHandler{namespace: testNamespace, clientSet: clientSetMock}
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "60"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &defaultRequeueHandler{namespace: testNamespace, clientSet: clientSetMock, backupTimeoutGetter: retryGetterMock}
 
 		requeueErrMock := newMockRequeuableError(t)
 		requeueErrMock.EXPECT().GetRequeueTime(mock.Anything).Return(30 * time.Second)
@@ -89,7 +97,12 @@ func Test_backupRequeueHandler_Handle(t *testing.T) {
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Eventf(backup, "Normal", "Requeue", "Falling back to backup status %s: Trying again in %s.", "upgrading", "1s")
 
-		sut := &defaultRequeueHandler{namespace: testNamespace, clientSet: clientSetMock, recorder: recorderMock}
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "60"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &defaultRequeueHandler{namespace: testNamespace, clientSet: clientSetMock, recorder: recorderMock, backupTimeoutGetter: retryGetterMock}
 
 		requeueErrMock := newMockRequeuableError(t)
 		requeueErrMock.EXPECT().GetRequeueTime(mock.Anything).Return(time.Second)
@@ -115,7 +128,12 @@ func Test_backupRequeueHandler_Handle(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(backupClientGetterMock)
 
-		sut := &defaultRequeueHandler{namespace: testNamespace, clientSet: clientSetMock}
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "60"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &defaultRequeueHandler{namespace: testNamespace, clientSet: clientSetMock, backupTimeoutGetter: retryGetterMock}
 
 		requeueErrMock := newMockRequeuableError(t)
 		requeueErrMock.EXPECT().GetRequeueTime(mock.Anything).Return(time.Second)
@@ -230,8 +248,9 @@ func (w wrongRequeueableStatus) GetStatus() string {
 func createRestore(name, namespace string) *k8sv1.Restore {
 	return &k8sv1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:              name,
+			Namespace:         namespace,
+			CreationTimestamp: metav1.Now(),
 		},
 		Spec: k8sv1.RestoreSpec{},
 	}
@@ -240,8 +259,9 @@ func createRestore(name, namespace string) *k8sv1.Restore {
 func createBackup(name, namespace string) *k8sv1.Backup {
 	return &k8sv1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:              name,
+			Namespace:         namespace,
+			CreationTimestamp: metav1.Now(),
 		},
 		Spec: k8sv1.BackupSpec{},
 	}
@@ -277,9 +297,96 @@ func Test_backupRequeueHandler_noLongerHandleRequeueing(t *testing.T) {
 func TestNewRequeueHandler(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// when
-		handler := NewRequeueHandler(newMockEcosystemInterface(t), newMockEventRecorder(t), testNamespace)
+		handler := NewRequeueHandler(newMockEcosystemInterface(t), newMockEventRecorder(t), testNamespace, nil)
 
 		// then
 		require.NotNil(t, handler)
+	})
+}
+
+func TestNormalizeRequeueTime(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+
+		// given
+		backup := createBackup("ecosystem-restore-1", "ecosystem")
+
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "60"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &defaultRequeueHandler{namespace: testNamespace, backupTimeoutGetter: retryGetterMock}
+
+		dur := time.Duration(10) * time.Second
+
+		res, err := sut.normalizeRequeueTime(testCtx, backup, dur)
+
+		// then
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		assert.Equal(t, res.Seconds(), float64(10))
+	})
+	t.Run("duration exceeded", func(t *testing.T) {
+
+		// given
+		backup := createBackup("ecosystem-restore-1", "ecosystem")
+
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "1"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &defaultRequeueHandler{namespace: testNamespace, backupTimeoutGetter: retryGetterMock}
+
+		dur := time.Duration(100) * time.Second
+
+		res, err := sut.normalizeRequeueTime(testCtx, backup, dur)
+
+		// then
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		assert.Equal(t, int(res.Seconds()), 59) //int rounds down
+	})
+	t.Run("negative deadline", func(t *testing.T) {
+
+		// given
+		backup := createBackup("ecosystem-restore-1", "ecosystem")
+
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "-1"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &defaultRequeueHandler{namespace: testNamespace, backupTimeoutGetter: retryGetterMock}
+
+		dur := time.Duration(100) * time.Second
+
+		res, err := sut.normalizeRequeueTime(testCtx, backup, dur)
+
+		// then
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		assert.Equal(t, int(res.Seconds()), 0)
+	})
+	t.Run("failed getting backup time", func(t *testing.T) {
+
+		// given
+		backup := createBackup("ecosystem-restore-1", "ecosystem")
+
+		mockConfigMap := newMockBackupConfigMapInterface(t)
+		retryGetterMock := backupconfig.NewGetter(mockConfigMap)
+		cm := &corev1.ConfigMap{Data: map[string]string{"retryTimeLimit": "invalid"}}
+		mockConfigMap.EXPECT().Get(testCtx, "k8s-backup-operator-backup-config", metav1.GetOptions{}).Return(cm, nil)
+
+		sut := &defaultRequeueHandler{namespace: testNamespace, backupTimeoutGetter: retryGetterMock}
+
+		dur := time.Duration(100) * time.Second
+
+		res, err := sut.normalizeRequeueTime(testCtx, backup, dur)
+
+		// then
+		require.Error(t, err)
+		require.NotNil(t, res)
+		assert.Equal(t, int(res.Seconds()), 0)
 	})
 }
