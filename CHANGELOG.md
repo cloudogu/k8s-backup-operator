@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v3.3.2] - 2026-06-11
+### Changed
+- [#117] Use Backup retry timeout in requeue timing
+
 ## [v3.3.1] - 2026-06-03
 - [#113] Load backupRetryTimeLimit dynamically on each backup creation
 

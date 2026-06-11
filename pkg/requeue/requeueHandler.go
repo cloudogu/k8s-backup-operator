@@ -4,14 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/retry-lib/retry"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"time"
 )
 
 // RequeueEventReason The name of the requeue event
@@ -19,18 +22,46 @@ const RequeueEventReason = "Requeue"
 
 // defaultRequeueHandler is responsible to requeue a backup resource after it failed.
 type defaultRequeueHandler struct {
-	clientSet ecosystemInterface
-	namespace string
-	recorder  eventRecorder
+	clientSet           ecosystemInterface
+	namespace           string
+	recorder            eventRecorder
+	backupTimeoutGetter config.Getter
 }
 
 // NewRequeueHandler creates a new component requeue handler.
-func NewRequeueHandler(clientSet ecosystemInterface, recorder record.EventRecorder, namespace string) *defaultRequeueHandler {
+func NewRequeueHandler(clientSet ecosystemInterface, recorder record.EventRecorder, namespace string, backupTimeoutGetter config.Getter) *defaultRequeueHandler {
 	return &defaultRequeueHandler{
-		clientSet: clientSet,
-		namespace: namespace,
-		recorder:  recorder,
+		clientSet:           clientSet,
+		namespace:           namespace,
+		recorder:            recorder,
+		backupTimeoutGetter: backupTimeoutGetter,
 	}
+}
+
+func (brh *defaultRequeueHandler) normalizeRequeueTime(ctx context.Context, requeuableObject k8sv1.RequeuableObject, dur time.Duration) (time.Duration, error) {
+	_, ok := requeuableObject.(*k8sv1.Backup)
+	if !ok {
+		return dur, nil
+	}
+	// end requeue on timeout
+	obj, ok := requeuableObject.(client.Object)
+	if ok {
+		creationTime := obj.GetCreationTimestamp().Time
+		retryTimeLimit, err := brh.backupTimeoutGetter.GetRetryLimit(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get backup timeout: %w", err)
+		}
+		deadline := creationTime.Add(time.Duration(retryTimeLimit) * time.Minute)
+		remaining := time.Until(deadline)
+		if remaining < dur {
+			if remaining <= 0 {
+				return 1, nil
+			} else {
+				return remaining, nil
+			}
+		}
+	}
+	return dur, nil
 }
 
 // Handle takes an error and handles the requeue process for the current backup operation.
@@ -41,6 +72,11 @@ func (brh *defaultRequeueHandler) Handle(ctx context.Context, contextMessage str
 	}
 
 	requeueTime := requeueableErr.GetRequeueTime(requeuableObject.GetStatus().GetRequeueTimeNanos())
+
+	requeueTime, err := brh.normalizeRequeueTime(ctx, requeuableObject, requeueTime)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	updateError := brh.getAndUpdateObject(ctx, requeuableObject, requeueStatus, requeueTime)
 	if updateError != nil {
