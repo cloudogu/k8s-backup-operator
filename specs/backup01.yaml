@@ -1,0 +1,7 @@
+apiVersion: k8s.cloudogu.com/v1
+kind: Backup
+metadata:
+  name: backup-test03
+  namespace: ecosystem
+spec:
+  provider: velero # only velero and "" (defaults to velero) is supported.
