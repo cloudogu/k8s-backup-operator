@@ -1,8 +1,7 @@
 package specs
 
 import (
-	"flag"
-	"path/filepath"
+	"os"
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -12,7 +11,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -25,14 +23,10 @@ func TestSpecs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "k3ces.localdomain"), "(optional) absolute path to the kubeconfig file")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
+	kubeConfigEnv := os.Getenv("K8S_TEST_CLUSTER_KUBECONFIG")
+	Expect(kubeConfigEnv).ShouldNot(BeEmpty())
 
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigEnv)
 	Expect(err).ShouldNot(HaveOccurred())
 
 	k8sClientSet, err = kubernetes.NewForConfig(config)
@@ -43,5 +37,4 @@ var _ = BeforeSuite(func() {
 
 	utilruntime.Must(velerov1.AddToScheme(k8sClient.Scheme()))
 	utilruntime.Must(backupv1.AddToScheme(k8sClient.Scheme()))
-
 })
