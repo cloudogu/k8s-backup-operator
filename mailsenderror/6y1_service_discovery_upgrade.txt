@@ -1,0 +1,5 @@
+#Need to apply this to have the value for discover set to true
+
+helm upgrade k8s-service-discovery oci://registry.cloudogu.com/k8s/k8s-service-discovery \
+     --version 6.1.0 -n ecosystem --reuse-values \
+     --set exposition.discoverExpositionCR=true

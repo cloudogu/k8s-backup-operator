@@ -1,0 +1,8 @@
+See /home/manjo-manjo/cloudogu/learn/Multinode-Adventure/quests/23-backup-and-restore/task.md
+
+create the secret velero-backup-target as mentioned
+create the velero.yaml as mentioned there.
+
+kubectl create secret generic -n ecosystem velero-backup-target --from-file=keyfile.json
+
+kubectl apply -f velero.yaml -n ecosystem

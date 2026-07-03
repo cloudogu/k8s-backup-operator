@@ -1,0 +1,11 @@
+1)create the mailpit deploy and service and apply them
+2) edit blueprint on the server to  update the postfix details:
+    a) change postfix version: 3.10.8-2
+    b) add configuration for postfix:
+spec:
+  blueprint:
+    config:
+      dogus:
+        postfix:
+        - key: normal/relayhost
+          value: "[mailpit.ecosystem.svc.cluster.local]:1025"

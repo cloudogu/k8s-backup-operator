@@ -1,0 +1,11 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postfix-ingress
+  namespace: ecosystem
+spec:
+  podSelector:
+    matchLabels:
+      k8s.cloudogu.com/component.name: postfix
+  ingress:
+  - {}

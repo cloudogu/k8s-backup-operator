@@ -1,0 +1,11 @@
+apiVersion: k8s.cloudogu.com/v2
+kind: Dogu
+metadata:
+  name: postgresql
+  labels:
+    app: ces
+spec:
+  name: official/postgresql
+  version: 14.22-1
+  resources:
+    minDataVolumeSize: "1Gi"

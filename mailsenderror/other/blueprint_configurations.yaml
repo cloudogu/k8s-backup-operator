@@ -1,0 +1,40 @@
+
+dogus:
+  cas:
+    - key: oidc/enabled
+      value: "false"
+    - key: oidc/discovery_uri
+      value: https://account.cloudogu.com/auth/realms/Cloudogu/.well-known/openid-configuration
+    - key: oidc/client_id
+      value: mmanoj-k8s-ces-doguv3
+    - key: oidc/display_name
+      value: Cloudogu-Platform
+    - key: oidc/optional
+      value: "true"
+    - key: oidc/scopes
+      value: openid,email,profile,groups
+    - key: oidc/principal_attribute
+      value: preferred_username
+    - key: oidc/attribute_mapping
+      value: email:mail,family_name:surname,given_name:givenName,preferred_username:username,name:displayName,groups:externalGroups
+    - key: oidc/allowed_groups
+      value: ZybHJmqk
+    - key: oidc/initial_admin_usernames
+      value: matthias.eiserloh,niklas.hinze,jeremias.weber,ninawaty.nyhuis,robertauer
+    - key: oidc/client_secret
+      secretRef:
+        key: cas_oidc_client_secret
+        name: ecosystem-core-setup-credentials
+      sensitive: true
+  ldap:
+    - key: admin_username
+      value: mmanoj
+    - key: admin_mail
+      value: admin@ces.invalid
+    - key: admin_member
+      value: "true"
+    - key: admin_password
+      secretRef:
+        key: ldap_admin_password
+        name: ecosystem-core-setup-credentials
+      sensitive: true

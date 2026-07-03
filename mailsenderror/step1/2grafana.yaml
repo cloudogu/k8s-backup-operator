@@ -1,0 +1,10 @@
+apiVersion: k8s.cloudogu.com/v2
+kind: Dogu
+metadata:
+  name: grafana
+  labels:
+    app: ces
+    dogu.name: grafana
+spec:
+  name: premium/grafana
+  version: 11.6.13-5
