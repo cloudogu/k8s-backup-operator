@@ -343,6 +343,15 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
 
+	/*
+		backupReconciler := &backup.Reconciler{}
+		err = backupReconciler.SetupWithManager(k8sManager)
+		if err != nil {
+			return fmt.Errorf("unable to create backup controller: %w", err)
+		}
+
+	*/
+
 	if err = backupschedule.NewReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler, imageConfig, operatorConfig.ImagePullSecrets).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backupSchedule controller: %w", err)
 	}
