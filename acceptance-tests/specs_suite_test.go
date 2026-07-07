@@ -1,4 +1,6 @@
-package specs
+//go:build acceptance
+
+package spec
 
 import (
 	"os"
