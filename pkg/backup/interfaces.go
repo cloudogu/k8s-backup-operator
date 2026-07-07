@@ -5,9 +5,10 @@ import (
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
-	"github.com/cloudogu/k8s-registry-lib/config"
+	registryConfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -94,10 +95,14 @@ type backupProvider interface {
 }
 
 type globalConfigRepository interface {
-	Get(ctx context.Context) (config.GlobalConfig, error)
-	Update(ctx context.Context, globalConfig config.GlobalConfig) (config.GlobalConfig, error)
+	Get(ctx context.Context) (registryConfig.GlobalConfig, error)
+	Update(ctx context.Context, globalConfig registryConfig.GlobalConfig) (registryConfig.GlobalConfig, error)
 }
 
 type blueprintInterface interface {
 	blueprintv3.BlueprintInterface
+}
+
+type configGateway interface {
+	config.Gateway
 }

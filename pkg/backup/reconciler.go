@@ -13,39 +13,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-func NewReconciler(backupApi ecosystemBackupInterface, backupProvider backupProvider) *Reconciler {
+func NewReconciler(backupApi ecosystemBackupInterface, service Service, configGateway configGateway) *Reconciler {
 	return &Reconciler{
-		backupApi:      backupApi,
-		backupProvider: backupProvider,
+		backupApi:     backupApi,
+		service:       service,
+		configGateway: configGateway,
 	}
 }
 
 type Reconciler struct {
-	backupApi      ecosystemBackupInterface
-	backupProvider backupProvider
+	backupApi     ecosystemBackupInterface
+	service       Service
+	configGateway configGateway
 }
-
-/*
-func (b *DefaultBackup) create(ctx context.Context, backup *backupv1.Backup) (ctrl.Result, error) {
-	// Update Conditions
-	// add Finalizer
-	// add Labels
-	// add Annotations
-	// maintenance on
-
-	return b.backup.create(ctx, backup)
-
-	//return ctrl.Result{}, nil
-}
-
-
-type VeleroBackup struct {
-}
-
-func (b *VeleroBackup) create(ctx context.Context, backup *backupv1.Backup) (ctrl.Result, error) {
-	return ctrl.Result{}, nil
-}
-*/
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -57,7 +37,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.IsZero() {
-		err = r.backupProvider.DeleteBackup(ctx, backup)
+		err = r.service.deleteBackup(ctx, Backup{Name: req.Name})
 		if err != nil {
 			logger.Error(err, "failed to delete provider backup", "namespace", req.NamespacedName.Namespace, "name", req.Name)
 			return ctrl.Result{}, err
@@ -65,33 +45,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	err = r.backupProvider.CreateBackup(ctx, backup)
-	if err != nil {
-		logger.Error(err, "failed to create provider backup", "namespace", req.NamespacedName.Namespace, "name", req.Name)
-		return ctrl.Result{}, nil
-	}
-
-	// err := r.client.Get(ctx, req.NamespacedName, ...)
-
-	// backup not found -> provider.Delete VeleroBackup
-
-	// provider.exists(namespace, name) bool
-	// if not -> Create Velero Backup
-	// else Do Nothing
-
-	// backup is Deleting -> provider.Delete(namespace, name)
-
-	// action =
-	// switch action
-	//   return r.backup.create()
-	//	 return r.backup.delete()
-
-	//veleroBackup := &velerov1.Backup{}
-	// get
-
-	//return r.actionMapper.handle(ctx, backup)
-
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, r.service.createBackup(ctx, Backup{Name: req.Name})
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -101,10 +55,3 @@ func (r *Reconciler) SetupWithManager(mgr controllerManager) error {
 		For(&backupv1.Backup{}).
 		Complete(r)
 }
-
-/*
-type RequestHandler interface {
-	handle(ctx context.Context, backup *backupv1.Backup, veleroBackup *velerov1.Backup) (ctrl.Result, error)
-}
-
-*/
