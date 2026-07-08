@@ -11,7 +11,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
-	internal "k8s.io/client-go/tools/internal/events"
+	internal "k8s.io/client-go/tools/events"
 	record "k8s.io/client-go/tools/record"
 	cache "sigs.k8s.io/controller-runtime/pkg/cache"
 	client "sigs.k8s.io/controller-runtime/pkg/client"

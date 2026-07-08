@@ -2,3 +2,5 @@ inpackage: True
 testonly: True
 with-expecter: True
 keeptree: False
+replace-type:
+  - "k8s.io/client-go/tools/internal/events=k8s.io/client-go/tools/events"
