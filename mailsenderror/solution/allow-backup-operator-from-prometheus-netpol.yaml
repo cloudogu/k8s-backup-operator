@@ -16,8 +16,8 @@ spec:
           matchLabels:
             app: k8s-prometheus
             k8s-prometheus: prometheus-server
-            k8s.cloudogu.com/component.nametest: k8s-prometheus
-    - ports:
+            k8s.cloudogu.com/component.name: k8s-prometheus
+      ports:
         - port: 8080
           protocol: TCP
   policyTypes:
