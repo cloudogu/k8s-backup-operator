@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-mailpit-ingress
+  name: allow-mailpit-from-postfix-ingress
   namespace: ecosystem
 spec:
   podSelector:
