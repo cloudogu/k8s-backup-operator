@@ -21,6 +21,53 @@ func (_m *MockService) EXPECT() *MockService_Expecter {
 	return &MockService_Expecter{mock: &_m.Mock}
 }
 
+// cancelBackup provides a mock function with given fields: _a0, backup
+func (_m *MockService) cancelBackup(_a0 context.Context, backup Backup) error {
+	ret := _m.Called(_a0, backup)
+
+	if len(ret) == 0 {
+		panic("no return value specified for cancelBackup")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, Backup) error); ok {
+		r0 = rf(_a0, backup)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockService_cancelBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'cancelBackup'
+type MockService_cancelBackup_Call struct {
+	*mock.Call
+}
+
+// cancelBackup is a helper method to define mock.On call
+//   - _a0 context.Context
+//   - backup Backup
+func (_e *MockService_Expecter) cancelBackup(_a0 interface{}, backup interface{}) *MockService_cancelBackup_Call {
+	return &MockService_cancelBackup_Call{Call: _e.mock.On("cancelBackup", _a0, backup)}
+}
+
+func (_c *MockService_cancelBackup_Call) Run(run func(_a0 context.Context, backup Backup)) *MockService_cancelBackup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(Backup))
+	})
+	return _c
+}
+
+func (_c *MockService_cancelBackup_Call) Return(_a0 error) *MockService_cancelBackup_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockService_cancelBackup_Call) RunAndReturn(run func(context.Context, Backup) error) *MockService_cancelBackup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // createBackup provides a mock function with given fields: _a0, backup
 func (_m *MockService) createBackup(_a0 context.Context, backup Backup) error {
 	ret := _m.Called(_a0, backup)
@@ -111,53 +158,6 @@ func (_c *MockService_deleteBackup_Call) Return(_a0 error) *MockService_deleteBa
 }
 
 func (_c *MockService_deleteBackup_Call) RunAndReturn(run func(context.Context, Backup) error) *MockService_deleteBackup_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// markBackupAsNotFinishedInTime provides a mock function with given fields: _a0, backup
-func (_m *MockService) markBackupAsNotFinishedInTime(_a0 context.Context, backup Backup) error {
-	ret := _m.Called(_a0, backup)
-
-	if len(ret) == 0 {
-		panic("no return value specified for markBackupAsNotFinishedInTime")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, Backup) error); ok {
-		r0 = rf(_a0, backup)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockService_markBackupAsNotFinishedInTime_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'markBackupAsNotFinishedInTime'
-type MockService_markBackupAsNotFinishedInTime_Call struct {
-	*mock.Call
-}
-
-// markBackupAsNotFinishedInTime is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - backup Backup
-func (_e *MockService_Expecter) markBackupAsNotFinishedInTime(_a0 interface{}, backup interface{}) *MockService_markBackupAsNotFinishedInTime_Call {
-	return &MockService_markBackupAsNotFinishedInTime_Call{Call: _e.mock.On("markBackupAsNotFinishedInTime", _a0, backup)}
-}
-
-func (_c *MockService_markBackupAsNotFinishedInTime_Call) Run(run func(_a0 context.Context, backup Backup)) *MockService_markBackupAsNotFinishedInTime_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(Backup))
-	})
-	return _c
-}
-
-func (_c *MockService_markBackupAsNotFinishedInTime_Call) Return(_a0 error) *MockService_markBackupAsNotFinishedInTime_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockService_markBackupAsNotFinishedInTime_Call) RunAndReturn(run func(context.Context, Backup) error) *MockService_markBackupAsNotFinishedInTime_Call {
 	_c.Call.Return(run)
 	return _c
 }

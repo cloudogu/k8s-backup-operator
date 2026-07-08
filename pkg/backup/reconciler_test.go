@@ -15,7 +15,7 @@ import (
 func TestReconciler(t *testing.T) {
 	var testCtx = context.TODO()
 
-	t.Run("should create backup", func(t *testing.T) {
+	t.Run("If a backup resource has been created a backup should be created", func(t *testing.T) {
 		backupCr := createBackup("ns1", "name1")
 
 		backupApiMock := newMockEcosystemBackupInterface(t)
@@ -36,7 +36,7 @@ func TestReconciler(t *testing.T) {
 		assert.Equal(t, ctrl.Result{}, result)
 	})
 
-	t.Run("should delete backup", func(t *testing.T) {
+	t.Run("If a backup resource has been deleted the corresponding backup should be deleted", func(t *testing.T) {
 		var deletionTime = metav1.Now()
 		backupCr := &backupv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
@@ -66,8 +66,8 @@ func TestReconciler(t *testing.T) {
 		assert.Equal(t, ctrl.Result{}, result)
 	})
 
-	t.Run("should mark backup as 'NotFinishedInTime' if it's in 'InProgress' and retry time limit has been reached", func(t *testing.T) {
-		t.Skip("TODO")
+	t.Run("If the backup does not complete in time and is still running it should be canceled", func(t *testing.T) {
+		t.Skip("TODO: It is not really possible to cancel a velero backup. Should we let it finish?")
 
 		var backupStartTime = metav1.Now()
 		var lastTransitionTime = backupStartTime.Add(time.Minute * 10)
@@ -95,7 +95,7 @@ func TestReconciler(t *testing.T) {
 		backupApiMock.EXPECT().Get(testCtx, "name3", metav1.GetOptions{}).Return(backupCr, nil)
 
 		serviceMock := NewMockService(t)
-		serviceMock.EXPECT().markBackupAsNotFinishedInTime(testCtx, Backup{Name: "name3"}).Return(nil)
+		serviceMock.EXPECT().cancelBackup(testCtx, Backup{Name: "name3"}).Return(nil)
 
 		configGatewayMock := newMockConfigGateway(t)
 		configGatewayMock.EXPECT().RetryLimit(testCtx).Return(10, nil)
@@ -112,6 +112,19 @@ func TestReconciler(t *testing.T) {
 		assert.Equal(t, ctrl.Result{}, result)
 	})
 
+	t.Run("If the backup does not complete in time and remains in an error state it should be canceled", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+
+	t.Run("If the backup is in an error state and has still time to complete we check it later again", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+
+	t.Run("If the backup is completed we do nothing", func(t *testing.T) {
+		t.Skip("TODO")
+		// We could configure the reconciler mock without a Service (=nil) and if any function of
+		// that service was called the test will fail.
+	})
 }
 
 func createBackup(namespace string, name string) *backupv1.Backup {

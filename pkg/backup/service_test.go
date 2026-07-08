@@ -1,48 +1,117 @@
 package backup
 
 import (
+	"context"
 	"testing"
 
-	annotationsPkg "github.com/cloudogu/k8s-backup-operator/pkg/annotations"
-	"github.com/cloudogu/k8s-backup-operator/pkg/blueprint"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestService(t *testing.T) {
-	t.Run("init backup with label", func(t *testing.T) {
-		t.Skip("TODO")
-		backupCr := createBackup("ns1", "name1")
-		service := &ServiceImpl{}
+	var testCtx = context.TODO()
 
-		service.initBackupCr(backupCr, nil)
-
-		labels := backupCr.GetLabels()
-		assert.Contains(t, labels, "k8s.cloudogu.com/part-of")
-		assert.Equal(t, labels["k8s.cloudogu.com/part-of"], "backup")
-
-		assert.Contains(t, labels, appLabelKey)
-		assert.Equal(t, labels["app"], "ces")
-	})
-
-	t.Run("init backup with blueprint annotations", func(t *testing.T) {
-		t.Skip("TODO")
-		backupCr := createBackup("ns1", "name1")
-		service := &ServiceImpl{}
-
-		blueprintWithDogus := &blueprint.BlueprintWithDogus{
-			DisplayName: "MyBlueprint",
-			DogusAsJson: "{dogus:[]}",
+	t.Run("It should add default labels", func(t *testing.T) {
+		expectedBackup := Backup{
+			Name: "backup1",
+			Labels: map[string]string{
+				"app":                      "ces",
+				"k8s.cloudogu.com/part-of": "backup",
+			},
 		}
 
-		service.initBackupCr(backupCr, blueprintWithDogus)
+		backupRepositoryMock := newMockBackupRepository(t)
+		backupRepositoryMock.EXPECT().save(expectedBackup).Return(nil)
 
-		annotations := backupCr.GetAnnotations()
+		providerBackupRepositoryMock := newMockProviderBackupRepository(t)
+		providerBackupRepositoryMock.EXPECT().save(expectedBackup).Return(nil)
 
-		assert.Contains(t, annotations, annotationsPkg.BlueprintIdAnnotation)
-		assert.Equal(t, annotations[annotationsPkg.BlueprintIdAnnotation], blueprintWithDogus.DisplayName)
+		configGatewayMock := newMockConfigGateway(t)
 
-		assert.Contains(t, annotations, annotationsPkg.DogusAnnotation)
-		assert.Equal(t, annotations[annotationsPkg.DogusAnnotation], blueprintWithDogus.DogusAsJson)
+		backup := Backup{
+			Name: "backup1",
+		}
+		service := NewService(backupRepositoryMock, providerBackupRepositoryMock, configGatewayMock)
+
+		err := service.createBackup(testCtx, backup)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("It should keep existing label", func(t *testing.T) {
+		expectedBackup := Backup{
+			Name: "backup2",
+			Labels: map[string]string{
+				"app":                      "ces",
+				"k8s.cloudogu.com/part-of": "backup",
+				"example.com/key1":         "value1",
+				"example.com/key2":         "value2",
+			},
+		}
+		backupRepositoryMock := newMockBackupRepository(t)
+		backupRepositoryMock.EXPECT().save(expectedBackup).Return(nil)
+
+		providerBackupRepositoryMock := newMockProviderBackupRepository(t)
+		providerBackupRepositoryMock.EXPECT().save(expectedBackup).Return(nil)
+
+		configGatewayMock := newMockConfigGateway(t)
+
+		backup := Backup{
+			Name: "backup2",
+			Labels: map[string]string{
+				"example.com/key1": "value1",
+				"example.com/key2": "value2",
+			},
+		}
+		service := NewService(backupRepositoryMock, providerBackupRepositoryMock, configGatewayMock)
+
+		err := service.createBackup(testCtx, backup)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("It should throw an error if the backup repository throws an error", func(t *testing.T) {
+		backupRepositoryMock := newMockBackupRepository(t)
+		backupRepositoryMock.EXPECT().save(mock.Anything).Return(assert.AnError)
+
+		providerBackupRepositoryMock := newMockProviderBackupRepository(t)
+		configGatewayMock := newMockConfigGateway(t)
+
+		backup := Backup{
+			Name: "backup3",
+		}
+		service := NewService(backupRepositoryMock, providerBackupRepositoryMock, configGatewayMock)
+
+		err := service.createBackup(testCtx, backup)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("It should throw an error if the provider backup repository throws an error", func(t *testing.T) {
+		backupRepositoryMock := newMockBackupRepository(t)
+		backupRepositoryMock.EXPECT().save(mock.Anything).Return(nil)
+
+		providerBackupRepositoryMock := newMockProviderBackupRepository(t)
+		providerBackupRepositoryMock.EXPECT().save(mock.Anything).Return(assert.AnError)
+
+		configGatewayMock := newMockConfigGateway(t)
+
+		backup := Backup{
+			Name: "backup3",
+		}
+		service := NewService(backupRepositoryMock, providerBackupRepositoryMock, configGatewayMock)
+
+		err := service.createBackup(testCtx, backup)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("It should add an annotation that contains information about the blueprint if it exists", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+
+	t.Run("It should add a finalizer", func(t *testing.T) {
+		t.Skip("TODO")
 	})
 
 }

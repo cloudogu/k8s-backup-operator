@@ -5,7 +5,6 @@ import (
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	registryConfig "github.com/cloudogu/k8s-registry-lib/config"
@@ -104,5 +103,13 @@ type blueprintInterface interface {
 }
 
 type configGateway interface {
-	config.Gateway
+	RetryLimit(context.Context) (int, error)
+}
+
+type backupRepository interface {
+	save(backup Backup) error
+}
+
+type providerBackupRepository interface {
+	save(backup Backup) error
 }
