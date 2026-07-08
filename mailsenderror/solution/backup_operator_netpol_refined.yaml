@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backup-operator-from-prometheus-ingress
+  namespace: ecosystem
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: k8s-backup-operator
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: ecosystem
+        podSelector:
+          matchLabels:
+            app: k8s-prometheus
+            k8s-prometheus: prometheus-server
+            k8s.cloudogu.com/component.nametest: k8s-prometheus
+    - ports:
+        - port: 8080
+          protocol: TCP
+  policyTypes:
+    - Ingress

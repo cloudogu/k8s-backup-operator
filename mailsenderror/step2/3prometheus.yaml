@@ -1,0 +1,14 @@
+apiVersion: k8s.cloudogu.com/v1
+kind: Component
+metadata:
+  name: k8s-prometheus
+spec:
+  name: k8s-prometheus
+  namespace: k8s
+  version: 75.3.5-7
+  valuesYamlOverwrite: |
+    configuration:
+      normal:
+        relayhost: "mailpit.ecosystem.svc.cluster.local:1025"
+        logging:
+          root: "DEBUG"

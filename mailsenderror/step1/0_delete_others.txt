@@ -1,0 +1,9 @@
+Delete blueprint and dogus that are not actually required
+
+ldap
+postfix
+cas
+postgresql
+redmine
+
+and then add swagger ui , so it does not cause a problem

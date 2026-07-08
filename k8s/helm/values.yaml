@@ -32,7 +32,7 @@ initContainer:
     tag: 1.35.2
 metrics:
   serviceMonitor:
-    enabled: false
+    enabled: true
     additionalLabels:
       release: prometheus
 backup:

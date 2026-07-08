@@ -12,6 +12,11 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ecosystem
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: postfix
+              app.kubernetes.io/name: postfix
+              k8s.cloudogu.com/component.name: postfix
       ports:
         - protocol: TCP
           port: 8025

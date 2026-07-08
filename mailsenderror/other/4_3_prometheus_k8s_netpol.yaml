@@ -1,0 +1,11 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-statefulset-ingress
+  namespace: ecosystem
+spec:
+  podSelector:
+    matchLabels:
+      app: k8s-prometheus
+  ingress:
+  - {}

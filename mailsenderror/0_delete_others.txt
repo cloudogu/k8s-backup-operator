@@ -1,1 +1,0 @@
-Delete blueprint and dogus that are not actually required
