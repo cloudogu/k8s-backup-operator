@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- [#40] Add NetworkPolicy to allow ingress traffic from prometheus
+- [#121] Add NetworkPolicy to allow ingress traffic from prometheus
 
 ## [v3.3.2] - 2026-06-11
 ### Changed
