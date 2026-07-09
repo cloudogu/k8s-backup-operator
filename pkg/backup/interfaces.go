@@ -107,9 +107,13 @@ type configGateway interface {
 }
 
 type backupRepository interface {
-	save(backup Backup) error
+	save(context context.Context, backup Backup) error
 }
 
 type providerBackupRepository interface {
 	save(backup Backup) error
+}
+
+type blueprintGateway interface {
+	find(context.Context) (*Blueprint, error)
 }

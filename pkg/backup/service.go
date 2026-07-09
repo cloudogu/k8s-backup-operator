@@ -6,8 +6,8 @@ import (
 	"maps"
 	"time"
 
-	backup "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/blueprint"
+	backupV1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
 )
 
 var defaultLabels = map[string]string{
@@ -16,9 +16,11 @@ var defaultLabels = map[string]string{
 }
 
 type Backup struct {
-	Name       string
-	Labels     map[string]string
-	Conditions []Condition
+	Name        string
+	Labels      map[string]string
+	Annotations map[string]string
+	Finalizers  []string
+	Conditions  []Condition
 }
 
 type Condition struct {
@@ -29,6 +31,11 @@ type Condition struct {
 	Message            string
 }
 
+type Blueprint struct {
+	DisplayName       string
+	DogusAsJsonString string
+}
+
 type Service interface {
 	createBackup(context context.Context, backup Backup) error
 	cancelBackup(context context.Context, backup Backup) error
@@ -36,38 +43,60 @@ type Service interface {
 }
 
 type ServiceImpl struct {
-	backupRepository         backupRepository
-	providerBackupRepository providerBackupRepository
-	configGateway            configGateway
+	backupRepository backupRepository
+	configGateway    configGateway
+	blueprintGateway blueprintGateway
+	providerService  Service
 }
 
 func NewService(
 	backupRepository backupRepository,
-	providerBackupRepository providerBackupRepository,
-	configGateway configGateway) *ServiceImpl {
+	providerService Service,
+	configGateway configGateway,
+	blueprintGateway blueprintGateway) *ServiceImpl {
 	return &ServiceImpl{
-		backupRepository:         backupRepository,
-		providerBackupRepository: providerBackupRepository,
-		configGateway:            configGateway,
+		backupRepository: backupRepository,
+		providerService:  providerService,
+		configGateway:    configGateway,
+		blueprintGateway: blueprintGateway,
 	}
 }
 
 func (srv *ServiceImpl) createBackup(context context.Context, backup Backup) error {
 	newBackup := Backup{
-		Name:   backup.Name,
-		Labels: make(map[string]string),
+		Name:        backup.Name,
+		Labels:      make(map[string]string),
+		Annotations: make(map[string]string),
+		Finalizers:  append([]string(nil), backup.Finalizers...),
 	}
 	maps.Copy(newBackup.Labels, backup.Labels)
+	maps.Copy(newBackup.Annotations, backup.Annotations)
+
 	maps.Copy(newBackup.Labels, defaultLabels)
 
-	err := srv.backupRepository.save(newBackup)
+	newBackup.Finalizers = append(newBackup.Finalizers, backupV1.BackupFinalizer)
+
+	blueprint, err := srv.blueprintGateway.find(context)
+	if err != nil {
+		return fmt.Errorf("find blueprint: %w", err)
+	}
+
+	if blueprint != nil {
+		blueprintInfos := map[string]string{
+			annotations.BlueprintIdAnnotation: blueprint.DisplayName,
+			annotations.DogusAnnotation:       blueprint.DogusAsJsonString,
+		}
+		maps.Copy(newBackup.Annotations, blueprintInfos)
+	}
+
+	err = srv.backupRepository.save(context, newBackup)
 	if err != nil {
 		return fmt.Errorf("save backup: %w", err)
 	}
 
-	err = srv.providerBackupRepository.save(newBackup)
+	err = srv.providerService.createBackup(context, newBackup)
 	if err != nil {
-		return fmt.Errorf("save provider backup: %w", err)
+		return fmt.Errorf("create provider backup: %w", err)
 	}
 	return nil
 }
@@ -80,8 +109,4 @@ func (srv *ServiceImpl) cancelBackup(context context.Context, backup Backup) err
 func (srv *ServiceImpl) deleteBackup(context context.Context, backup Backup) error {
 	//TODO implement me
 	panic("implement me")
-}
-
-func (srv *ServiceImpl) initBackupCr(backupCr *backup.Backup, blueprintWithDogus *blueprint.BlueprintWithDogus) {
-
 }
