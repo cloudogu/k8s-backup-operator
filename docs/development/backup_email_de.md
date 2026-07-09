@@ -29,7 +29,7 @@ Dadurch wird sichergestellt, dass ein Service-Monitor vorhanden ist: k8s-backup-
 
 ### 3. Grafana
 
-* **Aktion**: Auswerten der Backup-Metriken mithilfe einer in Grafana konfigurierten Alarmregel (    ![backupalerts.yaml](https://github.com/cloudogu/grafana/blob/develop/resources/default-provisioning/alerting/backupalerts.yaml)).
+* **Aktion**: Auswerten der Backup-Metriken mithilfe einer in Grafana konfigurierten Alarmregel ([backupalerts.yaml](https://github.com/cloudogu/grafana/blob/develop/resources/default-provisioning/alerting/backupalerts.yaml)).
 * **Zeitplan**: Wird alle 10 Minuten ausgeführt.
 * **Logik**: Fragt Prometheus ab. Wenn sich die Daten geändert haben (was auf einen neuen Fehler- oder Erfolgszustand hindeutet), löst dies eine Alarminstanz aus.
 * **Weiterleitung**: Leitet die Alarmbenachrichtigung an den konfigurierten SMTP-Kontakt weiter.
