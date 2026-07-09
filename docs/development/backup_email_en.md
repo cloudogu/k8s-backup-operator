@@ -29,7 +29,7 @@ Through this service monitor,  prometheus knows through which pod the data can b
 
 ### 3. Grafana
 
-* **Action**: Evaluates the backup metrics using an alert rule that is configured in grafana (    ![backupalerts.yaml](https://github.com/cloudogu/grafana/blob/develop/resources/default-provisioning/alerting/backupalerts.yaml)).
+* **Action**: Evaluates the backup metrics using an alert rule that is configured in grafana ([backupalerts.yaml](https://github.com/cloudogu/grafana/blob/develop/resources/default-provisioning/alerting/backupalerts.yaml)).
 * **Schedule**: Runs every 10 minutes.
 * **Logic**: Queries Prometheus. If the data has changed (indicating a new failure or success status), it triggers an alert instance.
 * **Routing**: Forwards the alert notification to the configured SMTP contact point.
