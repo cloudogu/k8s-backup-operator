@@ -7,10 +7,10 @@ This document explains how the k8s-backup-operator component interacts with Prom
    ![](img/cloudogu_backup_email.png)
 ## Component Workflows
 
-### 1. Application Pod
-* **Action**: Accepts an incoming API call to trigger a backup.
+### 1. k8s-backup-operator
+* **Action**: Accepts request to trigger a backup.
 * **Metrics Tracking**: Updates an internal Prometheus metric based on the outcome of the backup/restore
-* Success: (e.g., backup_status_transitions_total{name="backup-20260708-1624",namespace="ecosystem",to="success"} 4)
+* Success: (e.g., backup_status_transitions_total{name="backup-20260708-1624",namespace="ecosystem",to="completed"} 4)
 * Fail: (e.g., backup_status_transitions_total{name="backup-20260708-1624",namespace="ecosystem",to="failed"} 4).
 * **Storage**: Stores metrics in memory locally.
 * **Exposition**: Exposes these metrics on a `/metrics` HTTP endpoint on port 8080.
