@@ -9,7 +9,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: k8s-backup-operator
+      { { - include "k8s-backup-operator.selectorLabels" . | nindent 6 } }
   ingress:
     - from:
         - namespaceSelector:
