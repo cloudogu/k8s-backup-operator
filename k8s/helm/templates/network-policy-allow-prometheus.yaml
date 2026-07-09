@@ -25,4 +25,4 @@ spec:
           protocol: TCP
   policyTypes:
     - Ingress
-  {{- end }}
+{{- end }}
