@@ -10,12 +10,12 @@ This document explains how the k8s-backup-operator component interacts with Prom
 ### 1. k8s-backup-operator
 * **Action**: Accepts request to trigger a backup.
 * **Metrics Tracking**: Updates an internal Prometheus metric based on the outcome of the backup/restore
-* Success: (e.g., backup_status_transitions_total{name="backup-20260708-1624",namespace="ecosystem",to="completed"} 4)
-* Fail: (e.g., backup_status_transitions_total{name="backup-20260708-1624",namespace="ecosystem",to="failed"} 4).
+  * Success: (e.g., backup_status_transitions_total{name="backup-20260708-1624",namespace="ecosystem",to="completed"} 4)
+  * Fail: (e.g., backup_status_transitions_total{name="backup-20260708-1624",namespace="ecosystem",to="failed"} 4).
 * **Storage**: Stores metrics in memory locally.
 * **Exposition**: Exposes these metrics on a `/metrics` HTTP endpoint on port 8080.
 
-* Note: In order to let prometheus scrape the data, we need to set the following value:
+Note: In order to let prometheus scrape the data, we need to set the following value:
 
 `metrics.serviceMonitor.enabled=true`
 This ensures that there is a service monitor : k8s-backup-operator-servicemonitor.

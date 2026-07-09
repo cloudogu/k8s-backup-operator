@@ -11,13 +11,13 @@ Hier ist ein Diagramm, das einen Überblick über den Ablauf der Benachrichtigun
 ### 1. k8s-backup-operator
 * **Aktion**: Akzeptiert die Anforderung, ein Backup auszulösen.
 * **Metrik-Tracking**: Aktualisiert eine interne Prometheus-Metrik basierend auf dem Ergebnis der Backup/Restore
-* Erfolg: (z. B. backup_status_transitions_total{name=„backup-20260708-1624“,namespace=‚ecosystem‘,to=„completed“} 4)
-* Fehler: (z. B. backup_status_transitions_total{name=„backup-20260708-1624“,namespace=‚ecosystem‘,to=„failed“} 4).
+  * Erfolg: (z. B. backup_status_transitions_total{name=„backup-20260708-1624“,namespace=‚ecosystem‘,to=„completed“} 4)
+  * Fehler: (z. B. backup_status_transitions_total{name=„backup-20260708-1624“,namespace=‚ecosystem‘,to=„failed“} 4).
 * **Speicherung**: Speichert Metriken lokal im Arbeitsspeicher.
 * **Bereitstellung**: Stellt diese Metriken über einen HTTP-Endpunkt `/metrics` auf Port 8080 bereit.
 
-* Hinweis: Damit Prometheus die Daten erfassen kann, müssen wir den folgenden Wert festlegen:
-* 
+ Hinweis: Damit Prometheus die Daten erfassen kann, müssen wir den folgenden Wert festlegen:
+
 `metrics.serviceMonitor.enabled=true`
 Dadurch wird sichergestellt, dass ein Service-Monitor vorhanden ist: k8s-backup-operator-servicemonitor.
 Über diesen Service-Monitor weiß Prometheus, über welchen Pod auf die Daten zugegriffen werden kann.
