@@ -110,10 +110,14 @@ type backupRepository interface {
 	save(context context.Context, backup Backup) error
 }
 
-type providerBackupRepository interface {
-	save(backup Backup) error
+type veleroBackupRepository interface {
+	save(context context.Context, backup Backup) error
 }
 
 type blueprintGateway interface {
 	find(context.Context) (*Blueprint, error)
+}
+
+type maintenanceGateway interface {
+	ActivateMaintenance(ctx context.Context, title string, text string) error
 }

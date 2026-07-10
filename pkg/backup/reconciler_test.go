@@ -125,6 +125,10 @@ func TestReconciler(t *testing.T) {
 		// We could configure the reconciler mock without a Service (=nil) and if any function of
 		// that service was called the test will fail.
 	})
+
+	t.Run("It should convert a backupCr to a backup", func(t *testing.T) {
+		t.Skip("TODO")
+	})
 }
 
 func createBackup(namespace string, name string) *backupv1.Backup {

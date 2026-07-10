@@ -5,6 +5,7 @@ import (
 	"maps"
 	"reflect"
 	"testing"
+	"time"
 
 	backupV1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
@@ -16,17 +17,28 @@ func TestService(t *testing.T) {
 	var testCtx = context.TODO()
 
 	var backupRepositoryMock *mockBackupRepository
-	var providerServiceMock *MockService
+	var veleroBackupRepositoryMock *mockVeleroBackupRepository
 	var configGatewayMock *mockConfigGateway
 	var blueprintGatewayMock *mockBlueprintGateway
+	var clockMock *MockClock
+	var maintenanceGatewayMock *mockMaintenanceGateway
 	var service *ServiceImpl
 
 	run := func(name string, fn func(t *testing.T)) {
 		backupRepositoryMock = newMockBackupRepository(t)
-		providerServiceMock = NewMockService(t)
+		veleroBackupRepositoryMock = newMockVeleroBackupRepository(t)
 		configGatewayMock = newMockConfigGateway(t)
 		blueprintGatewayMock = newMockBlueprintGateway(t)
-		service = NewService(backupRepositoryMock, providerServiceMock, configGatewayMock, blueprintGatewayMock)
+		clockMock = NewMockClock(t)
+		maintenanceGatewayMock = newMockMaintenanceGateway(t)
+		service = NewService(
+			backupRepositoryMock,
+			veleroBackupRepositoryMock,
+			configGatewayMock,
+			blueprintGatewayMock,
+			clockMock,
+			maintenanceGatewayMock,
+		)
 		t.Run(name, fn)
 	}
 
@@ -36,12 +48,14 @@ func TestService(t *testing.T) {
 			assert.True(t, reflect.DeepEqual(backup.Labels, defaultLabels))
 		}).Return(nil)
 
-		providerServiceMock.EXPECT().createBackup(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
+		veleroBackupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
 			assert.Equal(t, "backup1", backup.Name)
 			assert.True(t, reflect.DeepEqual(backup.Labels, defaultLabels))
 		}).Return(nil)
 
+		clockMock.EXPECT().Now().Return(time.Now())
 		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, nil)
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
 
 		backup := Backup{Name: "backup1"}
 		err := service.createBackup(testCtx, backup)
@@ -61,12 +75,14 @@ func TestService(t *testing.T) {
 			assert.True(t, reflect.DeepEqual(backup.Labels, expectedLabels))
 		}).Return(nil)
 
-		providerServiceMock.EXPECT().createBackup(testCtx, mock.Anything).Run(func(_a0 context.Context, backup Backup) {
+		veleroBackupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(_a0 context.Context, backup Backup) {
 			assert.Equal(t, "backup2", backup.Name)
 			assert.True(t, reflect.DeepEqual(backup.Labels, expectedLabels))
 		}).Return(nil)
 
+		clockMock.EXPECT().Now().Return(time.Now())
 		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, nil)
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
 
 		backup := Backup{
 			Name: "backup2",
@@ -91,10 +107,13 @@ func TestService(t *testing.T) {
 			assert.True(t, reflect.DeepEqual(backup.Annotations, expectedAnnotations))
 		}).Return(nil)
 
-		providerServiceMock.EXPECT().createBackup(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
+		veleroBackupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
 			assert.Equal(t, "backup3", backup.Name)
 			assert.True(t, reflect.DeepEqual(backup.Annotations, expectedAnnotations))
 		}).Return(nil)
+
+		clockMock.EXPECT().Now().Return(time.Now())
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
 
 		blueprint := Blueprint{
 			DisplayName:       "Blueprint",
@@ -128,10 +147,13 @@ func TestService(t *testing.T) {
 			assert.True(t, reflect.DeepEqual(backup.Annotations, expectedAnnotations))
 		}).Return(nil)
 
-		providerServiceMock.EXPECT().createBackup(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
+		veleroBackupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
 			assert.Equal(t, "backup4", backup.Name)
 			assert.True(t, reflect.DeepEqual(backup.Annotations, expectedAnnotations))
 		}).Return(nil)
+
+		clockMock.EXPECT().Now().Return(time.Now())
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
 
 		blueprint := Blueprint{
 			DisplayName:       "Blueprint",
@@ -144,18 +166,20 @@ func TestService(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	run("It should not add an annotation with blueprint infos if there is not blueprint", func(t *testing.T) {
+	run("It should not add an annotation with blueprint infos if there is no blueprint", func(t *testing.T) {
 		backupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
 			assert.Equal(t, "backup5", backup.Name)
 			assert.Equal(t, 0, len(backup.Annotations))
 		}).Return(nil)
 
-		providerServiceMock.EXPECT().createBackup(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
+		veleroBackupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
 			assert.Equal(t, "backup5", backup.Name)
 			assert.Equal(t, 0, len(backup.Annotations))
 		}).Return(nil)
 
+		clockMock.EXPECT().Now().Return(time.Now())
 		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, nil)
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
 
 		backup := Backup{Name: "backup5"}
 		err := service.createBackup(testCtx, backup)
@@ -164,8 +188,11 @@ func TestService(t *testing.T) {
 	})
 
 	run("It should throw an error if the backup repository throws an error", func(t *testing.T) {
-		backupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Return(assert.AnError)
+		clockMock.EXPECT().Now().Return(time.Now())
 		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, nil)
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
+
+		backupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Return(assert.AnError)
 
 		backup := Backup{Name: "backup6"}
 		err := service.createBackup(testCtx, backup)
@@ -175,8 +202,11 @@ func TestService(t *testing.T) {
 
 	run("It should throw an error if the provider backup repository throws an error", func(t *testing.T) {
 		backupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Return(nil)
-		providerServiceMock.EXPECT().createBackup(testCtx, mock.Anything).Return(assert.AnError)
+		clockMock.EXPECT().Now().Return(time.Now())
 		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, nil)
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
+
+		veleroBackupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Return(assert.AnError)
 
 		backup := Backup{Name: "backup7"}
 		err := service.createBackup(testCtx, backup)
@@ -185,6 +215,9 @@ func TestService(t *testing.T) {
 	})
 
 	run("It should throw an error if the blueprint gateway throws an error", func(t *testing.T) {
+		clockMock.EXPECT().Now().Return(time.Now())
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
+
 		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, assert.AnError)
 
 		backup := Backup{Name: "backup8"}
@@ -201,12 +234,14 @@ func TestService(t *testing.T) {
 			assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
 		}).Return(nil)
 
-		providerServiceMock.EXPECT().createBackup(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
+		veleroBackupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
 			assert.Equal(t, "backup6", backup.Name)
 			assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
 		}).Return(nil)
 
+		clockMock.EXPECT().Now().Return(time.Now())
 		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, nil)
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
 
 		backup := Backup{Name: "backup6"}
 		err := service.createBackup(testCtx, backup)
@@ -227,19 +262,88 @@ func TestService(t *testing.T) {
 			assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
 		}).Return(nil)
 
-		providerServiceMock.EXPECT().createBackup(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
+		veleroBackupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
 			assert.Equal(t, "backup7", backup.Name)
 			assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
 		}).Return(nil)
 
+		clockMock.EXPECT().Now().Return(time.Now())
 		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, nil)
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
 
 		err := service.createBackup(testCtx, backup)
 
 		assert.NoError(t, err)
 	})
 
-	t.Run("It should activate the maintenance mode", func(t *testing.T) {
+	run("It should set start time", func(t *testing.T) {
+		timeNow := time.Now()
+		clockMock.EXPECT().Now().Return(timeNow)
+
+		backupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
+			assert.Equal(t, "backup8", backup.Name)
+			assert.Equal(t, &timeNow, backup.StartTime)
+		}).Return(nil)
+
+		veleroBackupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
+			assert.Equal(t, "backup8", backup.Name)
+			assert.Equal(t, &timeNow, backup.StartTime)
+		}).Return(nil)
+
+		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, nil)
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
+
+		backup := Backup{
+			Name:      "backup8",
+			StartTime: nil,
+		}
+		err := service.createBackup(testCtx, backup)
+
+		assert.NoError(t, err)
+	})
+
+	run("It should not set start time if it is already set", func(t *testing.T) {
+		startTime := time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC)
+
+		backupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
+			assert.Equal(t, "backup9", backup.Name)
+			assert.Equal(t, &startTime, backup.StartTime)
+		}).Return(nil)
+
+		veleroBackupRepositoryMock.EXPECT().save(testCtx, mock.Anything).Run(func(context context.Context, backup Backup) {
+			assert.Equal(t, "backup9", backup.Name)
+			assert.Equal(t, &startTime, backup.StartTime)
+		}).Return(nil)
+
+		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, nil)
+		maintenanceGatewayMock.EXPECT().ActivateMaintenance(testCtx, mock.Anything, mock.Anything).Return(nil)
+
+		backup := Backup{
+			Name:      "backup9",
+			StartTime: &startTime,
+		}
+		err := service.createBackup(testCtx, backup)
+
+		assert.NoError(t, err)
+	})
+
+	run("It should activate the maintenance mode", func(t *testing.T) {
+		blueprintGatewayMock.EXPECT().find(testCtx).Return(nil, nil)
+		clockMock.EXPECT().Now().Return(time.Now())
+
+		mock.InOrder(
+			backupRepositoryMock.On("save", testCtx, mock.Anything).Return(nil),
+			maintenanceGatewayMock.On("ActivateMaintenance", testCtx, maintenanceModeTitle, maintenanceModeText).Return(nil),
+			veleroBackupRepositoryMock.On("save", testCtx, mock.Anything).Return(nil),
+		)
+
+		backup := Backup{Name: "backup10"}
+		err := service.createBackup(testCtx, backup)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("It should set condition for state in progress", func(t *testing.T) {
 		t.Skip("TODO")
 	})
 

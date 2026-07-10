@@ -21,6 +21,7 @@ type Backup struct {
 	Annotations map[string]string
 	Finalizers  []string
 	Conditions  []Condition
+	StartTime   *time.Time
 }
 
 type Condition struct {
@@ -36,6 +37,10 @@ type Blueprint struct {
 	DogusAsJsonString string
 }
 
+type Clock interface {
+	Now() time.Time
+}
+
 type Service interface {
 	createBackup(context context.Context, backup Backup) error
 	cancelBackup(context context.Context, backup Backup) error
@@ -43,22 +48,28 @@ type Service interface {
 }
 
 type ServiceImpl struct {
-	backupRepository backupRepository
-	configGateway    configGateway
-	blueprintGateway blueprintGateway
-	providerService  Service
+	backupRepository       backupRepository
+	veleroBackupRepository veleroBackupRepository
+	configGateway          configGateway
+	blueprintGateway       blueprintGateway
+	clock                  Clock
+	maintenanceGateway     maintenanceGateway
 }
 
 func NewService(
 	backupRepository backupRepository,
-	providerService Service,
+	veleroBackupRepository veleroBackupRepository,
 	configGateway configGateway,
-	blueprintGateway blueprintGateway) *ServiceImpl {
+	blueprintGateway blueprintGateway,
+	clock Clock,
+	maintenanceGateway maintenanceGateway) *ServiceImpl {
 	return &ServiceImpl{
-		backupRepository: backupRepository,
-		providerService:  providerService,
-		configGateway:    configGateway,
-		blueprintGateway: blueprintGateway,
+		backupRepository:       backupRepository,
+		veleroBackupRepository: veleroBackupRepository,
+		configGateway:          configGateway,
+		blueprintGateway:       blueprintGateway,
+		clock:                  clock,
+		maintenanceGateway:     maintenanceGateway,
 	}
 }
 
@@ -68,6 +79,7 @@ func (srv *ServiceImpl) createBackup(context context.Context, backup Backup) err
 		Labels:      make(map[string]string),
 		Annotations: make(map[string]string),
 		Finalizers:  append([]string(nil), backup.Finalizers...),
+		StartTime:   backup.StartTime,
 	}
 	maps.Copy(newBackup.Labels, backup.Labels)
 	maps.Copy(newBackup.Annotations, backup.Annotations)
@@ -75,6 +87,10 @@ func (srv *ServiceImpl) createBackup(context context.Context, backup Backup) err
 	maps.Copy(newBackup.Labels, defaultLabels)
 
 	newBackup.Finalizers = append(newBackup.Finalizers, backupV1.BackupFinalizer)
+
+	if newBackup.StartTime == nil {
+		newBackup.StartTime = new(srv.clock.Now())
+	}
 
 	blueprint, err := srv.blueprintGateway.find(context)
 	if err != nil {
@@ -94,10 +110,20 @@ func (srv *ServiceImpl) createBackup(context context.Context, backup Backup) err
 		return fmt.Errorf("save backup: %w", err)
 	}
 
-	err = srv.providerService.createBackup(context, newBackup)
+	err = srv.maintenanceGateway.ActivateMaintenance(
+		context,
+		maintenanceModeTitle,
+		maintenanceModeText,
+	)
+	if err != nil {
+		return fmt.Errorf("activate maintenance mode: %w", err)
+	}
+
+	err = srv.veleroBackupRepository.save(context, newBackup)
 	if err != nil {
 		return fmt.Errorf("create provider backup: %w", err)
 	}
+
 	return nil
 }
 
