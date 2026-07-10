@@ -9,7 +9,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      { { - include "k8s-backup-operator.selectorLabels" . | nindent 6 } }
+      {{ - include "k8s-backup-operator.selectorLabels" . | nindent 6 }}
   ingress:
     - from:
         - namespaceSelector:
