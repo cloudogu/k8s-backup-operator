@@ -101,23 +101,3 @@ type globalConfigRepository interface {
 type blueprintInterface interface {
 	blueprintv3.BlueprintInterface
 }
-
-type configGateway interface {
-	RetryLimit(context.Context) (int, error)
-}
-
-type backupRepository interface {
-	save(context context.Context, backup Backup) error
-}
-
-type veleroBackupRepository interface {
-	save(context context.Context, backup Backup) error
-}
-
-type blueprintGateway interface {
-	find(context.Context) (*Blueprint, error)
-}
-
-type maintenanceGateway interface {
-	ActivateMaintenance(ctx context.Context, title string, text string) error
-}
