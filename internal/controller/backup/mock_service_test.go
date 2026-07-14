@@ -24,8 +24,21 @@ func (_m *mockService) EXPECT() *mockService_Expecter {
 }
 
 // addBlueprintAnnotation provides a mock function with given fields: _a0, backup, displayName, dogus
-func (_m *mockService) addBlueprintAnnotation(_a0 context.Context, backup *v1.Backup, displayName string, dogus []v3.Dogu) {
-	_m.Called(_a0, backup, displayName, dogus)
+func (_m *mockService) addBlueprintAnnotation(_a0 context.Context, backup *v1.Backup, displayName string, dogus []v3.Dogu) error {
+	ret := _m.Called(_a0, backup, displayName, dogus)
+
+	if len(ret) == 0 {
+		panic("no return value specified for addBlueprintAnnotation")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, string, []v3.Dogu) error); ok {
+		r0 = rf(_a0, backup, displayName, dogus)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // mockService_addBlueprintAnnotation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'addBlueprintAnnotation'
@@ -49,13 +62,13 @@ func (_c *mockService_addBlueprintAnnotation_Call) Run(run func(_a0 context.Cont
 	return _c
 }
 
-func (_c *mockService_addBlueprintAnnotation_Call) Return() *mockService_addBlueprintAnnotation_Call {
-	_c.Call.Return()
+func (_c *mockService_addBlueprintAnnotation_Call) Return(_a0 error) *mockService_addBlueprintAnnotation_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockService_addBlueprintAnnotation_Call) RunAndReturn(run func(context.Context, *v1.Backup, string, []v3.Dogu)) *mockService_addBlueprintAnnotation_Call {
-	_c.Run(run)
+func (_c *mockService_addBlueprintAnnotation_Call) RunAndReturn(run func(context.Context, *v1.Backup, string, []v3.Dogu) error) *mockService_addBlueprintAnnotation_Call {
+	_c.Call.Return(run)
 	return _c
 }
 

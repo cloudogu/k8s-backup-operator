@@ -14,7 +14,7 @@ import (
 
 type service interface {
 	configureBackup(context context.Context, backup *backupv1.Backup)
-	addBlueprintAnnotation(context context.Context, backup *backupv1.Backup, displayName string, dogus []blueprintv3.Dogu)
+	addBlueprintAnnotation(context context.Context, backup *backupv1.Backup, displayName string, dogus []blueprintv3.Dogu) error
 	reconcileBackup(context context.Context, backup *backupv1.Backup) error
 	cancelBackup(context context.Context, backup *backupv1.Backup) error
 	deleteBackup(context context.Context, backup *backupv1.Backup) error
@@ -53,13 +53,17 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	var blueprintList = blueprintv3.BlueprintList{}
 	if err := c.client.List(ctx, &blueprintList, client.InNamespace(req.Namespace)); err != nil {
-		logger.Error(err, "failed to list blueprint")
+		logger.Error(err, "failed to list blueprints")
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
 	if len(blueprintList.Items) > 0 {
 		blueprint := blueprintList.Items[0]
-		c.service.addBlueprintAnnotation(ctx, &backup, blueprint.Spec.DisplayName, blueprint.Spec.Blueprint.Dogus)
+		err := c.service.addBlueprintAnnotation(ctx, &backup, blueprint.Spec.DisplayName, blueprint.Spec.Blueprint.Dogus)
+		if err != nil {
+			logger.Error(err, "failed to add annotations for blueprint infos")
+			return reconcile.Result{}, err
+		}
 	}
 
 	err := c.client.Update(ctx, &backup)
