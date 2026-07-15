@@ -6,7 +6,6 @@ import (
 	context "context"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	v3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -21,55 +20,6 @@ type mockService_Expecter struct {
 
 func (_m *mockService) EXPECT() *mockService_Expecter {
 	return &mockService_Expecter{mock: &_m.Mock}
-}
-
-// addBlueprintAnnotation provides a mock function with given fields: _a0, backup, displayName, dogus
-func (_m *mockService) addBlueprintAnnotation(_a0 context.Context, backup *v1.Backup, displayName string, dogus []v3.Dogu) error {
-	ret := _m.Called(_a0, backup, displayName, dogus)
-
-	if len(ret) == 0 {
-		panic("no return value specified for addBlueprintAnnotation")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, string, []v3.Dogu) error); ok {
-		r0 = rf(_a0, backup, displayName, dogus)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockService_addBlueprintAnnotation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'addBlueprintAnnotation'
-type mockService_addBlueprintAnnotation_Call struct {
-	*mock.Call
-}
-
-// addBlueprintAnnotation is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - backup *v1.Backup
-//   - displayName string
-//   - dogus []v3.Dogu
-func (_e *mockService_Expecter) addBlueprintAnnotation(_a0 interface{}, backup interface{}, displayName interface{}, dogus interface{}) *mockService_addBlueprintAnnotation_Call {
-	return &mockService_addBlueprintAnnotation_Call{Call: _e.mock.On("addBlueprintAnnotation", _a0, backup, displayName, dogus)}
-}
-
-func (_c *mockService_addBlueprintAnnotation_Call) Run(run func(_a0 context.Context, backup *v1.Backup, displayName string, dogus []v3.Dogu)) *mockService_addBlueprintAnnotation_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup), args[2].(string), args[3].([]v3.Dogu))
-	})
-	return _c
-}
-
-func (_c *mockService_addBlueprintAnnotation_Call) Return(_a0 error) *mockService_addBlueprintAnnotation_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockService_addBlueprintAnnotation_Call) RunAndReturn(run func(context.Context, *v1.Backup, string, []v3.Dogu) error) *mockService_addBlueprintAnnotation_Call {
-	_c.Call.Return(run)
-	return _c
 }
 
 // cancelBackup provides a mock function with given fields: _a0, backup
@@ -116,40 +66,6 @@ func (_c *mockService_cancelBackup_Call) Return(_a0 error) *mockService_cancelBa
 
 func (_c *mockService_cancelBackup_Call) RunAndReturn(run func(context.Context, *v1.Backup) error) *mockService_cancelBackup_Call {
 	_c.Call.Return(run)
-	return _c
-}
-
-// configureBackup provides a mock function with given fields: _a0, backup
-func (_m *mockService) configureBackup(_a0 context.Context, backup *v1.Backup) {
-	_m.Called(_a0, backup)
-}
-
-// mockService_configureBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'configureBackup'
-type mockService_configureBackup_Call struct {
-	*mock.Call
-}
-
-// configureBackup is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - backup *v1.Backup
-func (_e *mockService_Expecter) configureBackup(_a0 interface{}, backup interface{}) *mockService_configureBackup_Call {
-	return &mockService_configureBackup_Call{Call: _e.mock.On("configureBackup", _a0, backup)}
-}
-
-func (_c *mockService_configureBackup_Call) Run(run func(_a0 context.Context, backup *v1.Backup)) *mockService_configureBackup_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup))
-	})
-	return _c
-}
-
-func (_c *mockService_configureBackup_Call) Return() *mockService_configureBackup_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *mockService_configureBackup_Call) RunAndReturn(run func(context.Context, *v1.Backup)) *mockService_configureBackup_Call {
-	_c.Run(run)
 	return _c
 }
 

@@ -2,34 +2,49 @@ package backup
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"maps"
+	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
+	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+var defaultRequeueAfterTime = 2 * time.Second
+
+const veleroBackupStorageName = "default"
+const veleroBackupStorageNotAvailable = "VeleroBackupStorageNotAvailable"
+const veleroBackupStorageAvailable = "VeleroBackupStorageAvailable"
+
 type service interface {
-	configureBackup(context context.Context, backup *backupv1.Backup)
-	addBlueprintAnnotation(context context.Context, backup *backupv1.Backup, displayName string, dogus []blueprintv3.Dogu) error
 	reconcileBackup(context context.Context, backup *backupv1.Backup) error
 	cancelBackup(context context.Context, backup *backupv1.Backup) error
 	deleteBackup(context context.Context, backup *backupv1.Backup) error
 }
 
-func NewController(client client.Client, service service) *Controller {
+type reconciler interface {
+	checkVeleroBackupStorageLocation(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (ctrl.Result, error)
+}
+
+func NewController(client client.Client, reconciler reconciler) *Controller {
 	return &Controller{
-		client:  client,
-		service: service,
+		client:     client,
+		reconciler: reconciler,
 	}
 }
 
 type Controller struct {
-	client  client.Client
-	service service
+	client     client.Client
+	service    service
+	reconciler reconciler
 }
 
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -40,39 +55,68 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.IsZero() {
+	if !backup.DeletionTimestamp.IsZero() {
 		err := c.service.deleteBackup(ctx, &backup)
 		if err != nil {
-			logger.Error(err, "failed to delete provider backup", "namespace", req.NamespacedName.Namespace, "name", req.Name)
+			logger.Error(err, "Failed to delete provider backup", "namespace", req.NamespacedName.Namespace, "name", req.Name)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
 
-	c.service.configureBackup(ctx, &backup)
+	err := c.setupBackup(ctx, &backup, req.NamespacedName.Namespace, logger)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	result, err := c.reconciler.checkVeleroBackupStorageLocation(ctx, &backup, req.NamespacedName.Namespace, logger)
+	if err != nil || result.RequeueAfter != 0 {
+		return result, err
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (c *Controller) setupBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) error {
+	if backup.Labels == nil {
+		backup.Labels = make(map[string]string)
+	}
+	maps.Copy(backup.Labels, defaultLabels)
+
+	controllerutil.AddFinalizer(backup, backupv1.BackupFinalizer)
 
 	var blueprintList = blueprintv3.BlueprintList{}
-	if err := c.client.List(ctx, &blueprintList, client.InNamespace(req.Namespace)); err != nil {
+	if err := c.client.List(ctx, &blueprintList, client.InNamespace(namespace)); err != nil {
 		logger.Error(err, "failed to list blueprints")
-		return reconcile.Result{}, client.IgnoreNotFound(err)
+		return client.IgnoreNotFound(err)
 	}
 
 	if len(blueprintList.Items) > 0 {
 		blueprint := blueprintList.Items[0]
-		err := c.service.addBlueprintAnnotation(ctx, &backup, blueprint.Spec.DisplayName, blueprint.Spec.Blueprint.Dogus)
-		if err != nil {
-			logger.Error(err, "failed to add annotations for blueprint infos")
-			return reconcile.Result{}, err
+
+		if backup.Annotations == nil {
+			backup.Annotations = make(map[string]string)
 		}
+
+		dogusAsJson, err := json.Marshal(blueprint.Spec.Blueprint.Dogus)
+		if err != nil {
+			return fmt.Errorf("marshal blueprint dogus to json: %w", err)
+		}
+
+		annotations := map[string]string{
+			blueprintIdAnnotation:    blueprint.Spec.DisplayName,
+			blueprintDogusAnnotation: string(dogusAsJson),
+		}
+		maps.Copy(backup.Annotations, annotations)
 	}
 
-	err := c.client.Update(ctx, &backup)
+	err := c.client.Update(ctx, backup)
 	if err != nil {
 		logger.Error(err, "failed to update backup to set labels and annotations")
-		return reconcile.Result{}, err
+		return err
 	}
 
-	return ctrl.Result{}, c.service.reconcileBackup(ctx, &backup)
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
