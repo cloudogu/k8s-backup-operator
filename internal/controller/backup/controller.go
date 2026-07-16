@@ -20,18 +20,24 @@ import (
 
 var defaultRequeueAfterTime = 2 * time.Second
 
-const veleroBackupStorageName = "default"
-const veleroBackupStorageNotAvailable = "VeleroBackupStorageNotAvailable"
-const veleroBackupStorageAvailable = "VeleroBackupStorageAvailable"
-
 type service interface {
 	reconcileBackup(context context.Context, backup *backupv1.Backup) error
 	cancelBackup(context context.Context, backup *backupv1.Backup) error
 	deleteBackup(context context.Context, backup *backupv1.Backup) error
 }
 
+type action int
+
+const (
+	Next action = iota
+	Retry
+	Abort
+)
+
 type reconciler interface {
-	checkVeleroBackupStorageLocation(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (ctrl.Result, error)
+	checkVeleroBackupStorage(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
+	checkMaintenanceModeIsActive(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
+	checkVeleroBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
 }
 
 func NewController(client client.Client, reconciler reconciler) *Controller {
@@ -69,10 +75,24 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return reconcile.Result{}, err
 	}
 
-	result, err := c.reconciler.checkVeleroBackupStorageLocation(ctx, &backup, req.NamespacedName.Namespace, logger)
-	if err != nil || result.RequeueAfter != 0 {
-		return result, err
+	nextAction, err := c.reconciler.checkVeleroBackupStorage(ctx, &backup, req.NamespacedName.Namespace, logger)
+	if nextAction == Retry {
+		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
 	}
+	if nextAction == Abort {
+		return ctrl.Result{}, err
+	}
+
+	nextAction, err = c.reconciler.checkMaintenanceModeIsActive(ctx, &backup, req.NamespacedName.Namespace, logger)
+	if nextAction == Retry {
+		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+	}
+	if nextAction == Abort {
+		return ctrl.Result{}, err
+	}
+
+	//TODO
+	_, _ = c.reconciler.checkVeleroBackup(ctx, &backup, req.NamespacedName.Namespace, logger)
 
 	return ctrl.Result{}, nil
 }

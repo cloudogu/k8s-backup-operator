@@ -3,7 +3,6 @@ package backup
 import (
 	"context"
 	"testing"
-	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
@@ -21,7 +20,7 @@ import (
 func TestControllerReconcile(t *testing.T) {
 	t.Run("If there is no backup do nothing", func(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).Build()
-		// We set the service to nil to check if the controller call any method of the service.
+		// We set the service to nil to check if the controller calls any method of the reconciler.
 		controller := NewController(fakeClient, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -30,39 +29,93 @@ func TestControllerReconcile(t *testing.T) {
 		assert.Equal(t, ctrl.Result{}, result)
 	})
 
-	t.Run("It should check velero backup storage and requeue if requeueAfter is set", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
-		fakeClient := newFakeClientBuilder(t).
-			WithObjects(backup).
-			Build()
-
-		reconcilerMock := newMockReconciler(t)
+	t.Run("check if the velero backup storage is available and retry", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			checkVeleroBackupStorageLocation(context.Background(), mock.Anything, "ns", mock.Anything).
-			Return(ctrl.Result{RequeueAfter: time.Second}, nil)
-		controller := NewController(fakeClient, reconcilerMock)
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Retry, assert.AnError)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.Equal(t, err, assert.AnError)
+		assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, result)
+	})
+
+	t.Run("check if the velero backup storage is available and abort", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Abort, assert.AnError)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.Equal(t, err, assert.AnError)
+		assert.Equal(t, ctrl.Result{}, result)
+	})
+
+	t.Run("check if the velero backup storage is available and proceed to the next step", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		// The next step was called.
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeIsActive(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
 
 		assert.NoError(t, err)
-		assert.Equal(t, ctrl.Result{RequeueAfter: time.Second}, result)
+		assert.Equal(t, ctrl.Result{}, result)
 	})
 
-	t.Run("It should check velero backup storage and requeue if an error occurred", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
-		fakeClient := newFakeClientBuilder(t).
-			WithObjects(backup).
-			Build()
-		reconcilerMock := newMockReconciler(t)
+	t.Run("check if the maintenance mode is active and retry", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			checkVeleroBackupStorageLocation(context.Background(), mock.Anything, "ns", mock.Anything).
-			Return(ctrl.Result{RequeueAfter: time.Second}, assert.AnError)
-		controller := NewController(fakeClient, reconcilerMock)
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeIsActive(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Retry, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
 
-		assert.Error(t, err)
-		assert.Equal(t, ctrl.Result{RequeueAfter: time.Second}, result)
+		assert.Equal(t, assert.AnError, err)
+		assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, result)
+	})
+
+	t.Run("check if the maintenance mode is active and abort", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeIsActive(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Abort, assert.AnError)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.Equal(t, assert.AnError, err)
+		assert.Equal(t, ctrl.Result{}, result)
+	})
+
+	t.Run("check if the maintenance mode is active and proceed to the next step", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeIsActive(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		// The next step was called.
+		reconcilerMock.EXPECT().
+			checkVeleroBackup(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Abort, nil)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, result)
 	})
 
 	t.Run("If the backup is about to delete, delete also the provider backup", func(t *testing.T) {
@@ -121,13 +174,6 @@ func newBackupForControllerTest(namespace string, name string) *backupv1.Backup 
 	}
 }
 
-func newReconcileRequestForTest(namespace string, name string) ctrl.Request {
-	return ctrl.Request{NamespacedName: types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}}
-}
-
 func newFakeClientBuilder(t *testing.T) *fake.ClientBuilder {
 	scheme := runtime.NewScheme()
 	require.NoError(t, backupv1.AddToScheme(scheme))
@@ -139,7 +185,18 @@ func newFakeClientBuilder(t *testing.T) *fake.ClientBuilder {
 
 func newReconcilerRequest(namespace string, name string) ctrl.Request {
 	return ctrl.Request{NamespacedName: types.NamespacedName{
-		Namespace: "ns",
-		Name:      "backup",
+		Namespace: namespace,
+		Name:      name,
 	}}
+}
+
+func newTestFixtureForControllerTest(t *testing.T) (*mockReconciler, *Controller) {
+	backup := newBackupForControllerTest("ns", "backup")
+	fakeClient := newFakeClientBuilder(t).
+		WithObjects(backup).
+		Build()
+
+	reconcilerMock := newMockReconciler(t)
+	controller := NewController(fakeClient, reconcilerMock)
+	return reconcilerMock, controller
 }
