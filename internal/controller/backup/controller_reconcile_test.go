@@ -60,7 +60,7 @@ func TestControllerReconcile(t *testing.T) {
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			checkMaintenanceModeIsActive(context.Background(), mock.Anything, "ns", mock.Anything).
+			checkMaintenanceModeActiveBeforeBackup(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -75,7 +75,7 @@ func TestControllerReconcile(t *testing.T) {
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			checkMaintenanceModeIsActive(context.Background(), mock.Anything, "ns", mock.Anything).
+			checkMaintenanceModeActiveBeforeBackup(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Retry, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -90,7 +90,7 @@ func TestControllerReconcile(t *testing.T) {
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			checkMaintenanceModeIsActive(context.Background(), mock.Anything, "ns", mock.Anything).
+			checkMaintenanceModeActiveBeforeBackup(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Abort, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -105,11 +105,11 @@ func TestControllerReconcile(t *testing.T) {
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			checkMaintenanceModeIsActive(context.Background(), mock.Anything, "ns", mock.Anything).
+			checkMaintenanceModeActiveBeforeBackup(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			checkVeleroBackup(context.Background(), mock.Anything, "ns", mock.Anything).
+			checkVeleroBackupResource(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -118,48 +118,131 @@ func TestControllerReconcile(t *testing.T) {
 		assert.Equal(t, ctrl.Result{}, result)
 	})
 
-	t.Run("If the backup is about to delete, delete also the provider backup", func(t *testing.T) {
-		t.Skip("TODO")
-		/*
-			backup := newBackupForControllerTest("ns", "backup")
-			deletionTime := metav1.Now()
-			backup.Finalizers = []string{"fakeFinalizer"}
-			backup.DeletionTimestamp = &deletionTime
+	t.Run("check velero backup resource and retry", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeActiveBeforeBackup(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupResource(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Retry, assert.AnError)
 
-			fakeClient := newFakeClientBuilder(t).
-				WithObjects(backup).
-				Build()
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
 
-			serviceMock := newMockReconciler(t)
-			serviceMock.EXPECT().deleteBackup(mock.Anything, mock.Anything).Return(nil)
-
-			controller := NewController(fakeClient, serviceMock)
-
-			result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
-
-			assert.NoError(t, err)
-			assert.Equal(t, ctrl.Result{}, result)
-
-		*/
+		assert.Error(t, err)
+		assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, result)
 	})
 
-	t.Run("If the backup does not complete in time and is still running it should be canceled", func(t *testing.T) {
-		t.Skip("TODO: It is not really possible to cancel a velero backup. Should we let it finish?")
+	t.Run("check velero backup resource and abort", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeActiveBeforeBackup(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupResource(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Abort, nil)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, result)
 	})
 
-	t.Run("If the backup does not complete in time and remains in an error state it should be canceled", func(t *testing.T) {
-		t.Skip("TODO")
+	t.Run("check velero backup resource and proceed to the next step", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeActiveBeforeBackup(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupResource(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		// The next step was called.
+		reconcilerMock.EXPECT().
+			checkVeleroBackupCompletion(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Abort, nil)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, result)
 	})
 
-	t.Run("If the backup is in an error state and has still time to complete we check it later again", func(t *testing.T) {
-		t.Skip("TODO")
+	t.Run("check velero backup completion and retry", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeActiveBeforeBackup(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupResource(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupCompletion(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Retry, nil)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, result)
 	})
 
-	t.Run("If the backup is completed we do nothing", func(t *testing.T) {
-		t.Skip("TODO")
-		// We could configure the reconciler mock without a Service (=nil) and if any function of
-		// that service was called the test will fail.
+	t.Run("check velero backup completion and abort", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeActiveBeforeBackup(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupResource(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupCompletion(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Abort, assert.AnError)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.Error(t, err)
+		assert.Equal(t, ctrl.Result{}, result)
 	})
+
+	t.Run("check velero backup completion and proceed to the next step", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeActiveBeforeBackup(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupResource(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroBackupCompletion(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Next, nil)
+		// The next step was called.
+		reconcilerMock.EXPECT().
+			checkMaintenanceModeNotActiveAfterBackup(context.Background(), mock.Anything, "ns", mock.Anything).
+			Return(Abort, nil)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, result)
+	})
+
 }
 
 func newBackupForControllerTest(namespace string, name string) *backupv1.Backup {

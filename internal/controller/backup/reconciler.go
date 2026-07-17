@@ -3,10 +3,13 @@ package backup
 import (
 	"context"
 	"fmt"
+	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
 	"github.com/go-logr/logr"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -15,15 +18,20 @@ import (
 
 const veleroBackupStorageName = "default"
 const (
-	reasonVeleroBackupStorageNotAvailable = "VeleroBackupStorageNotAvailable"
-	reasonVeleroBackupStorageAvailable    = "VeleroBackupStorageAvailable"
-	reasonPreparationNotCompleted         = "PreparationNotCompleted"
-	reasonMaintenanceModesIsNotActive     = "MaintenanceModesIsNotActive"
+	reasonVeleroBackupStorageNotAvailable  = "VeleroBackupStorageNotAvailable"
+	reasonVeleroBackupStorageAvailable     = "VeleroBackupStorageAvailable"
+	reasonPreparationNotCompleted          = "PreparationNotCompleted"
+	reasonMaintenanceModesIsNotActive      = "MaintenanceModesIsNotActive"
+	reasonVeleroBackupResourceDoesNotExist = "VeleroBackupResourceDoesNotExist"
+	reasonVeleroBackupNotCompleted         = "VeleroBackupNotCompleted"
 )
 const (
 	maintenanceModeTitle = "Service temporary unavailable"
 	maintenanceModeText  = "Backup in progress"
 )
+
+// defaultBackupTTL is ten years, basically infinity in backup standards
+const defaultBackupTTL = 87660 * time.Hour
 
 var defaultLabels = map[string]string{
 	"app":                      "ces",
@@ -48,6 +56,11 @@ type defaultReconciler struct {
 	maintenanceGateway maintenanceGateway
 }
 
+func (c *defaultReconciler) checkMaintenanceModeNotActiveAfterBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func newReconciler(client client.Client, maintenanceGateway maintenanceGateway) *defaultReconciler {
 	return &defaultReconciler{
 		client:             client,
@@ -63,7 +76,7 @@ func (c *defaultReconciler) checkVeleroBackupStorage(ctx context.Context, backup
 	if err != nil {
 		logger.Error(err, fmt.Sprintf("Failed to check velero backup storage location 'name=%s'", veleroBackupStorageName))
 
-		patchErr := c.markPreparationFailed(ctx, backup)
+		patchErr := c.markVeleroBackupStorageNotAvailable(ctx, backup)
 		if patchErr != nil {
 			logger.Error(err, fmt.Sprintf("Failed to patch condition for backup namespace='%s' name='%s'", namespace, backup.Name))
 			return Abort, fmt.Errorf("patch conditions to mark preparation as failed: %w", patchErr)
@@ -75,7 +88,7 @@ func (c *defaultReconciler) checkVeleroBackupStorage(ctx context.Context, backup
 	if veleroBackupStorageLocation.Status.Phase != velerov1.BackupStorageLocationPhaseAvailable {
 		logger.Info(fmt.Sprintf("Velero backup storage location 'name=%s' is not available.", veleroBackupStorageName))
 
-		patchErr := c.markPreparationFailed(ctx, backup)
+		patchErr := c.markVeleroBackupStorageNotAvailable(ctx, backup)
 		if patchErr != nil {
 			logger.Error(err, fmt.Sprintf("Failed to patch condition for backup namespace='%s' name='%s'", namespace, backup.Name))
 			return Abort, fmt.Errorf("patch conditions to mark preparation as failed: %w", patchErr)
@@ -83,7 +96,7 @@ func (c *defaultReconciler) checkVeleroBackupStorage(ctx context.Context, backup
 		return Retry, nil
 	}
 
-	patchErr := c.markPreparationSuccess(ctx, backup)
+	patchErr := c.markVeleroBackupStorageAvailable(ctx, backup)
 	if patchErr != nil {
 		logger.Error(err, fmt.Sprintf("Failed to patch condition for backup namespace='%s' name='%s'", namespace, backup.Name))
 		return Abort, fmt.Errorf("patch status to mark the preparation conditions as failed %w", patchErr)
@@ -92,7 +105,7 @@ func (c *defaultReconciler) checkVeleroBackupStorage(ctx context.Context, backup
 	return Next, nil
 }
 
-func (c *defaultReconciler) checkMaintenanceModeIsActive(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error) {
+func (c *defaultReconciler) checkMaintenanceModeActiveBeforeBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error) {
 	isActive, err := c.maintenanceGateway.isMaintenanceModeActive(ctx)
 	if err != nil {
 		logger.Error(err, "Failed to check maintenance mode")
@@ -127,12 +140,104 @@ func (c *defaultReconciler) checkMaintenanceModeIsActive(ctx context.Context, ba
 	return Next, nil
 }
 
-func (c *defaultReconciler) checkVeleroBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error) {
-	//TODO implement me
-	panic("implement me")
+func (c *defaultReconciler) checkVeleroBackupResource(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	namespace string,
+	logger logr.Logger,
+) (action, error) {
+	var veleroBackup = &velerov1.Backup{}
+	name := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
+	err := c.client.Get(ctx, name, veleroBackup)
+
+	if apierrors.IsNotFound(err) {
+		veleroBackupCr := c.createVeleroBackupResource(backup)
+		createErr := c.client.Create(ctx, veleroBackupCr)
+		if createErr != nil {
+			logger.Error(err, "Failed to create velero backup resource", "namespace", backup.Namespace, "name", backup.Name)
+			return Abort, fmt.Errorf("create velero backup resource: %w", createErr)
+		}
+
+		patchErr := c.markVeleroBackupResourceDoesNotExist(ctx, backup)
+		if patchErr != nil {
+			logger.Error(err, "Failed to patch status of backup resource", "namespace", backup.Namespace, "name", backup.Name)
+			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
+		}
+		return Retry, nil
+	}
+
+	if err != nil {
+		logger.Error(err, "Failed to get velero backup resource", "namespace", backup.Namespace, "name", backup.Name)
+		return Abort, fmt.Errorf("get velero backup resource: %w", err)
+	}
+
+	return Next, nil
 }
 
-func (c *defaultReconciler) markPreparationSuccess(ctx context.Context, backup *backupv1.Backup) error {
+func (c *defaultReconciler) checkVeleroBackupCompletion(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	namespace string,
+	logger logr.Logger,
+) (action, error) {
+	var veleroBackup = &velerov1.Backup{}
+	name := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
+	err := c.client.Get(ctx, name, veleroBackup)
+
+	if err != nil {
+		logger.Error(err, "Failed to get velero backup resource while checking for completion",
+			"namespace", backup.Namespace,
+			"name", backup.Name,
+		)
+		return Abort, fmt.Errorf("checking velero backup resource for completion: %w", err)
+	}
+
+	if veleroBackup.Status.Phase != velerov1.BackupPhaseCompleted {
+		patchErr := c.markBackupAsNotCompleted(ctx, backup, veleroBackup.Status.Phase)
+		if patchErr != nil {
+			logger.Error(err, "Failed to patch backup status condition while marking backup as not completed",
+				"namespace", backup.Namespace,
+				"name", backup.Name,
+			)
+			return Abort, fmt.Errorf("mark backup as not completed: %w", patchErr)
+		}
+		return Retry, nil
+	}
+
+	return Next, nil
+}
+
+func (c *defaultReconciler) createVeleroBackupResource(backup *backupv1.Backup) *velerov1.Backup {
+	selectors := []*metav1.LabelSelector{
+		{MatchLabels: map[string]string{"k8s.cloudogu.com/type": "global-config"}},
+		{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "dogu.name", Operator: metav1.LabelSelectorOpExists},
+		}},
+		// everything besides dogu-specific config that should be included in the backup, e.g., PVCs of components etc.
+		{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
+		}},
+	}
+	volumeFsBackup := false
+	return &velerov1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        backup.Name,
+			Namespace:   backup.Namespace,
+			Labels:      map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+			Annotations: annotations.GetBackupAnnotations(backup.ObjectMeta),
+		},
+		Spec: velerov1.BackupSpec{
+			IncludedNamespaces:       []string{backup.Namespace},
+			IncludedResources:        []string{"configmaps", "secrets", "persistentvolumeclaims", "persistentvolumes", "dogus.k8s.cloudogu.com"},
+			OrLabelSelectors:         selectors,
+			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
+			StorageLocation:          veleroBackupStorageName,
+			DefaultVolumesToFsBackup: &volumeFsBackup,
+		},
+	}
+}
+
+func (c *defaultReconciler) markVeleroBackupStorageAvailable(ctx context.Context, backup *backupv1.Backup) error {
 	prepared := metav1.Condition{
 		Type:    backupv1.ConditionPrepared,
 		Status:  metav1.ConditionTrue,
@@ -144,7 +249,7 @@ func (c *defaultReconciler) markPreparationSuccess(ctx context.Context, backup *
 	})
 }
 
-func (c *defaultReconciler) markPreparationFailed(ctx context.Context, backup *backupv1.Backup) error {
+func (c *defaultReconciler) markVeleroBackupStorageNotAvailable(ctx context.Context, backup *backupv1.Backup) error {
 	prepared := metav1.Condition{
 		Type:    backupv1.ConditionPrepared,
 		Status:  metav1.ConditionFalse,
@@ -161,6 +266,31 @@ func (c *defaultReconciler) markPreparationFailed(ctx context.Context, backup *b
 		meta.SetStatusCondition(&status.Conditions, prepared)
 		meta.SetStatusCondition(&status.Conditions, completed)
 	})
+}
+
+func (c *defaultReconciler) markVeleroBackupResourceDoesNotExist(ctx context.Context, backup *backupv1.Backup) error {
+	completed := metav1.Condition{
+		Type:    backupv1.ConditionCompleted,
+		Status:  metav1.ConditionFalse,
+		Reason:  reasonVeleroBackupResourceDoesNotExist,
+		Message: "Preparation not completed",
+	}
+	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, completed)
+	})
+}
+
+func (c *defaultReconciler) markBackupAsNotCompleted(ctx context.Context, backup *backupv1.Backup, veleroBackupPhase velerov1.BackupPhase) error {
+	completed := metav1.Condition{
+		Type:    backupv1.ConditionCompleted,
+		Status:  metav1.ConditionFalse,
+		Reason:  reasonVeleroBackupNotCompleted,
+		Message: fmt.Sprintf("Velero backup not completed. Velero is in phase: %v", veleroBackupPhase),
+	}
+	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, completed)
+	})
+
 }
 
 func (c *defaultReconciler) patchStatus(ctx context.Context, backup *backupv1.Backup, updateFn statusUpdate) error {
