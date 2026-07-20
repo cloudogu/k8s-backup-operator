@@ -105,10 +105,14 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	// TODO
-	_, _ = c.reconciler.checkMaintenanceModeNotActiveAfterBackup(ctx, &backup, req.NamespacedName.Namespace, logger)
+	// Since this is the last step, the "Next" and "Abort" actions lead to the same return statement. So we don't need
+	// to check the "Abort" action.
+	nextAction, err = c.reconciler.checkMaintenanceModeNotActiveAfterBackup(ctx, &backup, req.NamespacedName.Namespace, logger)
+	if nextAction == Retry {
+		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 func (c *Controller) setupBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) error {

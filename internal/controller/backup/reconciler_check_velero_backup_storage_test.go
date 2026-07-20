@@ -17,15 +17,7 @@ import (
 func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 	t.Run("If the velero backup storage is unavailable set conditions and retry", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-		veleroBackupStorageLocation := &velerov1.BackupStorageLocation{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "ns",
-				Name:      "default",
-			},
-			Status: velerov1.BackupStorageLocationStatus{
-				Phase: velerov1.BackupStorageLocationPhaseUnavailable,
-			},
-		}
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseUnavailable)
 		var patchCallCount = 0
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup, veleroBackupStorageLocation).
@@ -92,10 +84,10 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 
 	t.Run("If the velero backup storage is available set condition and proceed to the next step", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-		veleroBackupStorage := newVeleroBackupStorageReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		var patchCallCount = 0
 		fakeClient := newFakeClientBuilder(t).
-			WithObjects(backup, veleroBackupStorage).
+			WithObjects(backup, veleroBackupStorageLocation).
 			WithStatusSubresource(backup).
 			WithInterceptorFuncs(interceptor.Funcs{
 				SubResourcePatch: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
@@ -121,9 +113,9 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 
 	t.Run("If the velero backup storage is unavailable and a patch error occurred then abort", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-		veleroBackupStorage := newVeleroBackupStorageReconcilerTest(velerov1.BackupStorageLocationPhaseUnavailable)
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseUnavailable)
 		fakeClient := newFakeClientBuilder(t).
-			WithObjects(backup, veleroBackupStorage).
+			WithObjects(backup, veleroBackupStorageLocation).
 			WithStatusSubresource(backup).
 			WithInterceptorFuncs(interceptor.Funcs{
 				SubResourcePatch: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
@@ -141,9 +133,9 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 
 	t.Run("If the velero backup storage is available and a patch error occurred then abort", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-		veleroBackupStorage := newVeleroBackupStorageReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		fakeClient := newFakeClientBuilder(t).
-			WithObjects(backup, veleroBackupStorage).
+			WithObjects(backup, veleroBackupStorageLocation).
 			WithStatusSubresource(backup).
 			WithInterceptorFuncs(interceptor.Funcs{
 				SubResourcePatch: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
@@ -178,16 +170,4 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 		assert.Equal(t, Abort, nextAction)
 
 	})
-}
-
-func newVeleroBackupStorageReconcilerTest(phase velerov1.BackupStorageLocationPhase) *velerov1.BackupStorageLocation {
-	return &velerov1.BackupStorageLocation{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "ns",
-			Name:      "default",
-		},
-		Status: velerov1.BackupStorageLocationStatus{
-			Phase: phase,
-		},
-	}
 }

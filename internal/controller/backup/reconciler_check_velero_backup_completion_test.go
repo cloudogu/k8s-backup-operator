@@ -18,15 +18,7 @@ import (
 func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 	t.Run("If the velero backup is not completed, set condition and retry", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-		veleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      backup.Name,
-				Namespace: backup.Namespace,
-			},
-			Status: velerov1.BackupStatus{
-				Phase: velerov1.BackupPhaseInProgress,
-			},
-		}
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
 		var patchCallCount = 0
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup, veleroBackup).
@@ -55,15 +47,7 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 
 	t.Run("If the velero backup is completed proceed to the next step", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-		veleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      backup.Name,
-				Namespace: backup.Namespace,
-			},
-			Status: velerov1.BackupStatus{
-				Phase: velerov1.BackupPhaseCompleted,
-			},
-		}
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).
@@ -124,15 +108,7 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 
 	t.Run("Abort if patching the status fails.", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-		veleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      backup.Name,
-				Namespace: backup.Namespace,
-			},
-			Status: velerov1.BackupStatus{
-				Phase: velerov1.BackupPhaseInProgress,
-			},
-		}
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).

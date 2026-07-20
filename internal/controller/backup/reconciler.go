@@ -18,12 +18,14 @@ import (
 
 const veleroBackupStorageName = "default"
 const (
-	reasonVeleroBackupStorageNotAvailable  = "VeleroBackupStorageNotAvailable"
-	reasonVeleroBackupStorageAvailable     = "VeleroBackupStorageAvailable"
-	reasonPreparationNotCompleted          = "PreparationNotCompleted"
-	reasonMaintenanceModesIsNotActive      = "MaintenanceModesIsNotActive"
-	reasonVeleroBackupResourceDoesNotExist = "VeleroBackupResourceDoesNotExist"
-	reasonVeleroBackupNotCompleted         = "VeleroBackupNotCompleted"
+	reasonVeleroBackupStorageNotAvailable             = "VeleroBackupStorageNotAvailable"
+	reasonVeleroBackupStorageAvailable                = "VeleroBackupStorageAvailable"
+	reasonPreparationNotCompleted                     = "PreparationNotCompleted"
+	reasonMaintenanceModesIsNotActive                 = "MaintenanceModesIsNotActive"
+	reasonVeleroBackupResourceDoesNotExist            = "VeleroBackupResourceDoesNotExist"
+	reasonVeleroBackupNotCompleted                    = "VeleroBackupNotCompleted"
+	reasonMaintenanceModeIsActiveAfterBackupCompleted = "MaintenanceModeIsActiveAfterBackupCompleted"
+	reasonBackupCompleted                             = "BackupCompleted"
 )
 const (
 	maintenanceModeTitle = "Service temporary unavailable"
@@ -54,11 +56,6 @@ type statusUpdate func(status *backupv1.BackupStatus)
 type defaultReconciler struct {
 	client             client.Client
 	maintenanceGateway maintenanceGateway
-}
-
-func (c *defaultReconciler) checkMaintenanceModeNotActiveAfterBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error) {
-	//TODO implement me
-	panic("implement me")
 }
 
 func newReconciler(client client.Client, maintenanceGateway maintenanceGateway) *defaultReconciler {
@@ -237,6 +234,62 @@ func (c *defaultReconciler) createVeleroBackupResource(backup *backupv1.Backup) 
 	}
 }
 
+func (c *defaultReconciler) checkMaintenanceModeNotActiveAfterBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error) {
+	var veleroBackup = &velerov1.Backup{}
+	name := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
+	err := c.client.Get(ctx, name, veleroBackup)
+
+	if err != nil {
+		logger.Error(err,
+			"Error retrieving the Velero backup resource while checking if maintenance mode is active after the backup completes.",
+			"namespace", backup.Namespace,
+			"backup", backup.Name,
+		)
+		return Abort, fmt.Errorf("get velero backup resource: %w", err)
+	}
+
+	backupCompleted := veleroBackup.Status.Phase == velerov1.BackupPhaseCompleted
+	maintenanceModeIsActive, err := c.maintenanceGateway.isMaintenanceModeActive(ctx)
+	if err != nil {
+		logger.Error(err, "Error checking maintenance mode after backup completion")
+		return Abort, fmt.Errorf("check maintenance mode: %w", err)
+	}
+
+	if maintenanceModeIsActive && backupCompleted {
+		err2 := c.maintenanceGateway.deactivateMaintenanceMode(ctx)
+		if err2 != nil {
+			logger.Error(err, "Error deactivating the maintenance mode after backup completion")
+			return Abort, fmt.Errorf("deactivate maintenance mode: %w", err)
+		}
+
+		patchErr := c.markMaintenanceModeIsActiveAfterBackupCompleted(ctx, backup)
+		if patchErr != nil {
+			logger.Error(err,
+				"Error marking the backup as incomplete because maintenance mode is active after the backup completed.",
+				"namespace", backup.Namespace,
+				"backup", backup.Name,
+			)
+			return Abort, fmt.Errorf("mark backup as incompleted: %w", patchErr)
+		}
+		return Retry, nil
+	}
+
+	if !maintenanceModeIsActive && backupCompleted {
+		patchErr := c.markBackupAsCompleted(ctx, backup)
+		if patchErr != nil {
+			logger.Error(err,
+				"Error marking the backup as completed.",
+				"namespace", backup.Namespace,
+				"backup", backup.Name,
+			)
+			return Abort, fmt.Errorf("mark backup as completed: %w", patchErr)
+		}
+		return Next, nil
+	}
+
+	return Next, nil
+}
+
 func (c *defaultReconciler) markVeleroBackupStorageAvailable(ctx context.Context, backup *backupv1.Backup) error {
 	prepared := metav1.Condition{
 		Type:    backupv1.ConditionPrepared,
@@ -290,7 +343,31 @@ func (c *defaultReconciler) markBackupAsNotCompleted(ctx context.Context, backup
 	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, completed)
 	})
+}
 
+func (c *defaultReconciler) markMaintenanceModeIsActiveAfterBackupCompleted(ctx context.Context, backup *backupv1.Backup) error {
+	completed := metav1.Condition{
+		Type:    backupv1.ConditionCompleted,
+		Status:  metav1.ConditionFalse,
+		Reason:  reasonMaintenanceModeIsActiveAfterBackupCompleted,
+		Message: "The maintenance mode is active after the backup completed.",
+	}
+	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, completed)
+	})
+}
+
+func (c *defaultReconciler) markBackupAsCompleted(ctx context.Context, backup *backupv1.Backup) error {
+	completed := metav1.Condition{
+		Type:    backupv1.ConditionCompleted,
+		Status:  metav1.ConditionTrue,
+		Reason:  reasonBackupCompleted,
+		Message: "Backup completed.",
+	}
+	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		status.CompletionTimestamp = metav1.Now()
+		meta.SetStatusCondition(&status.Conditions, completed)
+	})
 }
 
 func (c *defaultReconciler) patchStatus(ctx context.Context, backup *backupv1.Backup, updateFn statusUpdate) error {

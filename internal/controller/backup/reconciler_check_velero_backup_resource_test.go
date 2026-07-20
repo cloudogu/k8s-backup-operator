@@ -18,7 +18,6 @@ import (
 func TestReconcilerCheckVeleroBackupResource(t *testing.T) {
 	t.Run("If the velero backup resource does not exist, create it, set condition and retry", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-
 		var createCallCount = 0
 		var patchCallCount = 0
 		fakeClient := newFakeClientBuilder(t).
@@ -64,7 +63,6 @@ func TestReconcilerCheckVeleroBackupResource(t *testing.T) {
 				Namespace: backup.Namespace,
 			},
 		}
-
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).
@@ -89,7 +87,6 @@ func TestReconcilerCheckVeleroBackupResource(t *testing.T) {
 
 	t.Run("If retrieving the Velero backup resource fails, abort.", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup).
 			WithStatusSubresource(backup).
@@ -110,7 +107,6 @@ func TestReconcilerCheckVeleroBackupResource(t *testing.T) {
 
 	t.Run("Abort if patching the status fails.", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup).
 			WithStatusSubresource(backup).
@@ -131,7 +127,6 @@ func TestReconcilerCheckVeleroBackupResource(t *testing.T) {
 
 	t.Run("Abort if creating the Velero backup resource fails.", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
-
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup).
 			WithStatusSubresource(backup).
