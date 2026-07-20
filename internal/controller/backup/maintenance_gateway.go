@@ -16,6 +16,12 @@ type defaultMaintenanceGateway struct {
 	maintenanceModeAdapter maintenanceModeAdapter
 }
 
+func NewMaintenanceGateway(maintenanceModeAdapter maintenanceModeAdapter) *defaultMaintenanceGateway {
+	return &defaultMaintenanceGateway{
+		maintenanceModeAdapter: maintenanceModeAdapter,
+	}
+}
+
 func (d defaultMaintenanceGateway) isMaintenanceModeActive(ctx context.Context) (bool, error) {
 	_, isActive, err := d.maintenanceModeAdapter.GetStatus(ctx)
 	return isActive, err

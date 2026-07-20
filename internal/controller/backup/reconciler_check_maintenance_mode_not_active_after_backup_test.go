@@ -45,7 +45,7 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			deactivateMaintenanceMode(context.Background()).
 			Return(nil)
-		reconciler := newReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
 
 		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, "ns", logr.Discard())
 
@@ -89,7 +89,7 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, nil)
-		reconciler := newReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
 
 		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, "ns", logr.Discard())
 
@@ -118,7 +118,7 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, errors.New("gateway error"))
-		reconciler := newReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
 
 		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, "ns", logr.Discard())
 
@@ -143,7 +143,7 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 			}).
 			Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		reconciler := newReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
 
 		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, "ns", logr.Discard())
 
@@ -168,7 +168,7 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, nil)
-		reconciler := newReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
 
 		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, "ns", logr.Discard())
 

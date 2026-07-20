@@ -29,7 +29,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
 
@@ -62,7 +62,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
 
@@ -96,7 +96,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
 
@@ -123,7 +123,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
 
@@ -143,7 +143,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
 
@@ -162,7 +162,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
 

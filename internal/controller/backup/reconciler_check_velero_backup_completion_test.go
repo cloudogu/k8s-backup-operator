@@ -30,7 +30,7 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupCompletion(context.Background(), backup, "ns", logr.Discard())
 
@@ -58,7 +58,7 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupCompletion(context.Background(), backup, "ns", logr.Discard())
 
@@ -77,7 +77,7 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupCompletion(context.Background(), backup, "ns", logr.Discard())
 
@@ -97,7 +97,7 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupCompletion(context.Background(), backup, "ns", logr.Discard())
 
@@ -118,7 +118,7 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := newReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil)
 
 		nextAction, err := reconciler.checkVeleroBackupCompletion(context.Background(), backup, "ns", logr.Discard())
 

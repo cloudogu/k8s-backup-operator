@@ -58,7 +58,7 @@ type defaultReconciler struct {
 	maintenanceGateway maintenanceGateway
 }
 
-func newReconciler(client client.Client, maintenanceGateway maintenanceGateway) *defaultReconciler {
+func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway) *defaultReconciler {
 	return &defaultReconciler{
 		client:             client,
 		maintenanceGateway: maintenanceGateway,
