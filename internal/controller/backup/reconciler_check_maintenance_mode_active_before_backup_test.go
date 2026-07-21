@@ -14,7 +14,8 @@ import (
 )
 
 func TestReconcilerCheckMaintenanceModeActiveBeforeBackup(t *testing.T) {
-	t.Run("If the maintenance mode is not active then activate it, set condition, set start time and retry", func(t *testing.T) {
+	t.Run("If the maintenance mode is not active and the backup was not started "+
+		"activate it, set condition, set start time and retry", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
 		var patchCallCount = 0
 		fakeClient := newFakeClientBuilder(t).
@@ -49,6 +50,39 @@ func TestReconcilerCheckMaintenanceModeActiveBeforeBackup(t *testing.T) {
 		assert.False(t, backup.Status.StartTimestamp.IsZero())
 
 		assert.Equal(t, 1, patchCallCount)
+	})
+
+	t.Run("If the maintenance mode is not active and the backup was completed proceed to the next step", func(t *testing.T) {
+		backup := newBackupForControllerTest("ns", "backup")
+		// The backup was completed
+		backup.Status.CompletionTimestamp = metav1.Now()
+		fakeClient := newFakeClientBuilder(t).Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		maintenanceGatewayMock.EXPECT().
+			isMaintenanceModeActive(context.Background()).
+			Return(false, nil)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
+
+		nextAction, err := reconciler.checkMaintenanceModeActiveBeforeBackup(context.Background(), backup, "ns", logr.Discard())
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+	})
+
+	t.Run("If the maintenance mode is active, proceed to the next step", func(t *testing.T) {
+		backup := newBackupForControllerTest("ns", "backup")
+		fakeClient := newFakeClientBuilder(t).
+			Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		maintenanceGatewayMock.EXPECT().
+			isMaintenanceModeActive(context.Background()).
+			Return(true, nil)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
+
+		nextAction, err := reconciler.checkMaintenanceModeActiveBeforeBackup(context.Background(), backup, "ns", logr.Discard())
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
 	})
 
 	t.Run("Abort if the maintenance mode check failed", func(t *testing.T) {
@@ -86,19 +120,4 @@ func TestReconcilerCheckMaintenanceModeActiveBeforeBackup(t *testing.T) {
 		assert.Equal(t, Abort, nextAction)
 	})
 
-	t.Run("If the maintenance mode is active, proceed to the next step", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
-		fakeClient := newFakeClientBuilder(t).
-			Build()
-		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		maintenanceGatewayMock.EXPECT().
-			isMaintenanceModeActive(context.Background()).
-			Return(true, nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
-
-		nextAction, err := reconciler.checkMaintenanceModeActiveBeforeBackup(context.Background(), backup, "ns", logr.Discard())
-
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
-	})
 }

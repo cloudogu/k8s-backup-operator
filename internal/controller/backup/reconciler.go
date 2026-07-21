@@ -65,6 +65,14 @@ func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway) 
 	}
 }
 
+func (c *defaultReconciler) checkBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+	if backup.Status.CompletionTimestamp.IsZero() {
+		return Next, nil
+	}
+
+	return Abort, nil
+}
+
 func (c *defaultReconciler) checkVeleroBackupStorage(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error) {
 	veleroBackupStorageLocation := velerov1.BackupStorageLocation{}
 	namespacedName := types.NamespacedName{Namespace: namespace, Name: veleroBackupStorageName}
@@ -109,7 +117,15 @@ func (c *defaultReconciler) checkMaintenanceModeActiveBeforeBackup(ctx context.C
 		return Abort, fmt.Errorf("check if maintenance is active: %w", err)
 	}
 
+	isBackupCompleted := !backup.Status.CompletionTimestamp.IsZero()
+	if !isActive && isBackupCompleted {
+		logger.V(1).Info("check maintenance mode before backup: is not active but backup is completed -> NEXT")
+		return Next, nil
+	}
+
 	if !isActive {
+		logger.V(1).Info("check maintenance mode before backup: is not active -> activate it; RETRY")
+
 		err2 := c.maintenanceGateway.activateMaintenanceMode(ctx, maintenanceModeTitle, maintenanceModeText)
 		if err2 != nil {
 			logger.Error(err, "Failed to activate maintenance mode")
@@ -134,6 +150,7 @@ func (c *defaultReconciler) checkMaintenanceModeActiveBeforeBackup(ctx context.C
 
 	}
 
+	logger.V(1).Info("check maintenance mode before backup: is active -> NEXT")
 	return Next, nil
 }
 
@@ -256,13 +273,15 @@ func (c *defaultReconciler) checkMaintenanceModeNotActiveAfterBackup(ctx context
 	}
 
 	if maintenanceModeIsActive && backupCompleted {
+		logger.V(1).Info("check maintenance mode after backup completed (want = is not active): is active and backup is completed -> deactivate it, complete backup, Next")
+
 		err2 := c.maintenanceGateway.deactivateMaintenanceMode(ctx)
 		if err2 != nil {
 			logger.Error(err, "Error deactivating the maintenance mode after backup completion")
 			return Abort, fmt.Errorf("deactivate maintenance mode: %w", err)
 		}
 
-		patchErr := c.markMaintenanceModeIsActiveAfterBackupCompleted(ctx, backup)
+		patchErr := c.markBackupAsCompleted(ctx, backup)
 		if patchErr != nil {
 			logger.Error(err,
 				"Error marking the backup as incomplete because maintenance mode is active after the backup completed.",
@@ -271,22 +290,13 @@ func (c *defaultReconciler) checkMaintenanceModeNotActiveAfterBackup(ctx context
 			)
 			return Abort, fmt.Errorf("mark backup as incompleted: %w", patchErr)
 		}
-		return Retry, nil
-	}
-
-	if !maintenanceModeIsActive && backupCompleted {
-		patchErr := c.markBackupAsCompleted(ctx, backup)
-		if patchErr != nil {
-			logger.Error(err,
-				"Error marking the backup as completed.",
-				"namespace", backup.Namespace,
-				"backup", backup.Name,
-			)
-			return Abort, fmt.Errorf("mark backup as completed: %w", patchErr)
-		}
 		return Next, nil
 	}
 
+	logger.V(1).Info("check maintenance mode after backup completed (want = is not active): -> Next",
+		"isMaintenanceActive", maintenanceModeIsActive,
+		"isBackupCompleted", backupCompleted,
+	)
 	return Next, nil
 }
 

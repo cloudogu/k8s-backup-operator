@@ -8,6 +8,7 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -29,6 +30,7 @@ const (
 )
 
 type reconciler interface {
+	checkBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	checkVeleroBackupStorage(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
 	checkMaintenanceModeActiveBeforeBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
 	checkVeleroBackupResource(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
@@ -50,6 +52,7 @@ type Controller struct {
 
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	metrics.UpdateBackupReconcileTotalMetric()
 
 	var backup = backupv1.Backup{}
 	if err := c.client.Get(ctx, req.NamespacedName, &backup); err != nil {
@@ -68,12 +71,20 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	*/
 
-	err := c.setupBackup(ctx, &backup, req.NamespacedName.Namespace, logger)
+	nextAction, err := c.reconciler.checkBackupCompletion(ctx, &backup, logger)
+	if nextAction == Retry {
+		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+	}
+	if nextAction == Abort {
+		return ctrl.Result{}, err
+	}
+
+	err = c.setupBackup(ctx, &backup, req.NamespacedName.Namespace, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	nextAction, err := c.reconciler.checkVeleroBackupStorage(ctx, &backup, req.NamespacedName.Namespace, logger)
+	nextAction, err = c.reconciler.checkVeleroBackupStorage(ctx, &backup, req.NamespacedName.Namespace, logger)
 	if nextAction == Retry {
 		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
 	}

@@ -17,7 +17,7 @@ import (
 )
 
 func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
-	t.Run("If maintenance mode is active after the velero backup completed, deactivate it, set condition and retry", func(t *testing.T) {
+	t.Run("If maintenance mode is active after the velero backup completed, deactivate it, set condition and proceed to the next step", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		var veleroBackupGetCallCount = 0
@@ -45,50 +45,6 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			deactivateMaintenanceMode(context.Background()).
 			Return(nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
-
-		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, "ns", logr.Discard())
-
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
-
-		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
-		assert.NotNil(t, completedCondition)
-		assert.Equal(t, metav1.ConditionFalse, completedCondition.Status)
-		assert.Equal(t, reasonMaintenanceModeIsActiveAfterBackupCompleted, completedCondition.Reason)
-
-		assert.True(t, backup.Status.CompletionTimestamp.IsZero())
-
-		assert.Equal(t, 1, veleroBackupGetCallCount)
-		assert.Equal(t, 1, patchCallCount)
-	})
-
-	t.Run("If the maintenance mode is not active after the velero backup completed, "+
-		"mark the backup as completed and proceed to the next step", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
-		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
-		var veleroBackupGetCallCount = 0
-		var patchCallCount = 0
-		fakeClient := newFakeClientBuilder(t).
-			WithObjects(backup, veleroBackup).
-			WithStatusSubresource(backup).
-			WithInterceptorFuncs(interceptor.Funcs{
-				Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.Backup]() {
-						veleroBackupGetCallCount++
-					}
-					return client.Get(ctx, key, obj, opts...)
-				},
-				SubResourcePatch: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
-					patchCallCount++
-					return client.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
-				},
-			}).
-			Build()
-		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		maintenanceGatewayMock.EXPECT().
-			isMaintenanceModeActive(context.Background()).
-			Return(false, nil)
 		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
 
 		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, "ns", logr.Discard())
@@ -167,7 +123,10 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
-			Return(false, nil)
+			Return(true, nil)
+		maintenanceGatewayMock.EXPECT().
+			deactivateMaintenanceMode(context.Background()).
+			Return(nil)
 		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
 
 		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, "ns", logr.Discard())
