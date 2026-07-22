@@ -22,6 +22,8 @@ github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260701080009-54709b1d79f0 h1:zwZgH
 github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260701080009-54709b1d79f0/go.mod h1:LHy0STVN1plMd3pYwVKKI6Jx7us15wHxyG7vOs2o7q8=
 github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260715094224-15a215617655 h1:7AHpaCQEwcFtDvW3n+mjmF3RZzXrmz2EjDPgWAqaeco=
 github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260715094224-15a215617655/go.mod h1:LHy0STVN1plMd3pYwVKKI6Jx7us15wHxyG7vOs2o7q8=
+github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260722085345-697a5f89172c h1:BJ8g7Q+P3BiapSuE/RjO4GNEGn0rmK5nLYYXSww3BR8=
+github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260722085345-697a5f89172c/go.mod h1:LHy0STVN1plMd3pYwVKKI6Jx7us15wHxyG7vOs2o7q8=
 github.com/cloudogu/k8s-backup-lib v1.8.0 h1:QV31jHkgG5sPaQs+j+z0jj7jaq2nx9OBTbofvFdLdaA=
 github.com/cloudogu/k8s-backup-lib v1.8.0/go.mod h1:LHy0STVN1plMd3pYwVKKI6Jx7us15wHxyG7vOs2o7q8=
 github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0 h1:7J/1X+qjrMi2bVOl6Hcl3Vja/RWUcJZrBruFSG7mNLY=

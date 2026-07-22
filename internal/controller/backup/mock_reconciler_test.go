@@ -81,6 +81,64 @@ func (_c *mockReconciler_checkBackupCompletion_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// checkBackupDeletion provides a mock function with given fields: ctx, backup, logger
+func (_m *mockReconciler) checkBackupDeletion(ctx context.Context, backup *v1.Backup, logger logr.Logger) (action, error) {
+	ret := _m.Called(ctx, backup, logger)
+
+	if len(ret) == 0 {
+		panic("no return value specified for checkBackupDeletion")
+	}
+
+	var r0 action
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, logr.Logger) (action, error)); ok {
+		return rf(ctx, backup, logger)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, logr.Logger) action); ok {
+		r0 = rf(ctx, backup, logger)
+	} else {
+		r0 = ret.Get(0).(action)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup, logr.Logger) error); ok {
+		r1 = rf(ctx, backup, logger)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockReconciler_checkBackupDeletion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'checkBackupDeletion'
+type mockReconciler_checkBackupDeletion_Call struct {
+	*mock.Call
+}
+
+// checkBackupDeletion is a helper method to define mock.On call
+//   - ctx context.Context
+//   - backup *v1.Backup
+//   - logger logr.Logger
+func (_e *mockReconciler_Expecter) checkBackupDeletion(ctx interface{}, backup interface{}, logger interface{}) *mockReconciler_checkBackupDeletion_Call {
+	return &mockReconciler_checkBackupDeletion_Call{Call: _e.mock.On("checkBackupDeletion", ctx, backup, logger)}
+}
+
+func (_c *mockReconciler_checkBackupDeletion_Call) Run(run func(ctx context.Context, backup *v1.Backup, logger logr.Logger)) *mockReconciler_checkBackupDeletion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Backup), args[2].(logr.Logger))
+	})
+	return _c
+}
+
+func (_c *mockReconciler_checkBackupDeletion_Call) Return(_a0 action, _a1 error) *mockReconciler_checkBackupDeletion_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockReconciler_checkBackupDeletion_Call) RunAndReturn(run func(context.Context, *v1.Backup, logr.Logger) (action, error)) *mockReconciler_checkBackupDeletion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // checkMaintenanceModeActiveBeforeBackup provides a mock function with given fields: ctx, backup, namespace, logger
 func (_m *mockReconciler) checkMaintenanceModeActiveBeforeBackup(ctx context.Context, backup *v1.Backup, namespace string, logger logr.Logger) (action, error) {
 	ret := _m.Called(ctx, backup, namespace, logger)

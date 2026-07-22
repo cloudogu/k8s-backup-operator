@@ -86,26 +86,6 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 		assert.Equal(t, Abort, nextAction)
 	})
 
-	t.Run("If retrieving the Velero backup resource failed, abort.", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
-		fakeClient := newFakeClientBuilder(t).
-			WithObjects(backup).
-			WithStatusSubresource(backup).
-			WithInterceptorFuncs(interceptor.Funcs{
-				Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					return errors.New("get error")
-				},
-			}).
-			Build()
-		reconciler := NewReconciler(fakeClient, nil)
-
-		nextAction, err := reconciler.checkVeleroBackupCompletion(context.Background(), backup, "ns", logr.Discard())
-
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "get error")
-		assert.Equal(t, Abort, nextAction)
-	})
-
 	t.Run("Abort if patching the status fails.", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)

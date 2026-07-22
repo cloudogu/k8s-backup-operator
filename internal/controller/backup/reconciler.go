@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const veleroBackupStorageName = "default"
@@ -26,6 +27,8 @@ const (
 	reasonVeleroBackupNotCompleted                    = "VeleroBackupNotCompleted"
 	reasonMaintenanceModeIsActiveAfterBackupCompleted = "MaintenanceModeIsActiveAfterBackupCompleted"
 	reasonBackupCompleted                             = "BackupCompleted"
+	reasonBackupDeleting                              = "BackupDeleting"
+	reasonBackupNotDeleting                           = "BackupNotDeleting"
 )
 const (
 	maintenanceModeTitle = "Service temporary unavailable"
@@ -65,6 +68,84 @@ func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway) 
 	}
 }
 
+func (c *defaultReconciler) checkBackupDeletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+	if !backup.DeletionTimestamp.IsZero() {
+		var veleroBackup = &velerov1.Backup{}
+		err := c.client.Get(ctx, backup.GetNamespacedName(), veleroBackup)
+		if apierrors.IsNotFound(err) {
+			logger.V(1).Info("check backup deletion: backup is deleted and velero backup not found -> remove finalizer, Abort")
+
+			controllerutil.RemoveFinalizer(backup, backupv1.BackupFinalizer)
+			updateErr := c.client.Update(ctx, backup)
+			if updateErr != nil {
+				logger.Error(err, "Failed to update backup after removing finalizer")
+				return Abort, fmt.Errorf("update backup after removing finalizer: %w", updateErr)
+			}
+			return Abort, nil
+		}
+		if err != nil {
+			logger.Error(err, "Failed to get velero backup resource while checking backup deletion")
+			return Abort, fmt.Errorf("get the velero backup resource to check if it exists: %w", err)
+		}
+		deleteReq, createErr := c.createVeleroDeleteBackupRequestIfNotExists(ctx, backup, logger)
+		if createErr != nil {
+			return Abort, createErr
+		}
+		patchErr := c.markBackupAsDeleting(ctx, backup, deleteReq.Status.Phase)
+		if patchErr != nil {
+			logger.Error(err, "Failed to patch condition to mark backup as deleting")
+			return Abort, fmt.Errorf("patch conditions to mark backup as deleting: %w", patchErr)
+		}
+		return Retry, nil
+	}
+
+	logger.V(1).Info("check backup deletion: backup is not deleted -> mark backup as not deleting, Next")
+
+	patchErr := c.markBackupAsNotDeleting(ctx, backup)
+	if patchErr != nil {
+		logger.Error(patchErr, "Failed to patch condition to mark backup as not deleting")
+		return Abort, fmt.Errorf("patch condition to mark backup as not deleting: %w", patchErr)
+	}
+
+	return Next, nil
+}
+
+func (c *defaultReconciler) createVeleroDeleteBackupRequestIfNotExists(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	logger logr.Logger,
+) (*velerov1.DeleteBackupRequest, error) {
+	var deleteBackupRequest = &velerov1.DeleteBackupRequest{}
+	err := c.client.Get(ctx, backup.GetNamespacedName(), deleteBackupRequest)
+	if apierrors.IsNotFound(err) {
+		logger.V(1).Info("check backup deletion: delete backup request not found -> create one")
+
+		var newDeleteBackupRequest = &velerov1.DeleteBackupRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      backup.Name,
+			},
+			Spec: velerov1.DeleteBackupRequestSpec{
+				BackupName: backup.Name,
+			},
+		}
+		createErr := c.client.Create(ctx, newDeleteBackupRequest)
+		if createErr != nil {
+			logger.Error(err, "Failed to create velero delete backup request")
+			return nil, fmt.Errorf("create velero delete backup request: %w", createErr)
+		}
+		return newDeleteBackupRequest, nil
+	}
+
+	if err != nil {
+		logger.Error(err, "Failed to get velero delete backup request")
+		return nil, fmt.Errorf("get velero delete backup request: %w", err)
+	}
+
+	logger.V(1).Info("check backup deletion: delete backup request already exists")
+	return deleteBackupRequest, nil
+}
+
 func (c *defaultReconciler) checkBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
 	if backup.Status.CompletionTimestamp.IsZero() {
 		return Next, nil
@@ -83,7 +164,7 @@ func (c *defaultReconciler) checkVeleroBackupStorage(ctx context.Context, backup
 
 		patchErr := c.markVeleroBackupStorageNotAvailable(ctx, backup)
 		if patchErr != nil {
-			logger.Error(err, fmt.Sprintf("Failed to patch condition for backup namespace='%s' name='%s'", namespace, backup.Name))
+			logger.Error(err, "Failed to patch condition for backup")
 			return Abort, fmt.Errorf("patch conditions to mark preparation as failed: %w", patchErr)
 		}
 
@@ -168,20 +249,20 @@ func (c *defaultReconciler) checkVeleroBackupResource(
 		veleroBackupCr := c.createVeleroBackupResource(backup)
 		createErr := c.client.Create(ctx, veleroBackupCr)
 		if createErr != nil {
-			logger.Error(err, "Failed to create velero backup resource", "namespace", backup.Namespace, "name", backup.Name)
+			logger.Error(err, "Failed to create velero backup resource")
 			return Abort, fmt.Errorf("create velero backup resource: %w", createErr)
 		}
 
 		patchErr := c.markVeleroBackupResourceDoesNotExist(ctx, backup)
 		if patchErr != nil {
-			logger.Error(err, "Failed to patch status of backup resource", "namespace", backup.Namespace, "name", backup.Name)
+			logger.Error(err, "Failed to patch status of backup resource")
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 		return Retry, nil
 	}
 
 	if err != nil {
-		logger.Error(err, "Failed to get velero backup resource", "namespace", backup.Namespace, "name", backup.Name)
+		logger.Error(err, "Failed to get velero backup resource", "namespace")
 		return Abort, fmt.Errorf("get velero backup resource: %w", err)
 	}
 
@@ -199,10 +280,7 @@ func (c *defaultReconciler) checkVeleroBackupCompletion(
 	err := c.client.Get(ctx, name, veleroBackup)
 
 	if err != nil {
-		logger.Error(err, "Failed to get velero backup resource while checking for completion",
-			"namespace", backup.Namespace,
-			"name", backup.Name,
-		)
+		logger.Error(err, "Failed to get velero backup resource while checking for completion")
 		return Abort, fmt.Errorf("checking velero backup resource for completion: %w", err)
 	}
 
@@ -259,8 +337,6 @@ func (c *defaultReconciler) checkMaintenanceModeNotActiveAfterBackup(ctx context
 	if err != nil {
 		logger.Error(err,
 			"Error retrieving the Velero backup resource while checking if maintenance mode is active after the backup completes.",
-			"namespace", backup.Namespace,
-			"backup", backup.Name,
 		)
 		return Abort, fmt.Errorf("get velero backup resource: %w", err)
 	}
@@ -285,8 +361,6 @@ func (c *defaultReconciler) checkMaintenanceModeNotActiveAfterBackup(ctx context
 		if patchErr != nil {
 			logger.Error(err,
 				"Error marking the backup as incomplete because maintenance mode is active after the backup completed.",
-				"namespace", backup.Namespace,
-				"backup", backup.Name,
 			)
 			return Abort, fmt.Errorf("mark backup as incompleted: %w", patchErr)
 		}
@@ -377,6 +451,30 @@ func (c *defaultReconciler) markBackupAsCompleted(ctx context.Context, backup *b
 	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		status.CompletionTimestamp = metav1.Now()
 		meta.SetStatusCondition(&status.Conditions, completed)
+	})
+}
+
+func (c *defaultReconciler) markBackupAsNotDeleting(ctx context.Context, backup *backupv1.Backup) error {
+	deleting := metav1.Condition{
+		Type:    backupv1.ConditionDeleting,
+		Status:  metav1.ConditionFalse,
+		Reason:  reasonBackupNotDeleting,
+		Message: "Backup is not deleting.",
+	}
+	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, deleting)
+	})
+}
+
+func (c *defaultReconciler) markBackupAsDeleting(ctx context.Context, backup *backupv1.Backup, deletingPhase velerov1.DeleteBackupRequestPhase) error {
+	deleting := metav1.Condition{
+		Type:    backupv1.ConditionDeleting,
+		Status:  metav1.ConditionTrue,
+		Reason:  reasonBackupDeleting,
+		Message: fmt.Sprintf("Backup is deleting (phase: %s)", deletingPhase),
+	}
+	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, deleting)
 	})
 }
 

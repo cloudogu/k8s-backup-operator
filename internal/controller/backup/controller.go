@@ -30,6 +30,7 @@ const (
 )
 
 type reconciler interface {
+	checkBackupDeletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	checkBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	checkVeleroBackupStorage(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
 	checkMaintenanceModeActiveBeforeBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
@@ -59,19 +60,15 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
-	/* TODO
-	if !backup.DeletionTimestamp.IsZero() {
-		err := c.service.deleteBackup(ctx, &backup)
-		if err != nil {
-			logger.Error(err, "Failed to delete provider backup", "namespace", req.NamespacedName.Namespace, "name", req.Name)
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
+	nextAction, err := c.reconciler.checkBackupDeletion(ctx, &backup, logger)
+	if nextAction == Retry {
+		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+	}
+	if nextAction == Abort {
+		return ctrl.Result{}, err
 	}
 
-	*/
-
-	nextAction, err := c.reconciler.checkBackupCompletion(ctx, &backup, logger)
+	nextAction, err = c.reconciler.checkBackupCompletion(ctx, &backup, logger)
 	if nextAction == Retry {
 		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
 	}
