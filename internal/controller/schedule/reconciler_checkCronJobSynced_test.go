@@ -10,7 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func Test_defaultReconciler_checkCronJobSynced(t *testing.T) {
+func Test_reconciler_checkCronJobSynced(t *testing.T) {
 	ctx := context.Background()
 	logger := log.Log.WithName("test")
 
@@ -25,10 +25,10 @@ func Test_defaultReconciler_checkCronJobSynced(t *testing.T) {
 			WithObjects(cronJob).
 			Build()
 
-		sut := &defaultReconciler{client: fakeClient}
+		reconciler := &defaultReconciler{client: fakeClient}
 
 		// when
-		isSynced, err := sut.checkCronJobSynced(ctx, backupSchedule, testNamespace, logger)
+		isSynced, err := reconciler.checkCronJobSynced(ctx, backupSchedule, testNamespace, logger)
 
 		// then
 		require.NoError(t, err)
@@ -46,10 +46,10 @@ func Test_defaultReconciler_checkCronJobSynced(t *testing.T) {
 			WithObjects(cronJob).
 			Build()
 
-		sut := &defaultReconciler{client: fakeClient}
+		reconciler := &defaultReconciler{client: fakeClient}
 
 		// when
-		isSynced, err := sut.checkCronJobSynced(ctx, backupSchedule, testNamespace, logger)
+		isSynced, err := reconciler.checkCronJobSynced(ctx, backupSchedule, testNamespace, logger)
 
 		// then
 		require.Error(t, err)
@@ -57,7 +57,7 @@ func Test_defaultReconciler_checkCronJobSynced(t *testing.T) {
 		assert.Contains(t, err.Error(), "no matching cronjob found")
 	})
 
-	t.Run("should find matching cronjob among multiple cronjobs", func(t *testing.T) {
+	t.Run("should find matching cronjob if there are multiple cronjobs", func(t *testing.T) {
 		// given
 		backupSchedule := createTestBackupSchedule()
 		cronJob1 := createTestCronJob("other-cronjob-1", "0 0 * * *")
@@ -70,10 +70,10 @@ func Test_defaultReconciler_checkCronJobSynced(t *testing.T) {
 			WithObjects(cronJob1, cronJob2, cronJob3).
 			Build()
 
-		sut := &defaultReconciler{client: fakeClient}
+		reconciler := &defaultReconciler{client: fakeClient}
 
 		// when
-		isSynced, err := sut.checkCronJobSynced(ctx, backupSchedule, testNamespace, logger)
+		isSynced, err := reconciler.checkCronJobSynced(ctx, backupSchedule, testNamespace, logger)
 
 		// then
 		require.NoError(t, err)

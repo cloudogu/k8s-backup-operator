@@ -8,14 +8,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_defaultReconciler_markAsSyncedToCronJob(t *testing.T) {
+func Test_reconciler_markAsSyncedToCronJob(t *testing.T) {
 	t.Run("should set synced condition to true", func(t *testing.T) {
 		// given
 		backupSchedule := createTestBackupSchedule()
-		sut := &defaultReconciler{}
+		reconciler := &defaultReconciler{}
 
 		// when
-		err := sut.markAsSyncedToCronJob(backupSchedule)
+		err := reconciler.markAsSyncedToCronJob(backupSchedule)
 
 		// then
 		require.NoError(t, err)
@@ -34,10 +34,10 @@ func Test_defaultReconciler_markAsSyncedToCronJob(t *testing.T) {
 		// First mark as not synced
 		_ = (&defaultReconciler{}).markAsNotSyncedToCronJob(backupSchedule)
 
-		sut := &defaultReconciler{}
+		reconciler := &defaultReconciler{}
 
 		// when
-		err := sut.markAsSyncedToCronJob(backupSchedule)
+		err := reconciler.markAsSyncedToCronJob(backupSchedule)
 
 		// then
 		require.NoError(t, err)
@@ -50,14 +50,14 @@ func Test_defaultReconciler_markAsSyncedToCronJob(t *testing.T) {
 	})
 }
 
-func Test_defaultReconciler_markAsNotSyncedToCronJob(t *testing.T) {
+func Test_reconciler_markAsNotSyncedToCronJob(t *testing.T) {
 	t.Run("should set synced condition to false", func(t *testing.T) {
 		// given
 		backupSchedule := createTestBackupSchedule()
-		sut := &defaultReconciler{}
+		reconciler := &defaultReconciler{}
 
 		// when
-		err := sut.markAsNotSyncedToCronJob(backupSchedule)
+		err := reconciler.markAsNotSyncedToCronJob(backupSchedule)
 
 		// then
 		require.NoError(t, err)
@@ -76,10 +76,10 @@ func Test_defaultReconciler_markAsNotSyncedToCronJob(t *testing.T) {
 		// First mark as synced
 		_ = (&defaultReconciler{}).markAsSyncedToCronJob(backupSchedule)
 
-		sut := &defaultReconciler{}
+		reconciler := &defaultReconciler{}
 
 		// when
-		err := sut.markAsNotSyncedToCronJob(backupSchedule)
+		err := reconciler.markAsNotSyncedToCronJob(backupSchedule)
 
 		// then
 		require.NoError(t, err)

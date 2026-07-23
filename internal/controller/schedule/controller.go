@@ -5,6 +5,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/go-logr/logr"
+	batchv1 "k8s.io/api/batch/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -47,8 +48,10 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, err
 }
 
-func (c *Controller) doSomething(ctx context.Context, b *backupv1.BackupSchedule, namespace string, logger logr.Logger) error {
-
-	return nil
-
+// SetupWithManager sets up the controller with the Manager and registers the watcher
+func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&backupv1.BackupSchedule{}).
+		Owns(&batchv1.CronJob{}). // Watch CronJobs owned by BackupSchedule
+		Complete(c)
 }
