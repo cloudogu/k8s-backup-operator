@@ -3,10 +3,13 @@ package schedule
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +35,13 @@ const (
 	ReasonCronJobSyncSuccessful = "CronJobSyncSuccessful"
 	ReasonCronJobSyncFailed     = "CronJobSyncFailed"
 )
+
+var defaultLabels = map[string]string{
+	"app":                          "ces",
+	"k8s.cloudogu.com/part-of":     "backup",
+	"app.kubernetes.io/created-by": "k8s-backup-operator",
+	"app.kubernetes.io/part-of":    "k8s-backup-operator",
+}
 
 // Reconciler handles reconciliation logic for BackupSchedule resources.
 type Reconciler interface {
@@ -82,6 +92,37 @@ func (c *defaultReconciler) checkCronJobSynced(ctx context.Context, schedule *ba
 	return true, nil
 }
 
+func (c *defaultReconciler) createCronJob(ctx context.Context, schedule *backupv1.BackupSchedule, namespace string, logger logr.Logger) error {
+	labels := make(map[string]string)
+	maps.Copy(labels, defaultLabels)
+
+	cronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      schedule.CronJobName(),
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule: schedule.Spec.Schedule,
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					//TODO: operatorImage & imagePullSecrets
+					Template: getCronJobTemplate(schedule, "", config.GetStagePullPolicy(), nil),
+				},
+			},
+		},
+	}
+	createErr := c.client.Create(ctx, cronJob)
+
+	if createErr != nil {
+		return fmt.Errorf("failed to create CronJob %s: %w", schedule.CronJobName(), createErr)
+	}
+
+	return nil
+}
+
+// set conditions
+
 func (c *defaultReconciler) markAsSyncedToCronJob(schedule *backupv1.BackupSchedule) error {
 	synced := metav1.Condition{
 		Type:    ConditionTypeCronJobSynced,
@@ -106,4 +147,42 @@ func (c *defaultReconciler) markAsNotSyncedToCronJob(schedule *backupv1.BackupSc
 	meta.SetStatusCondition(&scheduleStatus.Conditions, synced)
 
 	return nil
+}
+
+func (c *defaultReconciler) markAsReady(schedule *backupv1.BackupSchedule) error {
+	synced := metav1.Condition{
+		Type:    ConditionTypeReady,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonScheduleActive,
+		Message: "Backup schedule ready and active",
+	}
+	scheduleStatus := &schedule.Status
+	meta.SetStatusCondition(&scheduleStatus.Conditions, synced)
+
+	return nil
+}
+
+func (c *defaultReconciler) markAsNotReady(schedule *backupv1.BackupSchedule) error {
+	synced := metav1.Condition{
+		Type:    ConditionTypeReady,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonScheduleSuspended,
+		Message: "Backup schedule not ready",
+	}
+	scheduleStatus := &schedule.Status
+	meta.SetStatusCondition(&scheduleStatus.Conditions, synced)
+
+	return nil
+}
+
+// helper
+
+func getCronJobTemplate(schedule *backupv1.BackupSchedule, operatorImage string, pullPolicy corev1.PullPolicy, imagePullSecrets []corev1.LocalObjectReference) corev1.PodTemplateSpec {
+	podTemplateSpec := schedule.CronJobPodTemplate(operatorImage, pullPolicy)
+
+	if len(imagePullSecrets) > 0 {
+		podTemplateSpec.Spec.ImagePullSecrets = imagePullSecrets
+	}
+
+	return podTemplateSpec
 }
