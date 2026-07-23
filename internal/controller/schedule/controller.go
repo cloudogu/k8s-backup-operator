@@ -36,11 +36,11 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
-	isSynced, err := c.reconciler.checkCronJobSync(ctx, &backupschedule, req.NamespacedName.Namespace, logger)
+	isSynced, err := c.reconciler.checkCronJobSync(ctx, &backupschedule, req.Namespace, logger)
 	if isSynced {
 		// check is ready
 	} else {
-		c.reconciler.createCronJob(ctx, &backupschedule, req.NamespacedName.Namespace, logger)
+		c.reconciler.createCronJob(ctx, &backupschedule, req.Namespace, logger)
 	}
 
 	logger.Info("Reconcile ran")
