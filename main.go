@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scale"
@@ -209,6 +210,33 @@ func startOperator(ctx context.Context, flags *flag.FlagSet, args []string) erro
 	err = configureManager(ctx, k8sManager, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("unable to configure manager: %w", err)
+	}
+
+	// TODO for the backup schedule reconciler, preliminary code, this goes into cmd/main.go
+	// Create the manager
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		// handle error
+	}
+
+	// Register the BackupSchedule API types with the scheme
+	if err := k8sv1.AddToScheme(mgr.GetScheme()); err != nil {
+		// handle error
+	}
+
+	scheduleController := &schedule.Controller{
+		// Initialize with client and scheme
+	}
+
+	if err = scheduleController.SetupWithManager(mgr); err != nil {
+		// handle error
+	}
+
+	// Start the manager
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		// handle error
 	}
 
 	return startK8sManager(ctx, k8sManager)
