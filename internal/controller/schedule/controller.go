@@ -12,6 +12,9 @@ import (
 )
 
 type reconciler interface {
+	checkCronJobSync(ctx context.Context, schedule *backupv1.BackupSchedule, namespace string, logger logr.Logger) (bool, error)
+	markAsNotSyncedToCronJob(schedule *backupv1.BackupSchedule) error
+	markAsSyncedToCronJob(schedule *backupv1.BackupSchedule) error
 }
 
 type Controller struct {
@@ -27,7 +30,12 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
-	err := c.doSomething(ctx, &backupschedule, req.NamespacedName.Namespace, logger)
+	isSynced, err := c.reconciler.checkCronJobSync(ctx, &backupschedule, req.NamespacedName.Namespace, logger)
+	if isSynced {
+		// check is ready
+	} else {
+		// sync
+	}
 
 	logger.Info("Reconcile ran")
 
