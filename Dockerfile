@@ -11,23 +11,20 @@ COPY go.sum go.sum
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
 
-# Copy the go source
-COPY main.go main.go
-COPY interfaces.go interfaces.go
-COPY pkg/ pkg/
+# Copy the Go source (relies on .dockerignore to filter)
+COPY . .
 
 # Copy .git files as the build process builds the current commit id into the binary via ldflags.
 # We removed this entry as changes in the repository makes all cached layers invalid leading to rebuilding all layers.
 # TODO resolve COMMIT_ID
 #COPY .git .git
 
-# Copy build files
-COPY build build
-COPY Makefile Makefile
-
 # Build
-RUN go mod vendor
-RUN make compile-generic
+# the GOARCH has no default value to allow the binary to be built according to the host where the command
+# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
+# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
+# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -mod=mod -a -o k8s-backup-operator ./cmd/
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
@@ -37,7 +34,7 @@ LABEL maintainer="hello@cloudogu.com" \
       VERSION="3.3.2"
 
 WORKDIR /
-COPY --from=builder /workspace/target/k8s-backup-operator .
+COPY --from=builder /workspace/k8s-backup-operator .
 
 # the linter has a problem with the valid colon-syntax
 # dockerfile_lint - ignore
