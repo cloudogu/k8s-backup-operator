@@ -34,6 +34,8 @@ IMAGE_IMPORT_TARGET=image-import
 include build/make/k8s-controller.mk
 
 K8S_TEST_CLUSTER_KUBECONFIG?=${KUBECONFIG}
+# Build uses cmd/main.go as entrypoint (repo has no main package in project root).
+GO_BUILD_FLAGS=-mod=vendor -a -o $(BINARY) ./cmd/
 
 .PHONY: build-boot
 build-boot: helm-apply kill-operator-pod ## Builds a new version of the operator and deploys it into the K8s-EcoSystem.
