@@ -112,12 +112,22 @@ func (rm *defaultRestoreManager) DeleteRestore(ctx context.Context, restore *v1.
 	logger := log.FromContext(ctx)
 	rm.recorder.Event(restore, corev1.EventTypeNormal, v1.DeleteEventReason, "Using velero as restore provider")
 
-	err := rm.k8sClient.Delete(ctx, restore)
+	veleroRestore := &velerov1.Restore{}
+	// Velero resource uses same namespaced name as cloudogu one
+	err := rm.k8sClient.Get(ctx, client.ObjectKeyFromObject(restore), veleroRestore)
 	if errors.IsNotFound(err) {
 		logger.Info(fmt.Sprintf("velero restore resource [%s] not found: ignore", restore.Name))
 		return nil
 	}
+	if err != nil {
+		return fmt.Errorf("failed to get velero restore [%s]: %w", restore.Name, err)
+	}
 
+	err = rm.k8sClient.Delete(ctx, veleroRestore)
+	if errors.IsNotFound(err) {
+		logger.Info(fmt.Sprintf("velero restore resource [%s] already deleted: ignore", restore.Name))
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("failed to delete velero restore [%s]: %w", restore.Name, err)
 	}
