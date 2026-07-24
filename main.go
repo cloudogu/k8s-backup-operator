@@ -353,7 +353,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 
 	maintenanceModeAdapter := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sManager.GetClient(), operatorConfig.Namespace)
 	maintenanceGateway := backup2.NewMaintenanceGateway(maintenanceModeAdapter)
-	backupReconciler := backup2.NewReconciler(k8sManager.GetClient(), maintenanceGateway)
+	backupReconciler := backup2.NewReconciler(k8sManager.GetClient(), maintenanceGateway, backup2.DefaultClock{})
 	backupController := backup2.NewController(k8sManager.GetClient(), backupReconciler)
 	err = backupController.SetupWithManager(k8sManager)
 	if err != nil {

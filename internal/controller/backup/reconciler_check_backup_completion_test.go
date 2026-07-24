@@ -15,7 +15,7 @@ func TestReconcilerCheckBackupCompletion(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
 
 		nextAction, err := reconciler.checkBackupCompletion(context.Background(), backup, logr.Discard())
 
@@ -29,7 +29,7 @@ func TestReconcilerCheckBackupCompletion(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
 
 		nextAction, err := reconciler.checkBackupCompletion(context.Background(), backup, logr.Discard())
 

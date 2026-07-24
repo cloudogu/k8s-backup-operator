@@ -3,12 +3,14 @@ package backup
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
 	"github.com/go-logr/logr"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,10 +31,19 @@ const (
 	reasonBackupCompleted                             = "BackupCompleted"
 	reasonBackupDeleting                              = "BackupDeleting"
 	reasonBackupNotDeleting                           = "BackupNotDeleting"
+	reasonTimeWindowNotExpired                        = "TimeWindowNotExpired"
+	reasonTimeWindowExpired                           = "TimeWindowExpired"
+	reasonBackupWasAlreadyRunning                     = "BackupWasAlreadyRunning"
+	messageTimeWindowExpiredBackupNotStarted          = "The backup was not started by the end of the time window."
 )
 const (
 	maintenanceModeTitle = "Service temporary unavailable"
 	maintenanceModeText  = "Backup in progress"
+)
+
+const (
+	backupConfigMapName     = "k8s-backup-operator-backup-config"
+	backupRetryTimeLimitKey = "retryTimeLimit"
 )
 
 // defaultBackupTTL is ten years, basically infinity in backup standards
@@ -56,15 +67,27 @@ type maintenanceGateway interface {
 
 type statusUpdate func(status *backupv1.BackupStatus)
 
+type Clock interface {
+	Now() time.Time
+}
+
+type DefaultClock struct{}
+
+func (d DefaultClock) Now() time.Time {
+	return time.Now()
+}
+
 type defaultReconciler struct {
 	client             client.Client
 	maintenanceGateway maintenanceGateway
+	clock              Clock
 }
 
-func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway) *defaultReconciler {
+func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway, clock Clock) *defaultReconciler {
 	return &defaultReconciler{
 		client:             client,
 		maintenanceGateway: maintenanceGateway,
+		clock:              clock,
 	}
 }
 
@@ -149,6 +172,44 @@ func (c *defaultReconciler) createVeleroDeleteBackupRequestIfNotExists(
 func (c *defaultReconciler) checkBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
 	if backup.Status.CompletionTimestamp.IsZero() {
 		return Next, nil
+	}
+
+	return Abort, nil
+}
+
+func (c *defaultReconciler) checkBackupCancellation(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+	var backupConfigMap = &corev1.ConfigMap{}
+	err := c.client.Get(ctx, types.NamespacedName{Namespace: backup.Namespace, Name: backupConfigMapName}, backupConfigMap)
+	if err != nil {
+		return Abort, fmt.Errorf("get backup operator config map '%s/%s': %w", backup.Namespace, backupConfigMapName, err)
+	}
+
+	backupRetryTimeLimitAsStr, ok := backupConfigMap.Data[backupRetryTimeLimitKey]
+	if !ok {
+		return Abort, fmt.Errorf("read key '%s' from backup operator map '%s'", backupRetryTimeLimitKey, backupConfigMapName)
+	}
+
+	backupRetryTimeLimit, err := strconv.Atoi(backupConfigMap.Data[backupRetryTimeLimitKey])
+	if err != nil {
+		return Abort, fmt.Errorf("convert backup retry limit from string '%s' to int: %w", backupRetryTimeLimitAsStr, err)
+	}
+
+	timeWindowHasExpired := c.clock.Now().Sub(backup.CreationTimestamp.Time) > time.Duration(backupRetryTimeLimit)*time.Minute
+	if !timeWindowHasExpired {
+		patchErr := c.markBackupAsTimeWindowNotExpired(ctx, backup)
+		if patchErr != nil {
+			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window not expired'")
+		}
+		return Next, nil
+	}
+
+	backupHasNotStarted := backup.Status.StartTimestamp.IsZero() && backup.Status.CompletionTimestamp.IsZero()
+	if backupHasNotStarted {
+		patchErr := c.markBackupAsTimeWindowExpired(ctx, backup, messageTimeWindowExpiredBackupNotStarted)
+		if patchErr != nil {
+			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window not expired'")
+		}
+		return Abort, nil
 	}
 
 	return Abort, nil
@@ -475,6 +536,30 @@ func (c *defaultReconciler) markBackupAsDeleting(ctx context.Context, backup *ba
 	}
 	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, deleting)
+	})
+}
+
+func (c *defaultReconciler) markBackupAsTimeWindowNotExpired(ctx context.Context, backup *backupv1.Backup) error {
+	canceled := metav1.Condition{
+		Type:    backupv1.ConditionCanceled,
+		Status:  metav1.ConditionFalse,
+		Reason:  reasonTimeWindowNotExpired,
+		Message: "The time window has not expired.",
+	}
+	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, canceled)
+	})
+}
+
+func (c *defaultReconciler) markBackupAsTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, message string) error {
+	canceled := metav1.Condition{
+		Type:    backupv1.ConditionCanceled,
+		Status:  metav1.ConditionTrue,
+		Reason:  reasonTimeWindowExpired,
+		Message: message,
+	}
+	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, canceled)
 	})
 }
 

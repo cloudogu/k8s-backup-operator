@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -91,6 +92,46 @@ func TestControllerReconcile(t *testing.T) {
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Abort, nil)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, result)
+	})
+
+	t.Run("check backup cancellation and abort", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkBackupDeletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Abort, nil)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, result)
+	})
+
+	t.Run("check backup cancellation and proceed to the next step", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			checkBackupDeletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		// The next step was called.
+		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Abort, nil)
 
@@ -107,6 +148,9 @@ func TestControllerReconcile(t *testing.T) {
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
@@ -127,6 +171,9 @@ func TestControllerReconcile(t *testing.T) {
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Abort, assert.AnError)
 
@@ -143,6 +190,9 @@ func TestControllerReconcile(t *testing.T) {
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
@@ -167,6 +217,9 @@ func TestControllerReconcile(t *testing.T) {
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -188,6 +241,9 @@ func TestControllerReconcile(t *testing.T) {
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -207,6 +263,9 @@ func TestControllerReconcile(t *testing.T) {
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
@@ -234,6 +293,9 @@ func TestControllerReconcile(t *testing.T) {
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -258,6 +320,9 @@ func TestControllerReconcile(t *testing.T) {
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -280,6 +345,9 @@ func TestControllerReconcile(t *testing.T) {
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
@@ -310,6 +378,9 @@ func TestControllerReconcile(t *testing.T) {
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -337,6 +408,9 @@ func TestControllerReconcile(t *testing.T) {
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -362,6 +436,9 @@ func TestControllerReconcile(t *testing.T) {
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
@@ -395,6 +472,9 @@ func TestControllerReconcile(t *testing.T) {
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -425,6 +505,9 @@ func TestControllerReconcile(t *testing.T) {
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -453,6 +536,9 @@ func TestControllerReconcile(t *testing.T) {
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkBackupCompletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkBackupCancellation(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			checkVeleroBackupStorage(context.Background(), mock.Anything, "ns", mock.Anything).
@@ -495,6 +581,7 @@ func newFakeClientBuilder(t *testing.T) *fake.ClientBuilder {
 	require.NoError(t, backupv1.AddToScheme(scheme))
 	require.NoError(t, blueprintv3.AddToScheme(scheme))
 	require.NoError(t, velerov1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	return fake.NewClientBuilder().WithScheme(scheme)
 }

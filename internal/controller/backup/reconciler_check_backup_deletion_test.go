@@ -24,7 +24,7 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		require.True(t, backup.DeletionTimestamp.IsZero())
 
@@ -58,7 +58,7 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
 
@@ -100,7 +100,7 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
 
@@ -147,7 +147,7 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
 
@@ -171,7 +171,7 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
 
@@ -195,7 +195,7 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
 
@@ -219,7 +219,7 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
 
@@ -241,7 +241,7 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
 

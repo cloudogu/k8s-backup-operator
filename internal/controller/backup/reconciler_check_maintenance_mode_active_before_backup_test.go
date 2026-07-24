@@ -35,7 +35,7 @@ func TestReconcilerCheckMaintenanceModeActiveBeforeBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			activateMaintenanceMode(context.Background(), maintenanceModeTitle, maintenanceModeText).
 			Return(nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
 
 		nextAction, err := reconciler.checkMaintenanceModeActiveBeforeBackup(context.Background(), backup, "ns", logr.Discard())
 
@@ -61,7 +61,7 @@ func TestReconcilerCheckMaintenanceModeActiveBeforeBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
 
 		nextAction, err := reconciler.checkMaintenanceModeActiveBeforeBackup(context.Background(), backup, "ns", logr.Discard())
 
@@ -77,7 +77,7 @@ func TestReconcilerCheckMaintenanceModeActiveBeforeBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(true, nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
 
 		nextAction, err := reconciler.checkMaintenanceModeActiveBeforeBackup(context.Background(), backup, "ns", logr.Discard())
 
@@ -93,7 +93,7 @@ func TestReconcilerCheckMaintenanceModeActiveBeforeBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, assert.AnError)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
 
 		nextAction, err := reconciler.checkMaintenanceModeActiveBeforeBackup(context.Background(), backup, "ns", logr.Discard())
 
@@ -112,7 +112,7 @@ func TestReconcilerCheckMaintenanceModeActiveBeforeBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			activateMaintenanceMode(context.Background(), maintenanceModeTitle, maintenanceModeText).
 			Return(assert.AnError)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
 
 		nextAction, err := reconciler.checkMaintenanceModeActiveBeforeBackup(context.Background(), backup, "ns", logr.Discard())
 

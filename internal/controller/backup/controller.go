@@ -32,6 +32,7 @@ const (
 type reconciler interface {
 	checkBackupDeletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	checkBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+	checkBackupCancellation(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	checkVeleroBackupStorage(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
 	checkMaintenanceModeActiveBeforeBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
 	checkVeleroBackupResource(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
@@ -79,6 +80,11 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	err = c.setupBackup(ctx, &backup, req.NamespacedName.Namespace, logger)
 	if err != nil {
 		return reconcile.Result{}, err
+	}
+
+	nextAction, err = c.reconciler.checkBackupCancellation(ctx, &backup, logger)
+	if nextAction == Abort {
+		return ctrl.Result{}, err
 	}
 
 	nextAction, err = c.reconciler.checkVeleroBackupStorage(ctx, &backup, req.NamespacedName.Namespace, logger)
