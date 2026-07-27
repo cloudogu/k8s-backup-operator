@@ -1,0 +1,95 @@
+package restore
+
+import (
+	"context"
+	"fmt"
+
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+)
+
+type restoreStatusClient interface {
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*k8sv1.Restore, error)
+	UpdateStatus(ctx context.Context, restore *k8sv1.Restore, opts metav1.UpdateOptions) (*k8sv1.Restore, error)
+}
+
+type conditionUpdater struct {
+	client restoreStatusClient
+}
+
+func newConditionUpdater(client restoreStatusClient) *conditionUpdater {
+	return &conditionUpdater{client: client}
+}
+
+// setConditions applies the given conditions to the Restore status, writes the deprecated
+// scalar status for consumers that have not migrated yet, and persists the result.
+func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Restore, conditions ...metav1.Condition) (*k8sv1.Restore, error) {
+	current := restore
+	result := restore
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		desired := current.DeepCopy()
+		applyConditions(desired, conditions)
+
+		if apiequality.Semantic.DeepEqual(current.Status, desired.Status) {
+			result = current
+
+			return nil
+		}
+
+		updated, updateErr := u.client.UpdateStatus(ctx, desired, metav1.UpdateOptions{})
+		if apierrors.IsConflict(updateErr) {
+			refreshed, getErr := u.client.Get(ctx, restore.Name, metav1.GetOptions{})
+			if getErr != nil {
+				return fmt.Errorf("failed to get restore %q after a conflicting status update: %w", restore.Name, getErr)
+			}
+			current = refreshed
+
+			return updateErr
+		}
+		if updateErr != nil {
+			return updateErr
+		}
+
+		result = updated
+
+		return nil
+	})
+	if err != nil {
+		return restore, fmt.Errorf("failed to update conditions of restore %q: %w", restore.Name, err)
+	}
+
+	return result, nil
+}
+
+// setConditionsFromLegacyStatus persists the Successful condition derived from the deprecated
+// scalar status of a Restore created by an older operator, so that the interpretation has to happen
+// only once.
+func (u *conditionUpdater) setConditionsFromLegacyStatus(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, error) {
+	if findSuccessfulCondition(restore) != nil {
+		return restore, nil
+	}
+
+	condition := determineLegacySuccessfulCondition(restore)
+	if condition == nil {
+		return restore, nil
+	}
+
+	return u.setConditions(ctx, restore, *condition)
+}
+
+// applyConditions merges the conditions into the status and keeps the deprecated scalar status in
+// sync.
+func applyConditions(restore *k8sv1.Restore, conditions []metav1.Condition) {
+	for _, condition := range conditions {
+		condition.ObservedGeneration = restore.Generation
+		meta.SetStatusCondition(&restore.Status.Conditions, condition)
+	}
+
+	restore.Status.Status = legacyStatusFor(restore)
+}
