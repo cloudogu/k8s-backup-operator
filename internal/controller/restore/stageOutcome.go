@@ -1,0 +1,90 @@
+package restore
+
+import (
+	"context"
+	"time"
+
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+)
+
+// defaultRequeueDelay is used when a stage asks for a controlled retry without a usable delay.
+const defaultRequeueDelay = 5 * time.Second
+
+type stageAction int
+
+const (
+	// actionNext continues with the following stage.
+	actionNext stageAction = iota
+	// actionRetry ends this reconciliation and asks for another one.
+	actionRetry
+	// actionAbort ends this reconciliation without asking for another one, either because the
+	// restore is terminal or because further progress depends on an event.
+	actionAbort
+)
+
+type stageOutcome struct {
+	action       stageAction
+	requeueAfter time.Duration
+	err          error
+}
+
+func next() stageOutcome {
+	return stageOutcome{action: actionNext}
+}
+
+func retryAfter(delay time.Duration) stageOutcome {
+	// delay = 0 would be no requeue at all
+	if delay <= 0 {
+		delay = defaultRequeueDelay
+	}
+
+	return stageOutcome{action: actionRetry, requeueAfter: delay}
+}
+
+// retryOnError ends the reconciliation with an error and leaves the delay to the controller-runtime
+// backoff. Use it for transient failures. A nil error would silently stop the workflow, so it is
+// treated as an immediate controlled retry instead.
+func retryOnError(err error) stageOutcome {
+	if err == nil {
+		return retryAfter(defaultRequeueDelay)
+	}
+
+	return stageOutcome{action: actionRetry, err: err}
+}
+
+// abort ends the reconciliation without requeueing.
+func abort() stageOutcome {
+	return stageOutcome{action: actionAbort}
+}
+
+// result translates the outcome into the reconciler return values. This is the single place that
+// decides how outcomes reach controller-runtime: an error is never combined with an explicit
+// requeue, because controller-runtime would ignore the requeue and log the combination.
+func (o stageOutcome) result() (ctrl.Result, error) {
+	if o.err != nil {
+		return ctrl.Result{}, o.err
+	}
+
+	if o.action == actionRetry {
+		return ctrl.Result{RequeueAfter: o.requeueAfter}, nil
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// reconcileStage is one ordered step of the Restore workflow.
+type reconcileStage func(ctx context.Context, restore *k8sv1.Restore) stageOutcome
+
+// runStages executes the stages in order until one of them does not report next, and returns that
+// stage's result. Running out of stages ends the reconciliation without a requeue.
+func runStages(ctx context.Context, restore *k8sv1.Restore, stages ...reconcileStage) (ctrl.Result, error) {
+	for _, stage := range stages {
+		if outcome := stage(ctx, restore); outcome.action != actionNext {
+			return outcome.result()
+		}
+	}
+
+	return abort().result()
+}
