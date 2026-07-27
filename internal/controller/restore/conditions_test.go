@@ -70,6 +70,39 @@ func TestLegacyStatusForNeverRegressesAnObservedRestoreToNew(t *testing.T) {
 			want:    backupv1.RestoreStatusDeleting,
 		},
 		{
+			name: "a milestone write does not regress a terminally completed legacy restore",
+			restore: restoreWith(backupv1.RestoreStatusCompleted, metav1.Condition{
+				Type:   backupv1.ConditionPrepared,
+				Status: metav1.ConditionTrue,
+				Reason: ReasonPreparing,
+			}),
+			want: backupv1.RestoreStatusCompleted,
+		},
+		{
+			name: "a milestone write does not regress a terminally failed legacy restore",
+			restore: restoreWith(backupv1.RestoreStatusFailed, metav1.Condition{
+				Type:   backupv1.ConditionWorkloadsRecovered,
+				Status: metav1.ConditionFalse,
+				Reason: ReasonRecoveryNotAttemptedAfterProviderFailure,
+			}),
+			want: backupv1.RestoreStatusFailed,
+		},
+		{
+			name: "a milestone write on a legacy in progress restore keeps it in progress",
+			restore: restoreWith(backupv1.RestoreStatusInProgress, metav1.Condition{
+				Type:   backupv1.ConditionPrepared,
+				Status: metav1.ConditionTrue,
+				Reason: ReasonPreparing,
+			}),
+			want: backupv1.RestoreStatusInProgress,
+		},
+		{
+			name: "an outcome condition still overrides a terminal legacy status",
+			restore: restoreWith(backupv1.RestoreStatusFailed,
+				successful(metav1.ConditionTrue, ReasonRestoreCompleted)),
+			want: backupv1.RestoreStatusCompleted,
+		},
+		{
 			name:    "legacy in progress restore without conditions keeps its status",
 			restore: restoreWith(backupv1.RestoreStatusInProgress),
 			want:    backupv1.RestoreStatusInProgress,
@@ -118,7 +151,7 @@ func TestLegacySuccessfulConditionInterpretsRestoresCreatedBeforeConditions(t *t
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			condition := legacySuccessfulCondition(test.restore)
+			condition := determineLegacySuccessfulCondition(test.restore)
 
 			require.NotNil(t, condition)
 			assert.Equal(t, backupv1.ConditionSuccessful, condition.Type)
@@ -130,9 +163,9 @@ func TestLegacySuccessfulConditionInterpretsRestoresCreatedBeforeConditions(t *t
 }
 
 func TestLegacySuccessfulConditionCarriesNoOutcomeForNewAndDeletingRestores(t *testing.T) {
-	assert.Nil(t, legacySuccessfulCondition(restoreWith(backupv1.RestoreStatusNew)))
-	assert.Nil(t, legacySuccessfulCondition(restoreWith(backupv1.RestoreStatusDeleting)))
-	assert.Nil(t, legacySuccessfulCondition(restoreWith("something an older operator never wrote")))
+	assert.Nil(t, determineLegacySuccessfulCondition(restoreWith(backupv1.RestoreStatusNew)))
+	assert.Nil(t, determineLegacySuccessfulCondition(restoreWith(backupv1.RestoreStatusDeleting)))
+	assert.Nil(t, determineLegacySuccessfulCondition(restoreWith("something an older operator never wrote")))
 }
 
 func TestEffectiveSuccessfulConditionPrefersTheWrittenCondition(t *testing.T) {

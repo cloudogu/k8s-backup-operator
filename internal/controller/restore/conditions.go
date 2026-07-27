@@ -55,19 +55,16 @@ const (
 	ReasonMigratedFromLegacyStatus = "MigratedFromLegacyStatus"
 )
 
-// successfulCondition returns the Successful condition actually present in the status, or nil.
-func successfulCondition(restore *k8sv1.Restore) *metav1.Condition {
+// findSuccessfulCondition returns the Successful condition actually present in the status, or nil.
+func findSuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 	return meta.FindStatusCondition(restore.Status.Conditions, k8sv1.ConditionSuccessful)
 }
 
-// legacySuccessfulCondition derives a Successful condition from the deprecated scalar status of a
+// determineLegacySuccessfulCondition derives a Successful condition from the deprecated scalar status of a
 // Restore that predates conditions. It returns nil when the scalar carries no interpretable
 // outcome, which is the case for a new restore and for a deleting one: deletion is communicated
 // by metadata.deletionTimestamp, not by status.
-//
-// This exists only for the compatibility window. It must never turn an existing terminal restore
-// into new work.
-func legacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
+func determineLegacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 	var status metav1.ConditionStatus
 	switch restore.Status.Status {
 	case k8sv1.RestoreStatusCompleted:
@@ -98,11 +95,11 @@ func legacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 // because this operator did not observe those stages. The seeding write itself belongs to the
 // status updater and the reconciler stages, not here.
 func effectiveSuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
-	if condition := successfulCondition(restore); condition != nil {
+	if condition := findSuccessfulCondition(restore); condition != nil {
 		return condition
 	}
 
-	return legacySuccessfulCondition(restore)
+	return determineLegacySuccessfulCondition(restore)
 }
 
 // isTerminal reports whether the restore reached a terminal outcome and must not be worked on
@@ -113,14 +110,18 @@ func isTerminal(restore *k8sv1.Restore) bool {
 	return condition != nil && condition.Status != metav1.ConditionUnknown
 }
 
+func isTerminalLegacyStatus(status string) bool {
+	return status == k8sv1.RestoreStatusCompleted || status == k8sv1.RestoreStatusFailed
+}
+
 // legacyStatusFor maps conditions to thr deprecated status field.
 func legacyStatusFor(restore *k8sv1.Restore) string {
 	if restore.DeletionTimestamp != nil && !restore.DeletionTimestamp.IsZero() {
 		return k8sv1.RestoreStatusDeleting
 	}
 
-	switch condition := successfulCondition(restore); {
-	case condition == nil && len(restore.Status.Conditions) == 0:
+	switch condition := findSuccessfulCondition(restore); {
+	case condition == nil && (len(restore.Status.Conditions) == 0 || isTerminalLegacyStatus(restore.Status.Status)):
 		return restore.Status.Status
 	case condition == nil:
 		return k8sv1.RestoreStatusInProgress
