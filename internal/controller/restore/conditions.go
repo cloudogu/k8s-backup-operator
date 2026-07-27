@@ -29,6 +29,9 @@ const (
 	// ReasonVeleroRestoreFailed marks an owned Velero restore that failed terminally,
 	// including validation and partial failures.
 	ReasonVeleroRestoreFailed = "VeleroRestoreFailed"
+	// ReasonVeleroRestorePhaseUnknown marks an owned Velero restore whose phase this operator does
+	// not know, for example after a Velero upgrade added one. Such a phase is never success.
+	ReasonVeleroRestorePhaseUnknown = "VeleroRestorePhaseUnknown"
 	// ReasonVeleroRestoreConflict marks an existing Velero restore of the expected name that
 	// this operator may not adopt because its identity metadata does not prove our ownership.
 	ReasonVeleroRestoreConflict = "VeleroRestoreConflict"
