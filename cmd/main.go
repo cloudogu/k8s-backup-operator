@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	restorecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/restore"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scale"
@@ -40,7 +41,6 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
-	"github.com/cloudogu/k8s-backup-operator/pkg/restore"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
 	// +kubebuilder:scaffold:imports
 )
@@ -326,7 +326,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
 	scaleManager := scale.NewManager(k8sClient, operatorConfig.Namespace)
 
-	restoreManager := restore.NewRestoreManager(
+	restoreManager := restorecontroller.NewRestoreManager(
 		k8sClient,
 		ecosystemClientSet,
 		operatorConfig.Namespace,
@@ -334,7 +334,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		cleanupManager,
 		scaleManager,
 	)
-	if err = (restore.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
+	if err = (restorecontroller.NewRestoreReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, restoreManager, requeueHandler)).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
