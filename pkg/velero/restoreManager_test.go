@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/stretchr/testify/assert"
@@ -43,19 +42,16 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		mockK8sWatchClient := newMockK8sWatchClient(t)
 		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(nil)
 		watchMock := newMockWatchInterface(t)
-		channel := make(chan watch.Event)
+		channel := make(chan watch.Event, 1)
 		watchMock.EXPECT().ResultChan().Return(channel)
 		watchMock.EXPECT().Stop().Run(func() {
 			close(channel)
 		})
 		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore"), Namespace: testNamespace}).Return(watchMock, nil)
 
-		timer := time.NewTimer(time.Second)
-		go func() {
-			<-timer.C
-			expectedVeleroRestore.Status.Phase = velerov1.RestorePhaseCompleted
-			channel <- watch.Event{Type: watch.Modified, Object: expectedVeleroRestore}
-		}()
+		completedVeleroRestore := expectedVeleroRestore.DeepCopy()
+		completedVeleroRestore.Status.Phase = velerov1.RestorePhaseCompleted
+		channel <- watch.Event{Type: watch.Modified, Object: completedVeleroRestore}
 
 		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
@@ -139,19 +135,15 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		mockK8sWatchClient := newMockK8sWatchClient(t)
 		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(nil)
 		watchMock := newMockWatchInterface(t)
-		channel := make(chan watch.Event)
+		channel := make(chan watch.Event, 2)
 		watchMock.EXPECT().ResultChan().Return(channel)
 		watchMock.EXPECT().Stop().Run(func() {
 			close(channel)
 		})
 		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore"), Namespace: testNamespace}).Return(watchMock, nil)
 
-		go func() {
-			time.Sleep(time.Second)
-			channel <- watch.Event{Type: watch.Modified, Object: &appsv1.Deployment{}}
-			time.Sleep(time.Second)
-			channel <- watch.Event{Type: watch.Deleted, Object: expectedVeleroRestore}
-		}()
+		channel <- watch.Event{Type: watch.Modified, Object: &appsv1.Deployment{}}
+		channel <- watch.Event{Type: watch.Deleted, Object: expectedVeleroRestore}
 
 		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
@@ -191,19 +183,16 @@ func runVeleroStatusPhaseFailureTest(t *testing.T, phase velerov1.RestorePhase) 
 	mockK8sWatchClient := newMockK8sWatchClient(t)
 	mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(nil)
 	watchMock := newMockWatchInterface(t)
-	channel := make(chan watch.Event)
+	channel := make(chan watch.Event, 1)
 	watchMock.EXPECT().ResultChan().Return(channel)
 	watchMock.EXPECT().Stop().Run(func() {
 		close(channel)
 	})
 	mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore"), Namespace: testNamespace}).Return(watchMock, nil)
 
-	timer := time.NewTimer(time.Second)
-	go func() {
-		<-timer.C
-		expectedVeleroRestore.Status.Phase = phase
-		channel <- watch.Event{Type: watch.Modified, Object: expectedVeleroRestore}
-	}()
+	failedVeleroRestore := expectedVeleroRestore.DeepCopy()
+	failedVeleroRestore.Status.Phase = phase
+	channel <- watch.Event{Type: watch.Modified, Object: failedVeleroRestore}
 
 	sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 

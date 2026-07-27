@@ -356,7 +356,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		// given
 		backup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: testNamespace}}
 
-		watchChannel := make(chan watch.Event)
+		watchChannel := make(chan watch.Event, 1)
 		watchMock := newMockWatchInterface(t)
 		watchMock.EXPECT().ResultChan().Return(watchChannel)
 		watchMock.EXPECT().Stop()
@@ -378,12 +378,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
 
-		watchTimer := time.NewTimer(time.Second * 1)
-		go func() {
-			<-watchTimer.C
-			event := watch.Event{Type: watch.Modified, Object: expectedRequestProcessed}
-			watchChannel <- event
-		}()
+		watchChannel <- watch.Event{Type: watch.Modified, Object: expectedRequestProcessed}
 
 		// when
 		err := sut.DeleteBackup(testCtx, backup)
@@ -396,7 +391,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		// given
 		backup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: testNamespace}}
 
-		watchChannel := make(chan watch.Event)
+		watchChannel := make(chan watch.Event, 1)
 		watchMock := newMockWatchInterface(t)
 		watchMock.EXPECT().ResultChan().Return(watchChannel)
 		watchMock.EXPECT().Stop()
@@ -418,12 +413,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
 
-		watchTimer := time.NewTimer(time.Second * 1)
-		go func() {
-			<-watchTimer.C
-			event := watch.Event{Type: watch.Deleted, Object: expectedRequestProcessed}
-			watchChannel <- event
-		}()
+		watchChannel <- watch.Event{Type: watch.Deleted, Object: expectedRequestProcessed}
 
 		// when
 		err := sut.DeleteBackup(testCtx, backup)
@@ -436,7 +426,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		// given
 		backup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: testNamespace}}
 
-		watchChannel := make(chan watch.Event)
+		watchChannel := make(chan watch.Event, 4)
 		watchMock := newMockWatchInterface(t)
 		watchMock.EXPECT().ResultChan().Return(watchChannel)
 		watchMock.EXPECT().Stop()
@@ -458,18 +448,10 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
 
-		watchTimer := time.NewTimer(time.Second * 1)
-		go func() {
-			<-watchTimer.C
-			event1 := watch.Event{Type: watch.Modified, Object: &velerov1.Backup{}}
-			watchChannel <- event1
-			event2 := watch.Event{Type: watch.Modified, Object: expectedRequest}
-			watchChannel <- event2
-			event3 := watch.Event{Type: watch.Error, Object: expectedRequest}
-			watchChannel <- event3
-			event4 := watch.Event{Type: watch.Modified, Object: expectedRequestProcessed}
-			watchChannel <- event4
-		}()
+		watchChannel <- watch.Event{Type: watch.Modified, Object: &velerov1.Backup{}}
+		watchChannel <- watch.Event{Type: watch.Modified, Object: expectedRequest}
+		watchChannel <- watch.Event{Type: watch.Error, Object: expectedRequest}
+		watchChannel <- watch.Event{Type: watch.Modified, Object: expectedRequestProcessed}
 
 		// when
 		err := sut.DeleteBackup(testCtx, backup)
@@ -555,11 +537,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
 
-		watchTimer := time.NewTimer(time.Second * 1)
-		go func() {
-			<-watchTimer.C
-			close(watchChannel)
-		}()
+		close(watchChannel)
 
 		// when
 		err := sut.DeleteBackup(context.TODO(), backup)
@@ -594,11 +572,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 
 		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
 
-		watchTimer := time.NewTimer(time.Second * 1)
-		go func() {
-			<-watchTimer.C
-			close(watchChannel)
-		}()
+		close(watchChannel)
 
 		// when
 		err := sut.DeleteBackup(context.TODO(), backup)
@@ -612,7 +586,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		// given
 		backup := &backupv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: testNamespace}}
 
-		watchChannel := make(chan watch.Event)
+		watchChannel := make(chan watch.Event, 1)
 		watchMock := newMockWatchInterface(t)
 		watchMock.EXPECT().ResultChan().Return(watchChannel)
 		watchMock.EXPECT().Stop()
@@ -636,12 +610,7 @@ func Test_provider_DeleteBackup(t *testing.T) {
 		recorderMock.EXPECT().Event(backup, corev1.EventTypeWarning, backupv1.ErrorOnProviderDeleteEventReason, "velero DeleteBackupRequest error: error1\nvelero DeleteBackupRequest error: error2")
 		sut := defaultBackupManager{recorder: recorderMock, k8sClient: mockK8sWatchClient}
 
-		watchTimer := time.NewTimer(time.Second * 1)
-		go func() {
-			<-watchTimer.C
-			event := watch.Event{Type: watch.Modified, Object: expectedRequestProcessed}
-			watchChannel <- event
-		}()
+		watchChannel <- watch.Event{Type: watch.Modified, Object: expectedRequestProcessed}
 
 		// when
 		err := sut.DeleteBackup(context.TODO(), backup)
