@@ -38,7 +38,7 @@ const (
 // every ConfigMap, Secret and PVC labeled with the backup scope. It therefore
 // must never run concurrently with the Backup specs or with itself, hence
 // Serial. Run this suite only against a disposable cluster.
-var _ = Describe("Restore", Serial, Ordered, func() {
+var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 	suffix := uuid.New().String()
 	backupKey := client.ObjectKey{Namespace: restoreTestNamespace, Name: fmt.Sprintf("restore-spec-backup-%s", suffix)}
 	restoreKey := client.ObjectKey{Namespace: restoreTestNamespace, Name: fmt.Sprintf("restore-spec-%s", suffix)}
