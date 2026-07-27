@@ -1,6 +1,6 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-backup-operator
-VERSION=3.3.2
+VERSION=3.3.3
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.26.0
 MAKEFILES_VERSION=10.7.2
@@ -34,6 +34,8 @@ IMAGE_IMPORT_TARGET=image-import
 include build/make/k8s-controller.mk
 
 K8S_TEST_CLUSTER_KUBECONFIG?=${KUBECONFIG}
+# Build uses cmd/main.go as entrypoint (repo has no main package in project root).
+GO_BUILD_FLAGS=-mod=vendor -a -o $(BINARY) ./cmd/
 
 .PHONY: build-boot
 build-boot: helm-apply kill-operator-pod ## Builds a new version of the operator and deploys it into the K8s-EcoSystem.
@@ -86,3 +88,6 @@ print-debug-info: ## Generates indo and the list of environment variables requir
 
 acceptance-test:
 	go run github.com/onsi/ginkgo/v2/ginkgo --tags=acceptance ./acceptance-tests/...
+
+test-env:
+	@echo ${K8S_TEST_CLUSTER_KUBECONFIG}

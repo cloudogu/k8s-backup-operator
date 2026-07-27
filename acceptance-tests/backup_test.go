@@ -1,6 +1,6 @@
 //go:build acceptance
 
-package spec
+package specs
 
 import (
 	"fmt"
