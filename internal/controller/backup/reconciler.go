@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -36,6 +37,7 @@ const (
 	reasonBackupWasAlreadyRunning                     = "BackupWasAlreadyRunning"
 	messageTimeWindowExpiredBackupNotStarted          = "The backup was not started by the end of the time window."
 )
+
 const (
 	maintenanceModeTitle = "Service temporary unavailable"
 	maintenanceModeText  = "Backup in progress"
@@ -52,6 +54,12 @@ const defaultBackupTTL = 87660 * time.Hour
 var defaultLabels = map[string]string{
 	"app":                      "ces",
 	"k8s.cloudogu.com/part-of": "backup",
+}
+
+var veleroBackupIsRunningPhases = []velerov1.BackupPhase{
+	velerov1.BackupPhaseNew,
+	velerov1.BackupPhaseInProgress,
+	velerov1.BackupPhaseFinalizing,
 }
 
 const (
@@ -203,13 +211,31 @@ func (c *defaultReconciler) checkBackupCancellation(ctx context.Context, backup 
 		return Next, nil
 	}
 
-	backupHasNotStarted := backup.Status.StartTimestamp.IsZero() && backup.Status.CompletionTimestamp.IsZero()
+	backupHasNotStarted := backup.Status.StartTimestamp.IsZero()
 	if backupHasNotStarted {
 		patchErr := c.markBackupAsTimeWindowExpired(ctx, backup, messageTimeWindowExpiredBackupNotStarted)
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window not expired'")
 		}
 		return Abort, nil
+	}
+
+	backupHasStarted := !backup.Status.StartTimestamp.IsZero()
+	if backupHasStarted {
+		var veleroBackup = &velerov1.Backup{}
+		err = c.client.Get(ctx, backup.GetNamespacedName(), veleroBackup)
+		if err != nil {
+			return Abort, fmt.Errorf("get velero backup: %w", err)
+		}
+
+		isVeleroBackupRunning := slices.Contains(veleroBackupIsRunningPhases, veleroBackup.Status.Phase)
+		if isVeleroBackupRunning {
+			patchErr := c.markBackupAsTimeWindowExpiredBackupRunning(ctx, backup)
+			if patchErr != nil {
+				return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'")
+			}
+			return Next, nil
+		}
 	}
 
 	return Abort, nil
@@ -289,7 +315,6 @@ func (c *defaultReconciler) checkMaintenanceModeActiveBeforeBackup(ctx context.C
 			return Abort, fmt.Errorf("patch status to mark the complete condition as failed")
 		}
 		return Retry, nil
-
 	}
 
 	logger.V(1).Info("check maintenance mode before backup: is active -> NEXT")
@@ -557,6 +582,18 @@ func (c *defaultReconciler) markBackupAsTimeWindowExpired(ctx context.Context, b
 		Status:  metav1.ConditionTrue,
 		Reason:  reasonTimeWindowExpired,
 		Message: message,
+	}
+	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, canceled)
+	})
+}
+
+func (c *defaultReconciler) markBackupAsTimeWindowExpiredBackupRunning(ctx context.Context, backup *backupv1.Backup) error {
+	canceled := metav1.Condition{
+		Type:    backupv1.ConditionCanceled,
+		Status:  metav1.ConditionFalse,
+		Reason:  reasonBackupWasAlreadyRunning,
+		Message: "The backup was already running when the time window expired.",
 	}
 	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, canceled)
