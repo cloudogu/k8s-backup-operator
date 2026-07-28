@@ -88,10 +88,6 @@ func determineLegacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Conditio
 // effectiveSuccessfulCondition returns the Successful condition to base workflow decisions on.
 // A written condition always wins; the deprecated scalar status is consulted only for restores
 // that carry no Successful condition yet.
-//
-// The derived condition is meant to be persisted once, so that a restore created by an older
-// operator ends up with real conditions. Only Successful is set, because other conditions are not that important
-// after a terminal state is reached.
 func effectiveSuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 	if condition := findSuccessfulCondition(restore); condition != nil {
 		return condition

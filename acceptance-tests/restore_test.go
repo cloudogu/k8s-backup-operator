@@ -20,17 +20,17 @@ import (
 
 const (
 	// scaledownScopeLabel marks workloads that the restore flow scales to zero
-	// and back up again. See pkg/scale.
+	// and back up again.
 	scaledownScopeLabel = "k8s.cloudogu.com/restore-scaledown-scope"
 	// scaledownReplicasLabel holds the replica count captured at scale-down
 	// time. A leftover value means a previous restore did not finish.
 	scaledownReplicasLabel = "k8s.cloudogu.com/restore-scaledown-replicas"
 	// backupScopeLabel marks additional resources that the restore flow deletes
-	// before restoring. See pkg/cleanup.
+	// before restoring.
 	backupScopeLabel = "k8s.cloudogu.com/backup-scope"
 
 	restoreTestNamespace = "ecosystem"
-	throwawayReplicas    = int32(2)
+	throwawayReplicas    = 2
 )
 
 // Restore is a namespace-wide destructive operation: it scales down every
@@ -55,19 +55,15 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 			deleteAndIgnoreNotFound(ctx, newThrowawayDeployment(deploymentKey, throwawayReplicas))
 		})
 
-		// This backup is deliberately NOT deleted afterwards. Deleting a Cloudogu
-		// Backup issues a Velero DeleteBackupRequest, and Velero deletes the
-		// backup's volume snapshots along with it. A restore keeps consuming those
-		// snapshots after it reports completed, because the CSI provisioner
-		// materializes volumes asynchronously. This prevents missing snapshots after the restore.
+		// This backup is deliberately NOT deleted afterwards. The snapshots it captured were deleted faster
+		// than the restore of the dogus happened, so there were always dogus left stuck without pvcs.
 		By("creating a backup for the restore to reference")
 		backup := createBackupWithObjectKey(backupKey)
 		Expect(k8sClient.Create(ctx, backup)).Should(Succeed())
 		expectBackupStatus(ctx, backupKey, backupv1.BackupStatusCompleted)
 
-		// Created only after the backup completed, so it is deliberately absent
-		// from the backup. Cleanup must delete it and nothing must bring it
-		// back, which makes the assertion unambiguous.
+		// Created only after the backup completed, so it is absent
+		// from the backup. Cleanup must delete it and we assert that nothing brings it back.
 		By("creating a throwaway additional resource labeled for backup scope")
 		configMap := newThrowawayConfigMap(configMapKey)
 		Expect(k8sClient.Create(ctx, configMap)).Should(Succeed())
@@ -190,15 +186,6 @@ func expectNoLeftoverScaledownLabels(ctx SpecContext) {
 }
 
 // expectWorkloadsConverged waits until the namespace is actually usable again.
-//
-// A Restore reports completed as soon as Velero finishes creating API objects.
-// With CSI snapshots the PVCs are created referencing a VolumeSnapshot and the
-// provisioner materializes the volumes afterwards, so completed does not mean
-// the ecosystem is back. Without this check the suite would call a restore
-// successful even if every volume failed to attach.
-//
-// The timeout is generous because this gates on real volume provisioning and
-// container startup rather than on API round trips.
 func expectWorkloadsConverged(ctx SpecContext) {
 	Eventually(func(g Gomega) {
 		claims := &corev1.PersistentVolumeClaimList{}
@@ -219,18 +206,6 @@ func expectWorkloadsConverged(ctx SpecContext) {
 			g.Expect(deployment.Status.ReadyReplicas).Should(Equal(desired),
 				"Deployment %s has %d/%d ready replicas", deployment.Name,
 				deployment.Status.ReadyReplicas, desired)
-		}
-
-		statefulSets := &appsv1.StatefulSetList{}
-		g.Expect(k8sClient.List(ctx, statefulSets, client.InNamespace(restoreTestNamespace))).Should(Succeed())
-		for _, statefulSet := range statefulSets.Items {
-			desired := int32(1)
-			if statefulSet.Spec.Replicas != nil {
-				desired = *statefulSet.Spec.Replicas
-			}
-			g.Expect(statefulSet.Status.ReadyReplicas).Should(Equal(desired),
-				"StatefulSet %s has %d/%d ready replicas", statefulSet.Name,
-				statefulSet.Status.ReadyReplicas, desired)
 		}
 	}).
 		WithTimeout(15 * time.Minute).

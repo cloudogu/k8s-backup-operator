@@ -3,20 +3,17 @@
 package specs
 
 import (
-	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-import (
 	"fmt"
 	"time"
 
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("Backup", func() {

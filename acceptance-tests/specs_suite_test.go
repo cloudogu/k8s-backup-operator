@@ -42,8 +42,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).ShouldNot(HaveOccurred())
 
 	// These specs are destructive, so record the cluster they actually target.
-	_, _ = fmt.Fprintf(GinkgoWriter, "acceptance specs target cluster %s\n", config.Host)
-
+	// Print ONLY on process 1 using fmt.Printf so it bypasses Ginkgo's pass/fail buffer
+	if GinkgoParallelProcess() == 1 {
+		fmt.Printf("acceptance specs target cluster %s\n", config.Host)
+	}
 	k8sClientSet, err = kubernetes.NewForConfig(config)
 	Expect(err).ShouldNot(HaveOccurred())
 
