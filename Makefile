@@ -89,12 +89,15 @@ print-debug-info: ## Generates indo and the list of environment variables requir
 GINKGO_LABEL_FILTER?=
 GINKGO_SPEC_ARGS=-p -r --tags=acceptance $(if $(GINKGO_LABEL_FILTER),--label-filter="$(GINKGO_LABEL_FILTER)")
 
-.PHONY: run-specs
-run-specs: ## Run the cluster acceptance specs. DESTRUCTIVE - disposable clusters only.
+.PHONY: acceptance-test
+acceptance-test: ## Run the cluster acceptance specs. DESTRUCTIVE - disposable clusters only.
 	@echo "WARNING: the restore specs delete all dogus and all backup-scope labeled"
 	@echo "ConfigMaps/Secrets/PVCs in the target namespace. Use a disposable cluster."
-	ginkgo $(GINKGO_SPEC_ARGS) specs/...
+	go run github.com/onsi/ginkgo/v2/ginkgo $(GINKGO_SPEC_ARGS) ./acceptance-tests/...
 
-.PHONY: run-specs-restore
-run-specs-restore: ## Run only the Restore acceptance specs. DESTRUCTIVE - disposable clusters only.
+.PHONY: acceptance-test-restore
+acceptance-test-restore: ## Run only the Restore acceptance specs. DESTRUCTIVE - disposable clusters only.
 	@$(MAKE) --no-print-directory run-specs GINKGO_LABEL_FILTER=restore
+
+test-env:
+	@echo ${K8S_TEST_CLUSTER_KUBECONFIG}

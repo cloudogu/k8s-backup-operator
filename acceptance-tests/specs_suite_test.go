@@ -3,7 +3,7 @@
 // Package specs contains cluster acceptance tests. They require a running
 // EcoSystem with the operator and Velero deployed and are excluded from
 // ordinary unit runs by the `acceptance` build tag. Run them with
-// `make run-specs`.
+// `make acceptance-test`.
 package specs
 
 import (
