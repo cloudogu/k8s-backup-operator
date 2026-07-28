@@ -1,6 +1,6 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-backup-operator
-VERSION=3.3.3
+VERSION=3.3.4
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.26.0
 MAKEFILES_VERSION=10.7.2
@@ -34,6 +34,8 @@ IMAGE_IMPORT_TARGET=image-import
 include build/make/k8s-controller.mk
 
 K8S_TEST_CLUSTER_KUBECONFIG?=${KUBECONFIG}
+# Build uses cmd/main.go as entrypoint (repo has no main package in project root).
+GO_BUILD_FLAGS=-mod=vendor -a -o $(BINARY) ./cmd/
 
 .PHONY: build-boot
 build-boot: helm-apply kill-operator-pod ## Builds a new version of the operator and deploys it into the K8s-EcoSystem.
@@ -84,5 +86,8 @@ print-debug-info: ## Generates indo and the list of environment variables requir
 	@echo "The target generates a list of env variables required to start the operator in debug mode. These can be pasted directly into the 'go build' run configuration in IntelliJ to run and debug the operator on-demand."
 	@echo "STAGE=$(STAGE);LOG_LEVEL=$(LOG_LEVEL);KUBECONFIG=$(KUBECONFIG);NAMESPACE=$(NAMESPACE);DOGU_REGISTRY_ENDPOINT=$(DOGU_REGISTRY_ENDPOINT);DOGU_REGISTRY_USERNAME=$(DOGU_REGISTRY_USERNAME);DOGU_REGISTRY_PASSWORD=$(DOGU_REGISTRY_PASSWORD);DOCKER_REGISTRY={\"auths\":{\"$(docker_registry_server)\":{\"username\":\"$(docker_registry_username)\",\"password\":\"$(docker_registry_password)\",\"email\":\"ignore@me.com\",\"auth\":\"ignoreMe\"}}}"
 
-run-specs:
-	ginkgo -p -r specs/...
+acceptance-test:
+	go run github.com/onsi/ginkgo/v2/ginkgo --tags=acceptance ./acceptance-tests/...
+
+test-env:
+	@echo ${K8S_TEST_CLUSTER_KUBECONFIG}

@@ -5,8 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- [#119] changed the repository structure to comply with server recommendations ([see here](https://go.dev/doc/modules/layout#server-project)) and reduce unnecessary public visibility of packages.
+
+## [v3.3.4] - 2026-07-24
 ### Added
 - [#123] add german docs translations
+
+### Fixed
+- [#127] restore deletion now correctly deletes velero restore custom resource
 
 ## [v3.3.3] - 2026-07-10
 ### Fixed
