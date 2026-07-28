@@ -53,7 +53,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		restoreClientMock.EXPECT().UpdateStatusCompleted(testCtx, restore).Return(restore, nil)
+		expectSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionTrue, ReasonRestoreCompleted)
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
@@ -231,7 +231,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(assert.AnError)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		restoreClientMock.EXPECT().UpdateStatusCompleted(testCtx, restore).Return(restore, nil)
+		expectSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionTrue, ReasonRestoreCompleted)
 
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
@@ -310,7 +310,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
-		restoreClientMock.EXPECT().UpdateStatusFailed(testCtx, restore).Return(restore, nil)
+		expectSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionFalse, ReasonVeleroRestoreFailed)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -358,7 +358,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
-		restoreClientMock.EXPECT().UpdateStatusFailed(testCtx, restore).Return(nil, assert.AnError)
+		expectFailingSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionFalse, ReasonVeleroRestoreFailed, assert.AnError)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -406,7 +406,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
-		restoreClientMock.EXPECT().UpdateStatusCompleted(testCtx, restore).Return(nil, assert.AnError)
+		expectFailingSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionTrue, ReasonRestoreCompleted, assert.AnError)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)

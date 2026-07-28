@@ -74,14 +74,22 @@ func (o stageOutcome) result() (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-// reconcileStage is one ordered step of the Restore workflow.
-type reconcileStage func(ctx context.Context, restore *k8sv1.Restore) stageOutcome
+// reconcileStage is one ordered step of the Restore workflow. A stage that persisted the Restore
+// returns the persisted object so the following stages see it; a stage that did not may return the
+// Restore it received, or nil for the same effect.
+type reconcileStage func(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome)
 
 // runStages executes the stages in order until one of them does not report next, and returns that
-// stage's result. Running out of stages ends the reconciliation without a requeue.
+// stage's result. Each stage sees the Restore as the preceding stages left it. Running out of stages
+// ends the reconciliation without a requeue.
 func runStages(ctx context.Context, restore *k8sv1.Restore, stages ...reconcileStage) (ctrl.Result, error) {
 	for _, stage := range stages {
-		if outcome := stage(ctx, restore); outcome.action != actionNext {
+		updated, outcome := stage(ctx, restore)
+		if updated != nil {
+			restore = updated
+		}
+
+		if outcome.action != actionNext {
 			return outcome.result()
 		}
 	}

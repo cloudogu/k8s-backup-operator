@@ -23,21 +23,33 @@ func (_m *mockReconcileStage) EXPECT() *mockReconcileStage_Expecter {
 }
 
 // Execute provides a mock function with given fields: ctx, restore
-func (_m *mockReconcileStage) Execute(ctx context.Context, restore *v1.Restore) stageOutcome {
+func (_m *mockReconcileStage) Execute(ctx context.Context, restore *v1.Restore) (*v1.Restore, stageOutcome) {
 	ret := _m.Called(ctx, restore)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Execute")
 	}
 
-	var r0 stageOutcome
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Restore) stageOutcome); ok {
+	var r0 *v1.Restore
+	var r1 stageOutcome
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Restore) (*v1.Restore, stageOutcome)); ok {
+		return rf(ctx, restore)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Restore) *v1.Restore); ok {
 		r0 = rf(ctx, restore)
 	} else {
-		r0 = ret.Get(0).(stageOutcome)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Restore)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Restore) stageOutcome); ok {
+		r1 = rf(ctx, restore)
+	} else {
+		r1 = ret.Get(1).(stageOutcome)
+	}
+
+	return r0, r1
 }
 
 // mockReconcileStage_Execute_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Execute'
@@ -59,12 +71,12 @@ func (_c *mockReconcileStage_Execute_Call) Run(run func(ctx context.Context, res
 	return _c
 }
 
-func (_c *mockReconcileStage_Execute_Call) Return(_a0 stageOutcome) *mockReconcileStage_Execute_Call {
-	_c.Call.Return(_a0)
+func (_c *mockReconcileStage_Execute_Call) Return(_a0 *v1.Restore, _a1 stageOutcome) *mockReconcileStage_Execute_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockReconcileStage_Execute_Call) RunAndReturn(run func(context.Context, *v1.Restore) stageOutcome) *mockReconcileStage_Execute_Call {
+func (_c *mockReconcileStage_Execute_Call) RunAndReturn(run func(context.Context, *v1.Restore) (*v1.Restore, stageOutcome)) *mockReconcileStage_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }

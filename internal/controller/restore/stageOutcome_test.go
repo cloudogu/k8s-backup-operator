@@ -75,10 +75,10 @@ func TestStageOutcomeCannotSilentlyDropARetry(t *testing.T) {
 func TestRunStagesRunsOrderedStagesUntilOneDoesNotContinue(t *testing.T) {
 	var executed []string
 	stage := func(name string, outcome stageOutcome) reconcileStage {
-		return func(_ context.Context, _ *k8sv1.Restore) stageOutcome {
+		return func(_ context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 			executed = append(executed, name)
 
-			return outcome
+			return restore, outcome
 		}
 	}
 
@@ -121,6 +121,33 @@ func TestRunStagesRunsOrderedStagesUntilOneDoesNotContinue(t *testing.T) {
 			wantResult:   ctrl.Result{},
 		},
 	}
+
+	t.Run("a stage sees the restore the preceding stage returned", func(t *testing.T) {
+		replaced := restoreWith(k8sv1.RestoreStatusCompleted)
+		var seen []string
+
+		replacing := func(_ context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+			seen = append(seen, restore.Status.Status)
+
+			return replaced, next()
+		}
+		// A stage that returns no restore must not undo the replacement done by an earlier one.
+		returningNothing := func(_ context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+			seen = append(seen, restore.Status.Status)
+
+			return nil, next()
+		}
+		observing := func(_ context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+			seen = append(seen, restore.Status.Status)
+
+			return restore, abort()
+		}
+
+		_, err := runStages(testCtx, restoreWith(k8sv1.RestoreStatusInProgress), replacing, returningNothing, observing)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{k8sv1.RestoreStatusInProgress, k8sv1.RestoreStatusCompleted, k8sv1.RestoreStatusCompleted}, seen)
+	})
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

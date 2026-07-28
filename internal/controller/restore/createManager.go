@@ -10,6 +10,7 @@ import (
 	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -54,6 +55,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	cm.recorder.Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
 
 	restoreClient := cm.ecosystemClientSet.EcosystemV1Alpha1().Restores(cm.namespace)
+	conditions := newConditionUpdater(restoreClient)
 
 	restoreName := restore.Name
 	restore, err := restoreClient.UpdateStatusInProgress(ctx, restore)
@@ -102,7 +104,12 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	err = provider.CreateRestore(ctx, restore)
 	if err != nil {
 		err = fmt.Errorf("failed to trigger provider: %w", err)
-		_, updateStatusErr := restoreClient.UpdateStatusFailed(ctx, restore)
+		_, updateStatusErr := conditions.setConditions(ctx, restore, metav1.Condition{
+			Type:    v1.ConditionSuccessful,
+			Status:  metav1.ConditionFalse,
+			Reason:  ReasonVeleroRestoreFailed,
+			Message: fmt.Sprintf("The provider restore failed terminally: %v", err),
+		})
 		if updateStatusErr != nil {
 			err = errors.Join(err, fmt.Errorf("failed to update restore status to '%s': %w", v1.RestoreStatusFailed, updateStatusErr))
 		}
@@ -120,7 +127,12 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to scale up workloads after restore: %w", err)
 	}
 
-	_, err = restoreClient.UpdateStatusCompleted(ctx, restore)
+	_, err = conditions.setConditions(ctx, restore, metav1.Condition{
+		Type:    v1.ConditionSuccessful,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonRestoreCompleted,
+		Message: "The restore workflow finished successfully.",
+	})
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusCompleted, restoreName, err)
 	}
