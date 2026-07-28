@@ -22,7 +22,7 @@ rules:
 - apiGroups:
   - k8s.cloudogu.com
   resources:
-  - restore/finalizers
+  - restores/finalizers
   verbs:
   - update
 - apiGroups:
