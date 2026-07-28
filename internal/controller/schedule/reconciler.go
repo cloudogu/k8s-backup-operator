@@ -2,187 +2,159 @@ package schedule
 
 import (
 	"context"
-	"fmt"
-	"maps"
+	"reflect"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/config"
-	"github.com/go-logr/logr"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// TODO: put into backup-lib
-const (
-	// ConditionTypeReady indicates if the BackupSchedule is fully reconciled and operational.
-	ConditionTypeReady = "Ready"
-
-	// ConditionTypeCronJobSynced indicates if the underlying CronJob is successfully synced tp this crd
-	ConditionTypeCronJobSynced = "CronJobSynced"
-)
-
-// TODO: put into backup-lib
-const (
-	// Reasons for ConditionTypeReady
-	ReasonScheduleActive    = "ScheduleActive"
-	ReasonScheduleSuspended = "ScheduleSuspended"
-	ReasonInvalidSpec       = "InvalidSpec"
-
-	// Reasons for ConditionTypeCronJobSynced
-	ReasonCronJobSyncSuccessful = "CronJobSyncSuccessful"
-	ReasonCronJobSyncFailed     = "CronJobSyncFailed"
-)
-
-var defaultLabels = map[string]string{
-	"app":                          "ces",
-	"k8s.cloudogu.com/part-of":     "backup",
-	"app.kubernetes.io/created-by": "k8s-backup-operator",
-	"app.kubernetes.io/part-of":    "k8s-backup-operator",
-}
-
-// Reconciler handles reconciliation logic for BackupSchedule resources.
-type Reconciler interface {
+// BackupScheduleReconciler handles reconciliation logic for BackupSchedule resources.
+type BackupScheduleReconciler interface {
 	markAsSyncedToCronJob(schedule *backupv1.BackupSchedule) error
 }
 
 type defaultReconciler struct {
 	client client.Client
+
+	cronJobs   CronJobManager
+	validator  Validator
+	status     StatusManager
+	conditions ConditionManager
 }
 
-// NewReconciler creates a new Reconciler instance.
-func NewReconciler(client client.Client) Reconciler {
+type CronJobManager interface {
+	Ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error
+	Delete(ctx context.Context, schedule *backupv1.BackupSchedule) error
+}
+
+type Validator interface {
+	Validate(*backupv1.BackupSchedule) error
+}
+
+type ConditionManager interface {
+	MarkAccepted(schedule *backupv1.BackupSchedule)
+	MarkInvalid(schedule *backupv1.BackupSchedule, err error)
+	MarkCronJobSynced(schedule *backupv1.BackupSchedule)
+	MarkCronJobNotSynced(schedule *backupv1.BackupSchedule, err error)
+	MarkDeleting(schedule *backupv1.BackupSchedule)
+	ComputeReady(schedule *backupv1.BackupSchedule)
+}
+
+type StatusManager interface {
+	Patch(ctx context.Context, before *backupv1.BackupSchedule, after *backupv1.BackupSchedule) error
+}
+
+// NewReconciler creates a new BackupScheduleReconciler instance.
+func NewReconciler(client client.Client) *defaultReconciler {
 	return &defaultReconciler{
 		client: client,
 	}
 }
 
-func (c *defaultReconciler) checkCronJobSynced(ctx context.Context, schedule *backupv1.BackupSchedule, namespace string, logger logr.Logger) (bool, error) {
-	scheduleFromBackupSchedule := schedule.Spec.Schedule
-	expectedCronJobName := schedule.CronJobName()
-
-	// List all CronJobs in the namespace
-	cronJobList := &batchv1.CronJobList{}
-	err := c.client.List(ctx, cronJobList, &client.ListOptions{
-		Namespace: namespace,
-	})
+func (r *defaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	schedule, err := r.getBackupSchedule(ctx, req.NamespacedName)
 	if err != nil {
-		logger.Error(err, "Failed to list CronJobs")
-		return false, fmt.Errorf("failed to list cronjobs: %w", err)
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Check if any CronJob matches this schedule
-	var matchingCronJob *batchv1.CronJob
-	for i := range cronJobList.Items {
-		cronJob := &cronJobList.Items[i]
-		if cronJob.Name == expectedCronJobName && cronJob.Spec.Schedule == scheduleFromBackupSchedule {
-			matchingCronJob = cronJob
-			break
-		}
+	original := schedule.DeepCopy()
+
+	var reconcileErr error
+
+	switch {
+	// deletion
+	case !schedule.DeletionTimestamp.IsZero():
+		reconcileErr = r.reconcileDelete(ctx, schedule)
+	// create/update
+	default:
+		reconcileErr = r.reconcileNormal(ctx, schedule)
 	}
 
-	if matchingCronJob == nil {
-		logger.Info("No matching CronJob found for BackupSchedule", "expectedName", expectedCronJobName, "schedule", scheduleFromBackupSchedule)
-		return false, fmt.Errorf("no matching cronjob found for backup schedule")
+	// Always update status if it changed.
+	if err := r.patchStatus(ctx, original, schedule); err != nil {
+		return ctrl.Result{}, err
 	}
 
-	logger.Info("CronJob successfully synced with BackupSchedule", "cronJobName", matchingCronJob.Name)
-	return true, nil
+	if reconcileErr != nil {
+		return ctrl.Result{}, reconcileErr
+	}
+
+	return ctrl.Result{}, nil
+
 }
 
-func (c *defaultReconciler) createCronJob(ctx context.Context, schedule *backupv1.BackupSchedule, namespace string, logger logr.Logger) error {
-	labels := make(map[string]string)
-	maps.Copy(labels, defaultLabels)
+func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backupv1.BackupSchedule) error {
+	r.conditions.MarkDeleting(schedule)
 
-	cronJob := &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      schedule.CronJobName(),
-			Namespace: namespace,
-			Labels:    labels,
-		},
-		Spec: batchv1.CronJobSpec{
-			Schedule: schedule.Spec.Schedule,
-			JobTemplate: batchv1.JobTemplateSpec{
-				Spec: batchv1.JobSpec{
-					//TODO: operatorImage & imagePullSecrets
-					Template: getCronJobTemplate(schedule, "", config.GetStagePullPolicy(), nil),
-				},
-			},
-		},
+	if err := r.cronJobs.Delete(ctx, schedule); err != nil {
+		return err
 	}
-	createErr := c.client.Create(ctx, cronJob)
 
-	if createErr != nil {
-		return fmt.Errorf("failed to create CronJob %s: %w", schedule.CronJobName(), createErr)
+	if err := r.removeFinalizer(ctx, schedule); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// set conditions
-
-func (c *defaultReconciler) markAsSyncedToCronJob(schedule *backupv1.BackupSchedule) error {
-	synced := metav1.Condition{
-		Type:    ConditionTypeCronJobSynced,
-		Status:  metav1.ConditionTrue,
-		Reason:  ReasonCronJobSyncSuccessful,
-		Message: "Cron job synced to backup schedule resource",
+func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
+	if err := r.ensureFinalizerSet(ctx, schedule); err != nil {
+		return err
 	}
-	scheduleStatus := &schedule.Status
-	meta.SetStatusCondition(&scheduleStatus.Conditions, synced)
+
+	if err := r.validate(schedule); err != nil {
+		r.conditions.MarkInvalid(schedule, err)
+		r.conditions.MarkCronJobNotSynced(schedule, err)
+		r.conditions.ComputeReady(schedule)
+
+		// Spec is invalid.
+		// Don't return an error because retrying won't help.
+		return nil
+	}
+
+	r.conditions.MarkAccepted(schedule)
+
+	if err := r.cronJobs.Ensure(ctx, schedule); err != nil {
+		r.conditions.MarkCronJobNotSynced(schedule, err)
+		r.conditions.ComputeReady(schedule)
+
+		return err
+	}
+
+	r.conditions.MarkCronJobSynced(schedule)
+	r.conditions.ComputeReady(schedule)
 
 	return nil
 }
 
-func (c *defaultReconciler) markAsNotSyncedToCronJob(schedule *backupv1.BackupSchedule) error {
-	synced := metav1.Condition{
-		Type:    ConditionTypeCronJobSynced,
-		Status:  metav1.ConditionFalse,
-		Reason:  ReasonCronJobSyncFailed,
-		Message: "Could not sync cronjob to backup schedule",
+func (r *defaultReconciler) patchStatus(ctx context.Context, before, after *backupv1.BackupSchedule) error {
+	if reflect.DeepEqual(before.Status, after.Status) {
+		return nil
 	}
-	scheduleStatus := &schedule.Status
-	meta.SetStatusCondition(&scheduleStatus.Conditions, synced)
 
+	return r.client.Status().Patch(ctx, after, client.MergeFrom(before))
+}
+
+func (r *defaultReconciler) ensureFinalizerSet(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	return nil
 }
 
-func (c *defaultReconciler) markAsReady(schedule *backupv1.BackupSchedule) error {
-	synced := metav1.Condition{
-		Type:    ConditionTypeReady,
-		Status:  metav1.ConditionTrue,
-		Reason:  ReasonScheduleActive,
-		Message: "Backup schedule ready and active",
-	}
-	scheduleStatus := &schedule.Status
-	meta.SetStatusCondition(&scheduleStatus.Conditions, synced)
-
+func (r *defaultReconciler) removeFinalizer(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	return nil
 }
 
-func (c *defaultReconciler) markAsNotReady(schedule *backupv1.BackupSchedule) error {
-	synced := metav1.Condition{
-		Type:    ConditionTypeReady,
-		Status:  metav1.ConditionFalse,
-		Reason:  ReasonScheduleSuspended,
-		Message: "Backup schedule not ready",
-	}
-	scheduleStatus := &schedule.Status
-	meta.SetStatusCondition(&scheduleStatus.Conditions, synced)
-
+func (r *defaultReconciler) validate(schedule *backupv1.BackupSchedule) error {
 	return nil
 }
 
-// helper
+func (r *defaultReconciler) getBackupSchedule(ctx context.Context, name types.NamespacedName) (*backupv1.BackupSchedule, error) {
+	schedule := &backupv1.BackupSchedule{}
 
-func getCronJobTemplate(schedule *backupv1.BackupSchedule, operatorImage string, pullPolicy corev1.PullPolicy, imagePullSecrets []corev1.LocalObjectReference) corev1.PodTemplateSpec {
-	podTemplateSpec := schedule.CronJobPodTemplate(operatorImage, pullPolicy)
-
-	if len(imagePullSecrets) > 0 {
-		podTemplateSpec.Spec.ImagePullSecrets = imagePullSecrets
+	if err := r.client.Get(ctx, name, schedule); err != nil {
+		return nil, err
 	}
 
-	return podTemplateSpec
+	return schedule, nil
 }
