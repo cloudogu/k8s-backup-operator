@@ -262,10 +262,12 @@ func TestGetRestoreTreatsAnAbsentChildAsNoChild(t *testing.T) {
 func TestDeleteRestore(t *testing.T) {
 	t.Run("deletes the child", func(t *testing.T) {
 		parent := newParentRestore()
+		child := BuildRestore(parent)
+		child.UID = "22222222-2222-2222-2222-222222222222"
 		writes := &writeCounter{}
-		k8sClient := newTestClient(t, writes, parent, BuildRestore(parent))
+		k8sClient := newTestClient(t, writes, parent, child)
 
-		require.NoError(t, DeleteRestore(testCtx, k8sClient, parent))
+		require.NoError(t, DeleteRestore(testCtx, k8sClient, child))
 
 		assert.Equal(t, 1, writes.deletes)
 		err := k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: testRestore}, &velerov1.Restore{})
@@ -273,10 +275,12 @@ func TestDeleteRestore(t *testing.T) {
 	})
 
 	t.Run("tolerates an already absent child", func(t *testing.T) {
+		child := BuildRestore(newParentRestore())
+		child.UID = "22222222-2222-2222-2222-222222222222"
 		writes := &writeCounter{}
 		k8sClient := newTestClient(t, writes)
 
-		require.NoError(t, DeleteRestore(testCtx, k8sClient, newParentRestore()))
+		require.NoError(t, DeleteRestore(testCtx, k8sClient, child))
 	})
 
 	t.Run("propagates other errors", func(t *testing.T) {
@@ -288,8 +292,10 @@ func TestDeleteRestore(t *testing.T) {
 		testScheme := runtime.NewScheme()
 		require.NoError(t, velerov1.AddToScheme(testScheme))
 		k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithInterceptorFuncs(funcs).Build()
+		child := BuildRestore(newParentRestore())
+		child.UID = "22222222-2222-2222-2222-222222222222"
 
-		err := DeleteRestore(testCtx, k8sClient, newParentRestore())
+		err := DeleteRestore(testCtx, k8sClient, child)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to delete velero restore [test-restore]")

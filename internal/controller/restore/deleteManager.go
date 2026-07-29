@@ -28,8 +28,6 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore)
 	logger := log.FromContext(ctx)
 	restoreClient := dm.clientSet.EcosystemV1Alpha1().Restores(dm.namespace)
 
-	// The child is read and classified before any status write, because writing the deleting status
-	// would overwrite the deprecated scalar that mayDeleteProviderRestore reads.
 	child, err := velero.GetRestore(ctx, dm.k8sClient, restore)
 	if err != nil {
 		return fmt.Errorf("failed to get provider restore of [%s]: %w", restore.Name, err)
@@ -53,7 +51,7 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore)
 
 	switch {
 	case deleteChild:
-		err = velero.DeleteRestore(ctx, dm.k8sClient, restore)
+		err = velero.DeleteRestore(ctx, dm.k8sClient, child)
 		if err != nil {
 			return fmt.Errorf("failed to delete restore: %w", err)
 		}

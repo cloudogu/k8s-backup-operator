@@ -149,13 +149,14 @@ func EnsureRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.R
 	return child, nil
 }
 
-// DeleteRestore deletes the Velero restore at the expected name of the given Cloudogu
-// Restore. An already absent child is not an error.
-func DeleteRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.Restore) error {
+// DeleteRestore deletes a Velero restore that the caller already classified as safe to delete.
+// The UID precondition prevents a namesake that replaced the classified child from being deleted.
+// An already absent child is not an error.
+func DeleteRestore(ctx context.Context, k8sClient client.Client, child *velerov1.Restore) error {
 	logger := log.FromContext(ctx)
 
-	child := &velerov1.Restore{ObjectMeta: metav1.ObjectMeta{Name: parent.Name, Namespace: parent.Namespace}}
-	err := k8sClient.Delete(ctx, child)
+	uid := child.UID
+	err := k8sClient.Delete(ctx, child, client.Preconditions{UID: &uid})
 	if apierrors.IsNotFound(err) {
 		logger.Info(fmt.Sprintf("velero restore [%s] is already gone: ignore", child.Name))
 
