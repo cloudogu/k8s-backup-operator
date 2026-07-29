@@ -28,12 +28,14 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to update status [%s] on restore [%s]: %w", v1.RestoreStatusDeleting, restore.Name, err)
 	}
 
-	restoreDeleteProvider, err := provider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, dm.recorder, dm.k8sClient)
+	// The provider is still resolved for its readiness gate and its provider-selection event, but the
+	// Velero child is deleted directly: it is owned by this controller, not by the provider gateway.
+	_, err = provider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, dm.recorder, dm.k8sClient)
 	if err != nil {
 		return fmt.Errorf("failed to get provider [%s]: %w", restore.Spec.Provider, err)
 	}
 
-	err = restoreDeleteProvider.DeleteRestore(ctx, restore)
+	err = deleteVeleroRestore(ctx, dm.k8sClient, restore)
 	if err != nil {
 		return fmt.Errorf("failed to delete restore: %w", err)
 	}

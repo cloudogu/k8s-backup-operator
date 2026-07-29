@@ -101,13 +101,12 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to cleanup before restore: %w", err)
 	}
 
-	err = provider.CreateRestore(ctx, restore)
+	err = cm.runProviderRestore(ctx, provider, restore)
 	if err != nil {
-		err = fmt.Errorf("failed to trigger provider: %w", err)
 		_, updateStatusErr := conditions.setConditions(ctx, restore, metav1.Condition{
 			Type:    v1.ConditionSuccessful,
 			Status:  metav1.ConditionFalse,
-			Reason:  ReasonVeleroRestoreFailed,
+			Reason:  classifyProviderRestoreFailure(err),
 			Message: fmt.Sprintf("The provider restore failed terminally: %v", err),
 		})
 		if updateStatusErr != nil {
@@ -138,4 +137,32 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	}
 	metrics.UpdateRestoreStatusMetrics(cm.namespace, restore.Name, restore.Spec.BackupName, v1.RestoreStatusCompleted)
 	return nil
+}
+
+// runProviderRestore ensures the one owned Velero restore of the given Restore exists and then waits
+// for the provider to finish it. Creating the child is idempotent, so a repeated attempt after a
+// crash between child creation and parent status persistence reuses the child instead of failing.
+func (cm *defaultCreateManager) runProviderRestore(ctx context.Context, provider restoreProvider, restore *v1.Restore) error {
+	_, err := ensureVeleroRestore(ctx, cm.k8sClient, restore)
+	if err != nil {
+		cm.recorder.Event(restore, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, err.Error())
+
+		return fmt.Errorf("failed to ensure the velero restore: %w", err)
+	}
+
+	err = provider.WaitForRestore(ctx, restore)
+	if err != nil {
+		return fmt.Errorf("failed to trigger provider: %w", err)
+	}
+
+	return nil
+}
+
+func classifyProviderRestoreFailure(err error) string {
+	var conflictErr *veleroRestoreConflictError
+	if errors.As(err, &conflictErr) {
+		return ReasonVeleroRestoreConflict
+	}
+
+	return ReasonVeleroRestoreFailed
 }

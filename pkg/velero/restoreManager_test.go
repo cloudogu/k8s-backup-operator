@@ -30,7 +30,7 @@ func TestNewDefaultRestoreManager(t *testing.T) {
 	})
 }
 
-func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
+func Test_defaultRestoreManager_WaitForRestore(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
@@ -41,7 +41,6 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		recorderMock.EXPECT().Eventf(restore, corev1.EventTypeNormal, "Creation", "Successfully completed velero restore [%s]", "restore")
 
 		mockK8sWatchClient := newMockK8sWatchClient(t)
-		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(nil)
 		watchMock := newMockWatchInterface(t)
 		channel := make(chan watch.Event)
 		watchMock.EXPECT().ResultChan().Return(channel)
@@ -62,7 +61,38 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
 		// when
-		err := sut.CreateRestore(testCtx, restore)
+		err := sut.WaitForRestore(testCtx, restore)
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should complete on the initial event of an already completed child", func(t *testing.T) {
+		// A child reused from an earlier attempt can already be completed before the watch starts, in
+		// which case the API server reports it as watch.Added rather than watch.Modified.
+		// given
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
+		completedVeleroRestore := getExpectedVeleroRestore(restore)
+		completedVeleroRestore.Status.Phase = velerov1.RestorePhaseCompleted
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")
+		recorderMock.EXPECT().Eventf(restore, corev1.EventTypeNormal, "Creation", "Successfully completed velero restore [%s]", "restore")
+
+		mockK8sWatchClient := newMockK8sWatchClient(t)
+		watchMock := newMockWatchInterface(t)
+		channel := make(chan watch.Event, 1)
+		watchMock.EXPECT().ResultChan().Return(channel)
+		watchMock.EXPECT().Stop().Run(func() {
+			close(channel)
+		})
+		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore"), Namespace: testNamespace}).Return(watchMock, nil)
+		channel <- watch.Event{Type: watch.Added, Object: completedVeleroRestore}
+
+		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
+
+		// when
+		err := sut.WaitForRestore(testCtx, restore)
 
 		// then
 		require.NoError(t, err)
@@ -84,45 +114,21 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		runVeleroStatusPhaseFailureTest(t, velerov1.RestorePhaseFailedValidation)
 	})
 
-	t.Run("should return error on create velero restore error", func(t *testing.T) {
-		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
-		expectedVeleroRestore := getExpectedVeleroRestore(restore)
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, "ErrCreation", "failed to create velero restore [restore]: assert.AnError general error for testing")
-
-		mockK8sWatchClient := newMockK8sWatchClient(t)
-		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(assert.AnError)
-
-		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
-
-		// when
-		err := sut.CreateRestore(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to create velero restore [restore]")
-	})
-
 	t.Run("should return error on create velero restore watch error", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
-		expectedVeleroRestore := getExpectedVeleroRestore(restore)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, "Creation", "Using velero as restore provider")
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, "ErrCreation", "failed to create velero restore watch: assert.AnError general error for testing")
 
 		mockK8sWatchClient := newMockK8sWatchClient(t)
-		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(nil)
 		mockK8sWatchClient.EXPECT().Watch(testCtx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("metadata.name=restore"), Namespace: testNamespace}).Return(nil, assert.AnError)
 
 		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
 		// when
-		err := sut.CreateRestore(testCtx, restore)
+		err := sut.WaitForRestore(testCtx, restore)
 
 		// then
 		require.Error(t, err)
@@ -139,7 +145,6 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, "ErrCreation", "failed to complete velero restore [restore]: the restore got deleted")
 
 		mockK8sWatchClient := newMockK8sWatchClient(t)
-		mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(nil)
 		watchMock := newMockWatchInterface(t)
 		channel := make(chan watch.Event)
 		watchMock.EXPECT().ResultChan().Return(channel)
@@ -158,7 +163,7 @@ func Test_defaultRestoreManager_CreateRestore(t *testing.T) {
 		sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
 		// when
-		err := sut.CreateRestore(testCtx, restore)
+		err := sut.WaitForRestore(testCtx, restore)
 
 		// then
 		require.Error(t, err)
@@ -191,7 +196,6 @@ func runVeleroStatusPhaseFailureTest(t *testing.T, phase velerov1.RestorePhase) 
 	recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, "ErrCreation", fmt.Sprintf("failed to complete velero restore [restore]: has status phase [%s]", phase))
 
 	mockK8sWatchClient := newMockK8sWatchClient(t)
-	mockK8sWatchClient.EXPECT().Create(testCtx, expectedVeleroRestore).Return(nil)
 	watchMock := newMockWatchInterface(t)
 	channel := make(chan watch.Event)
 	watchMock.EXPECT().ResultChan().Return(channel)
@@ -210,7 +214,7 @@ func runVeleroStatusPhaseFailureTest(t *testing.T, phase velerov1.RestorePhase) 
 	sut := &defaultRestoreManager{k8sClient: mockK8sWatchClient, recorder: recorderMock}
 
 	// when
-	err := sut.CreateRestore(testCtx, restore)
+	err := sut.WaitForRestore(testCtx, restore)
 
 	// then
 	require.Error(t, err)

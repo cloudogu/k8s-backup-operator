@@ -8,7 +8,6 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,36 +24,17 @@ func newDefaultRestoreManager(k8sClient k8sWatchClient, recorder eventRecorder) 
 	return &defaultRestoreManager{k8sClient: k8sClient, recorder: recorder}
 }
 
-// CreateRestore creates a restore according to the restore configuration in v1.Restore.
-func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.Restore) error {
+// WaitForRestore blocks until the velero restore of the given v1.Restore completed or failed.
+// The velero restore itself is created by the restore controller, which owns the child resource.
+func (rm *defaultRestoreManager) WaitForRestore(ctx context.Context, restore *v1.Restore) error {
 	rm.recorder.Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Using velero as restore provider")
-
-	apiGroup := ""
-	veleroRestore := &velerov1.Restore{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: restore.Name, Namespace: restore.Namespace,
-		},
-		Spec: velerov1.RestoreSpec{
-			BackupName:             restore.Spec.BackupName,
-			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
-			ResourceModifier: &corev1.TypedLocalObjectReference{
-				APIGroup: &apiGroup,
-				Kind:     "ConfigMap",
-				Name:     "k8s-backup-operator-restore-dogu-modifier",
-			},
-		},
-	}
-	err := rm.k8sClient.Create(ctx, veleroRestore)
-	if err != nil {
-		return rm.handleFailedRestore(restore, fmt.Errorf("failed to create velero restore [%s]: %w", veleroRestore.Name, err))
-	}
 
 	selector, err := fields.ParseSelector(restore.GetFieldSelectorWithName())
 	if err != nil {
 		return rm.handleFailedRestore(restore, fmt.Errorf("failed to parse selector %q: %w", restore.GetFieldSelectorWithName(), err))
 	}
 
-	watcher, err := rm.k8sClient.Watch(ctx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: selector, Namespace: veleroRestore.Namespace})
+	watcher, err := rm.k8sClient.Watch(ctx, &velerov1.RestoreList{}, &client.ListOptions{FieldSelector: selector, Namespace: restore.Namespace})
 	if err != nil {
 		return rm.handleFailedRestore(restore, fmt.Errorf("failed to create velero restore watch: %w", err))
 	}
@@ -67,7 +47,7 @@ func (rm *defaultRestoreManager) CreateRestore(ctx context.Context, restore *v1.
 		return rm.handleFailedRestore(restore, err)
 	}
 
-	rm.recorder.Eventf(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Successfully completed velero restore [%s]", veleroRestore.Name)
+	rm.recorder.Eventf(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Successfully completed velero restore [%s]", restore.Name)
 	return nil
 }
 
@@ -88,7 +68,7 @@ func waitForRestoreCompletionOrFailure(ctx context.Context, veleroRestoreChan <-
 		switch veleroChange.Type {
 		case watch.Deleted:
 			return fmt.Errorf("failed to complete velero restore [%s]: the restore got deleted", changedRestore.Name)
-		case watch.Modified:
+		case watch.Added, watch.Modified:
 			switch changedRestore.Status.Phase {
 			case velerov1.RestorePhaseFailedValidation:
 				fallthrough
