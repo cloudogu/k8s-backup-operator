@@ -6,6 +6,9 @@ import (
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 )
@@ -22,9 +25,21 @@ func newDeleteManager(k8sClient k8sClient, clientSet ecosystemInterface, namespa
 }
 
 func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore) error {
+	logger := log.FromContext(ctx)
 	restoreClient := dm.clientSet.EcosystemV1Alpha1().Restores(dm.namespace)
 
-	_, err := restoreClient.UpdateStatusDeleting(ctx, restore)
+	// The child is read and classified before any status write, because writing the deleting status
+	// would overwrite the deprecated scalar that mayDeleteProviderRestore reads.
+	child, err := velero.GetRestore(ctx, dm.k8sClient, restore)
+	if err != nil {
+		return fmt.Errorf("failed to get provider restore of [%s]: %w", restore.Name, err)
+	}
+	successfulCondition := effectiveSuccessfulCondition(restore)
+	deleteChild := child != nil &&
+		(velero.IsOwnedRestore(restore, child) ||
+			(successfulCondition != nil && successfulCondition.Reason == ReasonMigratedFromLegacyStatus))
+
+	_, err = restoreClient.UpdateStatusDeleting(ctx, restore)
 	if err != nil {
 		return fmt.Errorf("failed to update status [%s] on restore [%s]: %w", v1.RestoreStatusDeleting, restore.Name, err)
 	}
@@ -36,9 +51,16 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore)
 		return fmt.Errorf("failed to get provider [%s]: %w", restore.Spec.Provider, err)
 	}
 
-	err = velero.DeleteRestore(ctx, dm.k8sClient, restore)
-	if err != nil {
-		return fmt.Errorf("failed to delete restore: %w", err)
+	switch {
+	case deleteChild:
+		err = velero.DeleteRestore(ctx, dm.k8sClient, restore)
+		if err != nil {
+			return fmt.Errorf("failed to delete restore: %w", err)
+		}
+	case child != nil:
+		message := fmt.Sprintf("Leaving provider restore [%s] untouched because it is not owned by this restore. Remove it manually if it is not needed.", child.Name)
+		logger.Info(message)
+		dm.recorder.Event(restore, corev1.EventTypeWarning, v1.DeleteEventReason, message)
 	}
 
 	_, err = restoreClient.RemoveFinalizer(ctx, restore, v1.RestoreFinalizer)

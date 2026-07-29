@@ -295,3 +295,28 @@ func TestDeleteRestore(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to delete velero restore [test-restore]")
 	})
 }
+
+func TestAMatchingRunningChildIsFoundAndReported(t *testing.T) {
+	parent := newParentRestore()
+	require.Empty(t, parent.Status.Conditions, "the scenario starts from a parent whose conditions were never persisted")
+	running := BuildRestore(parent)
+	running.Status.Phase = velerov1.RestorePhaseInProgress
+	writes := &writeCounter{}
+	k8sClient := newTestClient(t, writes, parent, running)
+
+	found, err := GetRestore(testCtx, k8sClient, parent)
+
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.True(t, IsOwnedRestore(parent, found))
+	require.NoError(t, CheckRestoreForConflicts(parent, found))
+	assert.Equal(t, RestoreRunning, ObserveRestorePhase(found.Status.Phase))
+
+	// the running child is reused, never restarted
+	ensured, err := EnsureRestore(testCtx, k8sClient, parent)
+
+	require.NoError(t, err)
+	require.NotNil(t, ensured)
+	assert.Equal(t, velerov1.RestorePhaseInProgress, ensured.Status.Phase)
+	assert.Equal(t, 0, writes.total(), "a running own child must be reported, not written to")
+}
