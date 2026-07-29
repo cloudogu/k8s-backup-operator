@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var defaultRequeueAfterTime = 2 * time.Second
+var defaultRequeueAfterTime = 5 * time.Second
 
 type action int
 
