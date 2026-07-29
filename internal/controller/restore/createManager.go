@@ -56,7 +56,7 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	cm.recorder.Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
 
 	restoreClient := cm.ecosystemClientSet.EcosystemV1Alpha1().Restores(cm.namespace)
-	conditions := newConditionUpdater(restoreClient)
+	conditions := newConditionUpdater(cm.k8sClient)
 
 	restoreName := restore.Name
 

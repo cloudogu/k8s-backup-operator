@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 // expectReadinessCheck installs a provider whose readiness check returns checkReadyErr, for tests
@@ -70,8 +71,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		expectSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionTrue, ReasonRestoreCompleted)
-
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
 
@@ -84,13 +83,16 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		parentClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
+
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
 
 		// then
 		require.NoError(t, err)
+		assertSuccessfulCondition(t, parentClient, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
 	})
 
 	t.Run("should fail to sync backups after restore", func(t *testing.T) {
@@ -130,7 +132,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClient(t, interceptor.Funcs{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -158,7 +160,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClient(t, interceptor.Funcs{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -185,7 +187,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClient(t, interceptor.Funcs{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -213,7 +215,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClient(t, interceptor.Funcs{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -242,7 +244,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClient(t, interceptor.Funcs{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -279,8 +281,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(assert.AnError)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		expectSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionTrue, ReasonRestoreCompleted)
-
 		cleanupMock := newMockCleanupManager(t)
 		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
 
@@ -293,13 +293,16 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		parentClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
+
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
 
 		// then
 		require.NoError(t, err)
+		assertSuccessfulCondition(t, parentClient, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
 	})
 
 	t.Run("should return error on cleanup error", func(t *testing.T) {
@@ -336,7 +339,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleManagerMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClient(t, interceptor.Funcs{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleManagerMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -358,7 +361,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
-		expectSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionFalse, ReasonProviderRestoreFailed)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -384,7 +386,9 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		parentClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
+
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -393,6 +397,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to trigger provider")
 		assert.ErrorIs(t, err, assert.AnError)
+		assertSuccessfulCondition(t, parentClient, restore.Name, metav1.ConditionFalse, ReasonProviderRestoreFailed)
 	})
 
 	t.Run("should wrap status error failing calling provider and update status", func(t *testing.T) {
@@ -406,7 +411,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
-		expectFailingSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionFalse, ReasonProviderRestoreFailed, assert.AnError)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -432,7 +436,9 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		parentClient := newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore)
+
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -454,7 +460,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
-		expectFailingSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionTrue, ReasonRestoreCompleted, assert.AnError)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -482,7 +487,9 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		parentClient := newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore)
+
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -527,7 +534,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClient(t, interceptor.Funcs{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -576,7 +583,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClient(t, interceptor.Funcs{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -598,7 +605,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
-		expectSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionTrue, ReasonRestoreCompleted)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -626,8 +632,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		writes := &childWriteCounter{}
-		k8sClient := newChildTestClient(t, writes, velero.BuildRestore(restore))
+		writes := &clientWrites{}
+		k8sClient := newTestClientWithParent(t, writes.interceptor(), restore, velero.BuildRestore(restore))
 		sut := &defaultCreateManager{k8sClient: k8sClient, recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
@@ -635,7 +641,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, 0, writes.total(), "the existing own child must be reused without any write")
+		assert.Equal(t, 0, writes.child.total(), "the existing own child must be reused without any write")
+		assertSuccessfulCondition(t, k8sClient, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
 	})
 
 	t.Run("fails terminally with a conflict on a foreign velero restore of the expected name", func(t *testing.T) {
@@ -654,7 +661,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(restore, nil)
-		expectSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionFalse, ReasonProviderRestoreConflict)
 
 		// the provider is never asked to wait, and SyncBackups and ScaleUp never run
 		providerMock := newMockRestoreProvider(t)
@@ -680,8 +686,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		writes := &childWriteCounter{}
-		k8sClient := newChildTestClient(t, writes, foreign)
+		writes := &clientWrites{}
+		k8sClient := newTestClientWithParent(t, writes.interceptor(), restore, foreign)
 		sut := &defaultCreateManager{k8sClient: k8sClient, recorder: recorderMock, ecosystemClientSet: clientSetMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
@@ -692,9 +698,10 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to ensure the provider restore")
 		var conflictErr *velero.ConflictError
 		require.ErrorAs(t, err, &conflictErr)
-		assert.Equal(t, 0, writes.total(), "the foreign velero restore must neither be deleted nor modified")
+		assert.Equal(t, 0, writes.child.total(), "the foreign velero restore must neither be deleted nor modified")
 		persisted := &velerov1.Restore{}
 		require.NoError(t, k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: restore.Name}, persisted))
 		assert.Empty(t, persisted.OwnerReferences, "the foreign velero restore must never be claimed")
+		assertSuccessfulCondition(t, k8sClient, restore.Name, metav1.ConditionFalse, ReasonProviderRestoreConflict)
 	})
 }

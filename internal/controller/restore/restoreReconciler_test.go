@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -25,38 +27,6 @@ var testCtx = context.TODO()
 
 var testNamespace = "ecosystem-test"
 var testRestore = "test-restore"
-
-// expectSuccessfulConditionUpdate expects exactly one status update carrying a Successful condition
-// of the given status and reason, and returns the written object so a following Get sees it.
-func expectSuccessfulConditionUpdate(restoreClient *mockEcosystemRestoreInterface, status metav1.ConditionStatus, reason string) {
-	matchesCondition := mock.MatchedBy(func(restore *v1.Restore) bool {
-		condition := findSuccessfulCondition(restore)
-
-		return condition != nil && condition.Status == status && condition.Reason == reason
-	})
-
-	restoreClient.EXPECT().
-		UpdateStatus(testCtx, matchesCondition, metav1.UpdateOptions{}).
-		RunAndReturn(func(_ context.Context, written *v1.Restore, _ metav1.UpdateOptions) (*v1.Restore, error) {
-			return written, nil
-		}).
-		Once()
-}
-
-// expectFailingSuccessfulConditionUpdate expects one status update carrying a Successful condition
-// of the given status and reason, and fails it.
-func expectFailingSuccessfulConditionUpdate(restoreClient *mockEcosystemRestoreInterface, status metav1.ConditionStatus, reason string, updateErr error) {
-	matchesCondition := mock.MatchedBy(func(restore *v1.Restore) bool {
-		condition := findSuccessfulCondition(restore)
-
-		return condition != nil && condition.Status == status && condition.Reason == reason
-	})
-
-	restoreClient.EXPECT().
-		UpdateStatus(testCtx, matchesCondition, metav1.UpdateOptions{}).
-		Return(nil, updateErr).
-		Once()
-}
 
 func TestNewRestoreReconciler(t *testing.T) {
 	t.Run("should create restore reconciler", func(t *testing.T) {
@@ -72,15 +42,14 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 	t.Run("should fail on getting restore", func(t *testing.T) {
 		// given
 		request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-		restoreClientMock := newMockEcosystemRestoreInterface(t)
-		restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(nil, assert.AnError)
-		v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-		clientSetMock := newMockEcosystemInterface(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+		failingGet := interceptor.Funcs{
+			Get: func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
+				return assert.AnError
+			},
+		}
 		sut := &restoreReconciler{
 			namespace: testNamespace,
-			clientSet: clientSetMock,
+			k8sClient: newTestClient(t, failingGet),
 		}
 
 		// when
@@ -96,27 +65,16 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		t.Run("should retry on deletion error", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
-				Name:              testRestore,
-				Namespace:         testNamespace,
-				DeletionTimestamp: &metav1.Time{Time: time.Now()},
-			}}
-
-			restoreClientMock := newMockEcosystemRestoreInterface(t)
-			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
-			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-			clientSetMock := newMockEcosystemInterface(t)
-			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+			restore := deletedRestore()
 
 			managerMock := newMockRestoreManager(t)
-			managerMock.EXPECT().delete(testCtx, restore).Return(assert.AnError)
+			managerMock.EXPECT().delete(testCtx, matchesRestoreNamed(testRestore)).Return(assert.AnError)
 			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, v1.DeleteEventReason, "Delete failed. Reason: assert.AnError general error for testing").Return()
+			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, v1.DeleteEventReason, "Delete failed. Reason: assert.AnError general error for testing").Return()
 
 			sut := &restoreReconciler{
 				namespace: testNamespace,
-				clientSet: clientSetMock,
+				k8sClient: newTestClient(t, interceptor.Funcs{}, restore),
 				manager:   managerMock,
 				recorder:  recorderMock,
 			}
@@ -133,27 +91,16 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		t.Run("should succeed with delete", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
-				Name:              testRestore,
-				Namespace:         testNamespace,
-				DeletionTimestamp: &metav1.Time{Time: time.Now()},
-			}}
-
-			restoreClientMock := newMockEcosystemRestoreInterface(t)
-			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
-			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-			clientSetMock := newMockEcosystemInterface(t)
-			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+			restore := deletedRestore()
 
 			managerMock := newMockRestoreManager(t)
-			managerMock.EXPECT().delete(testCtx, restore).Return(nil)
+			managerMock.EXPECT().delete(testCtx, matchesRestoreNamed(testRestore)).Return(nil)
 			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.DeleteEventReason, "Delete successful").Return()
+			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, v1.DeleteEventReason, "Delete successful").Return()
 
 			sut := &restoreReconciler{
 				namespace: testNamespace,
-				clientSet: clientSetMock,
+				k8sClient: newTestClient(t, interceptor.Funcs{}, restore),
 				manager:   managerMock,
 				recorder:  recorderMock,
 			}
@@ -176,18 +123,9 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 				Namespace: testNamespace,
 			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusFailed}}
 
-			restoreClientMock := newMockEcosystemRestoreInterface(t)
-			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
-			expectSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionFalse, ReasonMigratedFromLegacyStatus)
-			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-			clientSetMock := newMockEcosystemInterface(t)
-			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
-
-			sut := &restoreReconciler{
-				namespace: testNamespace,
-				clientSet: clientSetMock,
-			}
+			writes := &clientWrites{}
+			testClient := newTestClient(t, writes.interceptor(), restore)
+			sut := &restoreReconciler{namespace: testNamespace, k8sClient: testClient}
 
 			// when
 			actual, err := sut.Reconcile(testCtx, request)
@@ -195,7 +133,12 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			// then
 			require.NoError(t, err)
 			assert.Equal(t, ctrl.Result{}, actual)
-			assert.Equal(t, v1.RestoreStatusFailed, restore.Status.Status)
+			assert.Equal(t, 1, writes.parent.statusUpdates)
+			assertSuccessfulCondition(t, testClient, testRestore, metav1.ConditionFalse, ReasonMigratedFromLegacyStatus)
+
+			stored := &v1.Restore{}
+			require.NoError(t, sut.k8sClient.Get(testCtx, client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
+			assert.Equal(t, v1.RestoreStatusFailed, stored.Status.Status)
 		})
 		t.Run("should ignore a status phase without writing", func(t *testing.T) {
 			// given
@@ -205,16 +148,10 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 				Namespace: testNamespace,
 			}, Status: v1.RestoreStatus{Status: "some-unknown-status"}}
 
-			restoreClientMock := newMockEcosystemRestoreInterface(t)
-			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
-			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-			clientSetMock := newMockEcosystemInterface(t)
-			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
-
+			writes := &clientWrites{}
 			sut := &restoreReconciler{
 				namespace: testNamespace,
-				clientSet: clientSetMock,
+				k8sClient: newTestClient(t, writes.interceptor(), restore),
 			}
 
 			// when
@@ -223,6 +160,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			// then
 			require.NoError(t, err)
 			assert.Equal(t, ctrl.Result{}, actual)
+			assert.Equal(t, 0, writes.total())
 		})
 	})
 
@@ -230,26 +168,16 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		t.Run("should retry on create error", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
-				Name:      testRestore,
-				Namespace: testNamespace,
-			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusNew}}
-
-			restoreClientMock := newMockEcosystemRestoreInterface(t)
-			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
-			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-			clientSetMock := newMockEcosystemInterface(t)
-			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+			restore := newRestore()
 
 			managerMock := newMockRestoreManager(t)
-			managerMock.EXPECT().create(testCtx, restore).Return(assert.AnError)
+			managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(assert.AnError)
 			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, v1.CreateEventReason, "Creation failed. Reason: assert.AnError general error for testing").Return()
+			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, v1.CreateEventReason, "Creation failed. Reason: assert.AnError general error for testing").Return()
 
 			sut := &restoreReconciler{
 				namespace: testNamespace,
-				clientSet: clientSetMock,
+				k8sClient: newTestClient(t, interceptor.Funcs{}, restore),
 				manager:   managerMock,
 				recorder:  recorderMock,
 			}
@@ -266,26 +194,16 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		t.Run("should succeed with create", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
-				Name:      testRestore,
-				Namespace: testNamespace,
-			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusNew}}
-
-			restoreClientMock := newMockEcosystemRestoreInterface(t)
-			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
-			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-			clientSetMock := newMockEcosystemInterface(t)
-			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+			restore := newRestore()
 
 			managerMock := newMockRestoreManager(t)
-			managerMock.EXPECT().create(testCtx, restore).Return(nil)
+			managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(nil)
 			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Creation successful").Return()
+			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, v1.CreateEventReason, "Creation successful").Return()
 
 			sut := &restoreReconciler{
 				namespace: testNamespace,
-				clientSet: clientSetMock,
+				k8sClient: newTestClient(t, interceptor.Funcs{}, restore),
 				manager:   managerMock,
 				recorder:  recorderMock,
 			}

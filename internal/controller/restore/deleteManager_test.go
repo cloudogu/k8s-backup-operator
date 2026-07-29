@@ -1,7 +1,6 @@
 package restore
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -15,27 +14,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
-
-// newFailingDeleteClient returns a client whose Delete always fails, to cover the
-// non-NotFound error path of the typed child deletion.
-func newFailingDeleteClient(t *testing.T, objects ...client.Object) client.WithWatch {
-	t.Helper()
-
-	testScheme := runtime.NewScheme()
-	require.NoError(t, velerov1.AddToScheme(testScheme))
-
-	return fake.NewClientBuilder().WithScheme(testScheme).WithObjects(objects...).WithInterceptorFuncs(interceptor.Funcs{
-		Delete: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.DeleteOption) error {
-			return assert.AnError
-		},
-	}).Build()
-}
 
 func Test_defaultDeleteManager_delete(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
@@ -76,8 +57,8 @@ func Test_newDeleteManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		writes := &childWriteCounter{}
-		k8sClient := newChildTestClient(t, writes, velero.BuildRestore(restore))
+		writes := &clientWrites{}
+		k8sClient := newTestClient(t, writes.interceptor(), velero.BuildRestore(restore))
 		sut := &defaultDeleteManager{k8sClient: k8sClient, clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
 
 		// when
@@ -85,7 +66,7 @@ func Test_newDeleteManager(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, 1, writes.deletes)
+		assert.Equal(t, 1, writes.child.deletes)
 		getErr := k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: testRestore}, &velerov1.Restore{})
 		assert.True(t, apierrors.IsNotFound(getErr))
 	})
@@ -113,7 +94,7 @@ func Test_newDeleteManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultDeleteManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
+		sut := &defaultDeleteManager{k8sClient: newTestClient(t, interceptor.Funcs{}), clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -135,7 +116,7 @@ func Test_newDeleteManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultDeleteManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
+		sut := &defaultDeleteManager{k8sClient: newTestClient(t, interceptor.Funcs{}), clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -167,7 +148,7 @@ func Test_newDeleteManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultDeleteManager{k8sClient: newFailingDeleteClient(t, velero.BuildRestore(restore)), clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
+		sut := &defaultDeleteManager{k8sClient: newTestClient(t, failingDelete(assert.AnError), velero.BuildRestore(restore)), clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -201,7 +182,7 @@ func Test_newDeleteManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultDeleteManager{k8sClient: newChildTestClient(t, &childWriteCounter{}, velero.BuildRestore(restore)), clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
+		sut := &defaultDeleteManager{k8sClient: newTestClient(t, interceptor.Funcs{}, velero.BuildRestore(restore)), clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -303,8 +284,8 @@ func Test_defaultDeleteManager_deleteOnlyDeletesItsOwnProviderRestore(t *testing
 			clientSetMock := newMockEcosystemInterface(t)
 			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-			writes := &childWriteCounter{}
-			k8sClient := newChildTestClient(t, writes, test.child)
+			writes := &clientWrites{}
+			k8sClient := newTestClient(t, writes.interceptor(), test.child)
 			sut := &defaultDeleteManager{k8sClient: k8sClient, clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
 
 			// when
@@ -314,7 +295,7 @@ func Test_defaultDeleteManager_deleteOnlyDeletesItsOwnProviderRestore(t *testing
 			require.NoError(t, err)
 			getErr := k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: testRestore}, &velerov1.Restore{})
 			if test.wantDeleted {
-				assert.Equal(t, 1, writes.deletes)
+				assert.Equal(t, 1, writes.child.deletes)
 				assert.True(t, apierrors.IsNotFound(getErr), "the own child must be gone")
 			} else {
 				assert.Equal(t, 0, writes.total(), "a child that is not ours must not be written to at all")

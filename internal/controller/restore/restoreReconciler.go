@@ -7,7 +7,6 @@ import (
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -23,13 +22,13 @@ const (
 	operationIgnore = operation("ignore")
 )
 
-func NewRestoreReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, manager restoreManager) *restoreReconciler {
-	return &restoreReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager}
+func NewRestoreReconciler(k8sClient k8sClient, recorder eventRecorder, namespace string, manager restoreManager) *restoreReconciler {
+	return &restoreReconciler{k8sClient: k8sClient, recorder: recorder, namespace: namespace, manager: manager}
 }
 
 // restoreReconciler reconciles a Restore object
 type restoreReconciler struct {
-	clientSet ecosystemInterface
+	k8sClient k8sClient
 	recorder  eventRecorder
 	namespace string
 	manager   restoreManager
@@ -44,7 +43,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger := log.FromContext(ctx)
 	metrics.UpdateRestoreReconcileTotalMetric()
 
-	restore, err := r.clientSet.EcosystemV1Alpha1().Restores(r.namespace).Get(ctx, req.Name, metav1.GetOptions{})
+	restore := &k8sv1.Restore{}
+	err := r.k8sClient.Get(ctx, client.ObjectKey{Namespace: r.namespace, Name: req.Name}, restore)
 	if err != nil {
 		logger.Info(fmt.Sprintf("failed to get restore resource %s/%s: %s", r.namespace, req.Name, err))
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -87,7 +87,7 @@ func (r *restoreReconciler) ensureLegacyConditionsMigrated(ctx context.Context, 
 		return restore, next()
 	}
 
-	updater := newConditionUpdater(r.clientSet.EcosystemV1Alpha1().Restores(r.namespace))
+	updater := newConditionUpdater(r.k8sClient)
 
 	migrated, err := updater.setConditionsFromLegacyStatus(ctx, restore)
 	if err != nil {
