@@ -44,10 +44,6 @@ type deleteManager interface {
 	delete(ctx context.Context, restore *v1.Restore) error
 }
 
-type requeueHandler interface {
-	Handle(ctx context.Context, contextMessage string, restore v1.RequeuableObject, originalErr error, requeueStatus string) (ctrl.Result, error)
-}
-
 type maintenanceModeSwitch interface {
 	// Activate activates the maintenance mode.
 	Activate(ctx context.Context, description repository.MaintenanceModeDescription, force bool) error

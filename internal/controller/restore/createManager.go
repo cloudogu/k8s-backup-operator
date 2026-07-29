@@ -59,7 +59,17 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	conditions := newConditionUpdater(restoreClient)
 
 	restoreName := restore.Name
-	restore, err := restoreClient.UpdateStatusInProgress(ctx, restore)
+
+	// The readiness gate runs before any status write so that an unready provider leaves the Restore
+	// untouched: the deprecated scalar status stays New and requiredOperation still reports create, so
+	// the retry this reconciliation asks for actually re-enters the workflow. Once conditions are
+	// seeded and the workflow is resumable, that ordering constraint disappears.
+	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder, cm.k8sClient)
+	if err != nil {
+		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
+	}
+
+	restore, err = restoreClient.UpdateStatusInProgress(ctx, restore)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusInProgress, restoreName, err)
 	}
@@ -73,11 +83,6 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	restore, err = restoreClient.AddLabels(ctx, restore)
 	if err != nil {
 		return fmt.Errorf("failed to add labels to restore resource [%s]: %w", restoreName, err)
-	}
-
-	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder, cm.k8sClient)
-	if err != nil {
-		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
 	}
 
 	err = cm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)

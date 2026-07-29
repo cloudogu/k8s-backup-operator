@@ -16,6 +16,19 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// expectReadinessCheck installs a provider whose readiness check returns checkReadyErr, for tests
+// that only care about the readiness gate and not about the rest of the provider.
+func expectReadinessCheck(t *testing.T, checkReadyErr error) {
+	providerMock := newMockRestoreProvider(t)
+	providerMock.EXPECT().CheckReady(testCtx).Return(checkReadyErr)
+
+	oldNewVeleroProvider := provider.NewVeleroProvider
+	provider.NewVeleroProvider = func(_ provider.K8sClient, _ provider.EventRecorder, _ string) provider.Provider {
+		return providerMock
+	}
+	t.Cleanup(func() { provider.NewVeleroProvider = oldNewVeleroProvider })
+}
+
 func Test_newCreateManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
@@ -128,15 +141,45 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to sync backups with provider")
 	})
 
+	t.Run("should return error before touching the restore when the provider is not ready", func(t *testing.T) {
+		// given
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
+
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
+
+		// No write is expected at all: the readiness gate runs before the first status update, so the
+		// deprecated scalar status stays New and the reconciliation's retry can re-enter the workflow.
+		restoreClientMock := newMockEcosystemRestoreInterface(t)
+		expectReadinessCheck(t, assert.AnError)
+
+		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
+		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
+		clientSetMock := newMockEcosystemInterface(t)
+		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
+
+		sut := &defaultCreateManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), recorder: recorderMock, ecosystemClientSet: clientSetMock, namespace: testNamespace}
+
+		// when
+		err := sut.create(testCtx, restore)
+
+		// then
+		require.Error(t, err)
+		// GenericRequeueableError does not unwrap, so the cause is only visible in the message.
+		assert.ErrorContains(t, err, "failed to get restore provider [velero]: provider velero is not ready")
+		assert.ErrorContains(t, err, assert.AnError.Error())
+	})
+
 	t.Run("should return error on failing update status in progress", func(t *testing.T) {
 		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
 
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(nil, assert.AnError)
+		expectReadinessCheck(t, nil)
 
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
@@ -156,7 +199,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 	t.Run("should return error on failing add finalizer", func(t *testing.T) {
 		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
@@ -164,6 +207,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock := newMockEcosystemRestoreInterface(t)
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(nil, assert.AnError)
+		expectReadinessCheck(t, nil)
 
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
@@ -183,7 +227,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 	t.Run("should return error on failing add finalizer", func(t *testing.T) {
 		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup"}}
+		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
@@ -192,6 +236,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		restoreClientMock.EXPECT().UpdateStatusInProgress(testCtx, restore).Return(restore, nil)
 		restoreClientMock.EXPECT().AddFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(restore, nil)
 		restoreClientMock.EXPECT().AddLabels(testCtx, restore).Return(nil, assert.AnError)
+		expectReadinessCheck(t, nil)
 
 		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
 		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
