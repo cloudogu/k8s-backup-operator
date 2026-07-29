@@ -16,7 +16,7 @@ func TestDefaultMaintenanceGateway(t *testing.T) {
 			GetStatus(mock.Anything).
 			Return(repository.MaintenanceModeDescription{}, true, nil)
 
-		gateway := defaultMaintenanceGateway{maintenanceModeAdapter: maintenanceModeAdapterMock}
+		gateway := NewMaintenanceGateway(maintenanceModeAdapterMock)
 
 		isActive, err := gateway.isMaintenanceModeActive(context.Background())
 
@@ -30,7 +30,7 @@ func TestDefaultMaintenanceGateway(t *testing.T) {
 			Activate(mock.Anything, repository.MaintenanceModeDescription{Title: "title", Text: "text"}, false).
 			Return(nil)
 
-		gateway := defaultMaintenanceGateway{maintenanceModeAdapter: maintenanceModeAdapterMock}
+		gateway := NewMaintenanceGateway(maintenanceModeAdapterMock)
 
 		err := gateway.activateMaintenanceMode(context.Background(), "title", "text")
 
@@ -43,7 +43,7 @@ func TestDefaultMaintenanceGateway(t *testing.T) {
 			Deactivate(mock.Anything, false).
 			Return(nil)
 
-		gateway := defaultMaintenanceGateway{maintenanceModeAdapter: maintenanceModeAdapterMock}
+		gateway := NewMaintenanceGateway(maintenanceModeAdapterMock)
 
 		err := gateway.deactivateMaintenanceMode(context.Background())
 

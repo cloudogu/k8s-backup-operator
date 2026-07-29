@@ -51,6 +51,8 @@ const (
 // defaultBackupTTL is ten years, basically infinity in backup standards
 const defaultBackupTTL = 87660 * time.Hour
 
+const debug = 1
+
 var defaultLabels = map[string]string{
 	"app":                      "ces",
 	"k8s.cloudogu.com/part-of": "backup",
@@ -112,7 +114,7 @@ func (c *defaultReconciler) checkBackupDeletion(ctx context.Context, backup *bac
 		var veleroBackup = &velerov1.Backup{}
 		err := c.client.Get(ctx, backup.GetNamespacedName(), veleroBackup)
 		if apierrors.IsNotFound(err) {
-			logger.V(1).Info("check backup deletion: backup is deleted and velero backup not found -> remove finalizer, Abort")
+			logger.V(debug).Info("check backup deletion: backup is deleted and velero backup not found -> remove finalizer, Abort")
 
 			controllerutil.RemoveFinalizer(backup, backupv1.BackupFinalizer)
 			updateErr := c.client.Update(ctx, backup)
@@ -135,7 +137,7 @@ func (c *defaultReconciler) checkBackupDeletion(ctx context.Context, backup *bac
 		return Retry, nil
 	}
 
-	logger.V(1).Info("check backup deletion: backup is not deleted -> mark backup as not deleting, Next")
+	logger.V(debug).Info("check backup deletion: backup is not deleted -> mark backup as not deleting, Next")
 
 	patchErr := c.markBackupAsNotDeleting(ctx, backup)
 	if patchErr != nil {
@@ -154,7 +156,7 @@ func (c *defaultReconciler) createVeleroDeleteBackupRequestIfNotExists(
 	var deleteBackupRequest = &velerov1.DeleteBackupRequest{}
 	err := c.client.Get(ctx, backup.GetNamespacedName(), deleteBackupRequest)
 	if apierrors.IsNotFound(err) {
-		logger.V(1).Info("check backup deletion: delete backup request not found -> create one")
+		logger.V(debug).Info("check backup deletion: delete backup request not found -> create one")
 
 		var newDeleteBackupRequest = &velerov1.DeleteBackupRequest{
 			ObjectMeta: metav1.ObjectMeta{
@@ -176,7 +178,7 @@ func (c *defaultReconciler) createVeleroDeleteBackupRequestIfNotExists(
 		return nil, fmt.Errorf("get velero delete backup request: %w", err)
 	}
 
-	logger.V(1).Info("check backup deletion: delete backup request already exists")
+	logger.V(debug).Info("check backup deletion: delete backup request already exists")
 	return deleteBackupRequest, nil
 }
 
@@ -293,36 +295,26 @@ func (c *defaultReconciler) checkMaintenanceModeActiveBeforeBackup(ctx context.C
 
 	isBackupCompleted := !backup.Status.CompletionTimestamp.IsZero()
 	if !isActive && isBackupCompleted {
-		logger.V(1).Info("check maintenance mode before backup: is not active but backup is completed -> NEXT")
+		logger.V(debug).Info("check maintenance mode before backup: is not active but backup is completed -> NEXT")
 		return Next, nil
 	}
 
 	if !isActive {
-		logger.V(1).Info("check maintenance mode before backup: is not active -> activate it; RETRY")
+		logger.V(debug).Info("check maintenance mode before backup: is not active -> activate it; RETRY")
 
 		err2 := c.maintenanceGateway.activateMaintenanceMode(ctx, maintenanceModeTitle, maintenanceModeText)
 		if err2 != nil {
 			return Abort, fmt.Errorf("activate maintenance mode: %w", err)
 		}
 
-		completed := metav1.Condition{
-			Type:    backupv1.ConditionCompleted,
-			Status:  metav1.ConditionFalse,
-			Reason:  reasonMaintenanceModesIsNotActive,
-			Message: "Maintenance mode is not active",
-		}
-
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, completed)
-			status.StartTimestamp = metav1.Now()
-		})
+		patchErr := c.makeBackupAsMaintenanceModeNotActive(ctx, backup)
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch status to mark the complete condition as failed")
 		}
 		return Retry, nil
 	}
 
-	logger.V(1).Info("check maintenance mode before backup: is active -> NEXT")
+	logger.V(debug).Info("check maintenance mode before backup: is active -> NEXT")
 	return Next, nil
 }
 
@@ -418,7 +410,7 @@ func (c *defaultReconciler) checkMaintenanceModeNotActiveAfterBackup(ctx context
 	}
 
 	if maintenanceModeIsActive && backupCompleted {
-		logger.V(1).Info("check maintenance mode after backup completed (want = is not active): is active and backup is completed -> deactivate it, complete backup, Next")
+		logger.V(debug).Info("check maintenance mode after backup completed (want = is not active): is active and backup is completed -> deactivate it, complete backup, Next")
 
 		err2 := c.maintenanceGateway.deactivateMaintenanceMode(ctx)
 		if err2 != nil {
@@ -432,7 +424,7 @@ func (c *defaultReconciler) checkMaintenanceModeNotActiveAfterBackup(ctx context
 		return Next, nil
 	}
 
-	logger.V(1).Info("check maintenance mode after backup completed (want = is not active): -> Next",
+	logger.V(debug).Info("check maintenance mode after backup completed (want = is not active): -> Next",
 		"isMaintenanceActive", maintenanceModeIsActive,
 		"isBackupCompleted", backupCompleted,
 	)
@@ -480,6 +472,21 @@ func (c *defaultReconciler) markVeleroBackupResourceDoesNotExist(ctx context.Con
 	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, completed)
 	})
+}
+
+func (c *defaultReconciler) makeBackupAsMaintenanceModeNotActive(ctx context.Context, backup *backupv1.Backup) error {
+	completed := metav1.Condition{
+		Type:    backupv1.ConditionCompleted,
+		Status:  metav1.ConditionFalse,
+		Reason:  reasonMaintenanceModesIsNotActive,
+		Message: "Maintenance mode is not active",
+	}
+
+	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, completed)
+		status.StartTimestamp = metav1.Now()
+	})
+	return patchErr
 }
 
 func (c *defaultReconciler) markBackupAsNotCompleted(ctx context.Context, backup *backupv1.Backup, veleroBackupPhase velerov1.BackupPhase) error {
