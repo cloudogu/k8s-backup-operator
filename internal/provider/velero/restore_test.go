@@ -1,4 +1,4 @@
-package restore
+package velero
 
 import (
 	"context"
@@ -19,24 +19,28 @@ import (
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
+var testCtx = context.TODO()
+
 const (
+	testNamespace  = "ecosystem-test"
+	testRestore    = "test-restore"
 	testRestoreUID = types.UID("11111111-1111-1111-1111-111111111111")
 	testBackup     = "test-backup"
 )
 
-// veleroChildWriteCounter counts every mutating call a test makes through the fake client
-type veleroChildWriteCounter struct {
+// writeCounter counts every mutating call a test makes through the fake client
+type writeCounter struct {
 	creates int
 	updates int
 	patches int
 	deletes int
 }
 
-func (c *veleroChildWriteCounter) total() int {
+func (c *writeCounter) total() int {
 	return c.creates + c.updates + c.patches + c.deletes
 }
 
-func (c *veleroChildWriteCounter) interceptor() interceptor.Funcs {
+func (c *writeCounter) interceptor() interceptor.Funcs {
 	return interceptor.Funcs{
 		Create: func(ctx context.Context, wrapped client.WithWatch, object client.Object, opts ...client.CreateOption) error {
 			c.creates++
@@ -61,7 +65,7 @@ func (c *veleroChildWriteCounter) interceptor() interceptor.Funcs {
 	}
 }
 
-func newVeleroChildTestClient(t *testing.T, writes *veleroChildWriteCounter, objects ...client.Object) client.WithWatch {
+func newTestClient(t *testing.T, writes *writeCounter, objects ...client.Object) client.WithWatch {
 	t.Helper()
 
 	testScheme := runtime.NewScheme()
@@ -82,7 +86,7 @@ func newParentRestore() *k8sv1.Restore {
 	}
 }
 
-func getPersistedVeleroRestore(t *testing.T, k8sClient client.WithWatch) *velerov1.Restore {
+func getPersistedRestore(t *testing.T, k8sClient client.WithWatch) *velerov1.Restore {
 	t.Helper()
 
 	persisted := &velerov1.Restore{}
@@ -91,14 +95,14 @@ func getPersistedVeleroRestore(t *testing.T, k8sClient client.WithWatch) *velero
 	return persisted
 }
 
-func TestBuildVeleroRestore(t *testing.T) {
-	child := buildVeleroRestore(newParentRestore())
+func TestBuildRestore(t *testing.T) {
+	child := BuildRestore(newParentRestore())
 
 	assert.Equal(t, testRestore, child.Name)
 	assert.Equal(t, testNamespace, child.Namespace)
 	assert.Equal(t, map[string]string{
-		veleroRestoreSourceNameLabel: testRestore,
-		veleroRestoreSourceUIDLabel:  string(testRestoreUID),
+		RestoreSourceNameLabel: testRestore,
+		RestoreSourceUIDLabel:  string(testRestoreUID),
 	}, child.Labels)
 
 	controller := metav1.GetControllerOf(child)
@@ -118,44 +122,44 @@ func TestBuildVeleroRestore(t *testing.T) {
 	assert.Equal(t, restoreDoguModifierConfigMapName, child.Spec.ResourceModifier.Name)
 }
 
-func TestEnsureVeleroRestoreCreatesTheChild(t *testing.T) {
+func TestEnsureRestoreCreatesTheChild(t *testing.T) {
 	parent := newParentRestore()
-	writes := &veleroChildWriteCounter{}
-	k8sClient := newVeleroChildTestClient(t, writes, parent)
+	writes := &writeCounter{}
+	k8sClient := newTestClient(t, writes, parent)
 
-	created, err := ensureVeleroRestore(testCtx, k8sClient, parent)
+	created, err := EnsureRestore(testCtx, k8sClient, parent)
 
 	require.NoError(t, err)
 	require.NotNil(t, created)
 	assert.Equal(t, 1, writes.creates)
 	assert.Equal(t, 1, writes.total())
 
-	persisted := getPersistedVeleroRestore(t, k8sClient)
-	assert.True(t, isOwnedVeleroRestore(parent, persisted))
+	persisted := getPersistedRestore(t, k8sClient)
+	assert.True(t, IsOwnedRestore(parent, persisted))
 	assert.Equal(t, testBackup, persisted.Spec.BackupName)
-	assert.Equal(t, string(testRestoreUID), persisted.Labels[veleroRestoreSourceUIDLabel])
+	assert.Equal(t, string(testRestoreUID), persisted.Labels[RestoreSourceUIDLabel])
 }
 
-func TestEnsureVeleroRestoreReusesItsOwnChildWithoutWriting(t *testing.T) {
+func TestEnsureRestoreReusesItsOwnChildWithoutWriting(t *testing.T) {
 	parent := newParentRestore()
-	writes := &veleroChildWriteCounter{}
-	k8sClient := newVeleroChildTestClient(t, writes, parent)
+	writes := &writeCounter{}
+	k8sClient := newTestClient(t, writes, parent)
 
-	first, err := ensureVeleroRestore(testCtx, k8sClient, parent)
+	first, err := EnsureRestore(testCtx, k8sClient, parent)
 	require.NoError(t, err)
-	firstResourceVersion := getPersistedVeleroRestore(t, k8sClient).ResourceVersion
+	firstResourceVersion := getPersistedRestore(t, k8sClient).ResourceVersion
 
-	second, err := ensureVeleroRestore(testCtx, k8sClient, parent)
+	second, err := EnsureRestore(testCtx, k8sClient, parent)
 
 	require.NoError(t, err)
 	require.NotNil(t, second)
 	assert.Equal(t, first.Name, second.Name)
 	assert.Equal(t, 1, writes.creates, "the child must be created exactly once across both attempts")
 	assert.Equal(t, 1, writes.total(), "the second attempt must perform no write at all")
-	assert.Equal(t, firstResourceVersion, getPersistedVeleroRestore(t, k8sClient).ResourceVersion)
+	assert.Equal(t, firstResourceVersion, getPersistedRestore(t, k8sClient).ResourceVersion)
 }
 
-func TestEnsureVeleroRestoreReportsConflicts(t *testing.T) {
+func TestEnsureRestoreReportsConflicts(t *testing.T) {
 	tests := map[string]struct {
 		existing *velerov1.Restore
 		reason   string
@@ -172,13 +176,13 @@ func TestEnsureVeleroRestoreReportsConflicts(t *testing.T) {
 				foreignParent := newParentRestore()
 				foreignParent.UID = types.UID("22222222-2222-2222-2222-222222222222")
 
-				return buildVeleroRestore(foreignParent)
+				return BuildRestore(foreignParent)
 			}(),
 			reason: "must not be adopted",
 		},
 		"our own child restores a different backup than the parent now expects": {
 			existing: func() *velerov1.Restore {
-				child := buildVeleroRestore(newParentRestore())
+				child := BuildRestore(newParentRestore())
 				child.Spec.BackupName = "some-other-backup"
 
 				return child
@@ -190,26 +194,26 @@ func TestEnsureVeleroRestoreReportsConflicts(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			parent := newParentRestore()
-			writes := &veleroChildWriteCounter{}
-			k8sClient := newVeleroChildTestClient(t, writes, parent, test.existing)
-			untouched := getPersistedVeleroRestore(t, k8sClient)
+			writes := &writeCounter{}
+			k8sClient := newTestClient(t, writes, parent, test.existing)
+			untouched := getPersistedRestore(t, k8sClient)
 
-			child, err := ensureVeleroRestore(testCtx, k8sClient, parent)
+			child, err := EnsureRestore(testCtx, k8sClient, parent)
 
 			require.Error(t, err)
 			assert.Nil(t, child)
-			var conflictErr *veleroRestoreConflictError
+			var conflictErr *ConflictError
 			require.ErrorAs(t, err, &conflictErr, "the conflict must be classifiable without matching strings")
 			assert.Contains(t, err.Error(), test.reason)
 			assert.Equal(t, 0, writes.total(), "a conflicting child must neither be deleted, mutated nor claimed")
-			assert.Equal(t, untouched, getPersistedVeleroRestore(t, k8sClient))
+			assert.Equal(t, untouched, getPersistedRestore(t, k8sClient))
 		})
 	}
 }
 
-func TestEnsureVeleroRestorePropagatesClientErrors(t *testing.T) {
+func TestEnsureRestorePropagatesClientErrors(t *testing.T) {
 	t.Run("get fails", func(t *testing.T) {
-		writes := &veleroChildWriteCounter{}
+		writes := &writeCounter{}
 		funcs := writes.interceptor()
 		funcs.Get = func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
 			return assert.AnError
@@ -218,7 +222,7 @@ func TestEnsureVeleroRestorePropagatesClientErrors(t *testing.T) {
 		require.NoError(t, velerov1.AddToScheme(testScheme))
 		k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithInterceptorFuncs(funcs).Build()
 
-		child, err := ensureVeleroRestore(testCtx, k8sClient, newParentRestore())
+		child, err := EnsureRestore(testCtx, k8sClient, newParentRestore())
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to get velero restore [test-restore]")
@@ -228,7 +232,7 @@ func TestEnsureVeleroRestorePropagatesClientErrors(t *testing.T) {
 
 	t.Run("create fails", func(t *testing.T) {
 		parent := newParentRestore()
-		writes := &veleroChildWriteCounter{}
+		writes := &writeCounter{}
 		funcs := writes.interceptor()
 		funcs.Create = func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.CreateOption) error {
 			return assert.AnError
@@ -237,7 +241,7 @@ func TestEnsureVeleroRestorePropagatesClientErrors(t *testing.T) {
 		require.NoError(t, velerov1.AddToScheme(testScheme))
 		k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithInterceptorFuncs(funcs).Build()
 
-		child, err := ensureVeleroRestore(testCtx, k8sClient, parent)
+		child, err := EnsureRestore(testCtx, k8sClient, parent)
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to create velero restore [test-restore]")
@@ -245,23 +249,23 @@ func TestEnsureVeleroRestorePropagatesClientErrors(t *testing.T) {
 	})
 }
 
-func TestGetVeleroRestoreTreatsAnAbsentChildAsNoChild(t *testing.T) {
-	writes := &veleroChildWriteCounter{}
-	k8sClient := newVeleroChildTestClient(t, writes)
+func TestGetRestoreTreatsAnAbsentChildAsNoChild(t *testing.T) {
+	writes := &writeCounter{}
+	k8sClient := newTestClient(t, writes)
 
-	child, err := getVeleroRestore(testCtx, k8sClient, newParentRestore())
+	child, err := GetRestore(testCtx, k8sClient, newParentRestore())
 
 	require.NoError(t, err)
 	assert.Nil(t, child)
 }
 
-func TestDeleteVeleroRestore(t *testing.T) {
+func TestDeleteRestore(t *testing.T) {
 	t.Run("deletes the child", func(t *testing.T) {
 		parent := newParentRestore()
-		writes := &veleroChildWriteCounter{}
-		k8sClient := newVeleroChildTestClient(t, writes, parent, buildVeleroRestore(parent))
+		writes := &writeCounter{}
+		k8sClient := newTestClient(t, writes, parent, BuildRestore(parent))
 
-		require.NoError(t, deleteVeleroRestore(testCtx, k8sClient, parent))
+		require.NoError(t, DeleteRestore(testCtx, k8sClient, parent))
 
 		assert.Equal(t, 1, writes.deletes)
 		err := k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: testRestore}, &velerov1.Restore{})
@@ -269,14 +273,14 @@ func TestDeleteVeleroRestore(t *testing.T) {
 	})
 
 	t.Run("tolerates an already absent child", func(t *testing.T) {
-		writes := &veleroChildWriteCounter{}
-		k8sClient := newVeleroChildTestClient(t, writes)
+		writes := &writeCounter{}
+		k8sClient := newTestClient(t, writes)
 
-		require.NoError(t, deleteVeleroRestore(testCtx, k8sClient, newParentRestore()))
+		require.NoError(t, DeleteRestore(testCtx, k8sClient, newParentRestore()))
 	})
 
 	t.Run("propagates other errors", func(t *testing.T) {
-		writes := &veleroChildWriteCounter{}
+		writes := &writeCounter{}
 		funcs := writes.interceptor()
 		funcs.Delete = func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.DeleteOption) error {
 			return apierrors.NewForbidden(schema.GroupResource{Group: velerov1.SchemeGroupVersion.Group, Resource: "restores"}, testRestore, assert.AnError)
@@ -285,7 +289,7 @@ func TestDeleteVeleroRestore(t *testing.T) {
 		require.NoError(t, velerov1.AddToScheme(testScheme))
 		k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithInterceptorFuncs(funcs).Build()
 
-		err := deleteVeleroRestore(testCtx, k8sClient, newParentRestore())
+		err := DeleteRestore(testCtx, k8sClient, newParentRestore())
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to delete velero restore [test-restore]")

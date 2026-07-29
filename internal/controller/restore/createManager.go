@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/repository"
@@ -139,15 +140,15 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	return nil
 }
 
-// runProviderRestore ensures the one owned Velero restore of the given Restore exists and then waits
+// runProviderRestore ensures the one owned provider restore of the given Restore exists and then waits
 // for the provider to finish it. Creating the child is idempotent, so a repeated attempt after a
 // crash between child creation and parent status persistence reuses the child instead of failing.
 func (cm *defaultCreateManager) runProviderRestore(ctx context.Context, provider restoreProvider, restore *v1.Restore) error {
-	_, err := ensureVeleroRestore(ctx, cm.k8sClient, restore)
+	_, err := velero.EnsureRestore(ctx, cm.k8sClient, restore)
 	if err != nil {
 		cm.recorder.Event(restore, corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, err.Error())
 
-		return fmt.Errorf("failed to ensure the velero restore: %w", err)
+		return fmt.Errorf("failed to ensure the provider restore: %w", err)
 	}
 
 	err = provider.WaitForRestore(ctx, restore)
@@ -159,10 +160,10 @@ func (cm *defaultCreateManager) runProviderRestore(ctx context.Context, provider
 }
 
 func classifyProviderRestoreFailure(err error) string {
-	var conflictErr *veleroRestoreConflictError
+	var conflictErr *velero.ConflictError
 	if errors.As(err, &conflictErr) {
-		return ReasonVeleroRestoreConflict
+		return ReasonProviderRestoreConflict
 	}
 
-	return ReasonVeleroRestoreFailed
+	return ReasonProviderRestoreFailed
 }

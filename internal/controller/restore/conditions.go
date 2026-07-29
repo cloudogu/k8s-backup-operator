@@ -7,6 +7,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 )
 
 const (
@@ -20,21 +22,21 @@ const (
 	ReasonPreparing = "Preparing"
 	// ReasonPreparationFailed marks a terminally failed preparation.
 	ReasonPreparationFailed = "PreparationFailed"
-	// ReasonVeleroRestorePending marks an owned Velero restore that exists but has not started.
-	ReasonVeleroRestorePending = "VeleroRestorePending"
-	// ReasonVeleroRestoreRunning marks an owned Velero restore that is executing.
-	ReasonVeleroRestoreRunning = "VeleroRestoreRunning"
-	// ReasonVeleroRestoreCompleted marks an owned Velero restore that finished successfully.
-	ReasonVeleroRestoreCompleted = "VeleroRestoreCompleted"
-	// ReasonVeleroRestoreFailed marks an owned Velero restore that failed terminally,
+	// ReasonProviderRestorePending marks an owned provider restore that exists but has not started.
+	ReasonProviderRestorePending = "ProviderRestorePending"
+	// ReasonProviderRestoreRunning marks an owned provider restore that is executing.
+	ReasonProviderRestoreRunning = "ProviderRestoreRunning"
+	// ReasonProviderRestoreCompleted marks an owned provider restore that finished successfully.
+	ReasonProviderRestoreCompleted = "ProviderRestoreCompleted"
+	// ReasonProviderRestoreFailed marks an owned provider restore that failed terminally,
 	// including validation and partial failures.
-	ReasonVeleroRestoreFailed = "VeleroRestoreFailed"
-	// ReasonVeleroRestorePhaseUnknown marks an owned Velero restore whose phase this operator does
-	// not know, for example after a Velero upgrade added one. Such a phase is never success.
-	ReasonVeleroRestorePhaseUnknown = "VeleroRestorePhaseUnknown"
-	// ReasonVeleroRestoreConflict marks an existing Velero restore of the expected name that
+	ReasonProviderRestoreFailed = "ProviderRestoreFailed"
+	// ReasonProviderRestoreStateUnknown marks an owned provider restore whose state this operator
+	// does not know, for example after a provider upgrade added one. Such a state is never success.
+	ReasonProviderRestoreStateUnknown = "ProviderRestoreStateUnknown"
+	// ReasonProviderRestoreConflict marks an existing provider restore of the expected name that
 	// this operator may not adopt because its identity metadata does not prove our ownership.
-	ReasonVeleroRestoreConflict = "VeleroRestoreConflict"
+	ReasonProviderRestoreConflict = "ProviderRestoreConflict"
 	// ReasonRecoveringWorkloads marks a running workload recovery, i.e. scale-up and
 	// maintenance mode deactivation.
 	ReasonRecoveringWorkloads = "RecoveringWorkloads"
@@ -54,6 +56,27 @@ const (
 	// original cause of a legacy success or failure is not recoverable, so it is not claimed.
 	ReasonMigratedFromLegacyStatus = "MigratedFromLegacyStatus"
 )
+
+// observeProviderRestoreState maps the state of the owned provider restore to the status and reason
+// of the tri-state ProviderRestoreSuccessful condition.
+//
+// Unknown means that the provider has not decided yet, so a state this operator does not know is
+// never reported as success or failure. Translating provider vocabulary into a state is the provider
+// package's job; this function only decides what the condition says about it.
+func observeProviderRestoreState(state velero.RestoreState) (metav1.ConditionStatus, string) {
+	switch state {
+	case velero.RestorePending:
+		return metav1.ConditionUnknown, ReasonProviderRestorePending
+	case velero.RestoreRunning:
+		return metav1.ConditionUnknown, ReasonProviderRestoreRunning
+	case velero.RestoreSucceeded:
+		return metav1.ConditionTrue, ReasonProviderRestoreCompleted
+	case velero.RestoreFailed:
+		return metav1.ConditionFalse, ReasonProviderRestoreFailed
+	default:
+		return metav1.ConditionUnknown, ReasonProviderRestoreStateUnknown
+	}
+}
 
 // findSuccessfulCondition returns the Successful condition actually present in the status, or nil.
 func findSuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {

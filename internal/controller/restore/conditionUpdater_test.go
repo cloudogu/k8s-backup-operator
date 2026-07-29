@@ -50,7 +50,7 @@ func TestSetConditionsPreservesLastTransitionTimeWhileTheConditionStatusStays(t 
 	client.EXPECT().UpdateStatus(testCtx, mock.Anything, metav1.UpdateOptions{}).RunAndReturn(updateStatusEcho(&written)).Times(3)
 	updater := newConditionUpdater(client)
 
-	running := successful(metav1.ConditionUnknown, ReasonVeleroRestoreRunning)
+	running := successful(metav1.ConditionUnknown, ReasonProviderRestoreRunning)
 	running.Message = "Velero is restoring."
 
 	first, err := updater.setConditions(testCtx, restoreWith(""), running)
@@ -70,7 +70,7 @@ func TestSetConditionsPreservesLastTransitionTimeWhileTheConditionStatusStays(t 
 	assert.Equal(t, transitionedAt, secondCondition.LastTransitionTime)
 	assert.Equal(t, "Velero is still restoring.", secondCondition.Message)
 
-	failed := successful(metav1.ConditionFalse, ReasonVeleroRestoreFailed)
+	failed := successful(metav1.ConditionFalse, ReasonProviderRestoreFailed)
 	third, err := updater.setConditions(testCtx, second, failed)
 	require.NoError(t, err)
 	thirdCondition := findSuccessfulCondition(third)

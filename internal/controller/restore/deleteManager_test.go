@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -72,8 +73,8 @@ func Test_newDeleteManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		writes := &veleroChildWriteCounter{}
-		k8sClient := newVeleroChildTestClient(t, writes, buildVeleroRestore(restore))
+		writes := &childWriteCounter{}
+		k8sClient := newChildTestClient(t, writes, velero.BuildRestore(restore))
 		sut := &defaultDeleteManager{k8sClient: k8sClient, clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
 
 		// when
@@ -109,7 +110,7 @@ func Test_newDeleteManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultDeleteManager{k8sClient: newVeleroChildTestClient(t, &veleroChildWriteCounter{}), clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
+		sut := &defaultDeleteManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -197,7 +198,7 @@ func Test_newDeleteManager(t *testing.T) {
 		clientSetMock := newMockEcosystemInterface(t)
 		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultDeleteManager{k8sClient: newVeleroChildTestClient(t, &veleroChildWriteCounter{}, buildVeleroRestore(restore)), clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
+		sut := &defaultDeleteManager{k8sClient: newChildTestClient(t, &childWriteCounter{}, velero.BuildRestore(restore)), clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, restore)

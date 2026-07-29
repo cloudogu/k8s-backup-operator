@@ -8,6 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 )
 
 func restoreWith(legacyStatus string, conditions ...metav1.Condition) *backupv1.Restore {
@@ -42,7 +44,7 @@ func TestLegacyStatusForNeverRegressesAnObservedRestoreToNew(t *testing.T) {
 		},
 		{
 			name:    "terminally failed restore is failed",
-			restore: restoreWith("", successful(metav1.ConditionFalse, ReasonVeleroRestoreFailed)),
+			restore: restoreWith("", successful(metav1.ConditionFalse, ReasonProviderRestoreFailed)),
 			want:    backupv1.RestoreStatusFailed,
 		},
 		{
@@ -216,7 +218,7 @@ func TestIsTerminalKeepsExistingTerminalLegacyRestoresOutOfNewWork(t *testing.T)
 		},
 		{
 			name:    "running restore is not terminal",
-			restore: restoreWith("", successful(metav1.ConditionUnknown, ReasonVeleroRestoreRunning)),
+			restore: restoreWith("", successful(metav1.ConditionUnknown, ReasonProviderRestoreRunning)),
 			want:    false,
 		},
 		{
@@ -234,5 +236,39 @@ func TestIsTerminalKeepsExistingTerminalLegacyRestoresOutOfNewWork(t *testing.T)
 		t.Run(test.name, func(t *testing.T) {
 			assert.Equal(t, test.want, isTerminal(test.restore))
 		})
+	}
+}
+
+func TestObserveProviderRestoreStateMapsEveryState(t *testing.T) {
+	tests := []struct {
+		state      velero.RestoreState
+		wantStatus metav1.ConditionStatus
+		wantReason string
+	}{
+		{state: velero.RestorePending, wantStatus: metav1.ConditionUnknown, wantReason: ReasonProviderRestorePending},
+		{state: velero.RestoreRunning, wantStatus: metav1.ConditionUnknown, wantReason: ReasonProviderRestoreRunning},
+		{state: velero.RestoreSucceeded, wantStatus: metav1.ConditionTrue, wantReason: ReasonProviderRestoreCompleted},
+		{state: velero.RestoreFailed, wantStatus: metav1.ConditionFalse, wantReason: ReasonProviderRestoreFailed},
+		{state: velero.RestoreStateUnknown, wantStatus: metav1.ConditionUnknown, wantReason: ReasonProviderRestoreStateUnknown},
+		{state: velero.RestoreState("SomeStateNobodyDefined"), wantStatus: metav1.ConditionUnknown, wantReason: ReasonProviderRestoreStateUnknown},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.state), func(t *testing.T) {
+			status, reason := observeProviderRestoreState(test.state)
+
+			assert.Equal(t, test.wantStatus, status)
+			assert.Equal(t, test.wantReason, reason)
+		})
+	}
+}
+
+// A state the operator cannot interpret must never look like an outcome, because terminality is
+// derived from the condition status.
+func TestObserveProviderRestoreStateNeverReportsAnUnknownStateAsAnOutcome(t *testing.T) {
+	for _, state := range []velero.RestoreState{velero.RestoreStateUnknown, "", "Deleting", "succeeded"} {
+		status, _ := observeProviderRestoreState(state)
+
+		assert.Equal(t, metav1.ConditionUnknown, status, "state %q must not be reported as an outcome", state)
 	}
 }

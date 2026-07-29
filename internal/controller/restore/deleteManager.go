@@ -7,6 +7,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 )
 
 type defaultDeleteManager struct {
@@ -29,13 +30,13 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore)
 	}
 
 	// The provider is still resolved for its readiness gate and its provider-selection event, but the
-	// Velero child is deleted directly: it is owned by this controller, not by the provider gateway.
+	// provider child is deleted directly: it is owned by this controller, not by the provider gateway.
 	_, err = provider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, dm.recorder, dm.k8sClient)
 	if err != nil {
 		return fmt.Errorf("failed to get provider [%s]: %w", restore.Spec.Provider, err)
 	}
 
-	err = deleteVeleroRestore(ctx, dm.k8sClient, restore)
+	err = velero.DeleteRestore(ctx, dm.k8sClient, restore)
 	if err != nil {
 		return fmt.Errorf("failed to delete restore: %w", err)
 	}
