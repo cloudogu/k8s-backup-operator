@@ -31,7 +31,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -64,7 +64,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -98,7 +98,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -125,7 +125,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -145,7 +145,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -164,7 +164,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)

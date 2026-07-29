@@ -33,11 +33,11 @@ type reconciler interface {
 	checkBackupDeletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	checkBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	checkBackupCancellation(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	checkVeleroBackupStorage(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
-	checkMaintenanceModeActiveBeforeBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
-	checkVeleroBackupResource(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
-	checkVeleroBackupCompletion(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
-	checkMaintenanceModeNotActiveAfterBackup(ctx context.Context, backup *backupv1.Backup, namespace string, logger logr.Logger) (action, error)
+	checkVeleroBackupStorage(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+	checkMaintenanceModeActiveBeforeBackup(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+	checkVeleroBackupResource(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+	checkVeleroBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+	checkMaintenanceModeNotActiveAfterBackup(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 }
 
 func NewController(client client.Client, reconciler reconciler) *Controller {
@@ -87,7 +87,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	nextAction, err = c.reconciler.checkVeleroBackupStorage(ctx, &backup, req.NamespacedName.Namespace, logger)
+	nextAction, err = c.reconciler.checkVeleroBackupStorage(ctx, &backup, logger)
 	if nextAction == Retry {
 		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
 	}
@@ -95,7 +95,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	nextAction, err = c.reconciler.checkMaintenanceModeActiveBeforeBackup(ctx, &backup, req.NamespacedName.Namespace, logger)
+	nextAction, err = c.reconciler.checkMaintenanceModeActiveBeforeBackup(ctx, &backup, logger)
 	if nextAction == Retry {
 		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
 	}
@@ -103,7 +103,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	nextAction, err = c.reconciler.checkVeleroBackupResource(ctx, &backup, req.NamespacedName.Namespace, logger)
+	nextAction, err = c.reconciler.checkVeleroBackupResource(ctx, &backup, logger)
 	if nextAction == Retry {
 		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
 	}
@@ -111,7 +111,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	nextAction, err = c.reconciler.checkVeleroBackupCompletion(ctx, &backup, req.NamespacedName.Namespace, logger)
+	nextAction, err = c.reconciler.checkVeleroBackupCompletion(ctx, &backup, logger)
 	if nextAction == Retry {
 		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
 	}
@@ -121,7 +121,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Since this is the last step, the "Next" and "Abort" actions lead to the same return statement. So we don't need
 	// to check the "Abort" action.
-	nextAction, err = c.reconciler.checkMaintenanceModeNotActiveAfterBackup(ctx, &backup, req.NamespacedName.Namespace, logger)
+	nextAction, err = c.reconciler.checkMaintenanceModeNotActiveAfterBackup(ctx, &backup, logger)
 	if nextAction == Retry {
 		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
 	}
