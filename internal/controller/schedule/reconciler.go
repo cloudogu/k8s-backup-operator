@@ -2,9 +2,9 @@ package schedule
 
 import (
 	"context"
-	"reflect"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,6 +19,7 @@ type BackupScheduleReconciler interface {
 type defaultReconciler struct {
 	client client.Client
 
+	metadata   MetadataManager
 	cronJobs   CronJobManager
 	validator  Validator
 	conditions ConditionManager
@@ -41,6 +42,19 @@ type ConditionManager interface {
 	MarkDeleting(schedule *backupv1.BackupSchedule)
 	ComputeReady(schedule *backupv1.BackupSchedule)
 }
+
+type MetadataManager interface {
+	Ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error
+	Remove(ctx context.Context, schedule *backupv1.BackupSchedule) error
+}
+
+const (
+	LabelApp    = "app"
+	LabelPartOf = "k8s.cloudogu.com/part-of"
+
+	LabelValueApp    = "ces"
+	LabelValuePartOf = "backup"
+)
 
 // NewReconciler creates a new BackupScheduleReconciler instance.
 func NewReconciler(client client.Client) *defaultReconciler {
@@ -88,7 +102,8 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 		return err
 	}
 
-	if _, err := r.removeFinalizer(ctx, schedule); err != nil {
+	// only need to remove finalizers, not labels
+	if err := r.metadata.Remove(ctx, schedule); err != nil {
 		return err
 	}
 
@@ -96,11 +111,14 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 }
 
 func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	if _, err := r.ensureFinalizerSet(ctx, schedule); err != nil {
+	if err := r.metadata.Ensure(ctx, schedule); err != nil {
+		r.conditions.MarkInvalid(schedule, err)
+		r.conditions.MarkCronJobNotSynced(schedule, err)
+		r.conditions.ComputeReady(schedule)
 		return err
 	}
 
-	if err := r.validate(schedule); err != nil {
+	if err := r.validator.Validate(schedule); err != nil {
 		r.conditions.MarkInvalid(schedule, err)
 		r.conditions.MarkCronJobNotSynced(schedule, err)
 		r.conditions.ComputeReady(schedule)
@@ -120,47 +138,68 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 	}
 
 	r.conditions.MarkCronJobSynced(schedule)
+
+	// ready is computed from the other values
 	r.conditions.ComputeReady(schedule)
 
 	return nil
 }
 
 func (r *defaultReconciler) patchStatus(ctx context.Context, before, after *backupv1.BackupSchedule) error {
-	if reflect.DeepEqual(before.Status, after.Status) {
+	if equality.Semantic.DeepEqual(before.Status, after.Status) {
 		return nil
 	}
 
 	return r.client.Status().Patch(ctx, after, client.MergeFrom(before))
 }
 
-func (r *defaultReconciler) ensureFinalizerSet(ctx context.Context, schedule *backupv1.BackupSchedule) (bool, error) {
-	if controllerutil.ContainsFinalizer(schedule, backupv1.BackupScheduleFinalizer) {
-		return false, nil
-
-	}
-
+func (r *defaultReconciler) ensureMetadataSet(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	before := schedule.DeepCopy()
-
-	controllerutil.AddFinalizer(schedule, backupv1.BackupScheduleFinalizer)
-
-	return true, r.client.Patch(ctx, schedule, client.MergeFrom(before))
-}
-
-func (r *defaultReconciler) removeFinalizer(ctx context.Context, schedule *backupv1.BackupSchedule) (bool, error) {
+	changed := false
 
 	if !controllerutil.ContainsFinalizer(schedule, backupv1.BackupScheduleFinalizer) {
-		return false, nil
+		controllerutil.AddFinalizer(schedule, backupv1.BackupScheduleFinalizer)
+		changed = true
+	}
+
+	// no labels at all, initialize labels
+	if schedule.Labels == nil {
+		schedule.Labels = map[string]string{}
+	}
+
+	changed = addLabelsIfNecessary(schedule, changed)
+
+	if !changed {
+		return nil
+	}
+
+	return r.client.Patch(ctx, schedule, client.MergeFrom(before))
+}
+
+func addLabelsIfNecessary(schedule *backupv1.BackupSchedule, changed bool) bool {
+	if schedule.Labels[LabelApp] != LabelValueApp {
+		schedule.Labels[LabelApp] = LabelValueApp
+		changed = true
+	}
+
+	if schedule.Labels[LabelPartOf] != LabelValuePartOf {
+		schedule.Labels[LabelPartOf] = LabelValuePartOf
+		changed = true
+	}
+	return changed
+}
+
+func (r *defaultReconciler) removeFinalizer(ctx context.Context, schedule *backupv1.BackupSchedule) error {
+
+	if !controllerutil.ContainsFinalizer(schedule, backupv1.BackupScheduleFinalizer) {
+		return nil
 	}
 
 	before := schedule.DeepCopy()
 
 	controllerutil.RemoveFinalizer(schedule, backupv1.BackupScheduleFinalizer)
 
-	return true, r.client.Patch(ctx, schedule, client.MergeFrom(before))
-}
-
-func (r *defaultReconciler) validate(schedule *backupv1.BackupSchedule) error {
-	return nil
+	return r.client.Patch(ctx, schedule, client.MergeFrom(before))
 }
 
 func (r *defaultReconciler) getBackupSchedule(ctx context.Context, name types.NamespacedName) (*backupv1.BackupSchedule, error) {
