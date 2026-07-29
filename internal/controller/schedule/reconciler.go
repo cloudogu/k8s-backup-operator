@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // BackupScheduleReconciler handles reconciliation logic for BackupSchedule resources.
@@ -20,7 +21,6 @@ type defaultReconciler struct {
 
 	cronJobs   CronJobManager
 	validator  Validator
-	status     StatusManager
 	conditions ConditionManager
 }
 
@@ -40,10 +40,6 @@ type ConditionManager interface {
 	MarkCronJobNotSynced(schedule *backupv1.BackupSchedule, err error)
 	MarkDeleting(schedule *backupv1.BackupSchedule)
 	ComputeReady(schedule *backupv1.BackupSchedule)
-}
-
-type StatusManager interface {
-	Patch(ctx context.Context, before *backupv1.BackupSchedule, after *backupv1.BackupSchedule) error
 }
 
 // NewReconciler creates a new BackupScheduleReconciler instance.
@@ -92,7 +88,7 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 		return err
 	}
 
-	if err := r.removeFinalizer(ctx, schedule); err != nil {
+	if _, err := r.removeFinalizer(ctx, schedule); err != nil {
 		return err
 	}
 
@@ -100,7 +96,7 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 }
 
 func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	if err := r.ensureFinalizerSet(ctx, schedule); err != nil {
+	if _, err := r.ensureFinalizerSet(ctx, schedule); err != nil {
 		return err
 	}
 
@@ -137,12 +133,30 @@ func (r *defaultReconciler) patchStatus(ctx context.Context, before, after *back
 	return r.client.Status().Patch(ctx, after, client.MergeFrom(before))
 }
 
-func (r *defaultReconciler) ensureFinalizerSet(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	return nil
+func (r *defaultReconciler) ensureFinalizerSet(ctx context.Context, schedule *backupv1.BackupSchedule) (bool, error) {
+	if controllerutil.ContainsFinalizer(schedule, backupv1.BackupScheduleFinalizer) {
+		return false, nil
+
+	}
+
+	before := schedule.DeepCopy()
+
+	controllerutil.AddFinalizer(schedule, backupv1.BackupScheduleFinalizer)
+
+	return true, r.patchStatus(ctx, schedule, before)
 }
 
-func (r *defaultReconciler) removeFinalizer(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	return nil
+func (r *defaultReconciler) removeFinalizer(ctx context.Context, schedule *backupv1.BackupSchedule) (bool, error) {
+
+	if !controllerutil.ContainsFinalizer(schedule, backupv1.BackupScheduleFinalizer) {
+		return false, nil
+	}
+
+	before := schedule.DeepCopy()
+
+	controllerutil.RemoveFinalizer(schedule, backupv1.BackupScheduleFinalizer)
+
+	return true, r.patchStatus(ctx, schedule, before)
 }
 
 func (r *defaultReconciler) validate(schedule *backupv1.BackupSchedule) error {

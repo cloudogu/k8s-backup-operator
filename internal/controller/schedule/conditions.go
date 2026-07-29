@@ -9,7 +9,7 @@ import (
 type conditionManager struct{}
 
 func (c conditionManager) MarkAccepted(schedule *v1.BackupSchedule) {
-	schedule.Status.Conditions = append(schedule.Status.Conditions, metav1.Condition{
+	meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
 		Type:    AcceptedCondition,
 		Status:  metav1.ConditionTrue,
 		Reason:  "",
@@ -18,7 +18,7 @@ func (c conditionManager) MarkAccepted(schedule *v1.BackupSchedule) {
 }
 
 func (c conditionManager) MarkInvalid(schedule *v1.BackupSchedule, err error) {
-	schedule.Status.Conditions = append(schedule.Status.Conditions, metav1.Condition{
+	meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
 		Type:    AcceptedCondition,
 		Status:  metav1.ConditionFalse,
 		Reason:  "",
@@ -27,7 +27,7 @@ func (c conditionManager) MarkInvalid(schedule *v1.BackupSchedule, err error) {
 }
 
 func (c conditionManager) MarkCronJobSynced(schedule *v1.BackupSchedule) {
-	schedule.Status.Conditions = append(schedule.Status.Conditions, metav1.Condition{
+	meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
 		Type:    CronJobSyncedCondition,
 		Status:  metav1.ConditionTrue,
 		Reason:  "",
@@ -36,7 +36,7 @@ func (c conditionManager) MarkCronJobSynced(schedule *v1.BackupSchedule) {
 }
 
 func (c conditionManager) MarkCronJobNotSynced(schedule *v1.BackupSchedule, err error) {
-	schedule.Status.Conditions = append(schedule.Status.Conditions, metav1.Condition{
+	meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
 		Type:    CronJobSyncedCondition,
 		Status:  metav1.ConditionFalse,
 		Reason:  "",
@@ -45,7 +45,7 @@ func (c conditionManager) MarkCronJobNotSynced(schedule *v1.BackupSchedule, err 
 }
 
 func (c conditionManager) MarkDeleting(schedule *v1.BackupSchedule) {
-	schedule.Status.Conditions = append(schedule.Status.Conditions, metav1.Condition{
+	meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
 		Type:    DeletingCondition,
 		Status:  metav1.ConditionTrue,
 		Reason:  "",
