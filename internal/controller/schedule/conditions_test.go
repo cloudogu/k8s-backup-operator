@@ -152,7 +152,7 @@ func getCondition(t *testing.T, schedule *backupv1.BackupSchedule, conditionName
 	condition := meta.FindStatusCondition(schedule.Status.Conditions, conditionName)
 
 	if condition == nil {
-		t.Fatalf("condition was nil, expected %s condition", conditionName)
+		t.Fatalf("condition was nil, expectedFinalizerAfter %s condition", conditionName)
 	}
 
 	return condition

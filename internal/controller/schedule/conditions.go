@@ -9,46 +9,46 @@ import (
 type conditionManager struct{}
 
 func (c conditionManager) MarkAccepted(schedule *v1.BackupSchedule) {
-	meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
+	setCondition(schedule, metav1.Condition{
 		Type:    AcceptedCondition,
 		Status:  metav1.ConditionTrue,
-		Reason:  "",
+		Reason:  ReasonValidSpec,
 		Message: "Backup schedule accepted",
 	})
 }
 
 func (c conditionManager) MarkInvalid(schedule *v1.BackupSchedule, err error) {
-	meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
+	setCondition(schedule, metav1.Condition{
 		Type:    AcceptedCondition,
 		Status:  metav1.ConditionFalse,
-		Reason:  "",
+		Reason:  ReasonInvalidSpec,
 		Message: err.Error(),
 	})
 }
 
 func (c conditionManager) MarkCronJobSynced(schedule *v1.BackupSchedule) {
-	meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
+	setCondition(schedule, metav1.Condition{
 		Type:    CronJobSyncedCondition,
 		Status:  metav1.ConditionTrue,
-		Reason:  "",
+		Reason:  ReasonSynced,
 		Message: "CronJob synced",
 	})
 }
 
 func (c conditionManager) MarkCronJobNotSynced(schedule *v1.BackupSchedule, err error) {
-	meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
+	setCondition(schedule, metav1.Condition{
 		Type:    CronJobSyncedCondition,
 		Status:  metav1.ConditionFalse,
-		Reason:  "",
+		Reason:  ReasonSyncFailed,
 		Message: err.Error(),
 	})
 }
 
 func (c conditionManager) MarkDeleting(schedule *v1.BackupSchedule) {
-	meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
+	setCondition(schedule, metav1.Condition{
 		Type:    DeletingCondition,
 		Status:  metav1.ConditionTrue,
-		Reason:  "",
+		Reason:  ReasonDeleting,
 		Message: "Backup schedule is being deleted",
 	})
 }
@@ -60,7 +60,7 @@ func (c conditionManager) ComputeReady(schedule *v1.BackupSchedule) {
 
 	switch {
 	case deleting:
-		meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
+		setCondition(schedule, metav1.Condition{
 			Type:    ReadyCondition,
 			Status:  metav1.ConditionFalse,
 			Reason:  ReasonDeleting,
@@ -68,7 +68,7 @@ func (c conditionManager) ComputeReady(schedule *v1.BackupSchedule) {
 		})
 
 	case !accepted:
-		meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
+		setCondition(schedule, metav1.Condition{
 			Type:    ReadyCondition,
 			Status:  metav1.ConditionFalse,
 			Reason:  ReasonInvalidSpec,
@@ -76,7 +76,7 @@ func (c conditionManager) ComputeReady(schedule *v1.BackupSchedule) {
 		})
 
 	case !synced:
-		meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
+		setCondition(schedule, metav1.Condition{
 			Type:    ReadyCondition,
 			Status:  metav1.ConditionFalse,
 			Reason:  ReasonSyncFailed,
@@ -84,13 +84,17 @@ func (c conditionManager) ComputeReady(schedule *v1.BackupSchedule) {
 		})
 
 	default:
-		meta.SetStatusCondition(&schedule.Status.Conditions, metav1.Condition{
+		setCondition(schedule, metav1.Condition{
 			Type:    ReadyCondition,
 			Status:  metav1.ConditionTrue,
 			Reason:  "",
 			Message: "BackupSchedule is ready.",
 		})
 	}
+}
+
+func setCondition(schedule *v1.BackupSchedule, condition metav1.Condition) {
+	meta.SetStatusCondition(&schedule.Status.Conditions, condition)
 }
 
 func isConditionTrue(schedule *v1.BackupSchedule, conditionType string) bool {

@@ -143,7 +143,7 @@ func (r *defaultReconciler) ensureFinalizerSet(ctx context.Context, schedule *ba
 
 	controllerutil.AddFinalizer(schedule, backupv1.BackupScheduleFinalizer)
 
-	return true, r.patchStatus(ctx, schedule, before)
+	return true, r.client.Patch(ctx, schedule, client.MergeFrom(before))
 }
 
 func (r *defaultReconciler) removeFinalizer(ctx context.Context, schedule *backupv1.BackupSchedule) (bool, error) {
@@ -156,7 +156,7 @@ func (r *defaultReconciler) removeFinalizer(ctx context.Context, schedule *backu
 
 	controllerutil.RemoveFinalizer(schedule, backupv1.BackupScheduleFinalizer)
 
-	return true, r.patchStatus(ctx, schedule, before)
+	return true, r.client.Patch(ctx, schedule, client.MergeFrom(before))
 }
 
 func (r *defaultReconciler) validate(schedule *backupv1.BackupSchedule) error {
