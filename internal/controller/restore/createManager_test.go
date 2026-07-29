@@ -165,9 +165,8 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		// GenericRequeueableError does not unwrap, so the cause is only visible in the message.
 		assert.ErrorContains(t, err, "failed to get restore provider [velero]: provider velero is not ready")
-		assert.ErrorContains(t, err, assert.AnError.Error())
+		assert.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("should return error on failing update status in progress", func(t *testing.T) {

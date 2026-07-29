@@ -1,15 +1,43 @@
 package requeue
 
 import (
-	"github.com/stretchr/testify/assert"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_genericRequeueableError_Error(t *testing.T) {
 	sut := &GenericRequeueableError{"oh noez", assert.AnError}
 	expected := "oh noez: " + assert.AnError.Error()
 	assert.Equal(t, expected, sut.Error())
+}
+
+func Test_genericRequeueableError_Unwrap(t *testing.T) {
+	t.Run("should expose the cause to errors.Is", func(t *testing.T) {
+		// given
+		sut := &GenericRequeueableError{"oh noez", assert.AnError}
+
+		// when
+		wrapped := fmt.Errorf("outer: %w", sut)
+
+		// then
+		assert.ErrorIs(t, wrapped, assert.AnError)
+		var requeueable *GenericRequeueableError
+		assert.ErrorAs(t, wrapped, &requeueable)
+	})
+
+	t.Run("should end the chain on a missing cause", func(t *testing.T) {
+		// given
+		sut := &GenericRequeueableError{ErrMsg: "oh noez"}
+
+		// when
+		actual := sut.Unwrap()
+
+		// then
+		assert.NoError(t, actual)
+	})
 }
 
 func Test_genericRequeueableError_GetRequeueTime(t *testing.T) {
