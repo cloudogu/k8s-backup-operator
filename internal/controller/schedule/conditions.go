@@ -54,8 +54,8 @@ func (c conditionManager) MarkDeleting(schedule *v1.BackupSchedule) {
 }
 
 func (c conditionManager) ComputeReady(schedule *v1.BackupSchedule) {
-	accepted := isConditionTrue(schedule, AcceptedCondition)
-	synced := isConditionTrue(schedule, CronJobSyncedCondition)
+	accepted := meta.FindStatusCondition(schedule.Status.Conditions, AcceptedCondition)
+	synced := meta.FindStatusCondition(schedule.Status.Conditions, CronJobSyncedCondition)
 	deleting := isConditionTrue(schedule, DeletingCondition)
 
 	switch {
@@ -67,7 +67,13 @@ func (c conditionManager) ComputeReady(schedule *v1.BackupSchedule) {
 			Message: "BackupSchedule is being deleted.",
 		})
 
-	case !accepted:
+	case accepted == nil || accepted.Status == metav1.ConditionUnknown:
+		setCondition(schedule, metav1.Condition{
+			Type: ReadyCondition, Status: metav1.ConditionUnknown, Reason: ReasonNotEvaluated,
+			Message: "BackupSchedule spec has not been evaluated.",
+		})
+
+	case accepted.Status == metav1.ConditionFalse:
 		setCondition(schedule, metav1.Condition{
 			Type:    ReadyCondition,
 			Status:  metav1.ConditionFalse,
@@ -75,7 +81,13 @@ func (c conditionManager) ComputeReady(schedule *v1.BackupSchedule) {
 			Message: "BackupSchedule spec is invalid.",
 		})
 
-	case !synced:
+	case synced == nil || synced.Status == metav1.ConditionUnknown:
+		setCondition(schedule, metav1.Condition{
+			Type: ReadyCondition, Status: metav1.ConditionUnknown, Reason: ReasonNotEvaluated,
+			Message: "CronJob synchronization has not been evaluated.",
+		})
+
+	case synced.Status == metav1.ConditionFalse:
 		setCondition(schedule, metav1.Condition{
 			Type:    ReadyCondition,
 			Status:  metav1.ConditionFalse,

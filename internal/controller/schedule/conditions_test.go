@@ -70,7 +70,7 @@ func TestMarkDeleting(t *testing.T) {
 	assert.Equal(t, "Backup schedule is being deleted", c.Message)
 }
 
-func TestComputeReady(t *testing.T) {
+func TestComputeReadyWithEvaluatedConditions(t *testing.T) {
 	tests := []struct {
 		name           string
 		accepted       bool
@@ -136,6 +136,54 @@ func TestComputeReady(t *testing.T) {
 
 			assert.Equal(t, tt.expectedReady, ready.Status)
 			assert.Equal(t, tt.expectedReason, ready.Reason)
+		})
+	}
+}
+
+func TestComputeReadyWithUnevaluatedPrerequisites(t *testing.T) {
+	tests := []struct {
+		name            string
+		conditions      []metav1.Condition
+		expectedMessage string
+	}{
+		{name: "no conditions", expectedMessage: "BackupSchedule spec has not been evaluated."},
+		{
+			name: "accepted condition unknown",
+			conditions: []metav1.Condition{
+				{Type: AcceptedCondition, Status: metav1.ConditionUnknown, Reason: ReasonNotEvaluated},
+			},
+			expectedMessage: "BackupSchedule spec has not been evaluated.",
+		},
+		{
+			name: "cronjob condition missing",
+			conditions: []metav1.Condition{
+				{Type: AcceptedCondition, Status: metav1.ConditionTrue, Reason: ReasonValidSpec},
+			},
+			expectedMessage: "CronJob synchronization has not been evaluated.",
+		},
+		{
+			name: "cronjob condition unknown",
+			conditions: []metav1.Condition{
+				{Type: AcceptedCondition, Status: metav1.ConditionTrue, Reason: ReasonValidSpec},
+				{Type: CronJobSyncedCondition, Status: metav1.ConditionUnknown, Reason: ReasonNotEvaluated},
+			},
+			expectedMessage: "CronJob synchronization has not been evaluated.",
+		},
+	}
+
+	manager := conditionManager{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schedule := newBackupSchedule()
+			schedule.Status.Conditions = tt.conditions
+
+			manager.ComputeReady(schedule)
+
+			ready := getCondition(t, schedule, ReadyCondition)
+			assert.Equal(t, metav1.ConditionUnknown, ready.Status)
+			assert.Equal(t, ReasonNotEvaluated, ready.Reason)
+			assert.Equal(t, tt.expectedMessage, ready.Message)
 		})
 	}
 }

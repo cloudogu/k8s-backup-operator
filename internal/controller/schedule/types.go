@@ -8,9 +8,10 @@ const (
 )
 
 const (
-	ReasonValidSpec   = "ValidSpec"
-	ReasonInvalidSpec = "InvalidSpec"
-	ReasonSynced      = "Synced"
-	ReasonSyncFailed  = "SyncFailed"
-	ReasonDeleting    = "Deleting"
+	ReasonValidSpec    = "ValidSpec"
+	ReasonInvalidSpec  = "InvalidSpec"
+	ReasonSynced       = "Synced"
+	ReasonSyncFailed   = "SyncFailed"
+	ReasonDeleting     = "Deleting"
+	ReasonNotEvaluated = "NotEvaluated"
 )
