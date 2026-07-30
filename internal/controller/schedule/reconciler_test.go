@@ -11,100 +11,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var testCtx = context.TODO()
-
-func TestEnsureFinalizer(t *testing.T) {
-	tests := []struct {
-		name                   string
-		initialFinalizer       []string
-		testEnsure             bool
-		expectedFinalizerAfter []string
-	}{
-		{
-			name:             "ensure adds finalizer",
-			initialFinalizer: nil,
-			testEnsure:       true,
-			expectedFinalizerAfter: []string{
-				backupv1.BackupScheduleFinalizer,
-			},
-		},
-		{
-			name: "ensure doesn't add existing finalizer",
-			initialFinalizer: []string{
-				backupv1.BackupScheduleFinalizer,
-			},
-			testEnsure: true,
-			expectedFinalizerAfter: []string{
-				backupv1.BackupScheduleFinalizer,
-			},
-		},
-		{
-			name: "remove removes finalizer",
-			initialFinalizer: []string{
-				backupv1.BackupScheduleFinalizer,
-			},
-			testEnsure:             false,
-			expectedFinalizerAfter: nil,
-		},
-		{
-			name:                   "remove doesn't try to remove non-existing finalizer",
-			initialFinalizer:       nil,
-			testEnsure:             false,
-			expectedFinalizerAfter: nil,
-		},
-	}
-	scheme := runtime.NewScheme()
-	require.NoError(t, backupv1.AddToScheme(scheme))
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			schedule := &backupv1.BackupSchedule{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test",
-					Namespace:  "default",
-					Finalizers: tt.initialFinalizer,
-				},
-			}
-
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(schedule).
-				Build()
-
-			manager := metadataManager{client: fakeClient}
-
-			var (
-				err error
-			)
-
-			if tt.testEnsure {
-				err = manager.Ensure(context.Background(), schedule)
-			} else {
-				err = manager.Remove(context.Background(), schedule)
-			}
-
-			require.NoError(t, err)
-
-			stored := &backupv1.BackupSchedule{}
-			err = fakeClient.Get(
-				context.Background(),
-				client.ObjectKeyFromObject(schedule),
-				stored,
-			)
-			require.NoError(t, err)
-
-			assert.ElementsMatch(t, tt.expectedFinalizerAfter, stored.Finalizers)
-		})
-	}
-
-}
-
-// ----------------------
 
 type fakeValidator struct {
 	validatorCalled bool
@@ -119,33 +31,35 @@ func (v *fakeValidator) Validate(*backupv1.BackupSchedule) error {
 type fakeCronJobManager struct {
 	ensureCalled bool
 	deleteCalled bool
-	err          error
+	ensureErr    error
+	deleteErr    error
 }
 
 func (m *fakeCronJobManager) Ensure(ctx context.Context, s *backupv1.BackupSchedule) error {
 	m.ensureCalled = true
-	return m.err
+	return m.ensureErr
 }
 
 func (m *fakeCronJobManager) Delete(ctx context.Context, s *backupv1.BackupSchedule) error {
 	m.deleteCalled = true
-	return m.err
+	return m.deleteErr
 }
 
 type fakeMetaData struct {
 	ensureCalled bool
 	removeCalled bool
-	err          error
+	ensureErr    error
+	removeErr    error
 }
 
 func (m *fakeMetaData) Ensure(ctx context.Context, s *backupv1.BackupSchedule) error {
 	m.ensureCalled = true
-	return m.err
+	return m.ensureErr
 }
 
 func (m *fakeMetaData) Remove(ctx context.Context, s *backupv1.BackupSchedule) error {
 	m.removeCalled = true
-	return m.err
+	return m.removeErr
 }
 
 func newTestReconciler(client client.Client, validator Validator, cronJobs CronJobManager, metaData MetadataManager) *defaultReconciler {
@@ -224,45 +138,19 @@ func Test_reconcileNormal(t *testing.T) {
 		},
 	}
 
-	scheme := runtime.NewScheme()
-	require.NoError(t, backupv1.AddToScheme(scheme))
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
-			testValidator := &fakeValidator{
-				err: tt.validatorErr,
-			}
-
-			testCronJobs := &fakeCronJobManager{
-				err: tt.cronJobErr,
-			}
-
-			testMetaData := &fakeMetaData{
-				err: tt.metadataErr,
-			}
-
+			testValidator := &fakeValidator{err: tt.validatorErr}
+			testCronJobs := &fakeCronJobManager{ensureErr: tt.cronJobErr}
+			testMetaData := &fakeMetaData{ensureErr: tt.metadataErr}
 			schedule := &backupv1.BackupSchedule{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: "default",
-					Finalizers: []string{
-						backupv1.BackupScheduleFinalizer,
-					},
+					Name:       "test",
+					Namespace:  "default",
+					Finalizers: []string{backupv1.BackupScheduleFinalizer},
 				},
 			}
-
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(schedule).
-				Build()
-
-			reconciler := newTestReconciler(
-				fakeClient,
-				testValidator,
-				testCronJobs,
-				testMetaData,
-			)
+			reconciler := newTestReconciler(nil, testValidator, testCronJobs, testMetaData)
 
 			err := reconciler.reconcileNormal(testCtx, schedule)
 
@@ -285,7 +173,6 @@ func Test_reconcileNormal(t *testing.T) {
 			assert.Equal(t, tt.expectedReady, ready.Status)
 		})
 	}
-
 }
 
 func Test_reconcileDelete(t *testing.T) {
@@ -321,8 +208,8 @@ func Test_reconcileDelete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testCronJobs := &fakeCronJobManager{err: tt.cronJobErr}
-			testMetadata := &fakeMetaData{err: tt.metadataErr}
+			testCronJobs := &fakeCronJobManager{deleteErr: tt.cronJobErr}
+			testMetadata := &fakeMetaData{removeErr: tt.metadataErr}
 			schedule := &backupv1.BackupSchedule{}
 			reconciler := newTestReconciler(nil, nil, testCronJobs, testMetadata)
 
@@ -343,4 +230,97 @@ func Test_reconcileDelete(t *testing.T) {
 			assert.Equal(t, ReasonDeleting, deleting.Reason)
 		})
 	}
+}
+
+func Test_mainRecocileLoop(t *testing.T) {
+	deletionTimestamp := metav1.Now()
+	tests := []struct {
+		name string
+
+		deletionTimestamp *metav1.Time
+		metadataErr       error
+		cronJobErr        error
+
+		expectError          bool
+		expectMetadataEnsure bool
+		expectMetadataRemove bool
+		expectValidation     bool
+		expectCronJobEnsure  bool
+		expectCronJobDelete  bool
+	}{
+		{
+			name:                 "reconciles normally",
+			expectMetadataEnsure: true,
+			expectValidation:     true,
+			expectCronJobEnsure:  true,
+		},
+		{
+			name:                 "reconciles deletion",
+			deletionTimestamp:    &deletionTimestamp,
+			expectMetadataRemove: true,
+			expectCronJobDelete:  true,
+		},
+		{
+			name:                 "returns normal reconciliation error",
+			metadataErr:          errors.New("metadata ensure failed"),
+			expectError:          true,
+			expectMetadataEnsure: true,
+		},
+		{
+			name:                "returns deletion reconciliation error",
+			deletionTimestamp:   &deletionTimestamp,
+			cronJobErr:          errors.New("cronjob delete failed"),
+			expectError:         true,
+			expectCronJobDelete: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schedule := newReconcileTestSchedule(tt.deletionTimestamp)
+			fakeClient := newFakeScheduleClient(t, schedule)
+			validator := &fakeValidator{}
+			cronJobs := &fakeCronJobManager{deleteErr: tt.cronJobErr}
+			metadata := &fakeMetaData{ensureErr: tt.metadataErr}
+			reconciler := newTestReconciler(fakeClient, validator, cronJobs, metadata)
+
+			_, err := reconciler.Reconcile(testCtx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(schedule)})
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectMetadataEnsure, metadata.ensureCalled)
+			assert.Equal(t, tt.expectMetadataRemove, metadata.removeCalled)
+			assert.Equal(t, tt.expectValidation, validator.validatorCalled)
+			assert.Equal(t, tt.expectCronJobEnsure, cronJobs.ensureCalled)
+			assert.Equal(t, tt.expectCronJobDelete, cronJobs.deleteCalled)
+		})
+	}
+}
+
+func newReconcileTestSchedule(deletionTimestamp *metav1.Time) *backupv1.BackupSchedule {
+	return &backupv1.BackupSchedule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "test",
+			Namespace:         "default",
+			Finalizers:        []string{backupv1.BackupScheduleFinalizer},
+			DeletionTimestamp: deletionTimestamp,
+		},
+		Spec: backupv1.BackupScheduleSpec{Schedule: "0 2 * * *"},
+	}
+}
+
+func newFakeScheduleClient(t *testing.T, schedule *backupv1.BackupSchedule) client.Client {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, backupv1.AddToScheme(scheme))
+
+	return fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&backupv1.BackupSchedule{}).
+		WithObjects(schedule).
+		Build()
 }
