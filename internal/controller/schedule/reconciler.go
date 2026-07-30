@@ -8,13 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
-
-// BackupScheduleReconciler handles reconciliation logic for BackupSchedule resources.
-type BackupScheduleReconciler interface {
-	markAsSyncedToCronJob(schedule *backupv1.BackupSchedule) error
-}
 
 type defaultReconciler struct {
 	client client.Client
@@ -25,41 +19,14 @@ type defaultReconciler struct {
 	conditions ConditionManager
 }
 
-type CronJobManager interface {
-	Ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error
-	Delete(ctx context.Context, schedule *backupv1.BackupSchedule) error
-}
-
-type Validator interface {
-	Validate(*backupv1.BackupSchedule) error
-}
-
-type ConditionManager interface {
-	MarkAccepted(schedule *backupv1.BackupSchedule)
-	MarkInvalid(schedule *backupv1.BackupSchedule, err error)
-	MarkCronJobSynced(schedule *backupv1.BackupSchedule)
-	MarkCronJobNotSynced(schedule *backupv1.BackupSchedule, err error)
-	MarkDeleting(schedule *backupv1.BackupSchedule)
-	ComputeReady(schedule *backupv1.BackupSchedule)
-}
-
-type MetadataManager interface {
-	Ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error
-	Remove(ctx context.Context, schedule *backupv1.BackupSchedule) error
-}
-
-const (
-	LabelApp    = "app"
-	LabelPartOf = "k8s.cloudogu.com/part-of"
-
-	LabelValueApp    = "ces"
-	LabelValuePartOf = "backup"
-)
-
 // NewReconciler creates a new BackupScheduleReconciler instance.
 func NewReconciler(client client.Client) *defaultReconciler {
 	return &defaultReconciler{
-		client: client,
+		client:     client,
+		metadata:   metadataManager{client: client},
+		conditions: conditionManager{},
+		validator:  validator{},
+		cronJobs:   cronJobManager{},
 	}
 }
 
@@ -151,55 +118,6 @@ func (r *defaultReconciler) patchStatus(ctx context.Context, before, after *back
 	}
 
 	return r.client.Status().Patch(ctx, after, client.MergeFrom(before))
-}
-
-func (r *defaultReconciler) ensureMetadataSet(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	before := schedule.DeepCopy()
-	changed := false
-
-	if !controllerutil.ContainsFinalizer(schedule, backupv1.BackupScheduleFinalizer) {
-		controllerutil.AddFinalizer(schedule, backupv1.BackupScheduleFinalizer)
-		changed = true
-	}
-
-	// no labels at all, initialize labels
-	if schedule.Labels == nil {
-		schedule.Labels = map[string]string{}
-	}
-
-	changed = addLabelsIfNecessary(schedule, changed)
-
-	if !changed {
-		return nil
-	}
-
-	return r.client.Patch(ctx, schedule, client.MergeFrom(before))
-}
-
-func addLabelsIfNecessary(schedule *backupv1.BackupSchedule, changed bool) bool {
-	if schedule.Labels[LabelApp] != LabelValueApp {
-		schedule.Labels[LabelApp] = LabelValueApp
-		changed = true
-	}
-
-	if schedule.Labels[LabelPartOf] != LabelValuePartOf {
-		schedule.Labels[LabelPartOf] = LabelValuePartOf
-		changed = true
-	}
-	return changed
-}
-
-func (r *defaultReconciler) removeFinalizer(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-
-	if !controllerutil.ContainsFinalizer(schedule, backupv1.BackupScheduleFinalizer) {
-		return nil
-	}
-
-	before := schedule.DeepCopy()
-
-	controllerutil.RemoveFinalizer(schedule, backupv1.BackupScheduleFinalizer)
-
-	return r.client.Patch(ctx, schedule, client.MergeFrom(before))
 }
 
 func (r *defaultReconciler) getBackupSchedule(ctx context.Context, name types.NamespacedName) (*backupv1.BackupSchedule, error) {

@@ -9,10 +9,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type reconciler interface {
-	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
-}
-
 type Controller struct {
 	client     client.Client
 	reconciler reconciler

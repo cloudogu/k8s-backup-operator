@@ -76,18 +76,16 @@ func TestEnsureFinalizer(t *testing.T) {
 				WithObjects(schedule).
 				Build()
 
-			reconciler := &defaultReconciler{
-				client: fakeClient,
-			}
+			manager := metadataManager{client: fakeClient}
 
 			var (
 				err error
 			)
 
 			if tt.testEnsure {
-				err = reconciler.ensureMetadataSet(context.Background(), schedule)
+				err = manager.Ensure(context.Background(), schedule)
 			} else {
-				err = reconciler.removeFinalizer(context.Background(), schedule)
+				err = manager.Remove(context.Background(), schedule)
 			}
 
 			require.NoError(t, err)

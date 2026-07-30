@@ -10,7 +10,7 @@ import (
 
 type validator struct{}
 
-func (v *validator) Validate(schedule *backupv1.BackupSchedule) error {
+func (v validator) Validate(schedule *backupv1.BackupSchedule) error {
 	if schedule.Spec.Schedule == "" {
 		return errors.New("schedule must not be empty")
 	}
