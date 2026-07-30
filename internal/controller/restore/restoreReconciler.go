@@ -7,6 +7,7 @@ import (
 
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -235,8 +236,15 @@ func (r *restoreReconciler) performOperation(
 }
 
 // SetupWithManager sets up the controller with the Manager.
+//
+// Owns Velero restore resources to get notified when restore finishes or fails.
+//
+// There is deliberately no controller-wide event filter and no predicate on either source: a
+// GenerationChangedPredicate would drop the provider restore's phase transitions and the parent's own
+// status, finalizer and deletion events, all of which this level-triggered workflow reconciles on.
 func (r *restoreReconciler) SetupWithManager(mgr controllerManager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&k8sv1.Restore{}).
+		Owns(&velerov1.Restore{}).
 		Complete(r)
 }

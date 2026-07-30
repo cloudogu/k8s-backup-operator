@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -239,6 +240,8 @@ func Test_restoreReconciler_SetupWithManager(t *testing.T) {
 		ctrlManMock.EXPECT().GetLogger().Return(logger)
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetCache().Return(nil)
+		// only the owned provider restore watch needs to map an owner reference back to its parent
+		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
 
 		sut := &restoreReconciler{}
 
@@ -258,6 +261,9 @@ func createScheme(t *testing.T) *runtime.Scheme {
 	assert.NoError(t, err)
 
 	scheme.AddKnownTypes(gv, &v1.Restore{})
+	// the owned provider restore must be resolvable, otherwise the Owns watch cannot be set up
+	require.NoError(t, velerov1.AddToScheme(scheme))
+
 	return scheme
 }
 
