@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -55,6 +57,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return runStages(ctx, restore,
 		r.ensureLegacyConditionsMigrated,
 		r.ensureDeletionHandled,
+		r.ensureMetadata,
+		r.ensureProviderChildState,
 		r.ensureRestoreCreated,
 	)
 }
@@ -105,6 +109,88 @@ func (r *restoreReconciler) ensureDeletionHandled(ctx context.Context, restore *
 	log.FromContext(ctx).Info(fmt.Sprintf("required operation for restore %s/%s is %s", r.namespace, restore.Name, operationDelete))
 
 	return restore, r.performOperation(ctx, restore, k8sv1.DeleteEventReason, r.manager.delete)
+}
+
+// ensureMetadata adds the finalizer and the labels of a Restore that is about to be worked on,
+// in one no-op-aware write. A write ends the reconciliation and asks for another one, so that at most
+// one mutating stage runs per invocation.
+func (r *restoreReconciler) ensureMetadata(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	if requiredOperation(restore) != operationCreate {
+		return restore, next()
+	}
+
+	written, err := ensureRestoreMetadata(ctx, r.k8sClient, restore)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to converge the metadata of restore %s: %w", restore.Name, err))
+	}
+
+	if written {
+		// retry after defaultDelay is a fallback since the metadata write triggers an instant requeue anyway
+		return restore, retryAfter(defaultRequeueDelay)
+	}
+
+	return restore, next()
+}
+
+// ensureProviderChildState reads the owned provider restore before any destructive preparation can
+// run, which is the workflow's safety barrier: the crash window between child creation and parent
+// status persistence must not repeat cleanup or scale-down. The stage never writes the child. An
+// existing child that this Restore may not use is a terminal failure; an existing child that is ours
+// means the preparation has already happened and must not run again.
+func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	if requiredOperation(restore) != operationCreate {
+		return restore, next()
+	}
+
+	child, err := velero.GetRestore(ctx, r.k8sClient, restore)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to read the provider restore of restore %s: %w", restore.Name, err))
+	}
+
+	if child == nil {
+		return restore, next()
+	}
+
+	if conflictErr := velero.CheckRestoreForConflicts(restore, child); conflictErr != nil {
+		return r.failOnProviderChildConflict(ctx, restore, conflictErr)
+	}
+
+	// Our child already exists, so preparation is done and repeating it would destroy resources while
+	// a provider restore is in flight. Observing the child and finishing the workflow from here is the
+	// provider completion stage's job; until that stage exists this restore makes no further progress,
+	// which is deliberately preferred over repeating cleanup.
+	log.FromContext(ctx).Info(fmt.Sprintf("provider restore of restore %s/%s already exists: skip preparation", r.namespace, restore.Name))
+
+	return restore, abort()
+}
+
+// failOnProviderChildConflict reports an existing provider restore that this Restore may not adopt as
+// a terminal failure, before any preparation ran.
+func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, restore *k8sv1.Restore, conflictErr error) (*k8sv1.Restore, stageOutcome) {
+	r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, conflictErr.Error())
+	metrics.InitRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName)
+
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
+		metav1.Condition{
+			Type:    k8sv1.ConditionProviderRestoreSuccessful,
+			Status:  metav1.ConditionFalse,
+			Reason:  ReasonProviderRestoreConflict,
+			Message: conflictErr.Error(),
+		},
+		metav1.Condition{
+			Type:    k8sv1.ConditionSuccessful,
+			Status:  metav1.ConditionFalse,
+			Reason:  ReasonProviderRestoreConflict,
+			Message: fmt.Sprintf("The restore was not started: %v", conflictErr),
+		},
+	)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to report the provider restore conflict of restore %s: %w", restore.Name, err))
+	}
+
+	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed)
+
+	return updated, abort()
 }
 
 func (r *restoreReconciler) ensureRestoreCreated(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {

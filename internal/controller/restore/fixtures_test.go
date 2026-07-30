@@ -27,6 +27,15 @@ func newParentRestore() *k8sv1.Restore {
 	}
 }
 
+// withMetadata adds the finalizer and the labels the metadata stage writes, so that a test
+// starting behind that stage does not have to reconcile it first.
+func withMetadata(restore *k8sv1.Restore) *k8sv1.Restore {
+	restore.Finalizers = []string{k8sv1.RestoreFinalizer}
+	restore.Labels = restoreLabels()
+
+	return restore
+}
+
 func newRestore() *k8sv1.Restore {
 	return &k8sv1.Restore{
 		ObjectMeta: metav1.ObjectMeta{Name: testRestore, Namespace: testNamespace},

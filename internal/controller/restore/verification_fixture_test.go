@@ -108,6 +108,21 @@ func newRestoreRequest(name string) ctrl.Request {
 // test also has to inject a failure
 func recordClientActions(recorder *clientActionRecorder, next interceptor.Funcs) interceptor.Funcs {
 	return interceptor.Funcs{
+		// Reads are not recorded, but they are still handed on, so that a test can fail one.
+		Get: func(ctx context.Context, wrapped client.WithWatch, key client.ObjectKey, object client.Object, opts ...client.GetOption) error {
+			if next.Get != nil {
+				return next.Get(ctx, wrapped, key, object, opts...)
+			}
+
+			return wrapped.Get(ctx, key, object, opts...)
+		},
+		List: func(ctx context.Context, wrapped client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			if next.List != nil {
+				return next.List(ctx, wrapped, list, opts...)
+			}
+
+			return wrapped.List(ctx, list, opts...)
+		},
 		Create: func(ctx context.Context, wrapped client.WithWatch, object client.Object, opts ...client.CreateOption) error {
 			recorder.record("create", object)
 			if next.Create != nil {
@@ -156,6 +171,15 @@ func recordClientActions(recorder *clientActionRecorder, next interceptor.Funcs)
 
 			return wrapped.SubResource(subResource).Patch(ctx, object, patch, opts...)
 		},
+	}
+}
+
+// updateOf is the action a write of the given object records.
+func updateOf(object client.Object) recordedClientAction {
+	return recordedClientAction{
+		Verb: "update",
+		Type: reflect.TypeOf(object),
+		Key:  client.ObjectKeyFromObject(object),
 	}
 }
 

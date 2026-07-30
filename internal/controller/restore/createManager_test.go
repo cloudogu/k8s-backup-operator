@@ -81,11 +81,10 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assertPersistedMetadata(t, parentClient, restore.Name)
 		assertSuccessfulCondition(t, parentClient, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
 	})
 
-	t.Run("writes the parent only once when its status and metadata are already converged", func(t *testing.T) {
+	t.Run("writes the parent only once when its status is already converged", func(t *testing.T) {
 		restore := &v1.Restore{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:       "restore",
@@ -131,7 +130,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, 0, writes.parent.updates, "neither the finalizer nor the labels may be rewritten")
+		assert.Equal(t, 0, writes.parent.updates, "the metadata is the metadata stage's, so create must not write the object itself")
 		assert.Equal(t, 1, writes.parent.statusUpdates, "only the final Successful condition may be written")
 		assertSuccessfulCondition(t, parentClient, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
 	})
@@ -215,49 +214,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to set status [in progress] in restore resource [restore]")
-		assert.ErrorIs(t, err, assert.AnError)
-	})
-
-	t.Run("should return error on failing add finalizer", func(t *testing.T) {
-		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		expectReadinessCheck(t, nil)
-
-		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, failingUpdate(assert.AnError), restore), recorder: recorderMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to add finalizer [cloudogu-restore-finalizer] in restore resource [restore]")
-		assert.ErrorIs(t, err, assert.AnError)
-	})
-
-	t.Run("should return error on failing add labels", func(t *testing.T) {
-		// given a restore that already carries the finalizer, so the failing update is the label one
-		restore := &v1.Restore{
-			ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace, Finalizers: []string{v1.RestoreFinalizer}},
-			Spec:       v1.RestoreSpec{BackupName: "backup", Provider: "velero"},
-		}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		expectReadinessCheck(t, nil)
-
-		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, failingUpdate(assert.AnError), restore), recorder: recorderMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to add labels to restore resource [restore]")
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 

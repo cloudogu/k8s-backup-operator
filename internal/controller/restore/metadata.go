@@ -18,18 +18,24 @@ func restoreLabels() map[string]string {
 	}
 }
 
-// addFinalizer adds the given finalizer and persists the Restore only if the finalizer set actually
-// changed, so a repeated reconciliation of an already converged Restore writes nothing.
-func addFinalizer(ctx context.Context, k8sClient k8sClient, restore *k8sv1.Restore, finalizer string) error {
-	if !controllerutil.AddFinalizer(restore, finalizer) {
-		return nil
+// ensureRestoreMetadata converges the finalizer and the labels of the given Restore in a single
+// write and reports whether it had to write at all, so that a repeated reconciliation of an already
+// written Restore writes nothing.
+func ensureRestoreMetadata(ctx context.Context, k8sClient k8sClient, restore *k8sv1.Restore) (bool, error) {
+	changed := controllerutil.AddFinalizer(restore, k8sv1.RestoreFinalizer)
+	if applyLabels(restore) {
+		changed = true
+	}
+
+	if !changed {
+		return false, nil
 	}
 
 	if err := k8sClient.Update(ctx, restore); err != nil {
-		return fmt.Errorf("failed to add finalizer %s to restore: %w", finalizer, err)
+		return false, fmt.Errorf("failed to write finalizer %s and labels %v of restore: %w", k8sv1.RestoreFinalizer, restoreLabels(), err)
 	}
 
-	return nil
+	return true, nil
 }
 
 // removeFinalizer removes the given finalizer and persists the Restore only if the finalizer set
@@ -46,9 +52,9 @@ func removeFinalizer(ctx context.Context, k8sClient k8sClient, restore *k8sv1.Re
 	return nil
 }
 
-// addLabels applies the restore labels and persists the Restore only if at least one of them was
-// missing or had a different value.
-func addLabels(ctx context.Context, k8sClient k8sClient, restore *k8sv1.Restore) error {
+// applyLabels sets the restore labels on the given Restore without persisting it and reports whether
+// at least one of them was missing or had a different value.
+func applyLabels(restore *k8sv1.Restore) bool {
 	desired := restoreLabels()
 
 	changed := false
@@ -58,7 +64,7 @@ func addLabels(ctx context.Context, k8sClient k8sClient, restore *k8sv1.Restore)
 		}
 	}
 	if !changed {
-		return nil
+		return false
 	}
 
 	if restore.Labels == nil {
@@ -68,9 +74,5 @@ func addLabels(ctx context.Context, k8sClient k8sClient, restore *k8sv1.Restore)
 		restore.Labels[key] = value
 	}
 
-	if err := k8sClient.Update(ctx, restore); err != nil {
-		return fmt.Errorf("failed to add labels %v to restore: %w", desired, err)
-	}
-
-	return nil
+	return true
 }

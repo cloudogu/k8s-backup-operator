@@ -71,16 +71,6 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	}
 	metrics.UpdateRestoreStatusMetrics(cm.namespace, restore.Name, restore.Spec.BackupName, v1.RestoreStatusInProgress)
 
-	err = addFinalizer(ctx, cm.k8sClient, restore, v1.RestoreFinalizer)
-	if err != nil {
-		return fmt.Errorf("failed to add finalizer [%s] in restore resource [%s]: %w", v1.RestoreFinalizer, restoreName, err)
-	}
-
-	err = addLabels(ctx, cm.k8sClient, restore)
-	if err != nil {
-		return fmt.Errorf("failed to add labels to restore resource [%s]: %w", restoreName, err)
-	}
-
 	err = cm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
 	if err != nil {
 		logger.Error(err, "The Maintenance mode could not be activated. Continuing anyways...")
