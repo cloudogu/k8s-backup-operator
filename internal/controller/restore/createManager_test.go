@@ -6,7 +6,6 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
-	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -36,7 +35,7 @@ func Test_newCreateManager(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 
 		// when
-		manager := newCreateManager(clientMock, testNamespace, nil, nil, nil)
+		manager := newCreateManager(clientMock, testNamespace, nil, nil)
 
 		// then
 		require.NotEmpty(t, manager)
@@ -62,19 +61,14 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
-
 		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
 
 		parentClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
 
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -110,20 +104,15 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
-
 		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
 
 		writes := &clientWrites{}
 		parentClient := newTestClientWithParent(t, writes.interceptor(), restore)
 
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -153,16 +142,11 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
-
 		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 
-		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -197,76 +181,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		assert.Equal(t, 0, writes.total(), "an unready provider must leave the restore untouched")
 	})
 
-	t.Run("should continue with restore when failing ti activate maintenance mode", func(t *testing.T) {
-		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		providerMock := newMockRestoreProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().WaitForRestore(testCtx, matchesRestoreNamed(restore.Name)).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
-
-		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(assert.AnError)
-		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
-
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
-
-		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
-		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
-
-		parentClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
-
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.NoError(t, err)
-		assertSuccessfulCondition(t, parentClient, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
-	})
-
-	t.Run("should return error on cleanup error", func(t *testing.T) {
-		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		expectReadinessCheck(t, nil)
-
-		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
-		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
-
-		scaleManagerMock := newMockScaleManager(t)
-		scaleManagerMock.EXPECT().ScaleDown(testCtx).Return(nil)
-
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(assert.AnError)
-
-		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleManagerMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to cleanup before restore")
-		assert.ErrorIs(t, err, assert.AnError)
-	})
-
 	t.Run("should return error on provider error", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
@@ -284,18 +198,13 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
-
 		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 
 		parentClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
 
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -324,18 +233,13 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
-
 		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 
 		parentClient := newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore)
 
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -364,19 +268,14 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
-
 		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
 
 		parentClient := newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore)
 
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -384,35 +283,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to set status [completed] in restore resource [restore]")
-		assert.ErrorIs(t, err, assert.AnError)
-	})
-
-	t.Run("should return error on scaledown error", func(t *testing.T) {
-		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		expectReadinessCheck(t, nil)
-
-		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
-		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
-
-		cleanupMock := newMockCleanupManager(t)
-
-		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(assert.AnError)
-
-		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to scale down workloads before restore")
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
@@ -434,17 +304,12 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
-
 		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 		scaleMock.EXPECT().ScaleUp(testCtx).Return(assert.AnError)
 
-		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -473,19 +338,14 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
-
 		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
 
 		writes := &clientWrites{}
 		k8sClient := newTestClientWithParent(t, writes.interceptor(), restore, velero.BuildRestore(restore))
-		sut := &defaultCreateManager{k8sClient: k8sClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: k8sClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -512,18 +372,13 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		expectReadinessCheck(t, nil)
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{Title: "Service temporary unavailable", Text: "Restore in progress"}, false).Return(nil)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
-		cleanupMock := newMockCleanupManager(t)
-		cleanupMock.EXPECT().Cleanup(testCtx).Return(nil)
-
 		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 
 		writes := &clientWrites{}
 		k8sClient := newTestClientWithParent(t, writes.interceptor(), restore, foreign)
-		sut := &defaultCreateManager{k8sClient: k8sClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: k8sClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)

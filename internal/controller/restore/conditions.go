@@ -20,8 +20,11 @@ const (
 	// ReasonPreparing marks a running (destructive) preparation, i.e. maintenance mode,
 	// scale-down and cleanup.
 	ReasonPreparing = "Preparing"
-	// ReasonPreparationFailed marks a terminally failed preparation.
+	// ReasonPreparationFailed marks a failed preparation.
 	ReasonPreparationFailed = "PreparationFailed"
+	// ReasonPreparationCompleted marks a finished preparation: maintenance mode is active, the
+	// workloads are scaled down and the resources to be restored are removed.
+	ReasonPreparationCompleted = "PreparationCompleted"
 	// ReasonProviderRestorePending marks an owned provider restore that exists but has not started.
 	ReasonProviderRestorePending = "ProviderRestorePending"
 	// ReasonProviderRestoreRunning marks an owned provider restore that is executing.

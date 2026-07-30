@@ -37,7 +37,7 @@ func newReadyRestore() *backupv1.Restore {
 // reconcilerWithoutExternals builds the reconciler under test without a manager or a recorder, so an
 // external action panics instead of being merely unexpected.
 func reconcilerWithoutExternals(fakeClient client.WithWatch) reconcileFunction {
-	return NewRestoreReconciler(fakeClient, nil, testNamespace, nil).Reconcile
+	return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, nil).Reconcile
 }
 
 func TestRepeatedReconciliationOfAReadyRestoreWithACompletedChildPerformsNoWritesOrExternalActions(t *testing.T) {

@@ -23,7 +23,6 @@ const (
 type defaultCreateManager struct {
 	k8sClient             k8sClient
 	namespace             string
-	cleanup               cleanupManager
 	scaleManager          scaleManager
 	recorder              eventRecorder
 	maintenanceModeSwitch maintenanceModeSwitch
@@ -33,7 +32,6 @@ func newCreateManager(
 	k8sClient k8sClient,
 	namespace string,
 	recorder eventRecorder,
-	cleanup cleanupManager,
 	scaleManager scaleManager,
 ) *defaultCreateManager {
 	maintenanceSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
@@ -42,7 +40,6 @@ func newCreateManager(
 		namespace:             namespace,
 		recorder:              recorder,
 		maintenanceModeSwitch: maintenanceSwitch,
-		cleanup:               cleanup,
 		scaleManager:          scaleManager,
 	}
 }
@@ -67,27 +64,15 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	// the workflow conditions, which is what the scalar is derived from.
 	metrics.UpdateRestoreStatusMetrics(cm.namespace, restore.Name, restore.Spec.BackupName, v1.RestoreStatusInProgress)
 
-	err = cm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
-	if err != nil {
-		logger.Error(err, "The Maintenance mode could not be activated. Continuing anyways...")
-	}
-
+	// Maintenance mode is activated by the preparation stage; it must persist across the provider
+	// execution. This deferred deactivation is the last remnant of the blocking flow and moves to the
+	// provider completion and workload recovery stages together with the wait below.
 	defer func() {
 		errDefer := cm.maintenanceModeSwitch.Deactivate(ctx, false)
 		if errDefer != nil {
 			logger.Error(fmt.Errorf("failed to deactivate maintenance mode: [%w]", errDefer), "restore error")
 		}
 	}()
-
-	err = cm.scaleManager.ScaleDown(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to scale down workloads before restore: %w", err)
-	}
-
-	err = cm.cleanup.Cleanup(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to cleanup before restore: %w", err)
-	}
 
 	err = cm.runProviderRestore(ctx, provider, restore)
 	if err != nil {

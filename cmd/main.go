@@ -330,10 +330,17 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		k8sClient,
 		operatorConfig.Namespace,
 		recorder,
+		scaleManager,
+	)
+	restoreReconciler := restorecontroller.NewRestoreReconciler(
+		k8sClient,
+		recorder,
+		operatorConfig.Namespace,
+		restoreManager,
 		cleanupManager,
 		scaleManager,
 	)
-	if err = (restorecontroller.NewRestoreReconciler(k8sClient, recorder, operatorConfig.Namespace, restoreManager)).SetupWithManager(k8sManager); err != nil {
+	if err = restoreReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 

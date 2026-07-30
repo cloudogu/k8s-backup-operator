@@ -41,7 +41,7 @@ func TestAnExistingOwnedProviderChildStopsTheWorkflowBeforePreparation(t *testin
 
 	managerMock := newMockRestoreManager(t)
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, managerMock).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, managerMock, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedRunningChild(restore))
 
@@ -64,7 +64,7 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 		"velero restore [test-restore] conflicts with the expected child: it is not controlled by restore [test-restore] and must not be adopted").Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, managerMock).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, managerMock, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, conflicting)
 	request := newRestoreRequest(testRestore)
@@ -97,7 +97,7 @@ func TestAnUnreportableProviderChildConflictIsRetried(t *testing.T) {
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, managerMock).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, managerMock, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, foreignChild(restore))
 
@@ -122,7 +122,7 @@ func TestAnUnreadableProviderChildIsRetried(t *testing.T) {
 	}
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, managerMock).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, managerMock, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingChildGet, factory, restore)
 

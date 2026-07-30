@@ -10,11 +10,10 @@ func NewRestoreManager(
 	k8sClient k8sClient,
 	namespace string,
 	recorder eventRecorder,
-	cleanup cleanupManager,
 	scaleManager scaleManager,
 ) *defaultManager {
 	return &defaultManager{
-		createManager: newCreateManager(k8sClient, namespace, recorder, cleanup, scaleManager),
+		createManager: newCreateManager(k8sClient, namespace, recorder, scaleManager),
 		deleteManager: newDeleteManager(k8sClient, namespace, recorder),
 	}
 }

@@ -2,13 +2,17 @@ package restore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
+	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,16 +29,34 @@ const (
 	operationIgnore = operation("ignore")
 )
 
-func NewRestoreReconciler(k8sClient k8sClient, recorder eventRecorder, namespace string, manager restoreManager) *restoreReconciler {
-	return &restoreReconciler{k8sClient: k8sClient, recorder: recorder, namespace: namespace, manager: manager}
+func NewRestoreReconciler(
+	k8sClient k8sClient,
+	recorder eventRecorder,
+	namespace string,
+	manager restoreManager,
+	cleanup cleanupManager,
+	scaleManager scaleManager,
+) *restoreReconciler {
+	return &restoreReconciler{
+		k8sClient:             k8sClient,
+		recorder:              recorder,
+		namespace:             namespace,
+		manager:               manager,
+		cleanup:               cleanup,
+		scaleManager:          scaleManager,
+		maintenanceModeSwitch: repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace),
+	}
 }
 
 // restoreReconciler reconciles a Restore object
 type restoreReconciler struct {
-	k8sClient k8sClient
-	recorder  eventRecorder
-	namespace string
-	manager   restoreManager
+	k8sClient             k8sClient
+	recorder              eventRecorder
+	namespace             string
+	manager               restoreManager
+	cleanup               cleanupManager
+	scaleManager          scaleManager
+	maintenanceModeSwitch maintenanceModeSwitch
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -61,6 +83,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.ensureConditionsInitialized,
 		r.ensureMetadata,
 		r.ensureProviderChildState,
+		r.ensurePreparation,
 		r.ensureRestoreCreated,
 	)
 }
@@ -210,6 +233,89 @@ func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, res
 	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed)
 
 	return updated, abort()
+}
+
+// ensurePreparation runs the destructive preparation of the ecosystem — maintenance mode, scale-down
+// and cleanup. Maintenance mode is activated best-effort: a restore is more valuable than the
+// unavailability notice, so a failed activation is logged and the workflow continues.
+func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	if requiredOperation(restore) != operationCreate {
+		return restore, next()
+	}
+
+	prepared, err := r.isAlreadyPrepared(ctx, restore)
+	if err != nil {
+		return restore, retryOnError(err)
+	}
+	if prepared {
+		return restore, next()
+	}
+
+	// The provider is checked before anything is touched: the preparation is irreversible, so an
+	// unready provider must not cost the ecosystem its availability for a restore that cannot start.
+	_, err = restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
+	}
+
+	logger := log.FromContext(ctx)
+
+	err = r.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
+	if err != nil {
+		logger.Error(err, "The Maintenance mode could not be activated. Continuing anyways...")
+	}
+
+	if err := r.scaleManager.ScaleDown(ctx); err != nil {
+		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to scale down workloads before restore: %w", err))
+	}
+
+	if err := r.cleanup.Cleanup(ctx); err != nil {
+		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to cleanup before restore: %w", err))
+	}
+
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
+		Type:    k8sv1.ConditionPrepared,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonPreparationCompleted,
+		Message: "The ecosystem was prepared for the restore: maintenance mode is active, workloads are scaled down and the resources to be restored are removed.",
+	})
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to persist the preparation of restore %s: %w", restore.Name, err))
+	}
+
+	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
+	return updated, retryAfter(defaultRequeueDelay)
+}
+
+// isAlreadyPrepared reports whether the destructive preparation must be skipped because it has
+// already happened.
+func (r *restoreReconciler) isAlreadyPrepared(ctx context.Context, restore *k8sv1.Restore) (bool, error) {
+	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionPrepared) {
+		return true, nil
+	}
+
+	// The condition is not the single source of truth: If an owned child exists, the preparation already happened.
+	child, err := velero.GetRestore(ctx, r.k8sClient, restore)
+	if err != nil {
+		return false, fmt.Errorf("failed to read the provider restore of restore %s: %w", restore.Name, err)
+	}
+
+	return child != nil && velero.IsOwnedRestore(restore, child), nil
+}
+
+// reportFailedPreparation records a failed preparation as Prepared=False and retries it with the controller-runtime backoff.
+func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore *k8sv1.Restore, preparationErr error) (*k8sv1.Restore, stageOutcome) {
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
+		Type:    k8sv1.ConditionPrepared,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonPreparationFailed,
+		Message: fmt.Sprintf("The preparation of the ecosystem failed and is retried: %v", preparationErr),
+	})
+	if err != nil {
+		preparationErr = errors.Join(preparationErr, fmt.Errorf("failed to report the failed preparation of restore %s: %w", restore.Name, err))
+	}
+
+	return updated, retryOnError(preparationErr)
 }
 
 func (r *restoreReconciler) ensureRestoreCreated(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
