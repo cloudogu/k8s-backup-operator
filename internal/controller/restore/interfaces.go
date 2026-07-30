@@ -60,6 +60,10 @@ type cleanupManager interface {
 	Cleanup(ctx context.Context) error
 }
 
+type restoreProvider interface {
+	provider.Provider
+}
+
 type scaleManager interface {
 	// ScaleDown finds all resources labeled with the scaledown scope label,
 	// stores their current replica count, and scales them to zero.
@@ -111,10 +115,4 @@ type configMapInterface interface {
 //goland:noinspection GoUnusedType
 type ecosystemV1Alpha1Interface interface {
 	ecosystem.V1Alpha1Interface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type restoreProvider interface {
-	provider.Provider
 }

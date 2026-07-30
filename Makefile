@@ -33,7 +33,6 @@ IMAGE_IMPORT_TARGET=image-import
 
 include build/make/k8s-controller.mk
 
-K8S_TEST_CLUSTER_KUBECONFIG?=${KUBECONFIG}
 # Build uses cmd/main.go as entrypoint (repo has no main package in project root).
 GO_BUILD_FLAGS=-mod=vendor -a -o $(BINARY) ./cmd/
 
@@ -86,8 +85,19 @@ print-debug-info: ## Generates indo and the list of environment variables requir
 	@echo "The target generates a list of env variables required to start the operator in debug mode. These can be pasted directly into the 'go build' run configuration in IntelliJ to run and debug the operator on-demand."
 	@echo "STAGE=$(STAGE);LOG_LEVEL=$(LOG_LEVEL);KUBECONFIG=$(KUBECONFIG);NAMESPACE=$(NAMESPACE);DOGU_REGISTRY_ENDPOINT=$(DOGU_REGISTRY_ENDPOINT);DOGU_REGISTRY_USERNAME=$(DOGU_REGISTRY_USERNAME);DOGU_REGISTRY_PASSWORD=$(DOGU_REGISTRY_PASSWORD);DOCKER_REGISTRY={\"auths\":{\"$(docker_registry_server)\":{\"username\":\"$(docker_registry_username)\",\"password\":\"$(docker_registry_password)\",\"email\":\"ignore@me.com\",\"auth\":\"ignoreMe\"}}}"
 
-acceptance-test:
-	go run github.com/onsi/ginkgo/v2/ginkgo --tags=acceptance ./acceptance-tests/...
+# Optional Ginkgo label filter, e.g. GINKGO_LABEL_FILTER=restore
+GINKGO_LABEL_FILTER?=
+GINKGO_SPEC_ARGS=-p -r --tags=acceptance $(if $(GINKGO_LABEL_FILTER),--label-filter="$(GINKGO_LABEL_FILTER)")
+
+.PHONY: acceptance-test
+acceptance-test: ## Run the cluster acceptance specs. DESTRUCTIVE - disposable clusters only.
+	@echo "WARNING: the restore specs delete all dogus and all backup-scope labeled"
+	@echo "ConfigMaps/Secrets/PVCs in the target namespace. Use a disposable cluster."
+	go run github.com/onsi/ginkgo/v2/ginkgo $(GINKGO_SPEC_ARGS) ./acceptance-tests/...
+
+.PHONY: acceptance-test-restore
+acceptance-test-restore: ## Run only the Restore acceptance specs. DESTRUCTIVE - disposable clusters only.
+	@$(MAKE) --no-print-directory acceptance-test GINKGO_LABEL_FILTER=restore
 
 test-env:
 	@echo ${K8S_TEST_CLUSTER_KUBECONFIG}
