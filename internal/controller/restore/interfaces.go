@@ -10,14 +10,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
-
-type ecosystemInterface interface {
-	ecosystem.Interface
-}
 
 type k8sClient interface {
 	client.WithWatch
@@ -73,12 +68,6 @@ type scaleManager interface {
 
 //nolint:unused
 //goland:noinspection GoUnusedType
-type ecosystemRestoreInterface interface {
-	ecosystem.RestoreInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
 type statefulSetInterface interface {
 	appsv1.StatefulSetInterface
 }
@@ -105,10 +94,4 @@ type coreV1Interface interface {
 //goland:noinspection GoUnusedType
 type configMapInterface interface {
 	corev1.ConfigMapInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type ecosystemV1Alpha1Interface interface {
-	ecosystem.V1Alpha1Interface
 }

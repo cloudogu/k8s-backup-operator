@@ -328,7 +328,6 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 
 	restoreManager := restorecontroller.NewRestoreManager(
 		k8sClient,
-		ecosystemClientSet,
 		operatorConfig.Namespace,
 		recorder,
 		cleanupManager,

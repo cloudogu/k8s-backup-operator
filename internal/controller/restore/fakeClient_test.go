@@ -132,8 +132,32 @@ func failingDelete(err error) interceptor.Funcs {
 // failingStatusUpdate makes every status write fail with the given error, for the paths that have to
 // report a status update they could not persist.
 func failingStatusUpdate(err error) interceptor.Funcs {
+	return failingStatusUpdateFrom(1, err)
+}
+
+// failingStatusUpdateFrom makes the nth status write and every later one fail with the given error.
+// The offset is needed because the create flow writes the status more than once and the tests have to
+// pick which of those writes fails.
+func failingStatusUpdateFrom(nth int, err error) interceptor.Funcs {
+	seen := 0
+
 	return interceptor.Funcs{
-		SubResourceUpdate: func(_ context.Context, _ client.Client, _ string, _ client.Object, _ ...client.SubResourceUpdateOption) error {
+		SubResourceUpdate: func(ctx context.Context, wrapped client.Client, subResource string, object client.Object, opts ...client.SubResourceUpdateOption) error {
+			seen++
+			if seen >= nth {
+				return err
+			}
+
+			return wrapped.SubResource(subResource).Update(ctx, object, opts...)
+		},
+	}
+}
+
+// failingUpdate makes every update of the whole object fail with the given error, for the metadata
+// paths. Status writes are left working, so a test can fail a finalizer or label write in isolation.
+func failingUpdate(err error) interceptor.Funcs {
+	return interceptor.Funcs{
+		Update: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.UpdateOption) error {
 			return err
 		},
 	}

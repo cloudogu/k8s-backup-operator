@@ -29,8 +29,8 @@ const (
 	// before restoring.
 	backupScopeLabel = "k8s.cloudogu.com/backup-scope"
 
-	restoreTestNamespace = "ecosystem"
-	throwawayReplicas    = 2
+	restoreTestNamespace       = "ecosystem"
+	throwawayReplicas    int32 = 2
 )
 
 // Restore is a namespace-wide destructive operation: it scales down every

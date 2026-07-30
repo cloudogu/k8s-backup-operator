@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,19 @@ func deletedRestore() *k8sv1.Restore {
 		DeletionTimestamp: &metav1.Time{Time: time.Now()},
 		Finalizers:        []string{k8sv1.RestoreFinalizer},
 	}}
+}
+
+// assertPersistedMetadata asserts the finalizer and the labels the create flow has to apply.
+func assertPersistedMetadata(t *testing.T, testClient client.Client, name string) {
+	t.Helper()
+
+	stored := &k8sv1.Restore{}
+	require.NoError(t, testClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: name}, stored))
+
+	assert.Contains(t, stored.Finalizers, k8sv1.RestoreFinalizer)
+	for key, value := range restoreLabels() {
+		assert.Equal(t, value, stored.Labels[key], "label %s", key)
+	}
 }
 
 // assertSuccessfulCondition asserts the Successful condition persisted through the given client.
