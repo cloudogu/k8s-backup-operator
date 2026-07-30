@@ -115,53 +115,6 @@ func (_c *mockBackupProvider_CreateBackup_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// CreateRestore provides a mock function with given fields: ctx, restore
-func (_m *mockBackupProvider) CreateRestore(ctx context.Context, restore *v1.Restore) error {
-	ret := _m.Called(ctx, restore)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreateRestore")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Restore) error); ok {
-		r0 = rf(ctx, restore)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockBackupProvider_CreateRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateRestore'
-type mockBackupProvider_CreateRestore_Call struct {
-	*mock.Call
-}
-
-// CreateRestore is a helper method to define mock.On call
-//   - ctx context.Context
-//   - restore *v1.Restore
-func (_e *mockBackupProvider_Expecter) CreateRestore(ctx interface{}, restore interface{}) *mockBackupProvider_CreateRestore_Call {
-	return &mockBackupProvider_CreateRestore_Call{Call: _e.mock.On("CreateRestore", ctx, restore)}
-}
-
-func (_c *mockBackupProvider_CreateRestore_Call) Run(run func(ctx context.Context, restore *v1.Restore)) *mockBackupProvider_CreateRestore_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Restore))
-	})
-	return _c
-}
-
-func (_c *mockBackupProvider_CreateRestore_Call) Return(_a0 error) *mockBackupProvider_CreateRestore_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockBackupProvider_CreateRestore_Call) RunAndReturn(run func(context.Context, *v1.Restore) error) *mockBackupProvider_CreateRestore_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // DeleteBackup provides a mock function with given fields: ctx, backup
 func (_m *mockBackupProvider) DeleteBackup(ctx context.Context, backup *v1.Backup) error {
 	ret := _m.Called(ctx, backup)
@@ -345,6 +298,53 @@ func (_c *mockBackupProvider_SyncBackups_Call) Return(_a0 error) *mockBackupProv
 }
 
 func (_c *mockBackupProvider_SyncBackups_Call) RunAndReturn(run func(context.Context) error) *mockBackupProvider_SyncBackups_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WaitForRestore provides a mock function with given fields: ctx, restore
+func (_m *mockBackupProvider) WaitForRestore(ctx context.Context, restore *v1.Restore) error {
+	ret := _m.Called(ctx, restore)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WaitForRestore")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Restore) error); ok {
+		r0 = rf(ctx, restore)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockBackupProvider_WaitForRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForRestore'
+type mockBackupProvider_WaitForRestore_Call struct {
+	*mock.Call
+}
+
+// WaitForRestore is a helper method to define mock.On call
+//   - ctx context.Context
+//   - restore *v1.Restore
+func (_e *mockBackupProvider_Expecter) WaitForRestore(ctx interface{}, restore interface{}) *mockBackupProvider_WaitForRestore_Call {
+	return &mockBackupProvider_WaitForRestore_Call{Call: _e.mock.On("WaitForRestore", ctx, restore)}
+}
+
+func (_c *mockBackupProvider_WaitForRestore_Call) Run(run func(ctx context.Context, restore *v1.Restore)) *mockBackupProvider_WaitForRestore_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Restore))
+	})
+	return _c
+}
+
+func (_c *mockBackupProvider_WaitForRestore_Call) Return(_a0 error) *mockBackupProvider_WaitForRestore_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockBackupProvider_WaitForRestore_Call) RunAndReturn(run func(context.Context, *v1.Restore) error) *mockBackupProvider_WaitForRestore_Call {
 	_c.Call.Return(run)
 	return _c
 }
