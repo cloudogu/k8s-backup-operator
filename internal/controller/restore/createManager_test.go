@@ -197,26 +197,6 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		assert.Equal(t, 0, writes.total(), "an unready provider must leave the restore untouched")
 	})
 
-	t.Run("should return error on failing update status in progress", func(t *testing.T) {
-		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		expectReadinessCheck(t, nil)
-
-		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore), recorder: recorderMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to set status [in progress] in restore resource [restore]")
-		assert.ErrorIs(t, err, assert.AnError)
-	})
-
 	t.Run("should continue with restore when failing ti activate maintenance mode", func(t *testing.T) {
 		// given
 		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
@@ -353,8 +333,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		scaleMock := newMockScaleManager(t)
 		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 
-		// the in-progress status still has to persist, only the terminal condition must fail
-		parentClient := newTestClientWithParent(t, failingStatusUpdateFrom(2, assert.AnError), restore)
+		parentClient := newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore)
 
 		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 
@@ -395,8 +374,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		scaleMock.EXPECT().ScaleDown(testCtx).Return(nil)
 		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
 
-		// the in-progress status still has to persist, only the terminal condition must fail
-		parentClient := newTestClientWithParent(t, failingStatusUpdateFrom(2, assert.AnError), restore)
+		parentClient := newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore)
 
 		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, cleanup: cleanupMock, scaleManager: scaleMock, namespace: testNamespace}
 

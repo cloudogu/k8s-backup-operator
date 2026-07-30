@@ -36,6 +36,14 @@ func withMetadata(restore *k8sv1.Restore) *k8sv1.Restore {
 	return restore
 }
 
+// withInitializedConditions adds the Unknown workflow conditions the condition stage writes, so that
+// a test starting behind that stage does not have to reconcile it first.
+func withInitializedConditions(restore *k8sv1.Restore) *k8sv1.Restore {
+	applyConditions(restore, missingWorkflowConditions(restore))
+
+	return restore
+}
+
 func newRestore() *k8sv1.Restore {
 	return &k8sv1.Restore{
 		ObjectMeta: metav1.ObjectMeta{Name: testRestore, Namespace: testNamespace},

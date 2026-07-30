@@ -141,13 +141,18 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			require.NoError(t, sut.k8sClient.Get(testCtx, client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
 			assert.Equal(t, v1.RestoreStatusFailed, stored.Status.Status)
 		})
-		t.Run("should ignore a status phase without writing", func(t *testing.T) {
+		t.Run("should ignore a completed restore without writing", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
 			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
 				Name:      testRestore,
 				Namespace: testNamespace,
-			}, Status: v1.RestoreStatus{Status: "some-unknown-status"}}
+			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusCompleted, Conditions: []metav1.Condition{{
+				Type:               v1.ConditionSuccessful,
+				Status:             metav1.ConditionTrue,
+				Reason:             ReasonRestoreCompleted,
+				LastTransitionTime: metav1.Now(),
+			}}}}
 
 			writes := &clientWrites{}
 			sut := &restoreReconciler{
@@ -169,7 +174,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		t.Run("should retry on create error", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := withMetadata(newRestore())
+			restore := withInitializedConditions(withMetadata(newRestore()))
 
 			managerMock := newMockRestoreManager(t)
 			managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(assert.AnError)
@@ -195,7 +200,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		t.Run("should succeed with create", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := withMetadata(newRestore())
+			restore := withInitializedConditions(withMetadata(newRestore()))
 
 			managerMock := newMockRestoreManager(t)
 			managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(nil)
@@ -309,22 +314,22 @@ func Test_requiredOperation(t *testing.T) {
 			reasonWhy: "terminal",
 		},
 		{
-			name:      "ignore a restore with an unknown outcome",
+			name:      "continue a restore with an unknown outcome",
 			restore:   &v1.Restore{Status: v1.RestoreStatus{Conditions: successful(metav1.ConditionUnknown)}},
-			expected:  operationIgnore,
-			reasonWhy: "an interrupted restore may not repeat the destructive preparation; resuming needs the staged flow",
+			expected:  operationCreate,
+			reasonWhy: "an unknown outcome means in flight, so the staged workflow resumes where it stopped",
 		},
 		{
-			name:      "ignore a legacy restore that is still in progress",
+			name:      "continue a legacy restore that is still in progress",
 			restore:   &v1.Restore{Status: v1.RestoreStatus{Status: v1.RestoreStatusInProgress}},
-			expected:  operationIgnore,
+			expected:  operationCreate,
 			reasonWhy: "same as an unknown outcome, reached through the deprecated scalar status",
 		},
 		{
-			name:      "ignore a legacy restore with an uninterpretable status",
+			name:      "continue a legacy restore with an uninterpretable status",
 			restore:   &v1.Restore{Status: v1.RestoreStatus{Status: "some-unknown-status"}},
-			expected:  operationIgnore,
-			reasonWhy: "an unreadable legacy value must not start a destructive restore",
+			expected:  operationCreate,
+			reasonWhy: "an unreadable legacy value carries no outcome, and the child barrier guards the destructive stages",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {

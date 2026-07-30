@@ -15,7 +15,7 @@ import (
 // The metadata stage writes the finalizer and the labels in one update and ends the reconciliation,
 // so the following reconciliation is the one that starts the restore.
 func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing.T) {
-	restore := newParentRestore()
+	restore := withInitializedConditions(newParentRestore())
 
 	managerMock := newMockRestoreManager(t)
 	managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(nil).Once()
@@ -40,7 +40,7 @@ func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing
 }
 
 func TestEnsureMetadataDoesNotWriteAgain(t *testing.T) {
-	restore := withMetadata(newParentRestore())
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	managerMock := newMockRestoreManager(t)
 	managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(nil).Once()
@@ -61,7 +61,7 @@ func TestEnsureMetadataDoesNotWriteAgain(t *testing.T) {
 
 // The manager is nil, so a failing metadata write must not reach the create operation.
 func TestEnsureMetadataRetriesAFailedWriteWithoutStartingTheRestore(t *testing.T) {
-	restore := newParentRestore()
+	restore := withInitializedConditions(newParentRestore())
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil).Reconcile

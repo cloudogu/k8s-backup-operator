@@ -56,19 +56,15 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 
 	restoreName := restore.Name
 
-	// The readiness gate runs before any status write so that an unready provider leaves the Restore
-	// untouched: the deprecated scalar status stays New and requiredOperation still reports create, so
-	// the retry this reconciliation asks for actually re-enters the workflow. Once conditions are
-	// seeded and the workflow is resumable, that ordering constraint disappears.
+	// The readiness gate becomes its own stage; it stays first here so that an unready provider aborts
+	// before the destructive preparation runs.
 	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder, cm.k8sClient)
 	if err != nil {
 		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
 	}
 
-	restore, err = conditions.setLegacyStatus(ctx, restore, v1.RestoreStatusInProgress)
-	if err != nil {
-		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusInProgress, restoreName, err)
-	}
+	// The in-progress scalar status is no longer written here: the condition stage already initialized
+	// the workflow conditions, which is what the scalar is derived from.
 	metrics.UpdateRestoreStatusMetrics(cm.namespace, restore.Name, restore.Spec.BackupName, v1.RestoreStatusInProgress)
 
 	err = cm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)

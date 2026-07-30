@@ -58,6 +58,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return runStages(ctx, restore,
 		r.ensureLegacyConditionsMigrated,
 		r.ensureDeletionHandled,
+		r.ensureConditionsInitialized,
 		r.ensureMetadata,
 		r.ensureProviderChildState,
 		r.ensureRestoreCreated,
@@ -65,23 +66,40 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // requiredOperation decides what this reconciliation has to do. The decision is derived from the
-// deletion timestamp and from the effective Successful condition; the deprecated scalar status is
-// only consulted to keep a legacy value this operator cannot interpret out of the workflow.
+// deletion timestamp and from the effective Successful condition.
 func requiredOperation(restore *k8sv1.Restore) operation {
 	if restore.DeletionTimestamp != nil && !restore.DeletionTimestamp.IsZero() {
 		return operationDelete
 	}
 
-	successful := effectiveSuccessfulCondition(restore)
-	switch {
-	case successful == nil && restore.Status.Status == k8sv1.RestoreStatusNew:
-		return operationCreate
-	case successful == nil:
-		// An already started status must not start a destructive restore.
-		return operationIgnore
-	default:
+	if isTerminal(restore) {
 		return operationIgnore
 	}
+
+	return operationCreate
+}
+
+// ensureConditionsInitialized makes a restore that is about to run observable: all conditions of the
+// workflow are written as Unknown in one status write, before any destructive stage, so that a
+// running restore shows the milestones it has not reached yet instead of hiding them. Only absent
+// conditions are written, so a milestone a later stage resolved is never reset to Unknown.
+func (r *restoreReconciler) ensureConditionsInitialized(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	if requiredOperation(restore) != operationCreate {
+		return restore, next()
+	}
+
+	missing := missingWorkflowConditions(restore)
+	if len(missing) == 0 {
+		return restore, next()
+	}
+
+	initialized, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, missing...)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to initialize the conditions of restore %s: %w", restore.Name, err))
+	}
+
+	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
+	return initialized, retryAfter(defaultRequeueDelay)
 }
 
 // ensureLegacyConditionsMigrated persists the Successful condition derived from the

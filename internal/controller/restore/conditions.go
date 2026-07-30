@@ -57,6 +57,38 @@ const (
 	ReasonMigratedFromLegacyStatus = "MigratedFromLegacyStatus"
 )
 
+// workflowConditionTypes are the conditions every running restore carries, in the order a reader of
+// the status should see them.
+var workflowConditionTypes = []string{
+	k8sv1.ConditionSuccessful,
+	k8sv1.ConditionPrepared,
+	k8sv1.ConditionProviderRestoreSuccessful,
+	k8sv1.ConditionWorkloadsRecovered,
+	k8sv1.ConditionBackupsSynchronized,
+}
+
+// missingWorkflowConditions returns the workflow conditions the restore does not carry yet, as
+// Unknown. A condition that is already present is never returned, so a milestone that a stage has
+// already resolved cannot fall back to Unknown.
+func missingWorkflowConditions(restore *k8sv1.Restore) []metav1.Condition {
+	var missing []metav1.Condition
+
+	for _, conditionType := range workflowConditionTypes {
+		if meta.FindStatusCondition(restore.Status.Conditions, conditionType) != nil {
+			continue
+		}
+
+		missing = append(missing, metav1.Condition{
+			Type:    conditionType,
+			Status:  metav1.ConditionUnknown,
+			Reason:  ReasonPending,
+			Message: "The restore workflow has not reached this milestone yet.",
+		})
+	}
+
+	return missing
+}
+
 // observeProviderRestoreState maps the state of the owned provider restore to the status and reason
 // of the tri-state ProviderRestoreSuccessful condition.
 //

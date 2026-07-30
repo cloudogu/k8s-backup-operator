@@ -35,17 +35,6 @@ func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Res
 	})
 }
 
-// setLegacyStatus persists the deprecated scalar status directly, for the two workflow steps that
-// have no condition to write yet: marking a starting restore as in progress and a deleted one as
-// deleting. It exists so that the scalar keeps exactly one writer while the workflow is still
-// blocking; the condition seeding of the continuous workflow replaces both call sites and this
-// method goes with them.
-func (u *conditionUpdater) setLegacyStatus(ctx context.Context, restore *k8sv1.Restore, status string) (*k8sv1.Restore, error) {
-	return u.updateStatus(ctx, restore, func(desired *k8sv1.Restore) {
-		desired.Status.Status = status
-	})
-}
-
 // updateStatus applies mutate to a copy of the Restore status and persists it, unless the mutation
 // changed nothing. A conflict is resolved by re-reading the Restore and applying mutate again, so a
 // concurrent status write is never dropped.

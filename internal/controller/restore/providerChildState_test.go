@@ -37,7 +37,7 @@ func foreignChild(parent *k8sv1.Restore) *velerov1.Restore {
 }
 
 func TestAnExistingOwnedProviderChildStopsTheWorkflowBeforePreparation(t *testing.T) {
-	restore := withMetadata(newParentRestore())
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	managerMock := newMockRestoreManager(t)
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
@@ -55,7 +55,7 @@ func TestAnExistingOwnedProviderChildStopsTheWorkflowBeforePreparation(t *testin
 }
 
 func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T) {
-	restore := withMetadata(newParentRestore())
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
 	conflicting := foreignChild(restore)
 
 	managerMock := newMockRestoreManager(t)
@@ -90,7 +90,7 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 }
 
 func TestAnUnreportableProviderChildConflictIsRetried(t *testing.T) {
-	restore := withMetadata(newParentRestore())
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	managerMock := newMockRestoreManager(t)
 	recorderMock := newMockEventRecorder(t)
@@ -108,7 +108,7 @@ func TestAnUnreportableProviderChildConflictIsRetried(t *testing.T) {
 }
 
 func TestAnUnreadableProviderChildIsRetried(t *testing.T) {
-	restore := withMetadata(newParentRestore())
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	managerMock := newMockRestoreManager(t)
 	failingChildGet := interceptor.Funcs{
