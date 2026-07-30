@@ -289,3 +289,60 @@ func Test_reconcileNormal(t *testing.T) {
 	}
 
 }
+
+func Test_reconcileDelete(t *testing.T) {
+	tests := []struct {
+		name string
+
+		cronJobErr  error
+		metadataErr error
+
+		expectError          bool
+		expectDeleteCalled   bool
+		expectMetadataRemove bool
+	}{
+		{
+			name:                 "successful deletion",
+			expectDeleteCalled:   true,
+			expectMetadataRemove: true,
+		},
+		{
+			name:               "error deleting cronjob",
+			cronJobErr:         errors.New("deleting cronjob failed"),
+			expectError:        true,
+			expectDeleteCalled: true,
+		},
+		{
+			name:                 "error removing finalizer",
+			metadataErr:          errors.New("deleting metadata failed"),
+			expectError:          true,
+			expectDeleteCalled:   true,
+			expectMetadataRemove: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCronJobs := &fakeCronJobManager{err: tt.cronJobErr}
+			testMetadata := &fakeMetaData{err: tt.metadataErr}
+			schedule := &backupv1.BackupSchedule{}
+			reconciler := newTestReconciler(nil, nil, testCronJobs, testMetadata)
+
+			err := reconciler.reconcileDelete(testCtx, schedule)
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.expectDeleteCalled, testCronJobs.deleteCalled)
+			assert.Equal(t, tt.expectMetadataRemove, testMetadata.removeCalled)
+
+			deleting := meta.FindStatusCondition(schedule.Status.Conditions, DeletingCondition)
+			require.NotNil(t, deleting)
+			assert.Equal(t, metav1.ConditionTrue, deleting.Status)
+			assert.Equal(t, ReasonDeleting, deleting.Reason)
+		})
+	}
+}
