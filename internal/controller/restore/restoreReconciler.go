@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
@@ -54,42 +55,70 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	logger.Info(fmt.Sprintf("found restore resource %s", req.NamespacedName))
 
-	requiredOperation := evaluateRequiredOperation(restore)
-	logger.Info(fmt.Sprintf("required operation for restore %s is %s", req.NamespacedName, requiredOperation))
-
-	switch requiredOperation {
-	case operationCreate:
-		return r.performCreateOperation(ctx, restore)
-	case operationDelete:
-		return r.performDeleteOperation(ctx, restore)
-	case operationIgnore:
-		return ctrl.Result{}, nil
-	default:
-		return ctrl.Result{}, fmt.Errorf("unknown operation: %s", requiredOperation)
-	}
+	return runStages(ctx, restore,
+		r.ensureLegacyConditionsMigrated,
+		r.ensureDeletionHandled,
+		r.ensureRestoreCreated,
+	)
 }
 
-func evaluateRequiredOperation(restore *k8sv1.Restore) operation {
+// requiredOperation decides what this reconciliation has to do. The decision is derived from the
+// deletion timestamp and from the effective Successful condition; the deprecated scalar status is
+// only consulted to keep a legacy value this operator cannot interpret out of the workflow.
+func requiredOperation(restore *k8sv1.Restore) operation {
 	if restore.DeletionTimestamp != nil && !restore.DeletionTimestamp.IsZero() {
 		return operationDelete
 	}
 
-	switch restore.Status.Status {
-	case k8sv1.RestoreStatusFailed:
-		return operationIgnore
-	case k8sv1.RestoreStatusNew:
+	successful := effectiveSuccessfulCondition(restore)
+	switch {
+	case successful == nil && restore.Status.Status == k8sv1.RestoreStatusNew:
 		return operationCreate
+	case successful == nil:
+		// An already started status must not start a destructive restore.
+		return operationIgnore
 	default:
 		return operationIgnore
 	}
 }
 
-func (r *restoreReconciler) performCreateOperation(ctx context.Context, restore *k8sv1.Restore) (ctrl.Result, error) {
-	return r.performOperation(ctx, restore, k8sv1.CreateEventReason, k8sv1.RestoreStatusNew, r.manager.create)
+// ensureLegacyConditionsMigrated persists the Successful condition derived from the
+// status phase of a Restore created before conditions existed. A Restore that is being deleted is left alone:
+// its outcome no longer matters and writing conditions would only fight the deletion.
+func (r *restoreReconciler) ensureLegacyConditionsMigrated(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	if requiredOperation(restore) == operationDelete {
+		return restore, next()
+	}
+
+	updater := newConditionUpdater(r.clientSet.EcosystemV1Alpha1().Restores(r.namespace))
+
+	migrated, err := updater.setConditionsFromLegacyStatus(ctx, restore)
+	if err != nil {
+		return restore, retryOnError(err)
+	}
+
+	return migrated, next()
 }
 
-func (r *restoreReconciler) performDeleteOperation(ctx context.Context, restore *k8sv1.Restore) (ctrl.Result, error) {
-	return r.performOperation(ctx, restore, k8sv1.DeleteEventReason, restore.Status.Status, r.manager.delete)
+func (r *restoreReconciler) ensureDeletionHandled(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	if requiredOperation(restore) != operationDelete {
+		return restore, next()
+	}
+
+	log.FromContext(ctx).Info(fmt.Sprintf("required operation for restore %s/%s is %s", r.namespace, restore.Name, operationDelete))
+
+	return restore, r.performOperation(ctx, restore, k8sv1.DeleteEventReason, restore.Status.Status, r.manager.delete)
+}
+
+func (r *restoreReconciler) ensureRestoreCreated(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	op := requiredOperation(restore)
+	log.FromContext(ctx).Info(fmt.Sprintf("required operation for restore %s/%s is %s", r.namespace, restore.Name, op))
+
+	if op != operationCreate {
+		return restore, abort()
+	}
+
+	return restore, r.performOperation(ctx, restore, k8sv1.CreateEventReason, k8sv1.RestoreStatusNew, r.manager.create)
 }
 
 // performOperation executes the given operationFn and requeues if necessary.
@@ -100,7 +129,7 @@ func (r *restoreReconciler) performOperation(
 	eventReason string,
 	requeueStatus string,
 	operationFn func(context.Context, *k8sv1.Restore) error,
-) (ctrl.Result, error) {
+) stageOutcome {
 	logger := log.FromContext(ctx)
 
 	operationError := operationFn(ctx, restore)
@@ -120,10 +149,14 @@ func (r *restoreReconciler) performOperation(
 	if handleErr != nil {
 		r.recorder.Eventf(restore, corev1.EventTypeWarning, requeue.RequeueEventReason,
 			"Failed to requeue the %s.", strings.ToLower(eventReason))
-		return ctrl.Result{}, fmt.Errorf("failed to handle requeue: %w", handleErr)
+		return retryOnError(fmt.Errorf("failed to handle requeue: %w", handleErr))
 	}
 
-	return result, nil
+	if result.Requeue || result.RequeueAfter > 0 {
+		// if RequeueAfter is 0, use 1 second - Requeue = true is deprecated, and RequeueAfter needs a positive value to requeue at all.
+		return retryAfter(max(time.Second, result.RequeueAfter))
+	}
+	return abort()
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -2,6 +2,9 @@ package restore
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -10,8 +13,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"testing"
-	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,6 +27,38 @@ var testCtx = context.TODO()
 
 var testNamespace = "ecosystem-test"
 var testRestore = "test-restore"
+
+// expectSuccessfulConditionUpdate expects exactly one status update carrying a Successful condition
+// of the given status and reason, and returns the written object so a following Get sees it.
+func expectSuccessfulConditionUpdate(restoreClient *mockEcosystemRestoreInterface, status metav1.ConditionStatus, reason string) {
+	matchesCondition := mock.MatchedBy(func(restore *v1.Restore) bool {
+		condition := findSuccessfulCondition(restore)
+
+		return condition != nil && condition.Status == status && condition.Reason == reason
+	})
+
+	restoreClient.EXPECT().
+		UpdateStatus(testCtx, matchesCondition, metav1.UpdateOptions{}).
+		RunAndReturn(func(_ context.Context, written *v1.Restore, _ metav1.UpdateOptions) (*v1.Restore, error) {
+			return written, nil
+		}).
+		Once()
+}
+
+// expectFailingSuccessfulConditionUpdate expects one status update carrying a Successful condition
+// of the given status and reason, and fails it.
+func expectFailingSuccessfulConditionUpdate(restoreClient *mockEcosystemRestoreInterface, status metav1.ConditionStatus, reason string, updateErr error) {
+	matchesCondition := mock.MatchedBy(func(restore *v1.Restore) bool {
+		condition := findSuccessfulCondition(restore)
+
+		return condition != nil && condition.Status == status && condition.Reason == reason
+	})
+
+	restoreClient.EXPECT().
+		UpdateStatus(testCtx, matchesCondition, metav1.UpdateOptions{}).
+		Return(nil, updateErr).
+		Once()
+}
 
 func TestNewRestoreReconciler(t *testing.T) {
 	t.Run("should create restore reconciler", func(t *testing.T) {
@@ -124,7 +157,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			recorderMock := newMockEventRecorder(t)
 			recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, v1.DeleteEventReason, "Delete failed. Reason: assert.AnError general error for testing").Return()
 			requeueHandlerMock := newMockRequeueHandler(t)
-			requeueHandlerMock.EXPECT().Handle(testCtx, "Delete of restore test-restore failed", restore, assert.AnError, v1.RestoreStatusNew).Return(reconcile.Result{Requeue: true}, nil)
+			requeueHandlerMock.EXPECT().Handle(testCtx, "Delete of restore test-restore failed", restore, assert.AnError, v1.RestoreStatusNew).Return(reconcile.Result{Requeue: true}, nil) //nolint:staticcheck // the handler still returns the deprecated flag; the reconciler translates it
 
 			sut := &restoreReconciler{
 				namespace:      testNamespace,
@@ -139,7 +172,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 
 			// then
 			require.NoError(t, err)
-			assert.Equal(t, ctrl.Result{Requeue: true}, actual)
+			assert.Equal(t, ctrl.Result{RequeueAfter: time.Second}, actual)
 		})
 		t.Run("should succeed with delete", func(t *testing.T) {
 			// given
@@ -182,7 +215,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 	})
 
 	t.Run("ignore tests", func(t *testing.T) {
-		t.Run("should ignore when status is failed", func(t *testing.T) {
+		t.Run("should migrate the legacy status of a failed restore once and then ignore it", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
 			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
@@ -192,6 +225,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 
 			restoreClientMock := newMockEcosystemRestoreInterface(t)
 			restoreClientMock.EXPECT().Get(testCtx, testRestore, metav1.GetOptions{}).Return(restore, nil)
+			expectSuccessfulConditionUpdate(restoreClientMock, metav1.ConditionFalse, ReasonMigratedFromLegacyStatus)
 			v1alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
 			v1alpha1Mock.EXPECT().Restores(testNamespace).Return(restoreClientMock)
 			clientSetMock := newMockEcosystemInterface(t)
@@ -208,8 +242,9 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			// then
 			require.NoError(t, err)
 			assert.Equal(t, ctrl.Result{}, actual)
+			assert.Equal(t, v1.RestoreStatusFailed, restore.Status.Status)
 		})
-		t.Run("should ignore when status is unknown", func(t *testing.T) {
+		t.Run("should ignore a status phase without writing", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
 			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
@@ -299,7 +334,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			recorderMock := newMockEventRecorder(t)
 			recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, v1.CreateEventReason, "Creation failed. Reason: assert.AnError general error for testing").Return()
 			requeueHandlerMock := newMockRequeueHandler(t)
-			requeueHandlerMock.EXPECT().Handle(testCtx, "Creation of restore test-restore failed", restore, assert.AnError, v1.RestoreStatusNew).Return(reconcile.Result{Requeue: true}, nil)
+			requeueHandlerMock.EXPECT().Handle(testCtx, "Creation of restore test-restore failed", restore, assert.AnError, v1.RestoreStatusNew).Return(reconcile.Result{Requeue: true}, nil) //nolint:staticcheck // the handler still returns the deprecated flag; the reconciler translates it
 
 			sut := &restoreReconciler{
 				namespace:      testNamespace,
@@ -314,7 +349,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 
 			// then
 			require.NoError(t, err)
-			assert.Equal(t, ctrl.Result{Requeue: true}, actual)
+			assert.Equal(t, ctrl.Result{RequeueAfter: time.Second}, actual)
 		})
 		t.Run("should succeed with create", func(t *testing.T) {
 			// given
@@ -397,4 +432,70 @@ func createScheme(t *testing.T) *runtime.Scheme {
 
 	scheme.AddKnownTypes(gv, &v1.Restore{})
 	return scheme
+}
+
+func Test_requiredOperation(t *testing.T) {
+	successful := func(status metav1.ConditionStatus) []metav1.Condition {
+		return []metav1.Condition{{Type: v1.ConditionSuccessful, Status: status, Reason: "TestReason", LastTransitionTime: metav1.Now()}}
+	}
+
+	for _, testCase := range []struct {
+		name      string
+		restore   *v1.Restore
+		expected  operation
+		reasonWhy string
+	}{
+		{
+			name:      "delete a restore that is being deleted",
+			restore:   &v1.Restore{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
+			expected:  operationDelete,
+			reasonWhy: "deletion wins over any outcome, including a terminal one",
+		},
+		{
+			name:      "delete a completed restore that is being deleted",
+			restore:   &v1.Restore{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: time.Now()}}, Status: v1.RestoreStatus{Conditions: successful(metav1.ConditionTrue)}},
+			expected:  operationDelete,
+			reasonWhy: "deleting a finished restore is the normal case",
+		},
+		{
+			name:      "create a fresh restore",
+			restore:   &v1.Restore{},
+			expected:  operationCreate,
+			reasonWhy: "no outcome and no legacy status means the work has not started",
+		},
+		{
+			name:      "ignore a successful restore",
+			restore:   &v1.Restore{Status: v1.RestoreStatus{Conditions: successful(metav1.ConditionTrue)}},
+			expected:  operationIgnore,
+			reasonWhy: "terminal",
+		},
+		{
+			name:      "ignore a failed restore",
+			restore:   &v1.Restore{Status: v1.RestoreStatus{Conditions: successful(metav1.ConditionFalse)}},
+			expected:  operationIgnore,
+			reasonWhy: "terminal",
+		},
+		{
+			name:      "ignore a restore with an unknown outcome",
+			restore:   &v1.Restore{Status: v1.RestoreStatus{Conditions: successful(metav1.ConditionUnknown)}},
+			expected:  operationIgnore,
+			reasonWhy: "an interrupted restore may not repeat the destructive preparation; resuming needs the staged flow",
+		},
+		{
+			name:      "ignore a legacy restore that is still in progress",
+			restore:   &v1.Restore{Status: v1.RestoreStatus{Status: v1.RestoreStatusInProgress}},
+			expected:  operationIgnore,
+			reasonWhy: "same as an unknown outcome, reached through the deprecated scalar status",
+		},
+		{
+			name:      "ignore a legacy restore with an uninterpretable status",
+			restore:   &v1.Restore{Status: v1.RestoreStatus{Status: "some-unknown-status"}},
+			expected:  operationIgnore,
+			reasonWhy: "an unreadable legacy value must not start a destructive restore",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			assert.Equal(t, testCase.expected, requiredOperation(testCase.restore), testCase.reasonWhy)
+		})
+	}
 }
