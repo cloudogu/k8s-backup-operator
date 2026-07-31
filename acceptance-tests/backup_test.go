@@ -4,6 +4,7 @@ package specs
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -11,6 +12,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,98 +20,198 @@ import (
 )
 
 var _ = Describe("Backup", Label("backup"), Ordered, func() {
-	FDescribe("Creating a backup", Ordered, func() {
-		var backupObjectKey = client.ObjectKey{Namespace: "ecosystem", Name: fmt.Sprintf("backup-spec-%s", uuid.New().String())}
+	Describe("Creating a backup", Ordered, func() {
+		var backupObjectKey = client.ObjectKey{
+			Namespace: "ecosystem",
+			Name:      fmt.Sprintf("backup-spec-creating-backup%s", uuid.New().String()),
+		}
 
 		AfterAll(func(ctx SpecContext) {
-			By("deleting the backup resource")
-			backupCr := createBackupWithObjectKey(backupObjectKey)
-			err := k8sClient.Delete(ctx, backupCr, &client.DeleteOptions{})
+			By("deletes the backup resource")
+			backup := createBackupWithObjectKey(backupObjectKey)
+			err := k8sClient.Delete(ctx, backup, &client.DeleteOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
 
-			By("waiting until the backup is deleted")
-			Eventually(func(g Gomega) {
+			By("waits until the backup is deleted")
+			EventuallyShouldSucceed(func(g Gomega) {
 				backup := &backupv1.Backup{}
 				err := k8sClient.Get(ctx, backupObjectKey, backup)
 				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
-			}).
-				WithTimeout(10 * time.Minute).
-				WithPolling(10 * time.Second).
-				Should(Succeed())
+			})
 		})
 
 		It("creates the backup resource", func(ctx SpecContext) {
-			backupCr := createBackupWithObjectKey(backupObjectKey)
-			err := k8sClient.Create(ctx, backupCr, &client.CreateOptions{})
+			backup := createBackupWithObjectKey(backupObjectKey)
+			err := k8sClient.Create(ctx, backup, &client.CreateOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
-		It("creates the provider's backup resource", func(ctx SpecContext) {
-			Eventually(func(g Gomega) {
+		It("checks whether the provider's backup resource was created", func(ctx SpecContext) {
+			EventuallyShouldSucceed(func(g Gomega) {
 				veleroBackup := &velerov1.Backup{}
 				err := k8sClient.Get(ctx, backupObjectKey, veleroBackup)
 				g.Expect(err).ShouldNot(HaveOccurred())
-			}).
-				WithTimeout(10 * time.Minute).
-				WithPolling(5 * time.Second).
-				Should(Succeed())
+			})
 		})
 
-		It("completes successfully", func(ctx SpecContext) {
-			Eventually(func(g Gomega) {
+		It("waits until the backup has successfully completed", func(ctx SpecContext) {
+			EventuallyShouldSucceed(func(g Gomega) {
 				backup := &backupv1.Backup{}
 				err := k8sClient.Get(ctx, backupObjectKey, backup)
 				Expect(err).ShouldNot(HaveOccurred())
 
 				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
 				g.Expect(completed.Status).To(Equal(metav1.ConditionTrue))
-			}).
-				WithTimeout(10 * time.Minute).
-				WithPolling(10 * time.Second).
-				Should(Succeed())
+			})
 		})
 
 	})
 
 	Describe("Deleting a backup", Ordered, Label("backup"), func() {
-		var backupObjectKey = client.ObjectKey{Namespace: "ecosystem", Name: fmt.Sprintf("backup-spec-%s", uuid.New().String())}
+		var backupObjectKey = client.ObjectKey{
+			Namespace: "ecosystem",
+			Name:      fmt.Sprintf("backup-spec-deleting-backup-%s", uuid.New().String()),
+		}
 
-		BeforeAll(func(ctx SpecContext) {
+		It("creates the backup resource", func(ctx SpecContext) {
 			backup := createBackupWithObjectKey(backupObjectKey)
 			err := k8sClient.Create(ctx, backup, &client.CreateOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
-
-			Eventually(func(g Gomega) {
-				backup := &backupv1.Backup{}
-				err := k8sClient.Get(ctx, backupObjectKey, backup)
-				Expect(err).ShouldNot(HaveOccurred())
-
-				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
-				g.Expect(completed.Status).To(Equal(metav1.ConditionTrue))
-			}).
-				WithTimeout(10 * time.Minute).
-				WithPolling(10 * time.Second).
-				Should(Succeed())
 		})
 
-		It("if the backup is deleted", func(ctx SpecContext) {
-			backupCr := createBackupWithObjectKey(backupObjectKey)
-			err := k8sClient.Delete(ctx, backupCr, &client.DeleteOptions{})
+		It("waits until the backup has successfully completed", func(ctx SpecContext) {
+			EventuallyShouldSucceed(func(g Gomega) {
+				backup := &backupv1.Backup{}
+				err := k8sClient.Get(ctx, backupObjectKey, backup)
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
+				g.Expect(completed).ToNot(BeNil())
+				g.Expect(completed.Status).To(Equal(metav1.ConditionTrue))
+			})
+		})
+
+		It("deletes the backup", func(ctx SpecContext) {
+			backup := createBackupWithObjectKey(backupObjectKey)
+			err := k8sClient.Delete(ctx, backup, &client.DeleteOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
-		It("the provider's backup is also deleted", func(ctx SpecContext) {
-			Eventually(func(g Gomega) {
-				veleroBackup := &velerov1.Backup{}
-				err := k8sClient.Get(ctx, backupObjectKey, veleroBackup)
+		It("waits until the backup is deleted", func(ctx SpecContext) {
+			EventuallyShouldSucceed(func(g Gomega) {
+				backup := &backupv1.Backup{}
+				err := k8sClient.Get(ctx, backupObjectKey, backup)
 				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
-			}).
-				WithTimeout(10 * time.Minute).
-				WithPolling(10 * time.Second).
-				Should(Succeed())
+			})
+		})
+
+		It("checks if the provider's backup is also deleted", func(ctx SpecContext) {
+			veleroBackup := &velerov1.Backup{}
+			err := k8sClient.Get(ctx, backupObjectKey, veleroBackup)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
+	FDescribe("Canceling a backup", Ordered, Label("backup"), func() {
+		var backupObjectKey = client.ObjectKey{
+			Namespace: "ecosystem",
+			Name:      fmt.Sprintf("backup-spec-canceling-backup%s", uuid.New().String()),
+		}
+		var veleroBackupStoreLocationObjectKey = client.ObjectKey{
+			Namespace: "ecosystem",
+			Name:      "default",
+		}
+		var veleroBackupStoreLocationS3Region = ""
+		var retryTimeLimitInMinutes = 2
+
+		AfterAll(func(ctx SpecContext) {
+			By("deletes the backup resource")
+			backup := createBackupWithObjectKey(backupObjectKey)
+			err := k8sClient.Delete(ctx, backup, &client.DeleteOptions{})
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("waits until the backup is deleted")
+			EventuallyShouldSucceed(func(g Gomega) {
+				backup := &backupv1.Backup{}
+				err := k8sClient.Get(ctx, backupObjectKey, backup)
+				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			})
+		})
+
+		It("configures the backup time limit", func(ctx SpecContext) {
+			backupOperatorConfigMap := &corev1.ConfigMap{}
+			objectKey := client.ObjectKey{Namespace: "ecosystem", Name: "k8s-backup-operator-backup-config"}
+			err := k8sClient.Get(ctx, objectKey, backupOperatorConfigMap)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			backupOperatorConfigMap.Data["retryTimeLimit"] = strconv.Itoa(retryTimeLimitInMinutes) // minutes
+			err = k8sClient.Update(ctx, backupOperatorConfigMap)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("ensures the provider backup storage is unavailable", func(ctx SpecContext) {
+			veleroBackupStorageLocation := &velerov1.BackupStorageLocation{}
+			err := k8sClient.Get(ctx, veleroBackupStoreLocationObjectKey, veleroBackupStorageLocation)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			veleroBackupStoreLocationS3Region = veleroBackupStorageLocation.Spec.Config["region"]
+			veleroBackupStorageLocation.Spec.Config["region"] = "region_that_not_exist"
+			err = k8sClient.Update(ctx, veleroBackupStorageLocation)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("creates the backup resource", func(ctx SpecContext) {
+			backup := createBackupWithObjectKey(backupObjectKey)
+			err := k8sClient.Create(ctx, backup, &client.CreateOptions{})
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("checks whether the backup preparation does not meet the prepared condition", func(ctx SpecContext) {
+			EventuallyShouldSucceed(func(g Gomega) {
+				backup := &backupv1.Backup{}
+				err := k8sClient.Get(ctx, backupObjectKey, backup)
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
+				g.Expect(completed).ToNot(BeNil())
+				g.Expect(completed.Status).To(Equal(metav1.ConditionFalse))
+			})
+		})
+
+		It("ensures the provider backup storage is available after time window expired", func(ctx SpecContext) {
+			time.Sleep(time.Duration(retryTimeLimitInMinutes)*time.Minute + 30*time.Second)
+
+			veleroBackupStorageLocation := &velerov1.BackupStorageLocation{}
+			err := k8sClient.Get(ctx, veleroBackupStoreLocationObjectKey, veleroBackupStorageLocation)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			veleroBackupStorageLocation.Spec.Config["region"] = veleroBackupStoreLocationS3Region
+			err = k8sClient.Update(ctx, veleroBackupStorageLocation)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("check whether the backup was cancelled and did not start", func(ctx SpecContext) {
+			EventuallyShouldSucceed(func(g Gomega) {
+				backup := &backupv1.Backup{}
+				err := k8sClient.Get(ctx, backupObjectKey, backup)
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
+				g.Expect(completed).ToNot(BeNil())
+				g.Expect(completed.Status).To(Equal(metav1.ConditionTrue))
+
+				g.Expect(backup.Status.StartTimestamp.IsZero()).To(BeTrue())
+			})
 		})
 	})
 })
+
+func EventuallyShouldSucceed(fn func(g Gomega)) bool {
+	return Eventually(fn).
+		WithTimeout(5 * time.Minute).
+		WithPolling(5 * time.Second).
+		Should(Succeed())
+}
 
 func createBackupWithObjectKey(objectKey client.ObjectKey) *backupv1.Backup {
 	return &backupv1.Backup{
