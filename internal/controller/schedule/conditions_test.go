@@ -13,6 +13,7 @@ import (
 func TestMarkAccepted(t *testing.T) {
 	manager := conditionManager{}
 	schedule := newBackupSchedule()
+	schedule.Generation = 42
 
 	manager.MarkAccepted(schedule)
 
@@ -80,10 +81,11 @@ func TestComputeReadyWithEvaluatedConditions(t *testing.T) {
 		expectedReason string
 	}{
 		{
-			name:          "ready",
-			accepted:      true,
-			synced:        true,
-			expectedReady: metav1.ConditionTrue,
+			name:           "ready",
+			accepted:       true,
+			synced:         true,
+			expectedReady:  metav1.ConditionTrue,
+			expectedReason: ReasonReady,
 		},
 		{
 			name:           "invalid",

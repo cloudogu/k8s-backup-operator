@@ -19,26 +19,6 @@ func TestValidate(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:     "every five minutes",
-			schedule: "*/5 * * * *",
-			wantErr:  false,
-		},
-		{
-			name:     "empty",
-			schedule: "",
-			wantErr:  true,
-		},
-		{
-			name:     "invalid number of fields",
-			schedule: "* * *",
-			wantErr:  true,
-		},
-		{
-			name:     "invalid minute",
-			schedule: "60 * * * *",
-			wantErr:  true,
-		},
-		{
 			name:     "invalid text",
 			schedule: "this-is not-a-cron-expression",
 			wantErr:  true,

@@ -14,4 +14,5 @@ const (
 	ReasonSyncFailed   = "SyncFailed"
 	ReasonDeleting     = "Deleting"
 	ReasonNotEvaluated = "NotEvaluated"
+	ReasonReady        = "Ready"
 )

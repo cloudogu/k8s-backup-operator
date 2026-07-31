@@ -38,16 +38,20 @@ func (r *defaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	original := schedule.DeepCopy()
 
-	var reconcileErr error
+	if !schedule.DeletionTimestamp.IsZero() {
+		// set the deletion state before doing anything else
+		// Removing the finalizer may delete the resource immediately
+		// leading to an error when patching
+		r.conditions.MarkDeleting(schedule)
+		r.conditions.ComputeReady(schedule)
+		if err := r.patchStatus(ctx, original, schedule); err != nil {
+			return ctrl.Result{}, err
+		}
 
-	switch {
-	// deletion
-	case !schedule.DeletionTimestamp.IsZero():
-		reconcileErr = r.reconcileDelete(ctx, schedule)
-	// create/update
-	default:
-		reconcileErr = r.reconcileNormal(ctx, schedule)
+		return ctrl.Result{}, r.reconcileDelete(ctx, schedule)
 	}
+
+	reconcileErr := r.reconcileNormal(ctx, schedule)
 
 	// Always update status if it changed.
 	if err := r.patchStatus(ctx, original, schedule); err != nil {
@@ -63,8 +67,6 @@ func (r *defaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	r.conditions.MarkDeleting(schedule)
-
 	if err := r.cronJobs.Delete(ctx, schedule); err != nil {
 		return err
 	}
@@ -79,7 +81,7 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 
 func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	if err := r.metadata.Ensure(ctx, schedule); err != nil {
-		r.conditions.MarkInvalid(schedule, err)
+		r.conditions.MarkAcceptanceNotEvaluated(schedule, err)
 		r.conditions.MarkCronJobNotSynced(schedule, err)
 		r.conditions.ComputeReady(schedule)
 		return err

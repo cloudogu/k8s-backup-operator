@@ -19,6 +19,7 @@ type Validator interface {
 type ConditionManager interface {
 	MarkAccepted(schedule *backupv1.BackupSchedule)
 	MarkInvalid(schedule *backupv1.BackupSchedule, err error)
+	MarkAcceptanceNotEvaluated(schedule *backupv1.BackupSchedule, err error)
 	MarkCronJobSynced(schedule *backupv1.BackupSchedule)
 	MarkCronJobNotSynced(schedule *backupv1.BackupSchedule, err error)
 	MarkDeleting(schedule *backupv1.BackupSchedule)

@@ -26,6 +26,15 @@ func (c conditionManager) MarkInvalid(schedule *v1.BackupSchedule, err error) {
 	})
 }
 
+func (c conditionManager) MarkAcceptanceNotEvaluated(schedule *v1.BackupSchedule, err error) {
+	setCondition(schedule, metav1.Condition{
+		Type:    AcceptedCondition,
+		Status:  metav1.ConditionUnknown,
+		Reason:  ReasonNotEvaluated,
+		Message: "Required metadata could not be persisted: " + err.Error(),
+	})
+}
+
 func (c conditionManager) MarkCronJobSynced(schedule *v1.BackupSchedule) {
 	setCondition(schedule, metav1.Condition{
 		Type:    CronJobSyncedCondition,
@@ -99,7 +108,7 @@ func (c conditionManager) ComputeReady(schedule *v1.BackupSchedule) {
 		setCondition(schedule, metav1.Condition{
 			Type:    ReadyCondition,
 			Status:  metav1.ConditionTrue,
-			Reason:  "",
+			Reason:  ReasonReady,
 			Message: "BackupSchedule is ready.",
 		})
 	}

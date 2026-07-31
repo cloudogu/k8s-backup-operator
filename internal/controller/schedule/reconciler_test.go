@@ -50,6 +50,7 @@ type fakeMetaData struct {
 	removeCalled bool
 	ensureErr    error
 	removeErr    error
+	onRemove     func(*backupv1.BackupSchedule)
 }
 
 func (m *fakeMetaData) Ensure(ctx context.Context, s *backupv1.BackupSchedule) error {
@@ -59,6 +60,9 @@ func (m *fakeMetaData) Ensure(ctx context.Context, s *backupv1.BackupSchedule) e
 
 func (m *fakeMetaData) Remove(ctx context.Context, s *backupv1.BackupSchedule) error {
 	m.removeCalled = true
+	if m.onRemove != nil {
+		m.onRemove(s)
+	}
 	return m.removeErr
 }
 
@@ -86,9 +90,11 @@ func Test_reconcileNormal(t *testing.T) {
 		expectCronJobsEnsureCalled bool
 		expectDeleteCalled         bool
 
-		expectedAccepted metav1.ConditionStatus
-		expectedSynced   metav1.ConditionStatus
-		expectedReady    metav1.ConditionStatus
+		expectedAccepted        metav1.ConditionStatus
+		expectedSynced          metav1.ConditionStatus
+		expectAcceptedCondition bool
+		expectedReady           metav1.ConditionStatus
+		expectedAcceptedReason  string
 	}{
 		{
 			name: "success",
@@ -96,9 +102,10 @@ func Test_reconcileNormal(t *testing.T) {
 			expectValidatorCalled:      true,
 			expectCronJobsEnsureCalled: true,
 
-			expectedAccepted: metav1.ConditionTrue,
-			expectedSynced:   metav1.ConditionTrue,
-			expectedReady:    metav1.ConditionTrue,
+			expectedAccepted:        metav1.ConditionTrue,
+			expectedSynced:          metav1.ConditionTrue,
+			expectAcceptedCondition: true,
+			expectedReady:           metav1.ConditionTrue,
 		},
 		{
 			name: "validator error",
@@ -107,9 +114,10 @@ func Test_reconcileNormal(t *testing.T) {
 
 			expectValidatorCalled: true,
 
-			expectedAccepted: metav1.ConditionFalse,
-			expectedSynced:   metav1.ConditionFalse,
-			expectedReady:    metav1.ConditionFalse,
+			expectedAccepted:        metav1.ConditionFalse,
+			expectedSynced:          metav1.ConditionFalse,
+			expectAcceptedCondition: true,
+			expectedReady:           metav1.ConditionFalse,
 		},
 		{
 			name: "metadata error",
@@ -118,9 +126,11 @@ func Test_reconcileNormal(t *testing.T) {
 
 			expectError: true,
 
-			expectedAccepted: metav1.ConditionFalse,
-			expectedSynced:   metav1.ConditionFalse,
-			expectedReady:    metav1.ConditionFalse,
+			expectedAccepted:        metav1.ConditionUnknown,
+			expectAcceptedCondition: true,
+			expectedSynced:          metav1.ConditionFalse,
+			expectedReady:           metav1.ConditionUnknown,
+			expectedAcceptedReason:  ReasonNotEvaluated,
 		},
 		{
 			name: "cronjob error",
@@ -132,9 +142,10 @@ func Test_reconcileNormal(t *testing.T) {
 			expectValidatorCalled:      true,
 			expectCronJobsEnsureCalled: true,
 
-			expectedAccepted: metav1.ConditionTrue,
-			expectedSynced:   metav1.ConditionFalse,
-			expectedReady:    metav1.ConditionFalse,
+			expectedAccepted:        metav1.ConditionTrue,
+			expectedSynced:          metav1.ConditionFalse,
+			expectAcceptedCondition: true,
+			expectedReady:           metav1.ConditionFalse,
 		},
 	}
 
@@ -168,7 +179,15 @@ func Test_reconcileNormal(t *testing.T) {
 			synced := meta.FindStatusCondition(schedule.Status.Conditions, CronJobSyncedCondition)
 			ready := meta.FindStatusCondition(schedule.Status.Conditions, ReadyCondition)
 
-			assert.Equal(t, tt.expectedAccepted, accepted.Status)
+			if tt.expectAcceptedCondition {
+				require.NotNil(t, accepted)
+				assert.Equal(t, tt.expectedAccepted, accepted.Status)
+				if tt.expectedAcceptedReason != "" {
+					assert.Equal(t, tt.expectedAcceptedReason, accepted.Reason)
+				}
+			} else {
+				assert.Nil(t, accepted)
+			}
 			assert.Equal(t, tt.expectedSynced, synced.Status)
 			assert.Equal(t, tt.expectedReady, ready.Status)
 		})
@@ -224,10 +243,6 @@ func Test_reconcileDelete(t *testing.T) {
 			assert.Equal(t, tt.expectDeleteCalled, testCronJobs.deleteCalled)
 			assert.Equal(t, tt.expectMetadataRemove, testMetadata.removeCalled)
 
-			deleting := meta.FindStatusCondition(schedule.Status.Conditions, DeletingCondition)
-			require.NotNil(t, deleting)
-			assert.Equal(t, metav1.ConditionTrue, deleting.Status)
-			assert.Equal(t, ReasonDeleting, deleting.Reason)
 		})
 	}
 }
@@ -284,6 +299,10 @@ func Test_mainRecocileLoop(t *testing.T) {
 			metadata := &fakeMetaData{ensureErr: tt.metadataErr}
 			reconciler := newTestReconciler(fakeClient, validator, cronJobs, metadata)
 
+			if tt.deletionTimestamp != nil {
+				testDeletion(t, metadata, fakeClient)
+			}
+
 			_, err := reconciler.Reconcile(testCtx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(schedule)})
 
 			if tt.expectError {
@@ -297,6 +316,22 @@ func Test_mainRecocileLoop(t *testing.T) {
 			assert.Equal(t, tt.expectCronJobEnsure, cronJobs.ensureCalled)
 			assert.Equal(t, tt.expectCronJobDelete, cronJobs.deleteCalled)
 		})
+	}
+}
+
+func testDeletion(t *testing.T, metadata *fakeMetaData, fakeClient client.Client) {
+	metadata.onRemove = func(schedule *backupv1.BackupSchedule) {
+		stored := &backupv1.BackupSchedule{}
+		require.NoError(t, fakeClient.Get(testCtx, client.ObjectKeyFromObject(schedule), stored))
+
+		deleting := meta.FindStatusCondition(stored.Status.Conditions, DeletingCondition)
+		require.NotNil(t, deleting)
+		assert.Equal(t, metav1.ConditionTrue, deleting.Status)
+
+		// ready should have been reset
+		ready := meta.FindStatusCondition(stored.Status.Conditions, ReadyCondition)
+		require.NotNil(t, ready)
+		assert.Equal(t, metav1.ConditionFalse, ready.Status)
 	}
 }
 
