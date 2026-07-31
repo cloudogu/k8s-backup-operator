@@ -5,6 +5,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -181,6 +182,107 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 		require.Equal(t, ctrl.Result{}, settled[index])
 	}
 	require.Len(t, fixture.clientActions.snapshot(), before, "a completed restore must not be written again")
+}
+
+// A crash after the cleanup but before the child creation leaves a Restore whose
+// preparation is indistinguishable from one that never started. It may therefore repeat the
+// preparation and then has to continue instead of stalling.
+func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheProviderRestore(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+
+	providerMock := newMockRestoreProvider(t)
+	providerMock.EXPECT().CheckReady(testCtx).Return(nil).Once()
+	installProvider(t, providerMock)
+
+	maintenanceMock := newMockMaintenanceModeSwitch(t)
+	maintenanceMock.EXPECT().Activate(testCtx, mock.Anything, false).Return(nil).Once()
+	cleanupMock := newMockCleanupManager(t)
+	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
+	// No ScaleUp expectation: recovering the workloads before the provider ran would fail here.
+	scaleMock := newMockScaleManager(t)
+	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Start restore process").Return()
+
+	factory := func(fakeClient client.WithWatch) reconcileFunction {
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, cleanupMock, scaleMock)
+		reconciler.maintenanceModeSwitch = maintenanceMock
+
+		return reconciler.Reconcile
+	}
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
+	request := newRestoreRequest(testRestore)
+
+	repeated, repeatedErrs := fixture.reconcileTimes(testCtx, request, 1)
+	// The operator crashed before it could create the child, so it starts over from the persisted state.
+	fixture.restart(factory)
+	continued, continuedErrs := fixture.reconcileTimes(testCtx, request, 1)
+
+	require.NoError(t, repeatedErrs[0])
+	require.NoError(t, continuedErrs[0])
+	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, repeated[0], "the repeated preparation ends its reconciliation")
+	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, continued[0], "the started provider restore ends its reconciliation")
+
+	require.Equal(t, []recordedClientAction{
+		statusUpdateOf(restore),                // Prepared, reached the second time around
+		createOf(velero.BuildRestore(restore)), // and only then the child
+	}, fixture.clientActions.snapshot(), "the repeated preparation must be persisted before the child is created")
+
+	assertPersistedCondition(t, fixture.client, backupv1.ConditionPrepared, metav1.ConditionTrue, ReasonPreparationCompleted)
+}
+
+// The synchronization is the stage under test because it sits behind every destructive one,
+// so a regression is observable as a repeated scale-down, cleanup or child creation.
+func TestATransientStageFailureIsRetriedWithoutRepeatingAnEarlierDestructiveStage(t *testing.T) {
+	restore := synchronizableRestore()
+
+	providerMock := newMockRestoreProvider(t)
+	providerMock.EXPECT().CheckReady(testCtx).Return(nil).Twice()
+	providerMock.EXPECT().SyncBackups(testCtx).Return(assert.AnError).Once()
+	providerMock.EXPECT().SyncBackups(testCtx).Return(nil).Once()
+	installProvider(t, providerMock)
+
+	// No cleanup manager at all, and a scale manager that may only scale up: regressing to the
+	// preparation panics or fails on an unexpected call.
+	scaleMock := newMockScaleManager(t)
+	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
+	maintenanceMock := newMockMaintenanceModeSwitch(t)
+	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, backupv1.ErrorOnCreateEventReason, mock.Anything).Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Restore successful").Return()
+
+	factory := func(fakeClient client.WithWatch) reconcileFunction {
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, scaleMock)
+		reconciler.maintenanceModeSwitch = maintenanceMock
+
+		return reconciler.Reconcile
+	}
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore,
+		ownedChildInPhase(restore, velerov1.RestorePhaseCompleted))
+	request := newRestoreRequest(testRestore)
+
+	failed, failedErrs := fixture.reconcileTimes(testCtx, request, 1)
+	require.ErrorIs(t, failedErrs[0], assert.AnError)
+	require.Equal(t, ctrl.Result{}, failed[0], "the error carries the retry, so there must be no explicit requeue")
+	assertPersistedCondition(t, fixture.client, backupv1.ConditionBackupsSynchronized, metav1.ConditionFalse, ReasonBackupSynchronizationFailed)
+	assertSuccessfulCondition(t, fixture.client, restore.Name, metav1.ConditionUnknown, ReasonPending)
+
+	recovered, recoveredErrs := fixture.reconcileTimes(testCtx, request, 2)
+	for index := range recovered {
+		require.NoError(t, recoveredErrs[index], "reconciliation %d after the failure", index+1)
+	}
+	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, recovered[0], "the retried synchronization ends its reconciliation")
+	require.Equal(t, ctrl.Result{}, recovered[1], "the finished workflow must not be requeued")
+
+	require.Equal(t, []recordedClientAction{
+		statusUpdateOf(restore), // BackupsSynchronized=False, retried
+		statusUpdateOf(restore), // BackupsSynchronized=True on the retry
+		statusUpdateOf(restore), // WorkloadsRecovered=True and Successful=True
+	}, fixture.clientActions.snapshot(), "only the failed stage was repeated, and the child was never written again")
+
+	assertPersistedCondition(t, fixture.client, backupv1.ConditionPrepared, metav1.ConditionTrue, ReasonPreparationCompleted)
+	assertSuccessfulCondition(t, fixture.client, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
 }
 
 func TestAConflictingConcurrentStatusWriteDuringReconciliationDropsNoCondition(t *testing.T) {

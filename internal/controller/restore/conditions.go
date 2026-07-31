@@ -51,8 +51,6 @@ const (
 	// ReasonRecoveryNotAttemptedAfterProviderFailure marks workloads that were deliberately not
 	// scaled up because the provider restore failed terminally.
 	ReasonRecoveryNotAttemptedAfterProviderFailure = "RecoveryNotAttemptedAfterProviderFailure"
-	// ReasonSynchronizingBackups marks the running read-only backup catalog convergence check.
-	ReasonSynchronizingBackups = "SynchronizingBackups"
 	// ReasonSynchronizationNotAttemptedAfterProviderFailure marks a backup catalog that was
 	// deliberately not synchronized because the provider restore failed terminally.
 	ReasonSynchronizationNotAttemptedAfterProviderFailure = "SynchronizationNotAttemptedAfterProviderFailure"
@@ -75,7 +73,7 @@ var workflowConditionTypes = []string{
 	k8sv1.ConditionPrepared,
 	k8sv1.ConditionProviderRestoreSuccessful,
 	k8sv1.ConditionWorkloadsRecovered,
-	k8sv1.ConditionBackupsSynchronized,
+	k8sv1.ConditionBackupsSynchronized, //TODO: maybe this is not needed. Condition should be deleted too, if ensureStage will be deleted
 }
 
 // missingWorkflowConditions returns the workflow conditions the restore does not carry yet, as

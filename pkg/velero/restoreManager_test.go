@@ -25,21 +25,6 @@ func TestNewDefaultRestoreManager(t *testing.T) {
 	})
 }
 
-func getExpectedVeleroRestore(restore *v1.Restore) *velerov1.Restore {
-	apiGroup := ""
-	return &velerov1.Restore{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      restore.Name,
-			Namespace: restore.Namespace,
-		},
-		Spec: velerov1.RestoreSpec{
-			BackupName:             restore.Spec.BackupName,
-			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
-			ResourceModifier:       &corev1.TypedLocalObjectReference{APIGroup: &apiGroup, Kind: "ConfigMap", Name: "k8s-backup-operator-restore-dogu-modifier"},
-		},
-	}
-}
-
 func Test_defaultRestoreManager_DeleteRestore(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given

@@ -278,6 +278,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to cleanup before restore: %w", err))
 	}
 
+	//TODO: Message misleading, maintenance mode might not be active, which is an accepted case
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
 		Type:    k8sv1.ConditionPrepared,
 		Status:  metav1.ConditionTrue,
@@ -344,6 +345,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 		return restore, next()
 	}
 
+	//TODO: Think about this again, initializer increments the new metric on every retry
 	metrics.InitRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName)
 	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process")
 
@@ -509,6 +511,7 @@ func (r *restoreReconciler) ensureWorkloadsRecovered(ctx context.Context, restor
 	// Taking maintenance mode down is best-effort, like the activation: the workloads are up
 	// again, so a remaining notice is a nuisance and not a reason to fail a successful restore.
 	if err := r.maintenanceModeSwitch.Deactivate(ctx, false); err != nil {
+		// TODO: Retry on MaintenanceMode deactivation error
 		log.FromContext(ctx).Error(err, "The maintenance mode could not be deactivated after the restore. Continuing anyways...")
 	}
 
