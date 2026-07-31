@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 
 const (
@@ -71,11 +72,45 @@ func withProviderRestoreSuccess(restore *k8sv1.Restore) *k8sv1.Restore {
 	return restore
 }
 
-func newRestore() *k8sv1.Restore {
-	return &k8sv1.Restore{
-		ObjectMeta: metav1.ObjectMeta{Name: testRestore, Namespace: testNamespace},
-		Status:     k8sv1.RestoreStatus{Status: k8sv1.RestoreStatusNew},
+// withBackupsSynchronized adds the BackupsSynchronized milestone the synchronization stage writes, so
+// that a test starting behind that stage does not have to reconcile it first.
+func withBackupsSynchronized(restore *k8sv1.Restore) *k8sv1.Restore {
+	applyConditions(restore, []metav1.Condition{{
+		Type:    k8sv1.ConditionBackupsSynchronized,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonBackupSynchronizationCompleted,
+		Message: "The backup resources were synchronized with the provider.",
+	}})
+
+	return restore
+}
+
+// installProvider makes restoreprovider.Get return the given provider instead of a real one.
+func installProvider(t *testing.T, providerMock *mockRestoreProvider) {
+	t.Helper()
+
+	oldNewVeleroProvider := provider.NewVeleroProvider
+	provider.NewVeleroProvider = func(_ provider.K8sClient, _ provider.EventRecorder, _ string) provider.Provider {
+		return providerMock
 	}
+	t.Cleanup(func() { provider.NewVeleroProvider = oldNewVeleroProvider })
+}
+
+// expectReadinessCheck installs a provider whose readiness check returns checkReadyErr
+func expectReadinessCheck(t *testing.T, checkReadyErr error) {
+	providerMock := newMockRestoreProvider(t)
+	providerMock.EXPECT().CheckReady(testCtx).Return(checkReadyErr)
+
+	installProvider(t, providerMock)
+}
+
+// expectBackupSynchronization installs a ready provider whose backup synchronization returns syncErr.
+func expectBackupSynchronization(t *testing.T, syncErr error) {
+	providerMock := newMockRestoreProvider(t)
+	providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+	providerMock.EXPECT().SyncBackups(testCtx).Return(syncErr)
+
+	installProvider(t, providerMock)
 }
 
 func deletedRestore() *k8sv1.Restore {

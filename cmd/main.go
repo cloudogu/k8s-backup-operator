@@ -330,7 +330,6 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		k8sClient,
 		operatorConfig.Namespace,
 		recorder,
-		scaleManager,
 	)
 	restoreReconciler := restorecontroller.NewRestoreReconciler(
 		k8sClient,

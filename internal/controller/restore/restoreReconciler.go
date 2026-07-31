@@ -29,6 +29,11 @@ const (
 	operationIgnore = operation("ignore")
 )
 
+const (
+	maintenanceModeTitle = "Service temporary unavailable"
+	maintenanceModeText  = "Restore in progress"
+)
+
 func NewRestoreReconciler(
 	k8sClient k8sClient,
 	recorder eventRecorder,
@@ -86,7 +91,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.ensurePreparation,
 		r.ensureProviderRestore,
 		r.ensureProviderCompletion,
-		r.ensureRestoreCreated,
+		r.ensureBackupsSynchronized,
+		r.ensureWorkloadsRecovered,
 	)
 }
 
@@ -457,15 +463,90 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 	return updated, abort()
 }
 
-func (r *restoreReconciler) ensureRestoreCreated(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
-	op := requiredOperation(restore)
-	log.FromContext(ctx).Info(fmt.Sprintf("required operation for restore %s/%s is %s", r.namespace, restore.Name, op))
-
-	if op != operationCreate {
-		return restore, abort()
+// ensureBackupsSynchronized synchronizes the Backup resources with the ones the provider knows about
+func (r *restoreReconciler) ensureBackupsSynchronized(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	if requiredOperation(restore) != operationCreate {
+		return restore, next()
 	}
 
-	return restore, r.performOperation(ctx, restore, k8sv1.CreateEventReason, r.manager.create)
+	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionBackupsSynchronized) {
+		return restore, next()
+	}
+
+	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
+	}
+
+	if err := provider.SyncBackups(ctx); err != nil {
+		return r.reportUnreachedMilestone(ctx, restore, k8sv1.ConditionBackupsSynchronized, ReasonBackupSynchronizationFailed,
+			fmt.Errorf("failed to sync backups with provider: %w", err))
+	}
+
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
+		reachedMilestone(k8sv1.ConditionBackupsSynchronized, ReasonBackupSynchronizationCompleted,
+			"The backup resources were synchronized with the provider."))
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to persist the backup synchronization of restore %s: %w", restore.Name, err))
+	}
+
+	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
+	return updated, retryAfter(defaultRequeueDelay)
+}
+
+// ensureWorkloadsRecovered ends the workflow: the workloads are scaled up again, the unavailability
+// notice is taken down and the restore is reported as successful.
+func (r *restoreReconciler) ensureWorkloadsRecovered(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	if requiredOperation(restore) != operationCreate {
+		return restore, next()
+	}
+
+	if err := r.scaleManager.ScaleUp(ctx); err != nil {
+		return r.reportUnreachedMilestone(ctx, restore, k8sv1.ConditionWorkloadsRecovered, ReasonWorkloadRecoveryFailed,
+			fmt.Errorf("failed to scale up workloads after restore: %w", err))
+	}
+
+	// Taking maintenance mode down is best-effort, like the activation: the workloads are up
+	// again, so a remaining notice is a nuisance and not a reason to fail a successful restore.
+	if err := r.maintenanceModeSwitch.Deactivate(ctx, false); err != nil {
+		log.FromContext(ctx).Error(err, "The maintenance mode could not be deactivated after the restore. Continuing anyways...")
+	}
+
+	// Both milestones are written together because they are reached together: the restore is
+	// successful exactly because the workloads were recovered.
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
+		reachedMilestone(k8sv1.ConditionWorkloadsRecovered, ReasonWorkloadRecoveryCompleted,
+			"The workloads were scaled up again and the maintenance mode was switched off."),
+		reachedMilestone(k8sv1.ConditionSuccessful, ReasonRestoreCompleted,
+			"The restore workflow finished successfully."),
+	)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to persist the workload recovery of restore %s: %w", restore.Name, err))
+	}
+
+	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusCompleted)
+	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Restore successful")
+
+	// The restore is terminal now, so there is nothing left to do.
+	return updated, abort()
+}
+
+// reportUnreachedMilestone records a milestone the stage failed to reach as False and retries the
+// stage with the controller-runtime backoff
+func (r *restoreReconciler) reportUnreachedMilestone(ctx context.Context, restore *k8sv1.Restore, conditionType string, reason string, stageErr error) (*k8sv1.Restore, stageOutcome) {
+	r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, stageErr.Error())
+
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
+		Type:    conditionType,
+		Status:  metav1.ConditionFalse,
+		Reason:  reason,
+		Message: fmt.Sprintf("The restore workflow did not reach this milestone and is retried: %v", stageErr),
+	})
+	if err != nil {
+		stageErr = errors.Join(stageErr, fmt.Errorf("failed to report the unreached milestone %s of restore %s: %w", conditionType, restore.Name, err))
+	}
+
+	return updated, retryOnError(stageErr)
 }
 
 // performOperation executes the given operationFn, reports its outcome as an event and translates a

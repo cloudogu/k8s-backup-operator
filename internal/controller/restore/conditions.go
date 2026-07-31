@@ -100,6 +100,16 @@ func missingWorkflowConditions(restore *k8sv1.Restore) []metav1.Condition {
 	return missing
 }
 
+// reachedMilestone is a reached milestone of the restore workflow.
+func reachedMilestone(conditionType string, reason string, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:    conditionType,
+		Status:  metav1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	}
+}
+
 // observeProviderRestoreState maps the state of the owned provider restore to the status and reason
 // of the tri-state ProviderRestoreSuccessful condition.
 //

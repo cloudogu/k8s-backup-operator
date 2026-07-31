@@ -26,13 +26,10 @@ type controllerManager interface {
 	ctrl.Manager
 }
 
+// restoreManager is the deletion side of the workflow. Creating a restore is no longer a manager
+// operation but a sequence of reconciler stages.
 type restoreManager interface {
-	createManager
 	deleteManager
-}
-
-type createManager interface {
-	create(ctx context.Context, restore *v1.Restore) error
 }
 
 type deleteManager interface {

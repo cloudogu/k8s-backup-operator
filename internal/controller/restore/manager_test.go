@@ -12,7 +12,7 @@ func TestNewRestoreManager(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 
 		// when
-		manager := NewRestoreManager(clientMock, testNamespace, nil, nil)
+		manager := NewRestoreManager(clientMock, testNamespace, nil)
 
 		// then
 		require.NotNil(t, manager)

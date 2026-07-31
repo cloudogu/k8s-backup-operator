@@ -170,58 +170,6 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		})
 	})
 
-	t.Run("creation tests", func(t *testing.T) {
-		t.Run("should retry on create error", func(t *testing.T) {
-			// given
-			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := withProviderRestoreSuccess(withPreparation(withInitializedConditions(withMetadata(newRestore()))))
-
-			managerMock := newMockRestoreManager(t)
-			managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(assert.AnError)
-			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, v1.CreateEventReason, "Creation failed. Reason: assert.AnError general error for testing").Return()
-
-			sut := &restoreReconciler{
-				namespace: testNamespace,
-				k8sClient: newTestClient(t, interceptor.Funcs{}, restore),
-				manager:   managerMock,
-				recorder:  recorderMock,
-			}
-
-			// when
-			actual, err := sut.Reconcile(testCtx, request)
-
-			// then
-			require.Error(t, err)
-			assert.ErrorIs(t, err, assert.AnError)
-			assert.ErrorContains(t, err, "Creation of restore test-restore failed")
-			assert.Equal(t, ctrl.Result{}, actual)
-		})
-		t.Run("should succeed with create", func(t *testing.T) {
-			// given
-			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := withProviderRestoreSuccess(withPreparation(withInitializedConditions(withMetadata(newRestore()))))
-
-			managerMock := newMockRestoreManager(t)
-			managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(nil)
-			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, v1.CreateEventReason, "Creation successful").Return()
-
-			sut := &restoreReconciler{
-				namespace: testNamespace,
-				k8sClient: newTestClient(t, interceptor.Funcs{}, restore),
-				manager:   managerMock,
-				recorder:  recorderMock,
-			}
-
-			// when
-			actual, err := sut.Reconcile(testCtx, request)
-
-			// then
-			require.NoError(t, err)
-			assert.Equal(t, ctrl.Result{}, actual)
-		})
-	})
 }
 
 func Test_restoreReconciler_SetupWithManager(t *testing.T) {

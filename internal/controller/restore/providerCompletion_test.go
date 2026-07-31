@@ -60,18 +60,19 @@ func TestAnUndecidedProviderRestoreEndsTheReconciliationWithoutAnOutcome(t *test
 	}
 }
 
-func TestACompletedProviderRestoreResolvesItsMilestoneAndThenFinishesTheWorkflow(t *testing.T) {
+func TestACompletedProviderRestoreResolvesItsMilestoneAndThenContinuesTheWorkflow(t *testing.T) {
 	restore := startableRestore()
 
-	managerMock := newMockRestoreManager(t)
-	managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(nil).Once()
+	// The next stage after the resolved milestone is the backup synchronization.
+	expectBackupSynchronization(t, nil)
+
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason,
 		"Successfully completed the provider restore [%s]", testRestore).Return()
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Creation successful").Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, managerMock, nil, nil).Reconcile
+		// no scale manager - the workflow must not reach the recovery in these two reconciliations
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore,
 		ownedChildInPhase(restore, velerov1.RestorePhaseCompleted))
@@ -81,10 +82,11 @@ func TestACompletedProviderRestoreResolvesItsMilestoneAndThenFinishesTheWorkflow
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the resolved milestone must end the reconciliation")
-	assert.Equal(t, ctrl.Result{}, results[1], "the workflow continues once the milestone is stored")
-	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
-		"the milestone must be written once and the child must never be written")
+	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[1], "the workflow continues once the milestone is stored")
+	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
+		"one milestone per reconciliation, and the child must never be written")
 	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionTrue, ReasonProviderRestoreCompleted)
+	assertPersistedCondition(t, fixture.client, k8sv1.ConditionBackupsSynchronized, metav1.ConditionTrue, ReasonBackupSynchronizationCompleted)
 }
 
 func TestAFailedProviderRestoreIsTerminalWithoutRecoveringTheWorkloads(t *testing.T) {

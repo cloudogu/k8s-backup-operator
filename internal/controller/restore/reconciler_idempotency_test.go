@@ -108,21 +108,12 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Start restore process").Return()
 	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason,
 		"Successfully completed the provider restore [%s]", testRestore).Return()
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Creation successful").Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Restore successful").Return()
 
-	// The real create manager finishes the workflow; only its maintenance switch is a mock, because it
-	// builds its own adapter otherwise.
+	// The maintenance switch has to be replaced after construction: unlike the cleanup and the scale
+	// manager it is not a constructor parameter, so the reconciler builds a real adapter for it.
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		manager := &defaultManager{
-			createManager: &defaultCreateManager{
-				k8sClient:             fakeClient,
-				namespace:             testNamespace,
-				recorder:              recorderMock,
-				scaleManager:          scaleMock,
-				maintenanceModeSwitch: maintenanceMock,
-			},
-			deleteManager: newDeleteManager(fakeClient, testNamespace, recorderMock),
-		}
+		manager := NewRestoreManager(fakeClient, testNamespace, recorderMock)
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, manager, cleanupMock, scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
@@ -153,11 +144,13 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	fixture.restart(factory)
 	advanceChildTo(t, fixture, velerov1.RestorePhaseCompleted)
 
-	finishing, finishingErrs := fixture.reconcileTimes(testCtx, request, 2)
-	require.NoError(t, finishingErrs[0])
-	require.NoError(t, finishingErrs[1])
+	finishing, finishingErrs := fixture.reconcileTimes(testCtx, request, 3)
+	for index := range finishingErrs {
+		require.NoError(t, finishingErrs[index])
+	}
 	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, finishing[0], "the resolved provider milestone ends its reconciliation")
-	require.Equal(t, ctrl.Result{}, finishing[1], "the finished workflow must not be requeued")
+	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, finishing[1], "the synchronized backups end their reconciliation")
+	require.Equal(t, ctrl.Result{}, finishing[2], "the finished workflow must not be requeued")
 
 	require.Equal(t, []recordedClientAction{
 		statusUpdateOf(restore),                // the initialized conditions
@@ -167,7 +160,8 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 		statusUpdateOf(restore),                // ProviderRestoreSuccessful=Unknown, pending
 		statusUpdateOf(restore),                // ProviderRestoreSuccessful=Unknown, running
 		statusUpdateOf(restore),                // ProviderRestoreSuccessful=True
-		statusUpdateOf(restore),                // the remaining milestones and Successful=True
+		statusUpdateOf(restore),                // BackupsSynchronized=True
+		statusUpdateOf(restore),                // WorkloadsRecovered=True and Successful=True
 	}, fixture.clientActions.snapshot(), "one write per stage, and the child is created but never written")
 
 	stored := &backupv1.Restore{}
@@ -210,8 +204,10 @@ func TestAConflictingConcurrentStatusWriteDuringReconciliationDropsNoCondition(t
 
 	stored := &backupv1.Restore{}
 	require.NoError(t, fixture.client.Get(testCtx, request.NamespacedName, stored))
-	require.Equal(t, metav1.ConditionTrue, findSuccessfulCondition(stored).Status)
-	require.Equal(t, ReasonMigratedFromLegacyStatus, findSuccessfulCondition(stored).Reason)
+	successfulCondition := findSuccessfulCondition(stored)
+	require.NotNil(t, successfulCondition)
+	require.Equal(t, metav1.ConditionTrue, successfulCondition.Status)
+	require.Equal(t, ReasonMigratedFromLegacyStatus, successfulCondition.Reason)
 	survivor := meta.FindStatusCondition(stored.Status.Conditions, backupv1.ConditionWorkloadsRecovered)
 	require.NotNil(t, survivor, "the concurrently written condition must not be dropped")
 	require.Equal(t, concurrent.Message, survivor.Message)
