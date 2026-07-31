@@ -4,29 +4,39 @@ import (
 	"testing"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-// expectReadinessCheck installs a provider whose readiness check returns checkReadyErr, for tests
-// that only care about the readiness gate and not about the rest of the provider.
-func expectReadinessCheck(t *testing.T, checkReadyErr error) {
-	providerMock := newMockRestoreProvider(t)
-	providerMock.EXPECT().CheckReady(testCtx).Return(checkReadyErr)
+// installProvider makes restoreprovider.Get return the given provider instead of a real one.
+func installProvider(t *testing.T, providerMock *mockRestoreProvider) {
+	t.Helper()
 
 	oldNewVeleroProvider := provider.NewVeleroProvider
 	provider.NewVeleroProvider = func(_ provider.K8sClient, _ provider.EventRecorder, _ string) provider.Provider {
 		return providerMock
 	}
 	t.Cleanup(func() { provider.NewVeleroProvider = oldNewVeleroProvider })
+}
+
+// expectReadinessCheck installs a provider whose readiness check returns checkReadyErr
+func expectReadinessCheck(t *testing.T, checkReadyErr error) {
+	providerMock := newMockRestoreProvider(t)
+	providerMock.EXPECT().CheckReady(testCtx).Return(checkReadyErr)
+
+	installProvider(t, providerMock)
+}
+
+// expectBackupSynchronization installs a ready provider whose backup synchronization returns syncErr.
+func expectBackupSynchronization(t *testing.T, syncErr error) {
+	providerMock := newMockRestoreProvider(t)
+	providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+	providerMock.EXPECT().SyncBackups(testCtx).Return(syncErr)
+
+	installProvider(t, providerMock)
 }
 
 func Test_newCreateManager(t *testing.T) {
@@ -45,63 +55,9 @@ func Test_newCreateManager(t *testing.T) {
 func Test_defaultCreateManager_create(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
+		restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		providerMock := newMockRestoreProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().WaitForRestore(testCtx, matchesRestoreNamed(restore.Name)).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
-
-		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
-
-		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
-
-		parentClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
-
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.NoError(t, err)
-		assertSuccessfulCondition(t, parentClient, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
-	})
-
-	t.Run("writes the parent only once when its status is already converged", func(t *testing.T) {
-		restore := &v1.Restore{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       "restore",
-				Namespace:  testNamespace,
-				Finalizers: []string{v1.RestoreFinalizer},
-				Labels:     restoreLabels(),
-			},
-			Spec:   v1.RestoreSpec{BackupName: "backup", Provider: "velero"},
-			Status: v1.RestoreStatus{Status: v1.RestoreStatusInProgress},
-		}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		providerMock := newMockRestoreProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().WaitForRestore(testCtx, matchesRestoreNamed(restore.Name)).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
+		expectBackupSynchronization(t, nil)
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
@@ -112,7 +68,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		writes := &clientWrites{}
 		parentClient := newTestClientWithParent(t, writes.interceptor(), restore)
 
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: newMockEventRecorder(t), maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -120,33 +76,26 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.Equal(t, 0, writes.parent.updates, "the metadata is the metadata stage's, so create must not write the object itself")
-		assert.Equal(t, 1, writes.parent.statusUpdates, "only the final Successful condition may be written")
+		assert.Equal(t, 1, writes.parent.statusUpdates, "the milestones the manager reaches must be written together")
+		assert.Equal(t, 0, writes.child.total(), "the child belongs to the provider, so the manager must not touch it")
+		assertPersistedCondition(t, parentClient, v1.ConditionBackupsSynchronized, metav1.ConditionTrue, ReasonBackupSynchronizationCompleted)
+		assertPersistedCondition(t, parentClient, v1.ConditionWorkloadsRecovered, metav1.ConditionTrue, ReasonWorkloadRecoveryCompleted)
 		assertSuccessfulCondition(t, parentClient, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
 	})
 
 	t.Run("should fail to sync backups after restore", func(t *testing.T) {
 		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
+		restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		providerMock := newMockRestoreProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().WaitForRestore(testCtx, matchesRestoreNamed(restore.Name)).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(assert.AnError)
-		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
+		expectBackupSynchronization(t, assert.AnError)
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
 
+		// the workloads must not be scaled up when the synchronization failed
 		scaleMock := newMockScaleManager(t)
 
-		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), recorder: newMockEventRecorder(t), maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -159,17 +108,14 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 	t.Run("should return error before touching the restore when the provider is not ready", func(t *testing.T) {
 		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
+		restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
 		expectReadinessCheck(t, assert.AnError)
 
 		writes := &clientWrites{}
 		parentClient := newTestClientWithParent(t, writes.interceptor(), restore)
 
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: newMockEventRecorder(t), namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -181,91 +127,11 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		assert.Equal(t, 0, writes.total(), "an unready provider must leave the restore untouched")
 	})
 
-	t.Run("should return error on provider error", func(t *testing.T) {
-		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		providerMock := newMockRestoreProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().WaitForRestore(testCtx, matchesRestoreNamed(restore.Name)).Return(assert.AnError)
-		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
-
-		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
-
-		scaleMock := newMockScaleManager(t)
-
-		parentClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
-
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to trigger provider")
-		assert.ErrorIs(t, err, assert.AnError)
-		assertSuccessfulCondition(t, parentClient, restore.Name, metav1.ConditionFalse, ReasonProviderRestoreFailed)
-	})
-
-	t.Run("should wrap status error failing calling provider and update status", func(t *testing.T) {
-		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		providerMock := newMockRestoreProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().WaitForRestore(testCtx, matchesRestoreNamed(restore.Name)).Return(assert.AnError)
-		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
-
-		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
-
-		scaleMock := newMockScaleManager(t)
-
-		parentClient := newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore)
-
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to trigger provider: assert.AnError general error for testing\nfailed to update restore status to 'failed':")
-		assert.ErrorIs(t, err, assert.AnError)
-	})
-
 	t.Run("should return error on failing setting completed status", func(t *testing.T) {
 		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
+		restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		providerMock := newMockRestoreProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().WaitForRestore(testCtx, matchesRestoreNamed(restore.Name)).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
+		expectBackupSynchronization(t, nil)
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
@@ -275,33 +141,22 @@ func Test_defaultCreateManager_create(t *testing.T) {
 
 		parentClient := newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore)
 
-		sut := &defaultCreateManager{k8sClient: parentClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: parentClient, recorder: newMockEventRecorder(t), maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to set status [completed] in restore resource [restore]")
+		assert.ErrorContains(t, err, "failed to set status [completed] in restore resource [test-restore]")
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("should return error on scaleup error", func(t *testing.T) {
 		// given
-		restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: testNamespace}, Spec: v1.RestoreSpec{BackupName: "backup", Provider: "velero"}}
+		restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		providerMock := newMockRestoreProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().WaitForRestore(testCtx, matchesRestoreNamed(restore.Name)).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
+		expectBackupSynchronization(t, nil)
 
 		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
 		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
@@ -309,7 +164,7 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		scaleMock := newMockScaleManager(t)
 		scaleMock.EXPECT().ScaleUp(testCtx).Return(assert.AnError)
 
-		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
+		sut := &defaultCreateManager{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), recorder: newMockEventRecorder(t), maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
 
 		// when
 		err := sut.create(testCtx, restore)
@@ -318,80 +173,5 @@ func Test_defaultCreateManager_create(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to scale up workloads after restore")
 		assert.ErrorIs(t, err, assert.AnError)
-	})
-
-	t.Run("reuses an existing own velero child without creating another one", func(t *testing.T) {
-		// given
-		restore := newParentRestore()
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-
-		providerMock := newMockRestoreProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().WaitForRestore(testCtx, matchesRestoreNamed(restore.Name)).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		oldNewVeleroProvider := provider.NewVeleroProvider
-		provider.NewVeleroProvider = func(client provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-		defer func() { provider.NewVeleroProvider = oldNewVeleroProvider }()
-
-		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
-
-		scaleMock := newMockScaleManager(t)
-		scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
-
-		writes := &clientWrites{}
-		k8sClient := newTestClientWithParent(t, writes.interceptor(), restore, velero.BuildRestore(restore))
-		sut := &defaultCreateManager{k8sClient: k8sClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.NoError(t, err)
-		assert.Equal(t, 0, writes.child.total(), "the existing own child must be reused without any write")
-		assertSuccessfulCondition(t, k8sClient, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
-	})
-
-	t.Run("fails terminally with a conflict on a foreign velero restore of the expected name", func(t *testing.T) {
-		// given
-		restore := newParentRestore()
-		foreign := &velerov1.Restore{
-			ObjectMeta: metav1.ObjectMeta{Name: restore.Name, Namespace: restore.Namespace},
-			Spec:       velerov1.RestoreSpec{BackupName: restore.Spec.BackupName},
-		}
-
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
-		recorderMock.EXPECT().Event(matchesRestoreNamed(restore.Name), corev1.EventTypeWarning, v1.ErrorOnCreateEventReason, mock.Anything)
-
-		// the provider is never asked to wait, and SyncBackups and ScaleUp never run
-		expectReadinessCheck(t, nil)
-
-		maintenanceModeMock := newMockMaintenanceModeSwitch(t)
-		maintenanceModeMock.EXPECT().Deactivate(testCtx, false).Return(nil)
-
-		scaleMock := newMockScaleManager(t)
-
-		writes := &clientWrites{}
-		k8sClient := newTestClientWithParent(t, writes.interceptor(), restore, foreign)
-		sut := &defaultCreateManager{k8sClient: k8sClient, recorder: recorderMock, maintenanceModeSwitch: maintenanceModeMock, scaleManager: scaleMock, namespace: testNamespace}
-
-		// when
-		err := sut.create(testCtx, restore)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to ensure the provider restore")
-		var conflictErr *velero.ConflictError
-		require.ErrorAs(t, err, &conflictErr)
-		assert.Equal(t, 0, writes.child.total(), "the foreign velero restore must neither be deleted nor modified")
-		persisted := &velerov1.Restore{}
-		require.NoError(t, k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: restore.Name}, persisted))
-		assert.Empty(t, persisted.OwnerReferences, "the foreign velero restore must never be claimed")
-		assertSuccessfulCondition(t, k8sClient, restore.Name, metav1.ConditionFalse, ReasonProviderRestoreConflict)
 	})
 }

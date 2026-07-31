@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,16 +59,15 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 	assertPreparedCondition(t, fixture.client, metav1.ConditionTrue, ReasonPreparationCompleted)
 }
 
-func TestAPreparedRestoreSkipsThePreparationAndStartsTheRestore(t *testing.T) {
+func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testing.T) {
 	restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
-	managerMock := newMockRestoreManager(t)
-	managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(nil).Once()
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Creation successful").Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process").Return()
 
+	// The cleanup, scale and maintenance mocks carry no expectations, so any preparation step would fail.
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, managerMock, newMockCleanupManager(t), newMockScaleManager(t))
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, newMockCleanupManager(t), newMockScaleManager(t))
 		reconciler.maintenanceModeSwitch = newMockMaintenanceModeSwitch(t)
 
 		return reconciler.Reconcile
@@ -77,8 +77,9 @@ func TestAPreparedRestoreSkipsThePreparationAndStartsTheRestore(t *testing.T) {
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
-	assert.Equal(t, ctrl.Result{}, results[0])
-	assert.Empty(t, fixture.clientActions.snapshot(), "a prepared restore must not be written again")
+	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
+	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
+		"a prepared restore must not be written again, it must start the provider restore")
 }
 
 // A restore whose status was lost reads as unprepared although its owned child proves it prepared.

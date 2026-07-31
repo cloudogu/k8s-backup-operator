@@ -84,6 +84,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.ensureMetadata,
 		r.ensureProviderChildState,
 		r.ensurePreparation,
+		r.ensureProviderRestore,
+		r.ensureProviderCompletion,
 		r.ensureRestoreCreated,
 	)
 }
@@ -197,13 +199,10 @@ func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restor
 		return r.failOnProviderChildConflict(ctx, restore, conflictErr)
 	}
 
-	// Our child already exists, so preparation is done and repeating it would destroy resources while
-	// a provider restore is in flight. Observing the child and finishing the workflow from here is the
-	// provider completion stage's job; until that stage exists this restore makes no further progress,
-	// which is deliberately preferred over repeating cleanup.
+	// Our child already exists, so the preparation is done. Continue with next stage.
 	log.FromContext(ctx).Info(fmt.Sprintf("provider restore of restore %s/%s already exists: skip preparation", r.namespace, restore.Name))
 
-	return restore, abort()
+	return restore, next()
 }
 
 // failOnProviderChildConflict reports an existing provider restore that this Restore may not adopt as
@@ -316,6 +315,146 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 	}
 
 	return updated, retryOnError(preparationErr)
+}
+
+// ensureProviderRestore starts the provider restore and returns without waiting for it, so no worker
+// is occupied while the provider runs. Creating the child is idempotent, an existing owned child will be used
+// instead of starting a second restore.
+func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	if requiredOperation(restore) != operationCreate {
+		return restore, next()
+	}
+
+	// A provider restore already succeeded -> skip
+	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful) {
+		return restore, next()
+	}
+
+	existing, err := velero.GetRestore(ctx, r.k8sClient, restore)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to read the provider restore of restore %s: %w", restore.Name, err))
+	}
+	if existing != nil {
+		return restore, next()
+	}
+
+	metrics.InitRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName)
+	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process")
+
+	if _, err := velero.EnsureRestore(ctx, r.k8sClient, restore); err != nil {
+		// A conflict is not transient: another restore's child occupies the expected name, and no
+		// number of retries will change that.
+		var conflictErr *velero.ConflictError
+		if errors.As(err, &conflictErr) {
+			return r.failOnProviderChildConflict(ctx, restore, conflictErr)
+		}
+
+		r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, err.Error())
+
+		return restore, retryOnError(fmt.Errorf("failed to start the provider restore of restore %s: %w", restore.Name, err))
+	}
+
+	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusInProgress)
+
+	// The child's own events drive the next reconciliation; the delay is only the fallback.
+	return restore, retryAfter(defaultRequeueDelay)
+}
+
+// ensureProviderCompletion observes the owned provider restore without blocking. If the restore is not
+// terminated yet, stop reconciliation and wait for next change on the child resource.
+// Only a provider success continues the workflow; a failure is terminal.
+func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	if requiredOperation(restore) != operationCreate {
+		return restore, next()
+	}
+
+	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful) {
+		return restore, next()
+	}
+
+	child, err := velero.GetRestore(ctx, r.k8sClient, restore)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to read the provider restore of restore %s: %w", restore.Name, err))
+	}
+	if child == nil {
+		// The child vanished between the stages. There is nothing to observe, and the next
+		// reconciliation lets the provider restore stage create it again.
+		return restore, retryAfter(defaultRequeueDelay)
+	}
+
+	status, reason := observeProviderRestoreState(velero.ObserveRestorePhase(child.Status.Phase))
+	if status == metav1.ConditionFalse {
+		return r.failOnProviderRestore(ctx, restore, child, reason)
+	}
+
+	message := fmt.Sprintf("The provider restore %q reports the phase %q.", child.Name, child.Status.Phase)
+	if status == metav1.ConditionTrue {
+		message = fmt.Sprintf("The provider restored the backup %q.", restore.Spec.BackupName)
+		r.recorder.Eventf(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Successfully completed the provider restore [%s]", child.Name)
+	}
+
+	// The write is no-op aware, so an unchanged state costs nothing; a changed one makes the phase the
+	// restore is actually in visible in its status.
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
+		Type:    k8sv1.ConditionProviderRestoreSuccessful,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	})
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to persist the provider restore state of restore %s: %w", restore.Name, err))
+	}
+
+	if status == metav1.ConditionTrue {
+		// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
+		return updated, retryAfter(defaultRequeueDelay)
+	}
+
+	return updated, retryAfter(providerObservationRecoveryDelay)
+}
+
+// failOnProviderRestore reports a terminally failed provider restore.
+func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *k8sv1.Restore, child *velerov1.Restore, reason string) (*k8sv1.Restore, stageOutcome) {
+	message := fmt.Sprintf("The provider restore %q failed terminally in the phase %q.", child.Name, child.Status.Phase)
+	r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, message)
+
+	if err := r.maintenanceModeSwitch.Deactivate(ctx, false); err != nil {
+		log.FromContext(ctx).Error(err, "The maintenance mode could not be deactivated after a failed provider restore. Continuing anyways...")
+	}
+
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
+		metav1.Condition{
+			Type:    k8sv1.ConditionProviderRestoreSuccessful,
+			Status:  metav1.ConditionFalse,
+			Reason:  reason,
+			Message: message,
+		},
+		metav1.Condition{
+			Type:    k8sv1.ConditionWorkloadsRecovered,
+			Status:  metav1.ConditionFalse,
+			Reason:  ReasonRecoveryNotAttemptedAfterProviderFailure,
+			Message: "The workloads were deliberately left scaled down because the provider restore failed.",
+		},
+		metav1.Condition{
+			Type:    k8sv1.ConditionBackupsSynchronized,
+			Status:  metav1.ConditionFalse,
+			Reason:  ReasonSynchronizationNotAttemptedAfterProviderFailure,
+			Message: "The backups were deliberately not synchronized because the provider restore failed.",
+		},
+		metav1.Condition{
+			Type:    k8sv1.ConditionSuccessful,
+			Status:  metav1.ConditionFalse,
+			Reason:  reason,
+			Message: message,
+		},
+	)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to report the failed provider restore of restore %s: %w", restore.Name, err))
+	}
+
+	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed)
+
+	return updated, abort()
 }
 
 func (r *restoreReconciler) ensureRestoreCreated(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {

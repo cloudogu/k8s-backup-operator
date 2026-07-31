@@ -174,7 +174,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		t.Run("should retry on create error", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := withPreparation(withInitializedConditions(withMetadata(newRestore())))
+			restore := withProviderRestoreSuccess(withPreparation(withInitializedConditions(withMetadata(newRestore()))))
 
 			managerMock := newMockRestoreManager(t)
 			managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(assert.AnError)
@@ -200,7 +200,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		t.Run("should succeed with create", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := withPreparation(withInitializedConditions(withMetadata(newRestore())))
+			restore := withProviderRestoreSuccess(withPreparation(withInitializedConditions(withMetadata(newRestore()))))
 
 			managerMock := newMockRestoreManager(t)
 			managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(nil)

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -57,6 +58,19 @@ func withPreparation(restore *k8sv1.Restore) *k8sv1.Restore {
 	return restore
 }
 
+// withProviderRestoreSuccess adds the ProviderRestoreSuccessful milestone the completion stage
+// writes, so that a test starting behind that stage does not have to run a provider restore first.
+func withProviderRestoreSuccess(restore *k8sv1.Restore) *k8sv1.Restore {
+	applyConditions(restore, []metav1.Condition{{
+		Type:    k8sv1.ConditionProviderRestoreSuccessful,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonProviderRestoreCompleted,
+		Message: "The provider restored the backup.",
+	}})
+
+	return restore
+}
+
 func newRestore() *k8sv1.Restore {
 	return &k8sv1.Restore{
 		ObjectMeta: metav1.ObjectMeta{Name: testRestore, Namespace: testNamespace},
@@ -84,6 +98,20 @@ func assertPersistedMetadata(t *testing.T, testClient client.Client, name string
 	for key, value := range restoreLabels() {
 		assert.Equal(t, value, stored.Labels[key], "label %s", key)
 	}
+}
+
+// assertPersistedCondition asserts the status and the reason of one condition of the Restore under
+// test, as it was persisted through the given client.
+func assertPersistedCondition(t *testing.T, testClient client.Client, conditionType string, status metav1.ConditionStatus, reason string) {
+	t.Helper()
+
+	stored := &k8sv1.Restore{}
+	require.NoError(t, testClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
+
+	condition := meta.FindStatusCondition(stored.Status.Conditions, conditionType)
+	require.NotNil(t, condition, "no %s condition was persisted", conditionType)
+	assert.Equal(t, status, condition.Status, "status of the %s condition", conditionType)
+	assert.Equal(t, reason, condition.Reason, "reason of the %s condition", conditionType)
 }
 
 // assertSuccessfulCondition asserts the Successful condition persisted through the given client.

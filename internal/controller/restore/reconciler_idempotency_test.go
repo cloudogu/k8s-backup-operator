@@ -5,8 +5,10 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -65,6 +67,126 @@ func TestRepeatedReconciliationOfAReadyRestoreWithACompletedChildPerformsNoWrite
 	require.Equal(t, backupv1.RestoreStatusCompleted, stored.Status.Status)
 	require.Equal(t, metav1.ConditionTrue, findSuccessfulCondition(stored).Status)
 	require.Equal(t, ReasonRestoreCompleted, findSuccessfulCondition(stored).Reason)
+}
+
+// advanceChildTo moves the owned provider restore to the given phase, the way the provider would.
+func advanceChildTo(t *testing.T, fixture *multiReconcileFixture, phase velerov1.RestorePhase) {
+	t.Helper()
+
+	fixture.simulateExternalWrite(t, func(testClient client.WithWatch) error {
+		child := &velerov1.Restore{}
+		if err := testClient.Get(testCtx, newRestoreRequest(testRestore).NamespacedName, child); err != nil {
+			return err
+		}
+		child.Status.Phase = phase
+
+		return testClient.Update(testCtx, child)
+	})
+}
+
+// The whole workflow, one stage per reconciliation, from a fresh Restore to a successful one. No
+// reconciliation blocks: the provider's progress arrives as a child phase between two of them, and the
+// operator restarts while the provider is still running.
+func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *testing.T) {
+	restore := newParentRestore()
+
+	providerMock := newMockRestoreProvider(t)
+	providerMock.EXPECT().CheckReady(testCtx).Return(nil)
+	providerMock.EXPECT().SyncBackups(testCtx).Return(nil).Once()
+	installProvider(t, providerMock)
+
+	maintenanceMock := newMockMaintenanceModeSwitch(t)
+	maintenanceMock.EXPECT().Activate(testCtx, mock.Anything, false).Return(nil).Once()
+	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
+	cleanupMock := newMockCleanupManager(t)
+	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
+	scaleMock := newMockScaleManager(t)
+	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
+
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Start restore process").Return()
+	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason,
+		"Successfully completed the provider restore [%s]", testRestore).Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Creation successful").Return()
+
+	// The real create manager finishes the workflow; only its maintenance switch is a mock, because it
+	// builds its own adapter otherwise.
+	factory := func(fakeClient client.WithWatch) reconcileFunction {
+		manager := &defaultManager{
+			createManager: &defaultCreateManager{
+				k8sClient:             fakeClient,
+				namespace:             testNamespace,
+				recorder:              recorderMock,
+				scaleManager:          scaleMock,
+				maintenanceModeSwitch: maintenanceMock,
+			},
+			deleteManager: newDeleteManager(fakeClient, testNamespace, recorderMock),
+		}
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, manager, cleanupMock, scaleMock)
+		reconciler.maintenanceModeSwitch = maintenanceMock
+
+		return reconciler.Reconcile
+	}
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
+	request := newRestoreRequest(testRestore)
+
+	// One reconciliation per stage: conditions, metadata, preparation, start, and the first observation
+	// of a provider that has accepted the restore but not started it.
+	staged, stagedErrs := fixture.reconcileTimes(testCtx, request, 5)
+	for index := range stagedErrs {
+		require.NoError(t, stagedErrs[index])
+	}
+	for index, result := range staged[:4] {
+		require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, result, "stage %d must end its reconciliation", index+1)
+	}
+	require.Equal(t, ctrl.Result{RequeueAfter: providerObservationRecoveryDelay}, staged[4],
+		"waiting for the provider must never occupy a worker")
+
+	advanceChildTo(t, fixture, velerov1.RestorePhaseInProgress)
+	running, runningErrs := fixture.reconcileTimes(testCtx, request, 1)
+	require.NoError(t, runningErrs[0])
+	require.Equal(t, ctrl.Result{RequeueAfter: providerObservationRecoveryDelay}, running[0])
+	assertPersistedCondition(t, fixture.client, backupv1.ConditionProviderRestoreSuccessful, metav1.ConditionUnknown, ReasonProviderRestoreRunning)
+
+	// The operator restarts while the provider is still working, and the provider finishes meanwhile.
+	fixture.restart(factory)
+	advanceChildTo(t, fixture, velerov1.RestorePhaseCompleted)
+
+	finishing, finishingErrs := fixture.reconcileTimes(testCtx, request, 2)
+	require.NoError(t, finishingErrs[0])
+	require.NoError(t, finishingErrs[1])
+	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, finishing[0], "the resolved provider milestone ends its reconciliation")
+	require.Equal(t, ctrl.Result{}, finishing[1], "the finished workflow must not be requeued")
+
+	require.Equal(t, []recordedClientAction{
+		statusUpdateOf(restore),                // the initialized conditions
+		updateOf(restore),                      // the finalizer and the labels
+		statusUpdateOf(restore),                // Prepared
+		createOf(velero.BuildRestore(restore)), // the provider restore, started and not awaited
+		statusUpdateOf(restore),                // ProviderRestoreSuccessful=Unknown, pending
+		statusUpdateOf(restore),                // ProviderRestoreSuccessful=Unknown, running
+		statusUpdateOf(restore),                // ProviderRestoreSuccessful=True
+		statusUpdateOf(restore),                // the remaining milestones and Successful=True
+	}, fixture.clientActions.snapshot(), "one write per stage, and the child is created but never written")
+
+	stored := &backupv1.Restore{}
+	require.NoError(t, fixture.client.Get(testCtx, request.NamespacedName, stored))
+	require.Equal(t, backupv1.RestoreStatusCompleted, stored.Status.Status)
+	for _, conditionType := range workflowConditionTypes {
+		condition := meta.FindStatusCondition(stored.Status.Conditions, conditionType)
+		require.NotNil(t, condition, "condition %s", conditionType)
+		require.Equal(t, metav1.ConditionTrue, condition.Status, "condition %s must be resolved", conditionType)
+	}
+
+	// The finished restore is terminal, so further reconciliations do nothing at all.
+	before := len(fixture.clientActions.snapshot())
+	settled, settledErrs := fixture.reconcileTimes(testCtx, request, 2)
+	for index := range settled {
+		require.NoError(t, settledErrs[index])
+		require.Equal(t, ctrl.Result{}, settled[index])
+	}
+	require.Len(t, fixture.clientActions.snapshot(), before, "a completed restore must not be written again")
 }
 
 func TestAConflictingConcurrentStatusWriteDuringReconciliationDropsNoCondition(t *testing.T) {

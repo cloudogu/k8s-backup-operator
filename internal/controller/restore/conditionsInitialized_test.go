@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -84,21 +85,20 @@ func TestConditionInitializationDoesNotResetAResolvedCondition(t *testing.T) {
 func TestARestoreInterruptedAtAnUnknownOutcomeContinues(t *testing.T) {
 	restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
-	managerMock := newMockRestoreManager(t)
-	managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(nil).Once()
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Creation successful").Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process").Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, managerMock, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
-	assert.Equal(t, ctrl.Result{}, results[0])
-	assert.Empty(t, fixture.clientActions.snapshot(), "an already initialized restore must not be written again")
+	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
+	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
+		"the restore must continue with the provider restore instead of being written again")
 }
 
 func TestALegacyRestoreWithAnUninterpretableStatusIsInitializedInstead(t *testing.T) {

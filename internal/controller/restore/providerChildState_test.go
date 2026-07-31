@@ -36,22 +36,26 @@ func foreignChild(parent *k8sv1.Restore) *velerov1.Restore {
 	return child
 }
 
-func TestAnExistingOwnedProviderChildStopsTheWorkflowBeforePreparation(t *testing.T) {
+// An existing owned child must send the workflow past preparation even without a set condition
+func TestAnExistingOwnedProviderChildSkipsThePreparationAndIsObservedInstead(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
-	managerMock := newMockRestoreManager(t)
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, managerMock, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, nil).Reconcile
 	}
+	// with owned child
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedRunningChild(restore))
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
 
 	for index := range results {
 		require.NoError(t, errs[index])
-		assert.Equal(t, ctrl.Result{}, results[index])
+		assert.Equal(t, ctrl.Result{RequeueAfter: providerObservationRecoveryDelay}, results[index],
+			"an undecided provider restore must not be waited for")
 	}
-	assert.Empty(t, fixture.clientActions.snapshot(), "the barrier must neither write the parent nor the child")
+	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
+		"the observed state must be written once and the child must never be written")
+	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionUnknown, ReasonProviderRestoreRunning)
 }
 
 func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T) {

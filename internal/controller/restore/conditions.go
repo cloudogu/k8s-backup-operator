@@ -43,6 +43,9 @@ const (
 	// ReasonRecoveringWorkloads marks a running workload recovery, i.e. scale-up and
 	// maintenance mode deactivation.
 	ReasonRecoveringWorkloads = "RecoveringWorkloads"
+	// ReasonWorkloadRecoveryCompleted marks a finished workload recovery: the workloads are scaled up
+	// again and the maintenance mode is switched off.
+	ReasonWorkloadRecoveryCompleted = "WorkloadRecoveryCompleted"
 	// ReasonWorkloadRecoveryFailed marks a failed workload recovery after provider success.
 	ReasonWorkloadRecoveryFailed = "WorkloadRecoveryFailed"
 	// ReasonRecoveryNotAttemptedAfterProviderFailure marks workloads that were deliberately not
@@ -50,6 +53,11 @@ const (
 	ReasonRecoveryNotAttemptedAfterProviderFailure = "RecoveryNotAttemptedAfterProviderFailure"
 	// ReasonSynchronizingBackups marks the running read-only backup catalog convergence check.
 	ReasonSynchronizingBackups = "SynchronizingBackups"
+	// ReasonSynchronizationNotAttemptedAfterProviderFailure marks a backup catalog that was
+	// deliberately not synchronized because the provider restore failed terminally.
+	ReasonSynchronizationNotAttemptedAfterProviderFailure = "SynchronizationNotAttemptedAfterProviderFailure"
+	// ReasonBackupSynchronizationCompleted marks a finished backup catalog synchronization.
+	ReasonBackupSynchronizationCompleted = "BackupSynchronizationCompleted"
 	// ReasonBackupSynchronizationFailed marks a backup catalog that did not converge.
 	ReasonBackupSynchronizationFailed = "BackupSynchronizationFailed"
 	// ReasonRestoreCompleted marks the successfully finished restore workflow.

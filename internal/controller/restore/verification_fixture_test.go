@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,11 +26,16 @@ type recordedClientAction struct {
 type clientActionRecorder struct {
 	mutex   sync.Mutex
 	actions []recordedClientAction
+	paused  bool
 }
 
 func (r *clientActionRecorder) record(verb string, object client.Object) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+
+	if r.paused {
+		return
+	}
 
 	r.actions = append(r.actions, recordedClientAction{
 		Verb: verb,
@@ -77,6 +83,25 @@ func newMultiReconcileFixture(
 		clientActions: clientActions,
 		reconcile:     factory(fakeClient),
 	}
+}
+
+// simulateExternalWrite performs a write on behalf of somebody else — the provider moving its restore
+// to the next phase, for instance — without recording it, so that a snapshot only ever contains what
+// the reconciler itself did.
+func (f *multiReconcileFixture) simulateExternalWrite(t *testing.T, write func(client.WithWatch) error) {
+	t.Helper()
+
+	f.clientActions.mutex.Lock()
+	f.clientActions.paused = true
+	f.clientActions.mutex.Unlock()
+
+	err := write(f.client)
+
+	f.clientActions.mutex.Lock()
+	f.clientActions.paused = false
+	f.clientActions.mutex.Unlock()
+
+	require.NoError(t, err)
 }
 
 func (f *multiReconcileFixture) restart(factory reconcileFactory) {
@@ -171,6 +196,15 @@ func recordClientActions(recorder *clientActionRecorder, next interceptor.Funcs)
 
 			return wrapped.SubResource(subResource).Patch(ctx, object, patch, opts...)
 		},
+	}
+}
+
+// createOf is the action the creation of the given object records.
+func createOf(object client.Object) recordedClientAction {
+	return recordedClientAction{
+		Verb: "create",
+		Type: reflect.TypeOf(object),
+		Key:  client.ObjectKeyFromObject(object),
 	}
 }
 

@@ -134,6 +134,16 @@ func failingDelete(err error) interceptor.Funcs {
 	}
 }
 
+// failingCreate makes every create fail with the given error, to cover a provider child that cannot
+// be created.
+func failingCreate(err error) interceptor.Funcs {
+	return interceptor.Funcs{
+		Create: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.CreateOption) error {
+			return err
+		},
+	}
+}
+
 // failingStatusUpdate makes every status write fail with the given error, for the paths that have to
 // report a status update they could not persist.
 func failingStatusUpdate(err error) interceptor.Funcs {
