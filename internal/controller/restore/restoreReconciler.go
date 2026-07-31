@@ -4,12 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
-	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -25,17 +22,16 @@ const (
 	operationIgnore = operation("ignore")
 )
 
-func NewRestoreReconciler(clientSet ecosystemInterface, recorder eventRecorder, namespace string, manager restoreManager, handler requeueHandler) *restoreReconciler {
-	return &restoreReconciler{clientSet: clientSet, recorder: recorder, namespace: namespace, manager: manager, requeueHandler: handler}
+func NewRestoreReconciler(k8sClient k8sClient, recorder eventRecorder, namespace string, manager restoreManager) *restoreReconciler {
+	return &restoreReconciler{k8sClient: k8sClient, recorder: recorder, namespace: namespace, manager: manager}
 }
 
 // restoreReconciler reconciles a Restore object
 type restoreReconciler struct {
-	clientSet      ecosystemInterface
-	recorder       eventRecorder
-	namespace      string
-	manager        restoreManager
-	requeueHandler requeueHandler
+	k8sClient k8sClient
+	recorder  eventRecorder
+	namespace string
+	manager   restoreManager
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -47,7 +43,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger := log.FromContext(ctx)
 	metrics.UpdateRestoreReconcileTotalMetric()
 
-	restore, err := r.clientSet.EcosystemV1Alpha1().Restores(r.namespace).Get(ctx, req.Name, metav1.GetOptions{})
+	restore := &k8sv1.Restore{}
+	err := r.k8sClient.Get(ctx, client.ObjectKey{Namespace: r.namespace, Name: req.Name}, restore)
 	if err != nil {
 		logger.Info(fmt.Sprintf("failed to get restore resource %s/%s: %s", r.namespace, req.Name, err))
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -90,7 +87,7 @@ func (r *restoreReconciler) ensureLegacyConditionsMigrated(ctx context.Context, 
 		return restore, next()
 	}
 
-	updater := newConditionUpdater(r.clientSet.EcosystemV1Alpha1().Restores(r.namespace))
+	updater := newConditionUpdater(r.k8sClient)
 
 	migrated, err := updater.setConditionsFromLegacyStatus(ctx, restore)
 	if err != nil {
@@ -107,7 +104,7 @@ func (r *restoreReconciler) ensureDeletionHandled(ctx context.Context, restore *
 
 	log.FromContext(ctx).Info(fmt.Sprintf("required operation for restore %s/%s is %s", r.namespace, restore.Name, operationDelete))
 
-	return restore, r.performOperation(ctx, restore, k8sv1.DeleteEventReason, restore.Status.Status, r.manager.delete)
+	return restore, r.performOperation(ctx, restore, k8sv1.DeleteEventReason, r.manager.delete)
 }
 
 func (r *restoreReconciler) ensureRestoreCreated(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
@@ -118,22 +115,21 @@ func (r *restoreReconciler) ensureRestoreCreated(ctx context.Context, restore *k
 		return restore, abort()
 	}
 
-	return restore, r.performOperation(ctx, restore, k8sv1.CreateEventReason, k8sv1.RestoreStatusNew, r.manager.create)
+	return restore, r.performOperation(ctx, restore, k8sv1.CreateEventReason, r.manager.create)
 }
 
-// performOperation executes the given operationFn and requeues if necessary.
-// When requeueing, the requeueStatus is set as the restore status.
+// performOperation executes the given operationFn, reports its outcome as an event and translates a
+// failure into a retry. The stage outcome is the only requeue authority; there is no separate
+// requeue orchestration writing the deprecated scalar status any more.
 func (r *restoreReconciler) performOperation(
 	ctx context.Context,
 	restore *k8sv1.Restore,
 	eventReason string,
-	requeueStatus string,
 	operationFn func(context.Context, *k8sv1.Restore) error,
 ) stageOutcome {
 	logger := log.FromContext(ctx)
 
 	operationError := operationFn(ctx, restore)
-	contextMessageOnError := fmt.Sprintf("%s of restore %s failed", eventReason, restore.Name)
 	eventType := corev1.EventTypeNormal
 	message := fmt.Sprintf("%s successful", eventReason)
 	if operationError != nil {
@@ -145,17 +141,10 @@ func (r *restoreReconciler) performOperation(
 
 	r.recorder.Event(restore, eventType, eventReason, message)
 
-	result, handleErr := r.requeueHandler.Handle(ctx, contextMessageOnError, restore, operationError, requeueStatus)
-	if handleErr != nil {
-		r.recorder.Eventf(restore, corev1.EventTypeWarning, requeue.RequeueEventReason,
-			"Failed to requeue the %s.", strings.ToLower(eventReason))
-		return retryOnError(fmt.Errorf("failed to handle requeue: %w", handleErr))
+	if operationError != nil {
+		return retryOnError(fmt.Errorf("%s of restore %s failed: %w", eventReason, restore.Name, operationError))
 	}
 
-	if result.Requeue || result.RequeueAfter > 0 {
-		// if RequeueAfter is 0, use 1 second - Requeue = true is deprecated, and RequeueAfter needs a positive value to requeue at all.
-		return retryAfter(max(time.Second, result.RequeueAfter))
-	}
 	return abort()
 }
 
