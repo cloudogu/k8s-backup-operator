@@ -266,8 +266,10 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	logger := log.FromContext(ctx)
 
 	err = r.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
+	maintenanceMessage := "maintenance mode is active,"
 	if err != nil {
 		logger.Error(err, "The Maintenance mode could not be activated. Continuing anyways...")
+		maintenanceMessage = ""
 	}
 
 	if err := r.scaleManager.ScaleDown(ctx); err != nil {
@@ -278,12 +280,11 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to cleanup before restore: %w", err))
 	}
 
-	//TODO: Message misleading, maintenance mode might not be active, which is an accepted case
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
 		Type:    k8sv1.ConditionPrepared,
 		Status:  metav1.ConditionTrue,
 		Reason:  ReasonPreparationCompleted,
-		Message: "The ecosystem was prepared for the restore: maintenance mode is active, workloads are scaled down and the resources to be restored are removed.",
+		Message: fmt.Sprintf("The ecosystem was prepared for the restore: %s workloads are scaled down and the resources to be restored are removed.", maintenanceMessage),
 	})
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to persist the preparation of restore %s: %w", restore.Name, err))
@@ -511,8 +512,7 @@ func (r *restoreReconciler) ensureWorkloadsRecovered(ctx context.Context, restor
 	// Taking maintenance mode down is best-effort, like the activation: the workloads are up
 	// again, so a remaining notice is a nuisance and not a reason to fail a successful restore.
 	if err := r.maintenanceModeSwitch.Deactivate(ctx, false); err != nil {
-		// TODO: Retry on MaintenanceMode deactivation error
-		log.FromContext(ctx).Error(err, "The maintenance mode could not be deactivated after the restore. Continuing anyways...")
+		return restore, retryOnError(fmt.Errorf("The maintenance mode could not be deactivated after the restore %s: %w", restore.Name, err))
 	}
 
 	// Both milestones are written together because they are reached together: the restore is
