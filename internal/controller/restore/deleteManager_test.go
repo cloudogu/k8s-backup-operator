@@ -15,37 +15,28 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-// newFailingDeleteClient returns a client whose Delete always fails, to cover the
-// non-NotFound error path of the typed child deletion.
-func newFailingDeleteClient(t *testing.T, objects ...client.Object) client.WithWatch {
-	t.Helper()
+// deletableParent is a Restore carrying the finalizer that the delete flow has to remove. Without the
+// finalizer its removal would be a no-op and the tests would pass for the wrong reason.
+func deletableParent() *v1.Restore {
+	restore := newParentRestore()
+	restore.Finalizers = []string{v1.RestoreFinalizer}
 
-	testScheme := runtime.NewScheme()
-	require.NoError(t, velerov1.AddToScheme(testScheme))
-
-	return fake.NewClientBuilder().WithScheme(testScheme).WithObjects(objects...).WithInterceptorFuncs(interceptor.Funcs{
-		Delete: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.DeleteOption) error {
-			return assert.AnError
-		},
-	}).Build()
+	return restore
 }
 
 func Test_defaultDeleteManager_delete(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		recorderMock := newMockEventRecorder(t)
-		clientSetMock := newMockEcosystemInterface(t)
 		clientMock := newMockK8sClient(t)
 
 		// when
-		manager := newDeleteManager(clientMock, clientSetMock, testNamespace, recorderMock)
+		manager := newDeleteManager(clientMock, testNamespace, recorderMock)
 
 		// then
 		require.NotEmpty(t, manager)
@@ -55,12 +46,9 @@ func Test_defaultDeleteManager_delete(t *testing.T) {
 func Test_newDeleteManager(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		restore := newParentRestore()
+		restore := deletableParent()
 
 		recorderMock := newMockEventRecorder(t)
-		restoreClientMock := newMockEcosystemRestoreInterface(t)
-		restoreClientMock.EXPECT().UpdateStatusDeleting(testCtx, restore).Return(restore, nil)
-		restoreClientMock.EXPECT().RemoveFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(nil, nil)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -71,33 +59,28 @@ func Test_newDeleteManager(t *testing.T) {
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderGetter }()
 
-		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-		clientSetMock := newMockEcosystemInterface(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
-
-		writes := &childWriteCounter{}
-		k8sClient := newChildTestClient(t, writes, velero.BuildRestore(restore))
-		sut := &defaultDeleteManager{k8sClient: k8sClient, clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
+		writes := &clientWrites{}
+		k8sClient := newTestClientWithParent(t, writes.interceptor(), restore, velero.BuildRestore(restore))
+		sut := &defaultDeleteManager{k8sClient: k8sClient, namespace: testNamespace, recorder: recorderMock}
 
 		// when
 		err := sut.delete(testCtx, restore)
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, 1, writes.deletes)
+		assert.Equal(t, 1, writes.child.deletes)
 		getErr := k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: testRestore}, &velerov1.Restore{})
 		assert.True(t, apierrors.IsNotFound(getErr))
+		stored := &v1.Restore{}
+		require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: restore.Name}, stored))
+		assert.NotContains(t, stored.Finalizers, v1.RestoreFinalizer)
 	})
 
 	t.Run("tolerates an already deleted velero child", func(t *testing.T) {
 		// given
-		restore := newParentRestore()
+		restore := deletableParent()
 
 		recorderMock := newMockEventRecorder(t)
-		restoreClientMock := newMockEcosystemRestoreInterface(t)
-		restoreClientMock.EXPECT().UpdateStatusDeleting(testCtx, restore).Return(restore, nil)
-		restoreClientMock.EXPECT().RemoveFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(nil, nil)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -108,34 +91,26 @@ func Test_newDeleteManager(t *testing.T) {
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderGetter }()
 
-		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-		clientSetMock := newMockEcosystemInterface(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
-
-		sut := &defaultDeleteManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
+		k8sClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
+		sut := &defaultDeleteManager{k8sClient: k8sClient, namespace: testNamespace, recorder: recorderMock}
 
 		// when
 		err := sut.delete(testCtx, restore)
 
 		// then
 		require.NoError(t, err)
+		stored := &v1.Restore{}
+		require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: restore.Name}, stored))
+		assert.NotContains(t, stored.Finalizers, v1.RestoreFinalizer)
 	})
 
 	t.Run("should return error on status update error", func(t *testing.T) {
 		// given
-		restore := newParentRestore()
+		restore := deletableParent()
 
 		recorderMock := newMockEventRecorder(t)
-		restoreClientMock := newMockEcosystemRestoreInterface(t)
-		restoreClientMock.EXPECT().UpdateStatusDeleting(testCtx, restore).Return(nil, assert.AnError)
 
-		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-		clientSetMock := newMockEcosystemInterface(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
-
-		sut := &defaultDeleteManager{k8sClient: newChildTestClient(t, &childWriteCounter{}), clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
+		sut := &defaultDeleteManager{k8sClient: newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore), namespace: testNamespace, recorder: recorderMock}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -148,11 +123,9 @@ func Test_newDeleteManager(t *testing.T) {
 
 	t.Run("should return error on velero child delete error", func(t *testing.T) {
 		// given
-		restore := newParentRestore()
+		restore := deletableParent()
 
 		recorderMock := newMockEventRecorder(t)
-		restoreClientMock := newMockEcosystemRestoreInterface(t)
-		restoreClientMock.EXPECT().UpdateStatusDeleting(testCtx, restore).Return(restore, nil)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -162,12 +135,8 @@ func Test_newDeleteManager(t *testing.T) {
 			return providerMock
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderGetter }()
-		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-		clientSetMock := newMockEcosystemInterface(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultDeleteManager{k8sClient: newFailingDeleteClient(t, velero.BuildRestore(restore)), clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
+		sut := &defaultDeleteManager{k8sClient: newTestClientWithParent(t, failingDelete(assert.AnError), restore, velero.BuildRestore(restore)), recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -181,12 +150,9 @@ func Test_newDeleteManager(t *testing.T) {
 
 	t.Run("should return error on finalizer remove error", func(t *testing.T) {
 		// given
-		restore := newParentRestore()
+		restore := deletableParent()
 
 		recorderMock := newMockEventRecorder(t)
-		restoreClientMock := newMockEcosystemRestoreInterface(t)
-		restoreClientMock.EXPECT().UpdateStatusDeleting(testCtx, restore).Return(restore, nil)
-		restoreClientMock.EXPECT().RemoveFinalizer(testCtx, restore, "cloudogu-restore-finalizer").Return(nil, assert.AnError)
 
 		providerMock := newMockRestoreProvider(t)
 		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -196,12 +162,8 @@ func Test_newDeleteManager(t *testing.T) {
 			return providerMock
 		}
 		defer func() { provider.NewVeleroProvider = oldVeleroProviderGetter }()
-		v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-		clientSetMock := newMockEcosystemInterface(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
 
-		sut := &defaultDeleteManager{k8sClient: newChildTestClient(t, &childWriteCounter{}, velero.BuildRestore(restore)), clientSet: clientSetMock, recorder: recorderMock, namespace: testNamespace}
+		sut := &defaultDeleteManager{k8sClient: newTestClientWithParent(t, failingUpdate(assert.AnError), restore, velero.BuildRestore(restore)), recorder: recorderMock, namespace: testNamespace}
 
 		// when
 		err := sut.delete(testCtx, restore)
@@ -215,13 +177,13 @@ func Test_newDeleteManager(t *testing.T) {
 
 func Test_defaultDeleteManager_deleteOnlyDeletesItsOwnProviderRestore(t *testing.T) {
 	legacyCompleted := func() *v1.Restore {
-		restore := newParentRestore()
+		restore := deletableParent()
 		restore.Status.Status = v1.RestoreStatusCompleted // written before conditions existed
 
 		return restore
 	}
 	reportedConflict := func() *v1.Restore {
-		restore := newParentRestore()
+		restore := deletableParent()
 		restore.Status.Conditions = []metav1.Condition{{
 			Type:               v1.ConditionSuccessful,
 			Status:             metav1.ConditionFalse,
@@ -250,7 +212,7 @@ func Test_defaultDeleteManager_deleteOnlyDeletesItsOwnProviderRestore(t *testing
 		wantDeleted bool
 	}{
 		"our own child is deleted": {
-			restore:     newParentRestore(),
+			restore:     deletableParent(),
 			child:       velero.BuildRestore(newParentRestore()),
 			wantDeleted: true,
 		},
@@ -265,12 +227,12 @@ func Test_defaultDeleteManager_deleteOnlyDeletesItsOwnProviderRestore(t *testing
 			wantDeleted: false,
 		},
 		"a namesake of a restore that never ran survives": {
-			restore:     newParentRestore(),
+			restore:     deletableParent(),
 			child:       unownedChild(),
 			wantDeleted: false,
 		},
 		"a child controlled by another restore survives": {
-			restore:     newParentRestore(),
+			restore:     deletableParent(),
 			child:       foreignlyOwnedChild(),
 			wantDeleted: false,
 		},
@@ -281,14 +243,10 @@ func Test_defaultDeleteManager_deleteOnlyDeletesItsOwnProviderRestore(t *testing
 			// given
 			recorderMock := newMockEventRecorder(t)
 			if !test.wantDeleted {
-				recorderMock.EXPECT().Event(test.restore, corev1.EventTypeWarning, v1.DeleteEventReason, mock.MatchedBy(func(message string) bool {
+				recorderMock.EXPECT().Event(matchesRestoreNamed(test.restore.Name), corev1.EventTypeWarning, v1.DeleteEventReason, mock.MatchedBy(func(message string) bool {
 					return strings.Contains(message, "not owned by this restore")
 				}))
 			}
-
-			restoreClientMock := newMockEcosystemRestoreInterface(t)
-			restoreClientMock.EXPECT().UpdateStatusDeleting(testCtx, test.restore).Return(test.restore, nil)
-			restoreClientMock.EXPECT().RemoveFinalizer(testCtx, test.restore, "cloudogu-restore-finalizer").Return(nil, nil)
 
 			providerMock := newMockRestoreProvider(t)
 			providerMock.EXPECT().CheckReady(testCtx).Return(nil)
@@ -298,26 +256,24 @@ func Test_defaultDeleteManager_deleteOnlyDeletesItsOwnProviderRestore(t *testing
 			}
 			t.Cleanup(func() { provider.NewVeleroProvider = oldVeleroProviderGetter })
 
-			v1Alpha1Client := newMockEcosystemV1Alpha1Interface(t)
-			v1Alpha1Client.EXPECT().Restores(testNamespace).Return(restoreClientMock)
-			clientSetMock := newMockEcosystemInterface(t)
-			clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Client)
-
-			writes := &childWriteCounter{}
-			k8sClient := newChildTestClient(t, writes, test.child)
-			sut := &defaultDeleteManager{k8sClient: k8sClient, clientSet: clientSetMock, namespace: testNamespace, recorder: recorderMock}
+			writes := &clientWrites{}
+			k8sClient := newTestClientWithParent(t, writes.interceptor(), test.restore, test.child)
+			sut := &defaultDeleteManager{k8sClient: k8sClient, namespace: testNamespace, recorder: recorderMock}
 
 			// when
 			err := sut.delete(testCtx, test.restore)
 
 			// then the finalizer is removed either way, so deletion never wedges on a foreign child
 			require.NoError(t, err)
+			stored := &v1.Restore{}
+			require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: test.restore.Name}, stored))
+			assert.NotContains(t, stored.Finalizers, v1.RestoreFinalizer)
 			getErr := k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: testRestore}, &velerov1.Restore{})
 			if test.wantDeleted {
-				assert.Equal(t, 1, writes.deletes)
+				assert.Equal(t, 1, writes.child.deletes)
 				assert.True(t, apierrors.IsNotFound(getErr), "the own child must be gone")
 			} else {
-				assert.Equal(t, 0, writes.total(), "a child that is not ours must not be written to at all")
+				assert.Equal(t, 0, writes.child.total(), "a child that is not ours must not be written to at all")
 				assert.NoError(t, getErr, "the foreign child must survive its namesake")
 			}
 		})

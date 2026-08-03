@@ -15,18 +15,17 @@ import (
 
 type defaultDeleteManager struct {
 	k8sClient k8sClient
-	clientSet ecosystemInterface
 	namespace string
 	recorder  eventRecorder
 }
 
-func newDeleteManager(k8sClient k8sClient, clientSet ecosystemInterface, namespace string, recorder eventRecorder) *defaultDeleteManager {
-	return &defaultDeleteManager{k8sClient: k8sClient, clientSet: clientSet, namespace: namespace, recorder: recorder}
+func newDeleteManager(k8sClient k8sClient, namespace string, recorder eventRecorder) *defaultDeleteManager {
+	return &defaultDeleteManager{k8sClient: k8sClient, namespace: namespace, recorder: recorder}
 }
 
 func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore) error {
 	logger := log.FromContext(ctx)
-	restoreClient := dm.clientSet.EcosystemV1Alpha1().Restores(dm.namespace)
+	conditions := newConditionUpdater(dm.k8sClient)
 
 	child, err := velero.GetRestore(ctx, dm.k8sClient, restore)
 	if err != nil {
@@ -37,7 +36,7 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore)
 		(velero.IsOwnedRestore(restore, child) ||
 			(successfulCondition != nil && successfulCondition.Reason == ReasonMigratedFromLegacyStatus))
 
-	_, err = restoreClient.UpdateStatusDeleting(ctx, restore)
+	restore, err = conditions.setLegacyStatus(ctx, restore, v1.RestoreStatusDeleting)
 	if err != nil {
 		return fmt.Errorf("failed to update status [%s] on restore [%s]: %w", v1.RestoreStatusDeleting, restore.Name, err)
 	}
@@ -61,7 +60,7 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore)
 		dm.recorder.Event(restore, corev1.EventTypeWarning, v1.DeleteEventReason, message)
 	}
 
-	_, err = restoreClient.RemoveFinalizer(ctx, restore, v1.RestoreFinalizer)
+	err = removeFinalizer(ctx, dm.k8sClient, restore, v1.RestoreFinalizer)
 	if err != nil {
 		return fmt.Errorf("failed to delete finalizer [%s]: %w", v1.RestoreFinalizer, err)
 	}

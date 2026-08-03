@@ -18,8 +18,8 @@ github.com/cloudogu/ces-commons-lib v0.3.0 h1:HPf18pTLHGmAZpJb/H6pBrqxKcAUH6KhFr
 github.com/cloudogu/ces-commons-lib v0.3.0/go.mod h1:4rvR2RTDDaz5a6OZ1fW27G0MOnl5I3ackeiHxt4gn3o=
 github.com/cloudogu/cesapp-lib v0.18.2 h1:S89A8WrDi51iYutCnMdIZ24lMrDmIBCbYUIHhsz69X0=
 github.com/cloudogu/cesapp-lib v0.18.2/go.mod h1:8EIoGAI5WcwQH803FGjwF0I4sNPPcyTW8YPDtwdi+FM=
-github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260727141609-07e13f5ee739 h1:8njaG8tsNRt/ncmMfcocIsZ+Lp/z7tg3zjDhmRqECJg=
-github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260727141609-07e13f5ee739/go.mod h1:LHy0STVN1plMd3pYwVKKI6Jx7us15wHxyG7vOs2o7q8=
+github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260730042545-01cf6d5d2817 h1:3qK9RaaTomHXmdFx7ZIy6XJWa539FauW5Oo2mtzZq+U=
+github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260730042545-01cf6d5d2817/go.mod h1:LHy0STVN1plMd3pYwVKKI6Jx7us15wHxyG7vOs2o7q8=
 github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0 h1:7J/1X+qjrMi2bVOl6Hcl3Vja/RWUcJZrBruFSG7mNLY=
 github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0/go.mod h1:3E1iLra8//8+kCwBjuDi6b0iwtNoArYfOIYnzNXSFMQ=
 github.com/cloudogu/k8s-dogu-lib/v2 v2.12.0 h1:Eq8x9IzgcvoNmWMjCNsNAgO2AnrhskzT9X4ZlOh40Io=
@@ -204,6 +204,8 @@ github.com/prometheus/common v0.67.5 h1:pIgK94WWlQt1WLwAC5j2ynLaBRDiinoAb86HZHTU
 github.com/prometheus/common v0.67.5/go.mod h1:SjE/0MzDEEAyrdr5Gqc6G+sXI67maCxzaT3A2+HqjUw=
 github.com/prometheus/procfs v0.20.0 h1:AA7aCvjxwAquZAlonN7888f2u4IN8WVeFgBi4k82M4Q=
 github.com/prometheus/procfs v0.20.0/go.mod h1:o9EMBZGRyvDrSPH1RqdxhojkuXstoe4UlK79eF5TGGo=
+github.com/robfig/cron/v3 v3.0.1 h1:WdRxkvbJztn8LMz/QEvLN5sBU+xKpSqwwUO1Pjr4qDs=
+github.com/robfig/cron/v3 v3.0.1/go.mod h1:eQICP3HwyT7UooqI/z+Ov+PtYAWygg1TEWWzGIFLtro=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/shirou/gopsutil/v4 v4.26.1 h1:TOkEyriIXk2HX9d4isZJtbjXbEjf5qyKPAzbzY0JWSo=

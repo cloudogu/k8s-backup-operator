@@ -9,13 +9,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
 type restoreStatusClient interface {
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*k8sv1.Restore, error)
-	UpdateStatus(ctx context.Context, restore *k8sv1.Restore, opts metav1.UpdateOptions) (*k8sv1.Restore, error)
+	Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error
+	Status() client.SubResourceWriter
 }
 
 type conditionUpdater struct {
@@ -29,12 +30,32 @@ func newConditionUpdater(client restoreStatusClient) *conditionUpdater {
 // setConditions applies the given conditions to the Restore status, writes the deprecated
 // scalar status for consumers that have not migrated yet, and persists the result.
 func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Restore, conditions ...metav1.Condition) (*k8sv1.Restore, error) {
+	return u.updateStatus(ctx, restore, func(desired *k8sv1.Restore) {
+		applyConditions(desired, conditions)
+	})
+}
+
+// setLegacyStatus persists the deprecated scalar status directly, for the two workflow steps that
+// have no condition to write yet: marking a starting restore as in progress and a deleted one as
+// deleting. It exists so that the scalar keeps exactly one writer while the workflow is still
+// blocking; the condition seeding of the continuous workflow replaces both call sites and this
+// method goes with them.
+func (u *conditionUpdater) setLegacyStatus(ctx context.Context, restore *k8sv1.Restore, status string) (*k8sv1.Restore, error) {
+	return u.updateStatus(ctx, restore, func(desired *k8sv1.Restore) {
+		desired.Status.Status = status
+	})
+}
+
+// updateStatus applies mutate to a copy of the Restore status and persists it, unless the mutation
+// changed nothing. A conflict is resolved by re-reading the Restore and applying mutate again, so a
+// concurrent status write is never dropped.
+func (u *conditionUpdater) updateStatus(ctx context.Context, restore *k8sv1.Restore, mutate func(*k8sv1.Restore)) (*k8sv1.Restore, error) {
 	current := restore
 	result := restore
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		desired := current.DeepCopy()
-		applyConditions(desired, conditions)
+		mutate(desired)
 
 		if apiequality.Semantic.DeepEqual(current.Status, desired.Status) {
 			result = current
@@ -42,10 +63,10 @@ func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Res
 			return nil
 		}
 
-		updated, updateErr := u.client.UpdateStatus(ctx, desired, metav1.UpdateOptions{})
+		updateErr := u.client.Status().Update(ctx, desired)
 		if apierrors.IsConflict(updateErr) {
-			refreshed, getErr := u.client.Get(ctx, restore.Name, metav1.GetOptions{})
-			if getErr != nil {
+			refreshed := &k8sv1.Restore{}
+			if getErr := u.client.Get(ctx, client.ObjectKeyFromObject(restore), refreshed); getErr != nil {
 				return fmt.Errorf("failed to get restore %q after a conflicting status update: %w", restore.Name, getErr)
 			}
 			current = refreshed
@@ -56,12 +77,13 @@ func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Res
 			return updateErr
 		}
 
-		result = updated
+		// The client updated desired in place, so it now carries the persisted resource version.
+		result = desired
 
 		return nil
 	})
 	if err != nil {
-		return restore, fmt.Errorf("failed to update conditions of restore %q: %w", restore.Name, err)
+		return restore, fmt.Errorf("failed to update status of restore %q: %w", restore.Name, err)
 	}
 
 	return result, nil
