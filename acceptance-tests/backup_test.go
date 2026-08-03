@@ -3,6 +3,7 @@
 package specs
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -112,7 +113,7 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 		})
 	})
 
-	FDescribe("Canceling a backup", Ordered, Label("backup"), func() {
+	Describe("Canceling a backup", Ordered, Label("backup"), func() {
 		var backupObjectKey = client.ObjectKey{
 			Namespace: "ecosystem",
 			Name:      fmt.Sprintf("backup-spec-canceling-backup%s", uuid.New().String()),
@@ -122,7 +123,7 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 			Name:      "default",
 		}
 		var veleroBackupStoreLocationS3Region = ""
-		var retryTimeLimitInMinutes = 2
+		var retryTimeLimitInMinutesForTest = 1
 
 		AfterAll(func(ctx SpecContext) {
 			By("deletes the backup resource")
@@ -136,16 +137,14 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 				err := k8sClient.Get(ctx, backupObjectKey, backup)
 				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			})
+
+			By("resets the backup time limit to the default value")
+			err = configureBackupTimeLimit(ctx, 60)
+			Expect(err).ShouldNot(HaveOccurred())
 		})
 
 		It("configures the backup time limit", func(ctx SpecContext) {
-			backupOperatorConfigMap := &corev1.ConfigMap{}
-			objectKey := client.ObjectKey{Namespace: "ecosystem", Name: "k8s-backup-operator-backup-config"}
-			err := k8sClient.Get(ctx, objectKey, backupOperatorConfigMap)
-			Expect(err).ShouldNot(HaveOccurred())
-
-			backupOperatorConfigMap.Data["retryTimeLimit"] = strconv.Itoa(retryTimeLimitInMinutes) // minutes
-			err = k8sClient.Update(ctx, backupOperatorConfigMap)
+			err := configureBackupTimeLimit(ctx, retryTimeLimitInMinutesForTest)
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
@@ -158,6 +157,17 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 			veleroBackupStorageLocation.Spec.Config["region"] = "region_that_not_exist"
 			err = k8sClient.Update(ctx, veleroBackupStorageLocation)
 			Expect(err).ShouldNot(HaveOccurred())
+
+			// We are waiting for the velero reconciler time to update the status of the backup storage location
+			Eventually(func(g Gomega) {
+				veleroBackupStorageLocation := &velerov1.BackupStorageLocation{}
+				err := k8sClient.Get(ctx, veleroBackupStoreLocationObjectKey, veleroBackupStorageLocation)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(veleroBackupStorageLocation.Status.Phase).To(Equal(velerov1.BackupStorageLocationPhaseUnavailable))
+			}).
+				WithTimeout(1 * time.Minute).
+				WithPolling(10 * time.Second).
+				Should(Succeed())
 		})
 
 		It("creates the backup resource", func(ctx SpecContext) {
@@ -179,7 +189,7 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 		})
 
 		It("ensures the provider backup storage is available after time window expired", func(ctx SpecContext) {
-			time.Sleep(time.Duration(retryTimeLimitInMinutes)*time.Minute + 30*time.Second)
+			time.Sleep(time.Duration(retryTimeLimitInMinutesForTest)*time.Minute + 30*time.Second)
 
 			veleroBackupStorageLocation := &velerov1.BackupStorageLocation{}
 			err := k8sClient.Get(ctx, veleroBackupStoreLocationObjectKey, veleroBackupStorageLocation)
@@ -223,4 +233,22 @@ func createBackupWithObjectKey(objectKey client.ObjectKey) *backupv1.Backup {
 			Provider: "velero",
 		},
 	}
+}
+
+func configureBackupTimeLimit(ctx context.Context, retryLimitInMinutes int) error {
+	objectKey := client.ObjectKey{Namespace: "ecosystem", Name: "k8s-backup-operator-backup-config"}
+
+	backupOperatorConfigMap := &corev1.ConfigMap{}
+	err := k8sClient.Get(ctx, objectKey, backupOperatorConfigMap)
+	if err != nil {
+		return err
+	}
+
+	backupOperatorConfigMap.Data["retryTimeLimit"] = strconv.Itoa(retryLimitInMinutes) // minutes
+	err = k8sClient.Update(ctx, backupOperatorConfigMap)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
