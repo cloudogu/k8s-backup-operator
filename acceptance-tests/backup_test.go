@@ -123,7 +123,7 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 			Name:      "default",
 		}
 		var veleroBackupStoreLocationS3Region = ""
-		var retryTimeLimitInMinutesForTest = 1
+		var backupTimeLimitInMinutesForTest = 1
 
 		AfterAll(func(ctx SpecContext) {
 			By("deletes the backup resource")
@@ -144,7 +144,7 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 		})
 
 		It("configures the backup time limit", func(ctx SpecContext) {
-			err := configureBackupTimeLimit(ctx, retryTimeLimitInMinutesForTest)
+			err := configureBackupTimeLimit(ctx, backupTimeLimitInMinutesForTest)
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
@@ -158,7 +158,7 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 			err = k8sClient.Update(ctx, veleroBackupStorageLocation)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			// We are waiting for the velero reconciler time to update the status of the backup storage location
+			// We are waiting for the velero reconciler to update the status of the backup storage location
 			Eventually(func(g Gomega) {
 				veleroBackupStorageLocation := &velerov1.BackupStorageLocation{}
 				err := k8sClient.Get(ctx, veleroBackupStoreLocationObjectKey, veleroBackupStorageLocation)
@@ -189,7 +189,7 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 		})
 
 		It("ensures the provider backup storage is available after time window expired", func(ctx SpecContext) {
-			time.Sleep(time.Duration(retryTimeLimitInMinutesForTest)*time.Minute + 30*time.Second)
+			time.Sleep(time.Duration(backupTimeLimitInMinutesForTest)*time.Minute + 30*time.Second)
 
 			veleroBackupStorageLocation := &velerov1.BackupStorageLocation{}
 			err := k8sClient.Get(ctx, veleroBackupStoreLocationObjectKey, veleroBackupStorageLocation)
@@ -200,7 +200,7 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
-		It("check whether the backup was cancelled and did not start", func(ctx SpecContext) {
+		It("checks whether the backup was cancelled and did not start", func(ctx SpecContext) {
 			EventuallyShouldSucceed(func(g Gomega) {
 				backup := &backupv1.Backup{}
 				err := k8sClient.Get(ctx, backupObjectKey, backup)
@@ -213,6 +213,74 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 				g.Expect(backup.Status.StartTimestamp.IsZero()).To(BeTrue())
 			})
 		})
+	})
+
+	FDescribe("Canceling a running backup", Ordered, Label("backup"), func() {
+		var backupObjectKey = client.ObjectKey{
+			Namespace: "ecosystem",
+			Name:      fmt.Sprintf("backup-spec-canceling-backup%s", uuid.New().String()),
+		}
+		var backupTimeLimitInMinutesForTest = 1
+
+		AfterAll(func(ctx SpecContext) {
+			By("deletes the backup resource")
+			backup := createBackupWithObjectKey(backupObjectKey)
+			err := k8sClient.Delete(ctx, backup, &client.DeleteOptions{})
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("waits until the backup is deleted")
+			EventuallyShouldSucceed(func(g Gomega) {
+				backup := &backupv1.Backup{}
+				err := k8sClient.Get(ctx, backupObjectKey, backup)
+				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			})
+
+			By("resets the backup time limit to the default value")
+			err = configureBackupTimeLimit(ctx, 60)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("configures the backup time limit", func(ctx SpecContext) {
+			err := configureBackupTimeLimit(ctx, backupTimeLimitInMinutesForTest)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("creates the backup resource", func(ctx SpecContext) {
+			backup := createBackupWithObjectKey(backupObjectKey)
+			err := k8sClient.Create(ctx, backup, &client.CreateOptions{})
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		// This test expects a backup with a duration that exceeds the elapsed time window.
+		It("checks whether the backup is still running after time window expired", func(ctx SpecContext) {
+			time.Sleep(time.Duration(backupTimeLimitInMinutesForTest)*time.Minute + 10*time.Second)
+
+			EventuallyShouldSucceed(func(g Gomega) {
+				backup := &backupv1.Backup{}
+				err := k8sClient.Get(ctx, backupObjectKey, backup)
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
+				g.Expect(completed).ToNot(BeNil())
+				g.Expect(completed.Status).To(Equal(metav1.ConditionFalse))
+				g.Expect(completed.Reason).To(Equal("TimeWindowExpiredBackupIsRunning"))
+
+				g.Expect(backup.Status.StartTimestamp.IsZero()).To(BeFalse())
+			})
+		})
+
+		It("waits until the backup has successfully completed", func(ctx SpecContext) {
+			EventuallyShouldSucceed(func(g Gomega) {
+				backup := &backupv1.Backup{}
+				err := k8sClient.Get(ctx, backupObjectKey, backup)
+				Expect(err).ShouldNot(HaveOccurred())
+
+				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
+				g.Expect(completed).ToNot(BeNil())
+				g.Expect(completed.Status).To(Equal(metav1.ConditionTrue))
+			})
+		})
+
 	})
 })
 
