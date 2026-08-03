@@ -235,7 +235,7 @@ func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, res
 		return restore, retryOnError(fmt.Errorf("failed to report the provider restore conflict of restore %s: %w", restore.Name, err))
 	}
 
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed)
+	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed) // NOSONAR -- legacy restore status compatibility
 
 	return updated, abort()
 }
@@ -362,7 +362,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 		return restore, retryOnError(fmt.Errorf("failed to start the provider restore of restore %s: %w", restore.Name, err))
 	}
 
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusInProgress)
+	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusInProgress) // NOSONAR -- legacy restore status compatibility
 
 	// The child's own events drive the next reconciliation; the delay is only the fallback.
 	return restore, retryAfter(defaultRequeueDelay)
@@ -460,7 +460,7 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 		return restore, retryOnError(fmt.Errorf("failed to report the failed provider restore of restore %s: %w", restore.Name, err))
 	}
 
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed)
+	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed) // NOSONAR -- legacy restore status compatibility
 
 	return updated, abort()
 }
@@ -527,7 +527,7 @@ func (r *restoreReconciler) ensureWorkloadsRecovered(ctx context.Context, restor
 		return restore, retryOnError(fmt.Errorf("failed to persist the workload recovery of restore %s: %w", restore.Name, err))
 	}
 
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusCompleted)
+	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusCompleted) // NOSONAR -- legacy restore status compatibility
 	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Restore successful")
 
 	// The restore is terminal now, so there is nothing left to do.

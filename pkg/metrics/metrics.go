@@ -74,12 +74,12 @@ func UpdateRestoreStatusMetrics(namespace, name, backupName, newStatus string) {
 // InitRestoreStatusMetrics initializes the metrics for a restore resource
 func InitRestoreStatusMetrics(namespace, name, backupName string) {
 	// all status values need to be initialized to 0 to monitor status increases
-	restoreStatuses := []string{v1.RestoreStatusInProgress, v1.RestoreStatusCompleted, v1.RestoreStatusFailed, v1.RestoreStatusDeleting}
+	restoreStatuses := []string{v1.RestoreStatusInProgress, v1.RestoreStatusCompleted, v1.RestoreStatusFailed, v1.RestoreStatusDeleting} // NOSONAR -- legacy restore status compatibility
 	for _, status := range restoreStatuses {
 		RestoreStatusTransitionsTotal.WithLabelValues(namespace, name, status, backupName).Add(0)
 	}
 
-	UpdateRestoreStatusMetrics(namespace, name, backupName, v1.RestoreStatusNew)
+	UpdateRestoreStatusMetrics(namespace, name, backupName, v1.RestoreStatusNew) // NOSONAR -- legacy restore status compatibility
 }
 
 // UpdateRestoreReconcileTotalMetric increments the metric for the total number of reconciles of the restore resource

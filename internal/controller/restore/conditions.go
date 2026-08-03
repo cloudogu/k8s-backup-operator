@@ -140,12 +140,12 @@ func findSuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 // by metadata.deletionTimestamp, not by status.
 func determineLegacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 	var status metav1.ConditionStatus
-	switch restore.Status.Status {
-	case k8sv1.RestoreStatusCompleted:
+	switch restore.Status.Status { // NOSONAR -- legacy restore status compatibility
+	case k8sv1.RestoreStatusCompleted: // NOSONAR -- legacy restore status compatibility
 		status = metav1.ConditionTrue
-	case k8sv1.RestoreStatusFailed:
+	case k8sv1.RestoreStatusFailed: // NOSONAR -- legacy restore status compatibility
 		status = metav1.ConditionFalse
-	case k8sv1.RestoreStatusInProgress:
+	case k8sv1.RestoreStatusInProgress: // NOSONAR -- legacy restore status compatibility
 		status = metav1.ConditionUnknown
 	default:
 		return nil
@@ -179,25 +179,25 @@ func isTerminal(restore *k8sv1.Restore) bool {
 }
 
 func isTerminalLegacyStatus(status string) bool {
-	return status == k8sv1.RestoreStatusCompleted || status == k8sv1.RestoreStatusFailed
+	return status == k8sv1.RestoreStatusCompleted || status == k8sv1.RestoreStatusFailed // NOSONAR -- legacy restore status compatibility
 }
 
 // legacyStatusFor maps conditions to thr deprecated status field.
 func legacyStatusFor(restore *k8sv1.Restore) string {
 	if restore.DeletionTimestamp != nil && !restore.DeletionTimestamp.IsZero() {
-		return k8sv1.RestoreStatusDeleting
+		return k8sv1.RestoreStatusDeleting // NOSONAR -- legacy restore status compatibility
 	}
 
 	switch condition := findSuccessfulCondition(restore); {
 	case condition == nil && (len(restore.Status.Conditions) == 0 || isTerminalLegacyStatus(restore.Status.Status)):
 		return restore.Status.Status
 	case condition == nil:
-		return k8sv1.RestoreStatusInProgress
+		return k8sv1.RestoreStatusInProgress // NOSONAR -- legacy restore status compatibility
 	case condition.Status == metav1.ConditionTrue:
-		return k8sv1.RestoreStatusCompleted
+		return k8sv1.RestoreStatusCompleted // NOSONAR -- legacy restore status compatibility
 	case condition.Status == metav1.ConditionFalse:
-		return k8sv1.RestoreStatusFailed
+		return k8sv1.RestoreStatusFailed // NOSONAR -- legacy restore status compatibility
 	default:
-		return k8sv1.RestoreStatusInProgress
+		return k8sv1.RestoreStatusInProgress // NOSONAR -- legacy restore status compatibility
 	}
 }

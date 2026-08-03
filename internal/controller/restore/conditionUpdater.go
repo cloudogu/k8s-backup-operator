@@ -102,5 +102,5 @@ func applyConditions(restore *k8sv1.Restore, conditions []metav1.Condition) {
 		meta.SetStatusCondition(&restore.Status.Conditions, condition)
 	}
 
-	restore.Status.Status = legacyStatusFor(restore)
+	restore.Status.Status = legacyStatusFor(restore) // NOSONAR -- legacy restore status compatibility
 }
