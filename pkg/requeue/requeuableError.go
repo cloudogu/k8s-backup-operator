@@ -15,6 +15,10 @@ func (gre *GenericRequeueableError) Error() string {
 	return fmt.Sprintf("%s: %s", gre.ErrMsg, gre.Err.Error())
 }
 
+func (gre *GenericRequeueableError) Unwrap() error {
+	return gre.Err
+}
+
 // GetRequeueTime returns the time until the component should be requeued.
 func (gre *GenericRequeueableError) GetRequeueTime(requeueTimeNanos time.Duration) time.Duration {
 	return getRequeueTime(requeueTimeNanos)

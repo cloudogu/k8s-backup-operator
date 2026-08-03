@@ -22,7 +22,6 @@ const (
 
 type defaultCreateManager struct {
 	k8sClient             k8sClient
-	ecosystemClientSet    ecosystemInterface
 	namespace             string
 	cleanup               cleanupManager
 	scaleManager          scaleManager
@@ -32,7 +31,6 @@ type defaultCreateManager struct {
 
 func newCreateManager(
 	k8sClient k8sClient,
-	ecosystemClientSet ecosystemInterface,
 	namespace string,
 	recorder eventRecorder,
 	cleanup cleanupManager,
@@ -41,7 +39,6 @@ func newCreateManager(
 	maintenanceSwitch := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
 	return &defaultCreateManager{
 		k8sClient:             k8sClient,
-		ecosystemClientSet:    ecosystemClientSet,
 		namespace:             namespace,
 		recorder:              recorder,
 		maintenanceModeSwitch: maintenanceSwitch,
@@ -55,29 +52,33 @@ func (cm *defaultCreateManager) create(ctx context.Context, restore *v1.Restore)
 	metrics.InitRestoreStatusMetrics(cm.namespace, restore.Name, restore.Spec.BackupName)
 	cm.recorder.Event(restore, corev1.EventTypeNormal, v1.CreateEventReason, "Start restore process")
 
-	restoreClient := cm.ecosystemClientSet.EcosystemV1Alpha1().Restores(cm.namespace)
-	conditions := newConditionUpdater(restoreClient)
+	conditions := newConditionUpdater(cm.k8sClient)
 
 	restoreName := restore.Name
-	restore, err := restoreClient.UpdateStatusInProgress(ctx, restore)
+
+	// The readiness gate runs before any status write so that an unready provider leaves the Restore
+	// untouched: the deprecated scalar status stays New and requiredOperation still reports create, so
+	// the retry this reconciliation asks for actually re-enters the workflow. Once conditions are
+	// seeded and the workflow is resumable, that ordering constraint disappears.
+	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder, cm.k8sClient)
+	if err != nil {
+		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
+	}
+
+	restore, err = conditions.setLegacyStatus(ctx, restore, v1.RestoreStatusInProgress)
 	if err != nil {
 		return fmt.Errorf("failed to set status [%s] in restore resource [%s]: %w", v1.RestoreStatusInProgress, restoreName, err)
 	}
 	metrics.UpdateRestoreStatusMetrics(cm.namespace, restore.Name, restore.Spec.BackupName, v1.RestoreStatusInProgress)
 
-	restore, err = restoreClient.AddFinalizer(ctx, restore, v1.RestoreFinalizer)
+	err = addFinalizer(ctx, cm.k8sClient, restore, v1.RestoreFinalizer)
 	if err != nil {
 		return fmt.Errorf("failed to add finalizer [%s] in restore resource [%s]: %w", v1.RestoreFinalizer, restoreName, err)
 	}
 
-	restore, err = restoreClient.AddLabels(ctx, restore)
+	err = addLabels(ctx, cm.k8sClient, restore)
 	if err != nil {
 		return fmt.Errorf("failed to add labels to restore resource [%s]: %w", restoreName, err)
-	}
-
-	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, cm.recorder, cm.k8sClient)
-	if err != nil {
-		return fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err)
 	}
 
 	err = cm.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
