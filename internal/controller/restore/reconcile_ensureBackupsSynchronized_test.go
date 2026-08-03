@@ -14,7 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-// TODO: EnsureStages-Tests rename with reconcile prefix to have them together?
 // synchronizableRestore is a Restore whose provider restore succeeded, so the next stage is the
 // backup synchronization.
 func synchronizableRestore() *k8sv1.Restore {
