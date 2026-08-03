@@ -88,6 +88,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.ensureConditionsInitialized,
 		r.ensureMetadata,
 		r.ensureProviderChildState,
+		r.ensureActiveRestoreLease,
 		r.ensurePreparation,
 		r.ensureProviderRestore,
 		r.ensureProviderCompletion,

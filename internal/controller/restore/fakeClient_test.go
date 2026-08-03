@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,13 +100,34 @@ func newTestClient(t *testing.T, funcs interceptor.Funcs, objects ...client.Obje
 	testScheme := runtime.NewScheme()
 	require.NoError(t, k8sv1.AddToScheme(testScheme))
 	require.NoError(t, velerov1.AddToScheme(testScheme))
+	require.NoError(t, coordinationv1.AddToScheme(testScheme))
 
 	return fake.NewClientBuilder().
 		WithScheme(testScheme).
-		WithObjects(objects...).
+		WithObjects(withActiveRestoreLease(objects)...).
 		WithStatusSubresource(&k8sv1.Restore{}).
 		WithInterceptorFuncs(funcs).
 		Build()
+}
+
+// withActiveRestoreLease preserves the setup expected by tests that exercise workflow stages after
+// lease acquisition. An explicitly supplied Lease always wins.
+func withActiveRestoreLease(objects []client.Object) []client.Object {
+	for _, object := range objects {
+		if lease, ok := object.(*coordinationv1.Lease); ok && lease.Name == restoreLeaseName {
+			return objects
+		}
+	}
+
+	for _, object := range objects {
+		if restore, ok := object.(*k8sv1.Restore); ok {
+			withLease := append([]client.Object(nil), objects...)
+
+			return append(withLease, newRestoreLease(restore))
+		}
+	}
+
+	return objects
 }
 
 // newTestClientWithParent stores the parent Restore and syncs the resource version the client assigned
