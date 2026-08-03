@@ -93,7 +93,7 @@ func TestAFailedScaleUpReportsWorkloadsRecoveredFalseAndRetriesWithoutCompleting
 	assertPersistedCondition(t, fixture.client, k8sv1.ConditionSuccessful, metav1.ConditionUnknown, ReasonPending)
 }
 
-func TestTheWorkloadRecoveryCompletesTheRestoreWhenTheMaintenanceModeCannotBeSwitchedOff(t *testing.T) {
+func TestAFailedMaintenanceModeDeactivationIsRetriedWithoutCompletingTheRestore(t *testing.T) {
 	restore := recoverableRestore()
 
 	expectNoBackupSynchronization(t)
@@ -102,11 +102,10 @@ func TestTheWorkloadRecoveryCompletesTheRestoreWhenTheMaintenanceModeCannotBeSwi
 	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(assert.AnError).Once()
-	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Restore successful").Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, scaleMock)
+		// no recorder: a restore that has not switched off maintenance mode must not emit a success event
+		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
@@ -115,9 +114,13 @@ func TestTheWorkloadRecoveryCompletesTheRestoreWhenTheMaintenanceModeCannotBeSwi
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
-	require.NoError(t, errs[0], "a remaining unavailability notice must not fail a successful restore")
-	assert.Equal(t, ctrl.Result{}, results[0])
-	assertSuccessfulCondition(t, fixture.client, restore.Name, metav1.ConditionTrue, ReasonRestoreCompleted)
+	require.Error(t, errs[0])
+	assert.ErrorIs(t, errs[0], assert.AnError)
+	assert.ErrorContains(t, errs[0], "maintenance mode could not be deactivated after the restore test-restore")
+	assert.Equal(t, ctrl.Result{}, results[0], "the controller-runtime backoff decides when the deactivation is retried")
+	assert.Empty(t, fixture.clientActions.snapshot(), "the failed deactivation must not persist a successful outcome")
+	assertPersistedCondition(t, fixture.client, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonPending)
+	assertSuccessfulCondition(t, fixture.client, restore.Name, metav1.ConditionUnknown, ReasonPending)
 }
 
 func TestAnUnpersistableRestoreOutcomeIsRetried(t *testing.T) {
