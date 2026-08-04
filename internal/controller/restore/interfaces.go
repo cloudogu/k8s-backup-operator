@@ -41,9 +41,14 @@ type scaleManager interface {
 	// ScaleDown finds all resources labeled with the scaledown scope label,
 	// stores their current replica count, and scales them to zero.
 	ScaleDown(ctx context.Context) error
-	// ScaleUp finds all resources labeled with the scaledown scope label,
-	// reads the stored replica count, restores it, and removes the replicas label.
+	// ScaleUp finds all resources labeled with the scaledown scope label and restores
+	// the stored replica count. It retains the replicas label for recovery observation.
 	ScaleUp(ctx context.Context) error
+	// AreWorkloadsReady reports whether every workload still marked for recovery reached
+	// the replica count stored in its replicas label and is available.
+	AreWorkloadsReady(ctx context.Context) (bool, error)
+	// FinalizeScaleUp removes the stored replica labels after workload readiness was observed.
+	FinalizeScaleUp(ctx context.Context) error
 }
 
 // used for mocks

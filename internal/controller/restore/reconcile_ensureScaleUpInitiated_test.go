@@ -1,0 +1,121 @@
+package restore
+
+import (
+	"testing"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+)
+
+func TestScaleUpInitiationPersistsItsProgressAndRequeues(t *testing.T) {
+	restore := recoverableRestore()
+
+	scaleMock := newMockScaleManager(t)
+	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
+	writes := &clientWrites{}
+	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
+	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock)
+
+	updated, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
+
+	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
+	assert.Equal(t, 1, writes.total(), "the initiation must only persist its progress")
+	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonScaleUpInitiated)
+	assertPersistedCondition(t, testClient, k8sv1.ConditionSuccessful, metav1.ConditionUnknown, ReasonPending)
+	condition := meta.FindStatusCondition(updated.Status.Conditions, k8sv1.ConditionWorkloadsRecovered)
+	require.NotNil(t, condition)
+	assert.Equal(t, ReasonScaleUpInitiated, condition.Reason)
+}
+
+func TestScaleUpInitiationIsEnsuredAgainBeforeProceeding(t *testing.T) {
+	restore := recoverableRestore()
+	applyConditions(restore, []metav1.Condition{{
+		Type:    k8sv1.ConditionWorkloadsRecovered,
+		Status:  metav1.ConditionUnknown,
+		Reason:  ReasonScaleUpInitiated,
+		Message: "Scale-up was already initiated.",
+	}})
+
+	scaleMock := newMockScaleManager(t)
+	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
+	writes := &clientWrites{}
+	reconciler := NewRestoreReconciler(
+		newTestClientWithParent(t, writes.interceptor(), restore),
+		nil,
+		testNamespace,
+		nil,
+		scaleMock,
+	)
+
+	updated, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
+
+	assert.Equal(t, next(), outcome)
+	assert.Same(t, restore, updated)
+	assert.Equal(t, 0, writes.total(), "an already persisted initiation must not be written again")
+}
+
+func TestScaleUpInitiationDoesNotResetFinalizedRecoveryProgress(t *testing.T) {
+	restore := restoreWithWorkloadRecoveryReason(ReasonScaleUpFinalized)
+
+	scaleMock := newMockScaleManager(t)
+	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
+	writes := &clientWrites{}
+	reconciler := NewRestoreReconciler(
+		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock,
+	)
+
+	_, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
+
+	assert.Equal(t, next(), outcome)
+	assert.Equal(t, 0, writes.total())
+}
+
+func TestFailedScaleUpInitiationReportsRecoveryFalseAndRetries(t *testing.T) {
+	restore := recoverableRestore()
+
+	scaleMock := newMockScaleManager(t)
+	scaleMock.EXPECT().ScaleUp(testCtx).Return(assert.AnError).Once()
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(
+		matchesRestoreNamed(testRestore),
+		corev1.EventTypeWarning,
+		k8sv1.ErrorOnCreateEventReason,
+		"failed to initiate workload scale-up after restore: assert.AnError general error for testing",
+	).Return()
+	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
+	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, scaleMock)
+
+	_, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
+
+	require.Error(t, outcome.err)
+	assert.ErrorIs(t, outcome.err, assert.AnError)
+	assert.ErrorContains(t, outcome.err, "failed to initiate workload scale-up after restore")
+	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionFalse, ReasonWorkloadRecoveryFailed)
+	assertPersistedCondition(t, testClient, k8sv1.ConditionSuccessful, metav1.ConditionUnknown, ReasonPending)
+}
+
+func TestUnpersistableScaleUpInitiationIsRetried(t *testing.T) {
+	restore := recoverableRestore()
+
+	scaleMock := newMockScaleManager(t)
+	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
+	reconciler := NewRestoreReconciler(
+		newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore),
+		nil,
+		testNamespace,
+		nil,
+		scaleMock,
+	)
+
+	_, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
+
+	require.Error(t, outcome.err)
+	assert.ErrorIs(t, outcome.err, assert.AnError)
+	assert.ErrorContains(t, outcome.err, "failed to persist initiated workload scale-up for restore test-restore")
+}

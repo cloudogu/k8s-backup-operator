@@ -117,6 +117,244 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		assert.Equal(t, next(), actualOutcome)
 	})
 
+	t.Run("should report lease acquisition after waiting for another restore", func(t *testing.T) {
+		restore := newParentRestore()
+		applyConditions(restore, []metav1.Condition{{
+			Type: backupv1.ConditionSuccessful, Status: metav1.ConditionUnknown, Reason: ReasonWaitingForActiveRestore,
+		}})
+		clientMock := newMockK8sClient(t)
+		expectLeaseRead(t, clientMock, newRestoreLease(restore))
+		statusClient := newTestClient(t, interceptor.Funcs{}, restore.DeepCopy())
+		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		require.NoError(t, err)
+		clientMock.EXPECT().Status().Return(statusClient.Status())
+		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+
+		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+		condition := findSuccessfulCondition(actualRestore)
+		require.NotNil(t, condition)
+		assert.Equal(t, metav1.ConditionUnknown, condition.Status)
+		assert.Equal(t, ReasonRestoreLeaseAcquired, condition.Reason)
+		assert.Contains(t, condition.Message, "holds the namespace-wide restore lease")
+	})
+
+	t.Run("should return an error when reporting lease acquisition fails", func(t *testing.T) {
+		restore := newParentRestore()
+		applyConditions(restore, []metav1.Condition{{
+			Type: backupv1.ConditionSuccessful, Status: metav1.ConditionUnknown, Reason: ReasonWaitingForActiveRestore,
+		}})
+		clientMock := newMockK8sClient(t)
+		expectLeaseRead(t, clientMock, newRestoreLease(restore))
+		statusClient := newTestClient(t, failingStatusUpdate(assert.AnError), restore.DeepCopy())
+		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		require.NoError(t, err)
+		clientMock.EXPECT().Status().Return(statusClient.Status())
+		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+
+		assert.Same(t, restore, actualRestore)
+		require.Error(t, actualOutcome.err)
+		assert.ErrorIs(t, actualOutcome.err, assert.AnError)
+		assert.ErrorContains(t, actualOutcome.err, "failed to report lease acquisition")
+	})
+
+	t.Run("should clear an invalid lease condition after manual recovery", func(t *testing.T) {
+		restore := newParentRestore()
+		applyConditions(restore, []metav1.Condition{{
+			Type: backupv1.ConditionSuccessful, Status: metav1.ConditionUnknown, Reason: ReasonInvalidRestoreLease,
+		}})
+		clientMock := newMockK8sClient(t)
+		expectLeaseRead(t, clientMock, newRestoreLease(restore))
+		statusClient := newTestClient(t, interceptor.Funcs{}, restore.DeepCopy())
+		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		require.NoError(t, err)
+		clientMock.EXPECT().Status().Return(statusClient.Status())
+		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+
+		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+		condition := findSuccessfulCondition(actualRestore)
+		require.NotNil(t, condition)
+		assert.Equal(t, ReasonRestoreLeaseAcquired, condition.Reason)
+	})
+
+	t.Run("should report a lease without holder information as invalid", func(t *testing.T) {
+		restore := newParentRestore()
+		lease := &coordinationv1.Lease{ObjectMeta: metav1.ObjectMeta{Name: restoreLeaseName, Namespace: testNamespace}}
+		clientMock := newMockK8sClient(t)
+		expectLeaseRead(t, clientMock, lease)
+		statusClient := newTestClient(t, interceptor.Funcs{}, restore.DeepCopy())
+		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		require.NoError(t, err)
+		clientMock.EXPECT().Status().Return(statusClient.Status())
+		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+
+		require.Error(t, actualOutcome.err)
+		assert.ErrorContains(t, actualOutcome.err, "without holder identity or name")
+		condition := findSuccessfulCondition(actualRestore)
+		require.NotNil(t, condition)
+		assert.Equal(t, metav1.ConditionUnknown, condition.Status)
+		assert.Equal(t, ReasonInvalidRestoreLease, condition.Reason)
+		assert.Contains(t, condition.Message, "Delete the lease")
+	})
+
+	t.Run("should return an error when reporting an invalid lease fails", func(t *testing.T) {
+		restore := newParentRestore()
+		lease := &coordinationv1.Lease{ObjectMeta: metav1.ObjectMeta{Name: restoreLeaseName, Namespace: testNamespace}}
+		clientMock := newMockK8sClient(t)
+		expectLeaseRead(t, clientMock, lease)
+		statusClient := newTestClient(t, failingStatusUpdate(assert.AnError), restore.DeepCopy())
+		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		require.NoError(t, err)
+		clientMock.EXPECT().Status().Return(statusClient.Status())
+		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+
+		assert.Same(t, restore, actualRestore)
+		require.Error(t, actualOutcome.err)
+		assert.ErrorIs(t, actualOutcome.err, assert.AnError)
+		assert.ErrorContains(t, actualOutcome.err, "failed to report invalid restore lease")
+	})
+
+	t.Run("should repair a lease that only contains the holder name", func(t *testing.T) {
+		restore := newParentRestore()
+		holder := restoreWithIdentity("active-restore", types.UID("active-uid"))
+		lease := newRestoreLease(holder)
+		lease.Spec.HolderIdentity = nil
+		lease.ResourceVersion = "7"
+		clientMock := newMockK8sClient(t)
+		expectLeaseRead(t, clientMock, lease)
+		expectRestoreRead(t, clientMock, holder)
+		clientMock.EXPECT().Update(testCtx, mock.Anything).
+			Run(func(_ context.Context, object client.Object, _ ...client.UpdateOption) {
+				updatedLease := object.(*coordinationv1.Lease)
+				assert.Equal(t, "7", updatedLease.ResourceVersion)
+				assert.Equal(t, string(holder.UID), ptr.Deref(updatedLease.Spec.HolderIdentity, ""))
+				assert.Equal(t, holder.Name, updatedLease.Annotations[restoreLeaseHolderNameAnnotation])
+			}).
+			Return(nil)
+		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+
+		assert.Same(t, restore, actualRestore)
+		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+	})
+
+	t.Run("should repair a lease that only contains the holder UID", func(t *testing.T) {
+		restore := newParentRestore()
+		holder := restoreWithIdentity("active-restore", types.UID("active-uid"))
+		lease := newRestoreLease(holder)
+		lease.Annotations = nil
+		lease.ResourceVersion = "7"
+		clientMock := newMockK8sClient(t)
+		expectLeaseRead(t, clientMock, lease)
+		expectRestoreList(t, clientMock, holder)
+		clientMock.EXPECT().Update(testCtx, mock.Anything).
+			Run(func(_ context.Context, object client.Object, _ ...client.UpdateOption) {
+				updatedLease := object.(*coordinationv1.Lease)
+				assert.Equal(t, "7", updatedLease.ResourceVersion)
+				assert.Equal(t, string(holder.UID), ptr.Deref(updatedLease.Spec.HolderIdentity, ""))
+				assert.Equal(t, holder.Name, updatedLease.Annotations[restoreLeaseHolderNameAnnotation])
+			}).
+			Return(nil)
+		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+
+		assert.Same(t, restore, actualRestore)
+		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+	})
+
+	t.Run("should take over a UID-only lease when the holder no longer exists", func(t *testing.T) {
+		restore := newParentRestore()
+		holder := restoreWithIdentity("previous-restore", types.UID("previous-uid"))
+		lease := newRestoreLease(holder)
+		lease.Annotations = nil
+		lease.ResourceVersion = "7"
+		clientMock := newMockK8sClient(t)
+		expectLeaseRead(t, clientMock, lease)
+		expectRestoreList(t, clientMock)
+		clientMock.EXPECT().Update(testCtx, mock.Anything).
+			Run(func(_ context.Context, object client.Object, _ ...client.UpdateOption) {
+				updatedLease := object.(*coordinationv1.Lease)
+				assert.Equal(t, "7", updatedLease.ResourceVersion)
+				assert.Equal(t, string(restore.UID), ptr.Deref(updatedLease.Spec.HolderIdentity, ""))
+				assert.Equal(t, restore.Name, updatedLease.Annotations[restoreLeaseHolderNameAnnotation])
+			}).
+			Return(nil)
+		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+
+		assert.Same(t, restore, actualRestore)
+		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+	})
+
+	t.Run("should return an error when finding a holder by UID fails", func(t *testing.T) {
+		restore := newParentRestore()
+		holder := restoreWithIdentity("active-restore", types.UID("active-uid"))
+		lease := newRestoreLease(holder)
+		lease.Annotations = nil
+		clientMock := newMockK8sClient(t)
+		expectLeaseRead(t, clientMock, lease)
+		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+
+		assert.Same(t, restore, actualRestore)
+		require.Error(t, actualOutcome.err)
+		assert.ErrorIs(t, actualOutcome.err, assert.AnError)
+		assert.ErrorContains(t, actualOutcome.err, "failed to verify holder UID")
+	})
+
+	for _, test := range []struct {
+		name        string
+		updateError error
+		wantError   bool
+	}{
+		{
+			name:        "should retry when repairing the lease conflicts",
+			updateError: apierrors.NewConflict(leaseResource(), restoreLeaseName, assert.AnError),
+		},
+		{
+			name:        "should return an error when repairing the lease fails",
+			updateError: assert.AnError,
+			wantError:   true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			restore := newParentRestore()
+			holder := restoreWithIdentity("active-restore", types.UID("active-uid"))
+			lease := newRestoreLease(holder)
+			lease.Spec.HolderIdentity = nil
+			clientMock := newMockK8sClient(t)
+			expectLeaseRead(t, clientMock, lease)
+			expectRestoreRead(t, clientMock, holder)
+			clientMock.EXPECT().Update(testCtx, mock.Anything).Return(test.updateError)
+			sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+
+			actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+
+			assert.Same(t, restore, actualRestore)
+			if test.wantError {
+				require.Error(t, actualOutcome.err)
+				assert.ErrorIs(t, actualOutcome.err, assert.AnError)
+				assert.ErrorContains(t, actualOutcome.err, "failed to repair restore lease")
+			} else {
+				assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+			}
+		})
+	}
+
 	t.Run("should wait and report the active restore holding the lease", func(t *testing.T) {
 		restore := newParentRestore()
 		holder := restoreWithIdentity("active-restore", types.UID("active-uid"))
@@ -274,6 +512,19 @@ func expectRestoreRead(t *testing.T, clientMock *mockK8sClient, restore *backupv
 			actual, ok := object.(*backupv1.Restore)
 			require.True(t, ok)
 			restore.DeepCopyInto(actual)
+		}).
+		Return(nil)
+}
+
+func expectRestoreList(t *testing.T, clientMock *mockK8sClient, restores ...*backupv1.Restore) {
+	t.Helper()
+	clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).
+		Run(func(_ context.Context, list client.ObjectList, _ ...client.ListOption) {
+			actual, ok := list.(*backupv1.RestoreList)
+			require.True(t, ok)
+			for _, restore := range restores {
+				actual.Items = append(actual.Items, *restore.DeepCopy())
+			}
 		}).
 		Return(nil)
 }

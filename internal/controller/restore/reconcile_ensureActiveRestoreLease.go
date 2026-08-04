@@ -18,6 +18,15 @@ const (
 	restoreLeaseHolderNameAnnotation = "k8s.cloudogu.com/restore-lease-holder-name"
 )
 
+type restoreLeaseState int
+
+const (
+	restoreLeaseActive restoreLeaseState = iota
+	restoreLeaseStale
+	restoreLeaseInvalid
+	restoreLeaseRepaired
+)
+
 // ensureActiveRestoreLease serializes the namespace-wide restore workflow. Creating the
 // well-known Lease is the atomic fast path. An existing Lease may only be reused by the Restore
 // whose UID is stored as holderIdentity, or taken over when that exact Restore no longer exists or
@@ -53,19 +62,34 @@ func (r *restoreReconciler) ensureActiveRestoreLease(ctx context.Context, restor
 
 	// the Lease belongs to the current restore
 	// so the restore can start
-	if leaseHolderUID(lease) == restore.UID {
-		return restore, next()
+	if leaseHolderUID(lease) == restore.UID && lease.Annotations[restoreLeaseHolderNameAnnotation] == restore.Name {
+		condition := findSuccessfulCondition(restore)
+		if condition == nil || (condition.Reason != ReasonWaitingForActiveRestore && condition.Reason != ReasonInvalidRestoreLease) {
+			return restore, next()
+		}
+
+		updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
+			Type:    k8sv1.ConditionSuccessful,
+			Status:  metav1.ConditionUnknown,
+			Reason:  ReasonRestoreLeaseAcquired,
+			Message: "The restore holds the namespace-wide restore lease and can continue.",
+		})
+		if err != nil {
+			return restore, retryOnError(
+				fmt.Errorf("failed to report lease acquisition for restore %s: %w", restore.Name, err),
+			)
+		}
+
+		return updated, retryAfter(defaultRequeueDelay)
 	}
 
-	// otherwise the lease is binded to another restore-CR therefor
-	// the restore must wati until the lease is freed again
-
-	// check if the current lease ist stale (orphaned lease)
-	stale, err := r.isStaleRestoreLease(ctx, lease)
+	state, err := r.inspectRestoreLease(ctx, lease)
 	if err != nil {
 		return restore, retryOnError(err)
 	}
-	if stale {
+
+	switch state {
+	case restoreLeaseStale:
 		claimRestoreLease(lease, restore)
 		if err := r.k8sClient.Update(ctx, lease); err != nil {
 			// resourceVersion makes takeover a compare-and-swap. A conflict means another
@@ -78,6 +102,18 @@ func (r *restoreReconciler) ensureActiveRestoreLease(ctx context.Context, restor
 		}
 
 		return restore, retryAfter(defaultRequeueDelay)
+	case restoreLeaseRepaired:
+		if err := r.k8sClient.Update(ctx, lease); err != nil {
+			if apierrors.IsConflict(err) {
+				return restore, retryAfter(defaultRequeueDelay)
+			}
+
+			return restore, retryOnError(fmt.Errorf("failed to repair restore lease %s/%s: %w", key.Namespace, key.Name, err))
+		}
+
+		return restore, retryAfter(defaultRequeueDelay)
+	case restoreLeaseInvalid:
+		return r.reportInvalidRestoreLease(ctx, restore, lease)
 	}
 
 	holderName := lease.Annotations[restoreLeaseHolderNameAnnotation]
@@ -97,6 +133,21 @@ func (r *restoreReconciler) ensureActiveRestoreLease(ctx context.Context, restor
 	}
 
 	return updated, retryAfter(defaultRequeueDelay)
+}
+
+func (r *restoreReconciler) reportInvalidRestoreLease(ctx context.Context, restore *k8sv1.Restore, lease *coordinationv1.Lease) (*k8sv1.Restore, stageOutcome) {
+	leaseError := fmt.Errorf("restore is blocked by invalid lease %s/%s without holder identity or name", lease.Namespace, lease.Name)
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
+		Type:    k8sv1.ConditionSuccessful,
+		Status:  metav1.ConditionUnknown,
+		Reason:  ReasonInvalidRestoreLease,
+		Message: fmt.Sprintf("%s. Delete the lease after verifying that no restore is active.", leaseError.Error()),
+	})
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to report invalid restore lease for restore %s: %w", restore.Name, err))
+	}
+
+	return updated, retryOnError(leaseError)
 }
 
 func newRestoreLease(restore *k8sv1.Restore) *coordinationv1.Lease {
@@ -126,28 +177,69 @@ func leaseHolderUID(lease *coordinationv1.Lease) types.UID {
 	return types.UID(ptr.Deref(lease.Spec.HolderIdentity, ""))
 }
 
-// isStaleRestoreLease checks the Kubernetes object identity rather than a timeout. Unknown legacy
-// holders are kept instead of being stolen because safety is more important than automatic progress.
-func (r *restoreReconciler) isStaleRestoreLease(ctx context.Context, lease *coordinationv1.Lease) (bool, error) {
+// inspectRestoreLease checks the Kubernetes object identity rather than a timeout. Partial holder
+// information is repaired when it identifies an active Restore unambiguously. A Lease without any
+// holder information remains blocked because it cannot be taken over safely.
+func (r *restoreReconciler) inspectRestoreLease(ctx context.Context, lease *coordinationv1.Lease) (restoreLeaseState, error) {
 	holderUID := leaseHolderUID(lease)
 	holderName := lease.Annotations[restoreLeaseHolderNameAnnotation]
-	// if the lease does not have valid information, the cr might be corrupted
-	// but we can not determine if the lease is really orphaned or in use
-	if holderUID == "" || holderName == "" {
-		return false, nil
+	if holderUID == "" && holderName == "" {
+		return restoreLeaseInvalid, nil
 	}
 
-	//
+	if holderName == "" {
+		holder, err := r.findRestoreByUID(ctx, lease.Namespace, holderUID)
+		if err != nil {
+			return restoreLeaseActive, fmt.Errorf("failed to verify holder UID %s of restore lease %s/%s: %w", holderUID, lease.Namespace, lease.Name, err)
+		}
+		if holder == nil || isTerminal(holder) {
+			return restoreLeaseStale, nil
+		}
+
+		if lease.Annotations == nil {
+			lease.Annotations = map[string]string{}
+		}
+		lease.Annotations[restoreLeaseHolderNameAnnotation] = holder.Name
+
+		return restoreLeaseRepaired, nil
+	}
+
 	holder := &k8sv1.Restore{}
 	err := r.k8sClient.Get(ctx, client.ObjectKey{Namespace: lease.Namespace, Name: holderName}, holder)
-	// no restore for this lease
 	if apierrors.IsNotFound(err) {
-		return true, nil
+		return restoreLeaseStale, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("failed to verify holder %s of restore lease %s/%s: %w", holderName, lease.Namespace, lease.Name, err)
+		return restoreLeaseActive, fmt.Errorf("failed to verify holder %s of restore lease %s/%s: %w", holderName, lease.Namespace, lease.Name, err)
+	}
+	if isTerminal(holder) {
+		return restoreLeaseStale, nil
 	}
 
-	// if the current restore-holder is in terminal state, the lease can be reused
-	return holder.UID != holderUID || isTerminal(holder), nil
+	if holderUID == "" {
+		lease.Spec.HolderIdentity = ptr.To(string(holder.UID))
+
+		return restoreLeaseRepaired, nil
+	}
+
+	if holder.UID != holderUID {
+		return restoreLeaseStale, nil
+	}
+
+	return restoreLeaseActive, nil
+}
+
+func (r *restoreReconciler) findRestoreByUID(ctx context.Context, namespace string, uid types.UID) (*k8sv1.Restore, error) {
+	restores := &k8sv1.RestoreList{}
+	if err := r.k8sClient.List(ctx, restores, client.InNamespace(namespace)); err != nil {
+		return nil, err
+	}
+
+	for i := range restores.Items {
+		if restores.Items[i].UID == uid {
+			return &restores.Items[i], nil
+		}
+	}
+
+	return nil, nil
 }

@@ -12,8 +12,10 @@ import (
 	. "github.com/onsi/gomega"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -35,6 +37,11 @@ const (
 	// acceptanceParentHoldFinalizer keeps the parent observable after the operator released it, so
 	// the deleting status and the operator finalizer removal can be asserted independently.
 	acceptanceParentHoldFinalizer = "k8s.cloudogu.com/acceptance-parent-hold"
+	// These values mirror the restore controller's namespace-wide Lease contract. Keeping them in
+	// the black-box spec avoids coupling the acceptance test to controller implementation types.
+	restoreLeaseName                 = "k8s-backup-operator-restore"
+	restoreLeaseHolderNameAnnotation = "k8s.cloudogu.com/restore-lease-holder-name"
+	reasonWaitingForActiveRestore    = "WaitingForActiveRestore"
 
 	restoreTestNamespace       = "ecosystem"
 	throwawayReplicas    int32 = 2
@@ -227,6 +234,106 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 				WithTimeout(2 * time.Minute).
 				WithPolling(2 * time.Second).
 				Should(Succeed())
+		})
+	})
+
+	Describe("Serializing concurrent Restores with a Lease", Ordered, func() {
+		firstKey := client.ObjectKey{Namespace: restoreTestNamespace, Name: fmt.Sprintf("restore-lease-first-%s", suffix)}
+		secondKey := client.ObjectKey{Namespace: restoreTestNamespace, Name: fmt.Sprintf("restore-lease-second-%s", suffix)}
+		leaseKey := client.ObjectKey{Namespace: restoreTestNamespace, Name: restoreLeaseName}
+		var holderKey client.ObjectKey
+		var waiterKey client.ObjectKey
+		var initialLeaseTransitions int32
+
+		BeforeAll(func(ctx SpecContext) {
+			DeferCleanup(func(ctx SpecContext) {
+				deleteAndIgnoreNotFound(ctx, newRestoreWithObjectKey(firstKey, backupKey.Name))
+				deleteAndIgnoreNotFound(ctx, newRestoreWithObjectKey(secondKey, backupKey.Name))
+			})
+		})
+
+		It("creates two competing restores", func(ctx SpecContext) {
+			Expect(k8sClient.Create(ctx, newRestoreWithObjectKey(firstKey, backupKey.Name))).Should(Succeed())
+			Expect(k8sClient.Create(ctx, newRestoreWithObjectKey(secondKey, backupKey.Name))).Should(Succeed())
+		})
+
+		It("allows only the lease holder to start its provider restore", func(ctx SpecContext) {
+			Eventually(func(g Gomega) {
+				lease := &coordinationv1.Lease{}
+				g.Expect(k8sClient.Get(ctx, leaseKey, lease)).Should(Succeed())
+				g.Expect(lease.Spec.HolderIdentity).ShouldNot(BeNil())
+				g.Expect(lease.Spec.LeaseTransitions).ShouldNot(BeNil())
+
+				var observedHolderKey client.ObjectKey
+				var observedWaiterKey client.ObjectKey
+				switch lease.Annotations[restoreLeaseHolderNameAnnotation] {
+				case firstKey.Name:
+					observedHolderKey, observedWaiterKey = firstKey, secondKey
+				case secondKey.Name:
+					observedHolderKey, observedWaiterKey = secondKey, firstKey
+				default:
+					g.Expect(lease.Annotations[restoreLeaseHolderNameAnnotation]).Should(
+						Or(Equal(firstKey.Name), Equal(secondKey.Name)),
+						"the lease must be held by one of the competing restores")
+					return
+				}
+
+				holder := &backupv1.Restore{}
+				g.Expect(k8sClient.Get(ctx, observedHolderKey, holder)).Should(Succeed())
+				g.Expect(*lease.Spec.HolderIdentity).Should(Equal(string(holder.UID)))
+
+				waiter := &backupv1.Restore{}
+				g.Expect(k8sClient.Get(ctx, observedWaiterKey, waiter)).Should(Succeed())
+				condition := meta.FindStatusCondition(waiter.Status.Conditions, backupv1.ConditionSuccessful)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Status).Should(Equal(metav1.ConditionUnknown))
+				g.Expect(condition.Reason).Should(Equal(reasonWaitingForActiveRestore))
+
+				providerRestore := &velerov1.Restore{}
+				err := k8sClient.Get(ctx, observedWaiterKey, providerRestore)
+				g.Expect(apierrors.IsNotFound(err)).Should(BeTrue(),
+					"the waiting restore must not start a provider restore before it owns the lease")
+
+				holderKey, waiterKey = observedHolderKey, observedWaiterKey
+				initialLeaseTransitions = *lease.Spec.LeaseTransitions
+			}).
+				WithTimeout(10 * time.Minute).
+				WithPolling(2 * time.Second).
+				Should(Succeed())
+		})
+
+		It("completes the initial lease holder", func(ctx SpecContext) {
+			expectRestoreStatus(ctx, holderKey, backupv1.RestoreStatusCompleted)
+		})
+
+		It("transfers the lease to the waiting restore", func(ctx SpecContext) {
+			Eventually(func(g Gomega) {
+				waiter := &backupv1.Restore{}
+				g.Expect(k8sClient.Get(ctx, waiterKey, waiter)).Should(Succeed())
+
+				lease := &coordinationv1.Lease{}
+				g.Expect(k8sClient.Get(ctx, leaseKey, lease)).Should(Succeed())
+				g.Expect(lease.Annotations[restoreLeaseHolderNameAnnotation]).Should(Equal(waiterKey.Name))
+				g.Expect(lease.Spec.HolderIdentity).ShouldNot(BeNil())
+				g.Expect(*lease.Spec.HolderIdentity).Should(Equal(string(waiter.UID)))
+				g.Expect(lease.Spec.LeaseTransitions).ShouldNot(BeNil())
+				g.Expect(*lease.Spec.LeaseTransitions).Should(BeNumerically(">", initialLeaseTransitions))
+			}).
+				WithTimeout(10 * time.Minute).
+				WithPolling(2 * time.Second).
+				Should(Succeed())
+		})
+
+		It("starts and completes the restore after acquiring the lease", func(ctx SpecContext) {
+			Eventually(func(g Gomega) {
+				providerRestore := &velerov1.Restore{}
+				g.Expect(k8sClient.Get(ctx, waiterKey, providerRestore)).Should(Succeed())
+			}).
+				WithTimeout(10 * time.Minute).
+				WithPolling(5 * time.Second).
+				Should(Succeed())
+
+			expectRestoreStatus(ctx, waiterKey, backupv1.RestoreStatusCompleted)
 		})
 	})
 })

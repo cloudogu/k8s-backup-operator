@@ -108,7 +108,11 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.ensureProviderRestore,
 			r.ensureProviderCompletion,
 			r.ensureBackupsSynchronized,
-			r.ensureWorkloadsRecovered,
+			r.ensureScaleUpInitiated,
+			r.ensureWorkloadsReady,
+			r.ensureScaleUpFinalized,
+			r.ensureMaintenanceModeDeactivated,
+			r.ensureRestoreCompleted,
 		)
 	default:
 		return ctrl.Result{}, nil
@@ -472,39 +476,6 @@ func (r *restoreReconciler) ensureBackupsSynchronized(ctx context.Context, resto
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
 	return updated, retryAfter(defaultRequeueDelay)
-}
-
-// ensureWorkloadsRecovered ends the workflow: the workloads are scaled up again, the unavailability
-// notice is taken down and the restore is reported as successful.
-func (r *restoreReconciler) ensureWorkloadsRecovered(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
-	if err := r.scaleManager.ScaleUp(ctx); err != nil {
-		return r.reportUnreachedMilestone(ctx, restore, k8sv1.ConditionWorkloadsRecovered, ReasonWorkloadRecoveryFailed,
-			fmt.Errorf("failed to scale up workloads after restore: %w", err))
-	}
-
-	// Taking maintenance mode down is best-effort, like the activation: the workloads are up
-	// again, so a remaining notice is a nuisance and not a reason to fail a successful restore.
-	if err := r.maintenanceModeSwitch.Deactivate(ctx, false); err != nil {
-		return restore, retryOnError(fmt.Errorf("The maintenance mode could not be deactivated after the restore %s: %w", restore.Name, err))
-	}
-
-	// Both milestones are written together because they are reached together: the restore is
-	// successful exactly because the workloads were recovered.
-	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
-		reachedMilestone(k8sv1.ConditionWorkloadsRecovered, ReasonWorkloadRecoveryCompleted,
-			"The workloads were scaled up again and the maintenance mode was switched off."),
-		reachedMilestone(k8sv1.ConditionSuccessful, ReasonRestoreCompleted,
-			"The restore workflow finished successfully."),
-	)
-	if err != nil {
-		return restore, retryOnError(fmt.Errorf("failed to persist the workload recovery of restore %s: %w", restore.Name, err))
-	}
-
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusCompleted) // NOSONAR -- legacy restore status compatibility
-	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Restore successful")
-
-	// The restore is terminal now, so there is nothing left to do.
-	return updated, abort()
 }
 
 // ensureDeletingStatus persists the deprecated scalar deleting status for consumers that have not

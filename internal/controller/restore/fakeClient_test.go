@@ -7,7 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,7 +92,7 @@ func (w *clientWrites) interceptor() interceptor.Funcs {
 	}
 }
 
-// newTestClient builds a fake client that knows the Restore and Velero types, with the given
+// newTestClient builds a fake client that knows the Restore, Velero and workload types, with the given
 // interceptors. Status subresources are enabled for Restore so that Status().Update behaves like the
 // real client instead of writing the whole object. Pass interceptor.Funcs{} when the test does not
 // care about the writes, and writes.interceptor() when it does.
@@ -101,6 +103,8 @@ func newTestClient(t *testing.T, funcs interceptor.Funcs, objects ...client.Obje
 	require.NoError(t, k8sv1.AddToScheme(testScheme))
 	require.NoError(t, velerov1.AddToScheme(testScheme))
 	require.NoError(t, coordinationv1.AddToScheme(testScheme))
+	require.NoError(t, appsv1.AddToScheme(testScheme))
+	require.NoError(t, corev1.AddToScheme(testScheme))
 
 	return fake.NewClientBuilder().
 		WithScheme(testScheme).
