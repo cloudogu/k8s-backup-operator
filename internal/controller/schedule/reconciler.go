@@ -4,6 +4,8 @@ import (
 	"context"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/pkg/config"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -20,13 +22,19 @@ type defaultReconciler struct {
 }
 
 // NewReconciler creates a new BackupScheduleReconciler instance.
-func NewReconciler(client client.Client) *defaultReconciler {
+func NewReconciler(client client.Client, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *defaultReconciler {
 	return &defaultReconciler{
 		client:     client,
 		metadata:   metadataManager{client: client},
 		conditions: conditionManager{},
 		validator:  validator{},
-		cronJobs:   cronJobManager{},
+		cronJobs: cronJobManager{
+			Client:           client,
+			scheme:           client.Scheme(),
+			operatorImage:    operatorImage,
+			pullPolicy:       config.GetStagePullPolicy(),
+			imagePullSecrets: imagePullSecrets,
+		},
 	}
 }
 
