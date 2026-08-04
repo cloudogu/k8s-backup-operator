@@ -50,8 +50,7 @@ func (r *defaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// set the deletion state before doing anything else
 		// Removing the finalizer may delete the resource immediately
 		// leading to an error when patching
-		r.conditions.MarkDeleting(schedule)
-		r.conditions.ComputeReady(schedule)
+		r.conditions.MarkNotReady(schedule, ReasonDeleting, "BackupSchedule is being deleted.")
 		if err := r.patchStatus(ctx, original, schedule); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -90,15 +89,13 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	if err := r.metadata.Ensure(ctx, schedule); err != nil {
 		r.conditions.MarkAcceptanceNotEvaluated(schedule, err)
-		r.conditions.MarkCronJobNotSynced(schedule, err)
-		r.conditions.ComputeReady(schedule)
+		r.conditions.MarkNotReady(schedule, ReasonNotEvaluated, "Required metadata could not be persisted: "+err.Error())
 		return err
 	}
 
 	if err := r.validator.Validate(schedule); err != nil {
 		r.conditions.MarkInvalid(schedule, err)
-		r.conditions.MarkCronJobNotSynced(schedule, err)
-		r.conditions.ComputeReady(schedule)
+		r.conditions.MarkNotReady(schedule, ReasonInvalidSpec, "BackupSchedule spec is invalid: "+err.Error())
 
 		// Spec is invalid.
 		// Don't return an error because retrying won't help.
@@ -108,16 +105,12 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 	r.conditions.MarkAccepted(schedule)
 
 	if err := r.cronJobs.Ensure(ctx, schedule); err != nil {
-		r.conditions.MarkCronJobNotSynced(schedule, err)
-		r.conditions.ComputeReady(schedule)
+		r.conditions.MarkNotReady(schedule, ReasonSyncFailed, "CronJob synchronization failed: "+err.Error())
 
 		return err
 	}
 
-	r.conditions.MarkCronJobSynced(schedule)
-
-	// ready is computed from the other values
-	r.conditions.ComputeReady(schedule)
+	r.conditions.MarkReady(schedule)
 
 	return nil
 }
