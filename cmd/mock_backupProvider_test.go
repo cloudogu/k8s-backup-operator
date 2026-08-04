@@ -302,53 +302,6 @@ func (_c *mockBackupProvider_SyncBackups_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// WaitForRestore provides a mock function with given fields: ctx, restore
-func (_m *mockBackupProvider) WaitForRestore(ctx context.Context, restore *v1.Restore) error {
-	ret := _m.Called(ctx, restore)
-
-	if len(ret) == 0 {
-		panic("no return value specified for WaitForRestore")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Restore) error); ok {
-		r0 = rf(ctx, restore)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// mockBackupProvider_WaitForRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForRestore'
-type mockBackupProvider_WaitForRestore_Call struct {
-	*mock.Call
-}
-
-// WaitForRestore is a helper method to define mock.On call
-//   - ctx context.Context
-//   - restore *v1.Restore
-func (_e *mockBackupProvider_Expecter) WaitForRestore(ctx interface{}, restore interface{}) *mockBackupProvider_WaitForRestore_Call {
-	return &mockBackupProvider_WaitForRestore_Call{Call: _e.mock.On("WaitForRestore", ctx, restore)}
-}
-
-func (_c *mockBackupProvider_WaitForRestore_Call) Run(run func(ctx context.Context, restore *v1.Restore)) *mockBackupProvider_WaitForRestore_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Restore))
-	})
-	return _c
-}
-
-func (_c *mockBackupProvider_WaitForRestore_Call) Return(_a0 error) *mockBackupProvider_WaitForRestore_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockBackupProvider_WaitForRestore_Call) RunAndReturn(run func(context.Context, *v1.Restore) error) *mockBackupProvider_WaitForRestore_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // newMockBackupProvider creates a new instance of mockBackupProvider. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func newMockBackupProvider(t interface {

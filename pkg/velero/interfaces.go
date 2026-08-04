@@ -33,8 +33,6 @@ type backupManager interface {
 }
 
 type restoreManager interface {
-	// WaitForRestore blocks until the velero restore of the given v1.Restore completed or failed.
-	WaitForRestore(ctx context.Context, restore *v1.Restore) error
 	// DeleteRestore deletes the velero restore resource.
 	DeleteRestore(ctx context.Context, restore *v1.Restore) error
 }

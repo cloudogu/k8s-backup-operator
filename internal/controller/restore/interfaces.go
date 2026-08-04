@@ -26,13 +26,10 @@ type controllerManager interface {
 	ctrl.Manager
 }
 
+// restoreManager is the deletion side of the workflow. Creating a restore is no longer a manager
+// operation but a sequence of reconciler stages.
 type restoreManager interface {
-	createManager
 	deleteManager
-}
-
-type createManager interface {
-	create(ctx context.Context, restore *v1.Restore) error
 }
 
 type deleteManager interface {
@@ -51,10 +48,6 @@ type cleanupManager interface {
 	Cleanup(ctx context.Context) error
 }
 
-type restoreProvider interface {
-	provider.Provider
-}
-
 type scaleManager interface {
 	// ScaleDown finds all resources labeled with the scaledown scope label,
 	// stores their current replica count, and scales them to zero.
@@ -65,6 +58,12 @@ type scaleManager interface {
 }
 
 // used for mocks
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type restoreProvider interface {
+	provider.Provider
+}
 
 //nolint:unused
 //goland:noinspection GoUnusedType

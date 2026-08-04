@@ -12,6 +12,11 @@ import (
 // defaultRequeueDelay is used when a stage asks for a controlled retry without a usable delay.
 const defaultRequeueDelay = 5 * time.Second
 
+// providerObservationRecoveryDelay is the delay a stage uses while it waits for the provider to
+// decide. The owned child's events are the observation path, so this timer only ever matters when a
+// watch event was lost.
+const providerObservationRecoveryDelay = 5 * time.Minute
+
 type stageAction int
 
 const (
