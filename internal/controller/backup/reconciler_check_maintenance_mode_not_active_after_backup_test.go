@@ -45,9 +45,9 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			deactivateMaintenanceMode(context.Background()).
 			Return(nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -74,9 +74,9 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, errors.New("gateway error"))
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "gateway error")
@@ -99,9 +99,9 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 			}).
 			Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "velero backup get error")
@@ -127,9 +127,9 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			deactivateMaintenanceMode(context.Background()).
 			Return(nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkMaintenanceModeNotActiveAfterBackup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "patch error")

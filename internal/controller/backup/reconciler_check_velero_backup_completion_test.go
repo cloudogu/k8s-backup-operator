@@ -30,14 +30,14 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkVeleroBackupCompletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupCompleted(context.Background(), backup, logr.Discard())
 
 		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
 		assert.NotNil(t, completedCondition)
 		assert.Equal(t, metav1.ConditionFalse, completedCondition.Status)
-		assert.Equal(t, reasonVeleroBackupNotCompleted, completedCondition.Reason)
+		assert.Equal(t, reasonProviderBackupNotCompleted, completedCondition.Reason)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -58,9 +58,9 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkVeleroBackupCompletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupCompleted(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -77,9 +77,9 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkVeleroBackupCompletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupCompleted(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "get error")
@@ -98,9 +98,9 @@ func TestReconcilerCheckVeleroBackupCompletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkVeleroBackupCompletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupCompleted(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "patch error")

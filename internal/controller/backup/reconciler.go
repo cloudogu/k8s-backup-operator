@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -22,12 +23,12 @@ import (
 
 const veleroBackupStorageName = "default"
 const (
-	reasonVeleroBackupStorageNotAvailable             = "VeleroBackupStorageNotAvailable"
-	reasonVeleroBackupStorageAvailable                = "VeleroBackupStorageAvailable"
+	reasonProviderBackupStorageNotAvailable           = "ProviderBackupStorageNotAvailable"
+	reasonProviderBackupStorageAvailable              = "ProviderBackupStorageAvailable"
 	reasonPreparationNotCompleted                     = "PreparationNotCompleted"
 	reasonMaintenanceModesIsNotActive                 = "MaintenanceModesIsNotActive"
-	reasonVeleroBackupResourceDoesNotExist            = "VeleroBackupResourceDoesNotExist"
-	reasonVeleroBackupNotCompleted                    = "VeleroBackupNotCompleted"
+	reasonProviderBackupResourceDoesNotExist          = "ProviderBackupResourceDoesNotExist"
+	reasonProviderBackupNotCompleted                  = "ProviderBackupNotCompleted"
 	reasonMaintenanceModeIsActiveAfterBackupCompleted = "MaintenanceModeIsActiveAfterBackupCompleted"
 	reasonBackupCompleted                             = "BackupCompleted"
 	reasonBackupDeleting                              = "BackupDeleting"
@@ -85,6 +86,12 @@ type maintenanceGateway interface {
 	deactivateMaintenanceMode(ctx context.Context) error
 }
 
+type providerBackupStatus interface {
+	isInProgress(backup *velerov1.Backup) bool
+	isCompleted(backup *velerov1.Backup) bool
+	hasFailed(backup *velerov1.Backup) bool
+}
+
 type statusUpdate func(status *backupv1.BackupStatus)
 
 type Clock interface {
@@ -98,25 +105,36 @@ func (d DefaultClock) Now() time.Time {
 }
 
 type defaultReconciler struct {
-	client             client.Client
-	maintenanceGateway maintenanceGateway
-	clock              Clock
+	client               client.Client
+	maintenanceGateway   maintenanceGateway
+	clock                Clock
+	providerBackupStatus providerBackupStatus
 }
 
-func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway, clock Clock) *defaultReconciler {
+func NewReconciler(
+	client client.Client,
+	maintenanceGateway maintenanceGateway,
+	clock Clock,
+	providerBackupStatus providerBackupStatus,
+) *defaultReconciler {
 	return &defaultReconciler{
-		client:             client,
-		maintenanceGateway: maintenanceGateway,
-		clock:              clock,
+		client:               client,
+		maintenanceGateway:   maintenanceGateway,
+		clock:                clock,
+		providerBackupStatus: providerBackupStatus,
 	}
 }
 
-func (c *defaultReconciler) checkBackupDeletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
-	if !backup.DeletionTimestamp.IsZero() {
-		var veleroBackup = &velerov1.Backup{}
-		err := c.client.Get(ctx, backup.GetNamespacedName(), veleroBackup)
-		if apierrors.IsNotFound(err) {
-			logger.V(debug).Info("check backup deletion: backup is deleted and velero backup not found -> remove finalizer, Abort")
+func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+	isBackupDeleting := !backup.DeletionTimestamp.IsZero()
+	if isBackupDeleting {
+		var veleroBackup, err = c.getProviderBackup(ctx, backup.GetNamespacedName())
+		if err != nil {
+			return Abort, fmt.Errorf("get the velero backup resource to check if it exists: %w", err)
+		}
+
+		if veleroBackup == nil {
+			logger.V(debug).Info("ensureProviderBackupDeleted: backup is deleted and provider backup not found -> remove finalizer, ABORT")
 
 			controllerutil.RemoveFinalizer(backup, backupv1.BackupFinalizer)
 			updateErr := c.client.Update(ctx, backup)
@@ -125,9 +143,7 @@ func (c *defaultReconciler) checkBackupDeletion(ctx context.Context, backup *bac
 			}
 			return Abort, nil
 		}
-		if err != nil {
-			return Abort, fmt.Errorf("get the velero backup resource to check if it exists: %w", err)
-		}
+
 		deleteReq, createErr := c.createVeleroDeleteBackupRequestIfNotExists(ctx, backup, logger)
 		if createErr != nil {
 			return Abort, createErr
@@ -139,7 +155,7 @@ func (c *defaultReconciler) checkBackupDeletion(ctx context.Context, backup *bac
 		return Retry, nil
 	}
 
-	logger.V(debug).Info("check backup deletion: backup is not deleted -> mark backup as not deleting, Next")
+	logger.V(debug).Info("ensureProviderBackupDeleted: backup is not deleted -> mark backup as not deleting, Next")
 
 	patchErr := c.markBackupAsNotDeleting(ctx, backup)
 	if patchErr != nil {
@@ -148,6 +164,15 @@ func (c *defaultReconciler) checkBackupDeletion(ctx context.Context, backup *bac
 	}
 
 	return Next, nil
+}
+
+func (c *defaultReconciler) getProviderBackup(ctx context.Context, namespacedName types.NamespacedName) (*velerov1.Backup, error) {
+	var veleroBackup = &velerov1.Backup{}
+	err := c.client.Get(ctx, namespacedName, veleroBackup)
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	return veleroBackup, err
 }
 
 func (c *defaultReconciler) createVeleroDeleteBackupRequestIfNotExists(
@@ -184,7 +209,7 @@ func (c *defaultReconciler) createVeleroDeleteBackupRequestIfNotExists(
 	return deleteBackupRequest, nil
 }
 
-func (c *defaultReconciler) checkBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+func (c *defaultReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
 	if backup.Status.CompletionTimestamp.IsZero() {
 		logger.V(debug).Info("checkBackupCompletion: backup not completed -> NEXT")
 		return Next, nil
@@ -194,7 +219,7 @@ func (c *defaultReconciler) checkBackupCompletion(ctx context.Context, backup *b
 	return Abort, nil
 }
 
-func (c *defaultReconciler) checkBackupCancellation(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+func (c *defaultReconciler) ensureBackupAreCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
 	var backupConfigMap = &corev1.ConfigMap{}
 	err := c.client.Get(ctx, types.NamespacedName{Namespace: backup.Namespace, Name: backupConfigMapName}, backupConfigMap)
 	if err != nil {
@@ -233,8 +258,7 @@ func (c *defaultReconciler) checkBackupCancellation(ctx context.Context, backup 
 		return Abort, nil
 	}
 
-	var veleroBackup = &velerov1.Backup{}
-	err = c.client.Get(ctx, backup.GetNamespacedName(), veleroBackup)
+	veleroBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
 	if err != nil {
 		return Abort, fmt.Errorf("get velero backup: %w", err)
 	}
@@ -279,7 +303,7 @@ func (c *defaultReconciler) checkBackupCancellation(ctx context.Context, backup 
 	return Next, nil
 }
 
-func (c *defaultReconciler) checkVeleroBackupStorage(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
 	veleroBackupStorageLocation := velerov1.BackupStorageLocation{}
 	namespacedName := types.NamespacedName{Namespace: backup.Namespace, Name: veleroBackupStorageName}
 	err := c.client.Get(ctx, namespacedName, &veleroBackupStorageLocation)
@@ -315,7 +339,7 @@ func (c *defaultReconciler) checkVeleroBackupStorage(ctx context.Context, backup
 	return Next, nil
 }
 
-func (c *defaultReconciler) checkMaintenanceModeActiveBeforeBackup(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
 	isActive, err := c.maintenanceGateway.isMaintenanceModeActive(ctx)
 	if err != nil {
 		return Abort, fmt.Errorf("check if maintenance is active: %w", err)
@@ -346,11 +370,13 @@ func (c *defaultReconciler) checkMaintenanceModeActiveBeforeBackup(ctx context.C
 	return Next, nil
 }
 
-func (c *defaultReconciler) checkVeleroBackupResource(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
-	var veleroBackup = &velerov1.Backup{}
-	err := c.client.Get(ctx, backup.GetNamespacedName(), veleroBackup)
+func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+	var veleroBackup, err = c.getProviderBackup(ctx, backup.GetNamespacedName())
+	if err != nil {
+		return Abort, fmt.Errorf("get velero backup resource: %w", err)
+	}
 
-	if apierrors.IsNotFound(err) {
+	if veleroBackup == nil {
 		veleroBackupCr := c.createVeleroBackupResource(backup)
 		createErr := c.client.Create(ctx, veleroBackupCr)
 		if createErr != nil {
@@ -362,31 +388,26 @@ func (c *defaultReconciler) checkVeleroBackupResource(ctx context.Context, backu
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 
-		logger.V(debug).Info("checkVeleroBackupResource: velero backup not found -> Completed = False, RETRY")
+		logger.V(debug).Info("ensureProviderBackupCreated: velero backup not found -> Completed = False, RETRY")
 
 		return Retry, nil
 	}
 
-	if err != nil {
-		return Abort, fmt.Errorf("get velero backup resource: %w", err)
-	}
-
-	logger.V(debug).Info("checkVeleroBackupResource: velero backup found -> NEXT")
+	logger.V(debug).Info("ensureProviderBackupCreated: velero backup found -> NEXT")
 
 	return Next, nil
 }
 
-func (c *defaultReconciler) checkVeleroBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
-	var veleroBackup = &velerov1.Backup{}
-	err := c.client.Get(ctx, backup.GetNamespacedName(), veleroBackup)
-	if err != nil {
+func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+	var providerBackup, err = c.getProviderBackup(ctx, backup.GetNamespacedName())
+	if err != nil || providerBackup == nil {
 		return Abort, fmt.Errorf("checking velero backup resource for completion: %w", err)
 	}
 
-	if veleroBackup.Status.Phase != velerov1.BackupPhaseCompleted {
-		logger.V(debug).Info(fmt.Sprintf("checkVeleroBackupCompletion: velero backup not completed (phase: %s) -> NEXT", veleroBackup.Status.Phase))
+	if providerBackup.Status.Phase != velerov1.BackupPhaseCompleted {
+		logger.V(debug).Info(fmt.Sprintf("checkVeleroBackupCompletion: velero backup not completed (phase: %s) -> NEXT", providerBackup.Status.Phase))
 
-		patchErr := c.markBackupAsNotCompleted(ctx, backup, veleroBackup.Status.Phase)
+		patchErr := c.markBackupAsNotCompleted(ctx, backup, providerBackup.Status.Phase)
 		if patchErr != nil {
 			return Abort, fmt.Errorf("mark backup as not completed: %w", patchErr)
 		}
@@ -427,15 +448,16 @@ func (c *defaultReconciler) createVeleroBackupResource(backup *backupv1.Backup) 
 	}
 }
 
-func (c *defaultReconciler) checkMaintenanceModeNotActiveAfterBackup(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
-	var veleroBackup = &velerov1.Backup{}
-	err := c.client.Get(ctx, backup.GetNamespacedName(), veleroBackup)
-
+func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+	var providerBackup, err = c.getProviderBackup(ctx, backup.GetNamespacedName())
 	if err != nil {
 		return Abort, fmt.Errorf("get velero backup resource: %w", err)
 	}
+	if providerBackup == nil {
+		return Abort, errors.New(fmt.Sprintf("provider backup not found namespace='%s', name='%s'", backup.Namespace, backup.Name))
+	}
 
-	backupCompleted := veleroBackup.Status.Phase == velerov1.BackupPhaseCompleted
+	backupCompleted := providerBackup.Status.Phase == velerov1.BackupPhaseCompleted
 	maintenanceModeIsActive, err := c.maintenanceGateway.isMaintenanceModeActive(ctx)
 	if err != nil {
 		return Abort, fmt.Errorf("check maintenance mode after backup completion: %w", err)
@@ -467,7 +489,7 @@ func (c *defaultReconciler) markVeleroBackupStorageAvailable(ctx context.Context
 	prepared := metav1.Condition{
 		Type:    backupv1.ConditionPrepared,
 		Status:  metav1.ConditionTrue,
-		Reason:  reasonVeleroBackupStorageAvailable,
+		Reason:  reasonProviderBackupStorageAvailable,
 		Message: fmt.Sprintf("velero backup storage location 'name=%s' is available.", veleroBackupStorageName),
 	}
 	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
@@ -479,7 +501,7 @@ func (c *defaultReconciler) markVeleroBackupStorageNotAvailable(ctx context.Cont
 	prepared := metav1.Condition{
 		Type:    backupv1.ConditionPrepared,
 		Status:  metav1.ConditionFalse,
-		Reason:  reasonVeleroBackupStorageNotAvailable,
+		Reason:  reasonProviderBackupStorageNotAvailable,
 		Message: fmt.Sprintf("velero backup storage location 'name=%s' is not available.", veleroBackupStorageName),
 	}
 	completed := metav1.Condition{
@@ -498,7 +520,7 @@ func (c *defaultReconciler) markVeleroBackupResourceDoesNotExist(ctx context.Con
 	completed := metav1.Condition{
 		Type:    backupv1.ConditionCompleted,
 		Status:  metav1.ConditionFalse,
-		Reason:  reasonVeleroBackupResourceDoesNotExist,
+		Reason:  reasonProviderBackupResourceDoesNotExist,
 		Message: "Preparation not completed",
 	}
 	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
@@ -525,7 +547,7 @@ func (c *defaultReconciler) markBackupAsNotCompleted(ctx context.Context, backup
 	completed := metav1.Condition{
 		Type:    backupv1.ConditionCompleted,
 		Status:  metav1.ConditionFalse,
-		Reason:  reasonVeleroBackupNotCompleted,
+		Reason:  reasonProviderBackupNotCompleted,
 		Message: fmt.Sprintf("Velero backup not completed. Velero is in phase: %v", veleroBackupPhase),
 	}
 	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {

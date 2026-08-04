@@ -29,9 +29,9 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -39,7 +39,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
-		assert.Equal(t, reasonVeleroBackupStorageNotAvailable, preparedCondition.Reason)
+		assert.Equal(t, reasonProviderBackupStorageNotAvailable, preparedCondition.Reason)
 
 		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
 		assert.NotNil(t, completedCondition)
@@ -62,9 +62,9 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -72,7 +72,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
-		assert.Equal(t, reasonVeleroBackupStorageNotAvailable, preparedCondition.Reason)
+		assert.Equal(t, reasonProviderBackupStorageNotAvailable, preparedCondition.Reason)
 
 		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
 		assert.NotNil(t, completedCondition)
@@ -96,9 +96,9 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -106,7 +106,7 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionTrue, preparedCondition.Status)
-		assert.Equal(t, reasonVeleroBackupStorageAvailable, preparedCondition.Reason)
+		assert.Equal(t, reasonProviderBackupStorageAvailable, preparedCondition.Reason)
 
 		assert.Equal(t, 1, patchCallCount)
 	})
@@ -123,9 +123,9 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -143,9 +143,9 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -162,9 +162,9 @@ func TestReconcilerCheckVeleroBackupStorage(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkVeleroBackupStorage(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)

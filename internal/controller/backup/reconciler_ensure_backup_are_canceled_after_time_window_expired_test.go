@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-func TestReconcilerCheckBackupCancellation(t *testing.T) {
+func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 	t.Run("If the time window has not yet expired, set condition and proceed to the next step", func(t *testing.T) {
 		baseTime := time.Now()
 		backup := newBackupForControllerTest("ns", "backup")
@@ -47,9 +47,9 @@ func TestReconcilerCheckBackupCancellation(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(10*time.Minute - time.Millisecond))
-		reconciler := NewReconciler(fakeClient, nil, clockMock)
+		reconciler := NewReconciler(fakeClient, nil, clockMock, nil)
 
-		nextAction, err := reconciler.checkBackupCancellation(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -90,11 +90,11 @@ func TestReconcilerCheckBackupCancellation(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(10*time.Minute + time.Millisecond))
-		reconciler := NewReconciler(fakeClient, nil, clockMock)
+		reconciler := NewReconciler(fakeClient, nil, clockMock, nil)
 
 		require.True(t, backup.Status.StartTimestamp.IsZero())
 
-		nextAction, err := reconciler.checkBackupCancellation(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -141,9 +141,9 @@ func TestReconcilerCheckBackupCancellation(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
-		reconciler := NewReconciler(fakeClient, nil, clockMock)
+		reconciler := NewReconciler(fakeClient, nil, clockMock, nil)
 
-		nextAction, err := reconciler.checkBackupCancellation(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -191,9 +191,9 @@ func TestReconcilerCheckBackupCancellation(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
-		reconciler := NewReconciler(fakeClient, nil, clockMock)
+		reconciler := NewReconciler(fakeClient, nil, clockMock, nil)
 
-		nextAction, err := reconciler.checkBackupCancellation(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -241,9 +241,9 @@ func TestReconcilerCheckBackupCancellation(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
-		reconciler := NewReconciler(fakeClient, nil, clockMock)
+		reconciler := NewReconciler(fakeClient, nil, clockMock, nil)
 
-		nextAction, err := reconciler.checkBackupCancellation(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)

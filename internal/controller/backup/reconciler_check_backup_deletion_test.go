@@ -17,18 +17,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-func TestReconcilerCheckBackupDeletion(t *testing.T) {
-	t.Run("If the backup is not deleted, set condition and proceed to the next step", func(t *testing.T) {
+func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
+	t.Run("If the backup is not deleting, set condition and proceed to the next step", func(t *testing.T) {
 		backup := newBackupForControllerTest("ns", "backup")
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
 		require.True(t, backup.DeletionTimestamp.IsZero())
 
-		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -58,9 +58,9 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -100,9 +100,9 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -147,9 +147,9 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -171,9 +171,9 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "get error")
@@ -195,9 +195,9 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "get error")
@@ -219,9 +219,9 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "create error")
@@ -241,9 +241,9 @@ func TestReconcilerCheckBackupDeletion(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
 
-		nextAction, err := reconciler.checkBackupDeletion(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "patch status error")
