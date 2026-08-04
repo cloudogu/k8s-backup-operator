@@ -215,7 +215,7 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 		})
 	})
 
-	FDescribe("Canceling a running backup", Ordered, Label("backup"), func() {
+	Describe("Canceling a running backup", Ordered, Label("backup"), func() {
 		var backupObjectKey = client.ObjectKey{
 			Namespace: "ecosystem",
 			Name:      fmt.Sprintf("backup-spec-canceling-backup%s", uuid.New().String()),
