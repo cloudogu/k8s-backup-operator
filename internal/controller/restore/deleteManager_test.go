@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
@@ -20,13 +21,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-// deletableParent is a Restore carrying the finalizer that the delete flow has to remove. Without the
-// finalizer its removal would be a no-op and the tests would pass for the wrong reason.
+// deletableParent returns the parent as the delete manager actually sees it: marked for deletion and
+// still held by the finalizer. Without the finalizer its removal would be a no-op and the tests would
+// pass for the wrong reason; without the deletion timestamp the derived status phase would not be
+// "deleting" and the status write would be a no-op.
 func deletableParent() *v1.Restore {
 	restore := newParentRestore()
 	restore.Finalizers = []string{v1.RestoreFinalizer}
+	restore.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 
 	return restore
+}
+
+// assertParentDeleted asserts that removing the finalizer let the deletion of the parent finish.
+func assertParentDeleted(t *testing.T, testClient client.Client, name string) {
+	t.Helper()
+
+	err := testClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: name}, &v1.Restore{})
+	assert.True(t, apierrors.IsNotFound(err), "the parent must be gone once its finalizer is removed, got %v", err)
 }
 
 func Test_defaultDeleteManager_delete(t *testing.T) {
@@ -71,9 +83,7 @@ func Test_newDeleteManager(t *testing.T) {
 		assert.Equal(t, 1, writes.child.deletes)
 		getErr := k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: testRestore}, &velerov1.Restore{})
 		assert.True(t, apierrors.IsNotFound(getErr))
-		stored := &v1.Restore{}
-		require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: restore.Name}, stored))
-		assert.NotContains(t, stored.Finalizers, v1.RestoreFinalizer)
+		assertParentDeleted(t, k8sClient, restore.Name)
 	})
 
 	t.Run("tolerates an already deleted velero child", func(t *testing.T) {
@@ -99,9 +109,7 @@ func Test_newDeleteManager(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		stored := &v1.Restore{}
-		require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: restore.Name}, stored))
-		assert.NotContains(t, stored.Finalizers, v1.RestoreFinalizer)
+		assertParentDeleted(t, k8sClient, restore.Name)
 	})
 
 	t.Run("should return error on status update error", func(t *testing.T) {
@@ -265,9 +273,7 @@ func Test_defaultDeleteManager_deleteOnlyDeletesItsOwnProviderRestore(t *testing
 
 			// then the finalizer is removed either way, so deletion never wedges on a foreign child
 			require.NoError(t, err)
-			stored := &v1.Restore{}
-			require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: test.restore.Name}, stored))
-			assert.NotContains(t, stored.Finalizers, v1.RestoreFinalizer)
+			assertParentDeleted(t, k8sClient, test.restore.Name)
 			getErr := k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: testRestore}, &velerov1.Restore{})
 			if test.wantDeleted {
 				assert.Equal(t, 1, writes.child.deletes)

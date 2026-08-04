@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +32,7 @@ var testRestore = "test-restore"
 func TestNewRestoreReconciler(t *testing.T) {
 	t.Run("should create restore reconciler", func(t *testing.T) {
 		// when
-		actual := NewRestoreReconciler(nil, nil, "default", nil)
+		actual := NewRestoreReconciler(nil, nil, "default", nil, nil, nil)
 
 		// then
 		assert.NotNil(t, actual)
@@ -140,13 +141,18 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			require.NoError(t, sut.k8sClient.Get(testCtx, client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
 			assert.Equal(t, v1.RestoreStatusFailed, stored.Status.Status)
 		})
-		t.Run("should ignore a status phase without writing", func(t *testing.T) {
+		t.Run("should ignore a completed restore without writing", func(t *testing.T) {
 			// given
 			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
 			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
 				Name:      testRestore,
 				Namespace: testNamespace,
-			}, Status: v1.RestoreStatus{Status: "some-unknown-status"}}
+			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusCompleted, Conditions: []metav1.Condition{{
+				Type:               v1.ConditionSuccessful,
+				Status:             metav1.ConditionTrue,
+				Reason:             ReasonRestoreCompleted,
+				LastTransitionTime: metav1.Now(),
+			}}}}
 
 			writes := &clientWrites{}
 			sut := &restoreReconciler{
@@ -164,58 +170,6 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		})
 	})
 
-	t.Run("creation tests", func(t *testing.T) {
-		t.Run("should retry on create error", func(t *testing.T) {
-			// given
-			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := newRestore()
-
-			managerMock := newMockRestoreManager(t)
-			managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(assert.AnError)
-			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, v1.CreateEventReason, "Creation failed. Reason: assert.AnError general error for testing").Return()
-
-			sut := &restoreReconciler{
-				namespace: testNamespace,
-				k8sClient: newTestClient(t, interceptor.Funcs{}, restore),
-				manager:   managerMock,
-				recorder:  recorderMock,
-			}
-
-			// when
-			actual, err := sut.Reconcile(testCtx, request)
-
-			// then
-			require.Error(t, err)
-			assert.ErrorIs(t, err, assert.AnError)
-			assert.ErrorContains(t, err, "Creation of restore test-restore failed")
-			assert.Equal(t, ctrl.Result{}, actual)
-		})
-		t.Run("should succeed with create", func(t *testing.T) {
-			// given
-			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := newRestore()
-
-			managerMock := newMockRestoreManager(t)
-			managerMock.EXPECT().create(testCtx, matchesRestoreNamed(testRestore)).Return(nil)
-			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, v1.CreateEventReason, "Creation successful").Return()
-
-			sut := &restoreReconciler{
-				namespace: testNamespace,
-				k8sClient: newTestClient(t, interceptor.Funcs{}, restore),
-				manager:   managerMock,
-				recorder:  recorderMock,
-			}
-
-			// when
-			actual, err := sut.Reconcile(testCtx, request)
-
-			// then
-			require.NoError(t, err)
-			assert.Equal(t, ctrl.Result{}, actual)
-		})
-	})
 }
 
 func Test_restoreReconciler_SetupWithManager(t *testing.T) {
@@ -239,6 +193,8 @@ func Test_restoreReconciler_SetupWithManager(t *testing.T) {
 		ctrlManMock.EXPECT().GetLogger().Return(logger)
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetCache().Return(nil)
+		// only the owned provider restore watch needs to map an owner reference back to its parent
+		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
 
 		sut := &restoreReconciler{}
 
@@ -258,6 +214,9 @@ func createScheme(t *testing.T) *runtime.Scheme {
 	assert.NoError(t, err)
 
 	scheme.AddKnownTypes(gv, &v1.Restore{})
+	// the owned provider restore must be resolvable, otherwise the Owns watch cannot be set up
+	require.NoError(t, velerov1.AddToScheme(scheme))
+
 	return scheme
 }
 
@@ -303,22 +262,22 @@ func Test_requiredOperation(t *testing.T) {
 			reasonWhy: "terminal",
 		},
 		{
-			name:      "ignore a restore with an unknown outcome",
+			name:      "continue a restore with an unknown outcome",
 			restore:   &v1.Restore{Status: v1.RestoreStatus{Conditions: successful(metav1.ConditionUnknown)}},
-			expected:  operationIgnore,
-			reasonWhy: "an interrupted restore may not repeat the destructive preparation; resuming needs the staged flow",
+			expected:  operationCreate,
+			reasonWhy: "an unknown outcome means in flight, so the staged workflow resumes where it stopped",
 		},
 		{
-			name:      "ignore a legacy restore that is still in progress",
+			name:      "continue a legacy restore that is still in progress",
 			restore:   &v1.Restore{Status: v1.RestoreStatus{Status: v1.RestoreStatusInProgress}},
-			expected:  operationIgnore,
+			expected:  operationCreate,
 			reasonWhy: "same as an unknown outcome, reached through the deprecated scalar status",
 		},
 		{
-			name:      "ignore a legacy restore with an uninterpretable status",
+			name:      "continue a legacy restore with an uninterpretable status",
 			restore:   &v1.Restore{Status: v1.RestoreStatus{Status: "some-unknown-status"}},
-			expected:  operationIgnore,
-			reasonWhy: "an unreadable legacy value must not start a destructive restore",
+			expected:  operationCreate,
+			reasonWhy: "an unreadable legacy value carries no outcome, and the child barrier guards the destructive stages",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {

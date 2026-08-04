@@ -20,8 +20,11 @@ const (
 	// ReasonPreparing marks a running (destructive) preparation, i.e. maintenance mode,
 	// scale-down and cleanup.
 	ReasonPreparing = "Preparing"
-	// ReasonPreparationFailed marks a terminally failed preparation.
+	// ReasonPreparationFailed marks a failed preparation.
 	ReasonPreparationFailed = "PreparationFailed"
+	// ReasonPreparationCompleted marks a finished preparation: maintenance mode is active, the
+	// workloads are scaled down and the resources to be restored are removed.
+	ReasonPreparationCompleted = "PreparationCompleted"
 	// ReasonProviderRestorePending marks an owned provider restore that exists but has not started.
 	ReasonProviderRestorePending = "ProviderRestorePending"
 	// ReasonProviderRestoreRunning marks an owned provider restore that is executing.
@@ -40,13 +43,19 @@ const (
 	// ReasonRecoveringWorkloads marks a running workload recovery, i.e. scale-up and
 	// maintenance mode deactivation.
 	ReasonRecoveringWorkloads = "RecoveringWorkloads"
+	// ReasonWorkloadRecoveryCompleted marks a finished workload recovery: the workloads are scaled up
+	// again and the maintenance mode is switched off.
+	ReasonWorkloadRecoveryCompleted = "WorkloadRecoveryCompleted"
 	// ReasonWorkloadRecoveryFailed marks a failed workload recovery after provider success.
 	ReasonWorkloadRecoveryFailed = "WorkloadRecoveryFailed"
 	// ReasonRecoveryNotAttemptedAfterProviderFailure marks workloads that were deliberately not
 	// scaled up because the provider restore failed terminally.
 	ReasonRecoveryNotAttemptedAfterProviderFailure = "RecoveryNotAttemptedAfterProviderFailure"
-	// ReasonSynchronizingBackups marks the running read-only backup catalog convergence check.
-	ReasonSynchronizingBackups = "SynchronizingBackups"
+	// ReasonSynchronizationNotAttemptedAfterProviderFailure marks a backup catalog that was
+	// deliberately not synchronized because the provider restore failed terminally.
+	ReasonSynchronizationNotAttemptedAfterProviderFailure = "SynchronizationNotAttemptedAfterProviderFailure"
+	// ReasonBackupSynchronizationCompleted marks a finished backup catalog synchronization.
+	ReasonBackupSynchronizationCompleted = "BackupSynchronizationCompleted"
 	// ReasonBackupSynchronizationFailed marks a backup catalog that did not converge.
 	ReasonBackupSynchronizationFailed = "BackupSynchronizationFailed"
 	// ReasonRestoreCompleted marks the successfully finished restore workflow.
@@ -56,6 +65,48 @@ const (
 	// original cause of a legacy success or failure is not recoverable, so it is not claimed.
 	ReasonMigratedFromLegacyStatus = "MigratedFromLegacyStatus"
 )
+
+// workflowConditionTypes are the conditions every running restore carries, in the order a reader of
+// the status should see them.
+var workflowConditionTypes = []string{
+	k8sv1.ConditionSuccessful,
+	k8sv1.ConditionPrepared,
+	k8sv1.ConditionProviderRestoreSuccessful,
+	k8sv1.ConditionWorkloadsRecovered,
+	k8sv1.ConditionBackupsSynchronized, //TODO: maybe this is not needed. Condition should be deleted too, if ensureStage will be deleted
+}
+
+// missingWorkflowConditions returns the workflow conditions the restore does not carry yet, as
+// Unknown. A condition that is already present is never returned, so a milestone that a stage has
+// already resolved cannot fall back to Unknown.
+func missingWorkflowConditions(restore *k8sv1.Restore) []metav1.Condition {
+	var missing []metav1.Condition
+
+	for _, conditionType := range workflowConditionTypes {
+		if meta.FindStatusCondition(restore.Status.Conditions, conditionType) != nil {
+			continue
+		}
+
+		missing = append(missing, metav1.Condition{
+			Type:    conditionType,
+			Status:  metav1.ConditionUnknown,
+			Reason:  ReasonPending,
+			Message: "The restore workflow has not reached this milestone yet.",
+		})
+	}
+
+	return missing
+}
+
+// reachedMilestone is a reached milestone of the restore workflow.
+func reachedMilestone(conditionType string, reason string, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:    conditionType,
+		Status:  metav1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	}
+}
 
 // observeProviderRestoreState maps the state of the owned provider restore to the status and reason
 // of the tri-state ProviderRestoreSuccessful condition.
@@ -89,12 +140,12 @@ func findSuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 // by metadata.deletionTimestamp, not by status.
 func determineLegacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 	var status metav1.ConditionStatus
-	switch restore.Status.Status {
-	case k8sv1.RestoreStatusCompleted:
+	switch restore.Status.Status { // NOSONAR -- legacy restore status compatibility
+	case k8sv1.RestoreStatusCompleted: // NOSONAR -- legacy restore status compatibility
 		status = metav1.ConditionTrue
-	case k8sv1.RestoreStatusFailed:
+	case k8sv1.RestoreStatusFailed: // NOSONAR -- legacy restore status compatibility
 		status = metav1.ConditionFalse
-	case k8sv1.RestoreStatusInProgress:
+	case k8sv1.RestoreStatusInProgress: // NOSONAR -- legacy restore status compatibility
 		status = metav1.ConditionUnknown
 	default:
 		return nil
@@ -128,25 +179,25 @@ func isTerminal(restore *k8sv1.Restore) bool {
 }
 
 func isTerminalLegacyStatus(status string) bool {
-	return status == k8sv1.RestoreStatusCompleted || status == k8sv1.RestoreStatusFailed
+	return status == k8sv1.RestoreStatusCompleted || status == k8sv1.RestoreStatusFailed // NOSONAR -- legacy restore status compatibility
 }
 
 // legacyStatusFor maps conditions to thr deprecated status field.
 func legacyStatusFor(restore *k8sv1.Restore) string {
 	if restore.DeletionTimestamp != nil && !restore.DeletionTimestamp.IsZero() {
-		return k8sv1.RestoreStatusDeleting
+		return k8sv1.RestoreStatusDeleting // NOSONAR -- legacy restore status compatibility
 	}
 
 	switch condition := findSuccessfulCondition(restore); {
 	case condition == nil && (len(restore.Status.Conditions) == 0 || isTerminalLegacyStatus(restore.Status.Status)):
 		return restore.Status.Status
 	case condition == nil:
-		return k8sv1.RestoreStatusInProgress
+		return k8sv1.RestoreStatusInProgress // NOSONAR -- legacy restore status compatibility
 	case condition.Status == metav1.ConditionTrue:
-		return k8sv1.RestoreStatusCompleted
+		return k8sv1.RestoreStatusCompleted // NOSONAR -- legacy restore status compatibility
 	case condition.Status == metav1.ConditionFalse:
-		return k8sv1.RestoreStatusFailed
+		return k8sv1.RestoreStatusFailed // NOSONAR -- legacy restore status compatibility
 	default:
-		return k8sv1.RestoreStatusInProgress
+		return k8sv1.RestoreStatusInProgress // NOSONAR -- legacy restore status compatibility
 	}
 }

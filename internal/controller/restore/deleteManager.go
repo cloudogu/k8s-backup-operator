@@ -36,9 +36,11 @@ func (dm *defaultDeleteManager) delete(ctx context.Context, restore *v1.Restore)
 		(velero.IsOwnedRestore(restore, child) ||
 			(successfulCondition != nil && successfulCondition.Reason == ReasonMigratedFromLegacyStatus))
 
-	restore, err = conditions.setLegacyStatus(ctx, restore, v1.RestoreStatusDeleting)
+	// A deleting restore has no condition of its own; the status phase is derived from the
+	// deletion timestamp, so this write carries no conditions and only persists that status phase.
+	restore, err = conditions.setConditions(ctx, restore)
 	if err != nil {
-		return fmt.Errorf("failed to update status [%s] on restore [%s]: %w", v1.RestoreStatusDeleting, restore.Name, err)
+		return fmt.Errorf("failed to update status [%s] on restore [%s]: %w", v1.RestoreStatusDeleting, restore.Name, err) // NOSONAR -- legacy restore status compatibility
 	}
 
 	// The provider is still resolved for its readiness gate and its provider-selection event, but the

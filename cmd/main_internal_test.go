@@ -400,6 +400,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetCache().Return(nil)
+		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
 		ctrlManMock.EXPECT().AddHealthzCheck("healthz", mock.Anything).Return(assert.AnError)
 
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -477,6 +478,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetCache().Return(nil)
+		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
 		ctrlManMock.EXPECT().AddHealthzCheck("healthz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().AddReadyzCheck("readyz", mock.Anything).Return(assert.AnError)
 
@@ -552,6 +554,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetCache().Return(nil)
+		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
 		ctrlManMock.EXPECT().AddHealthzCheck("healthz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().AddReadyzCheck("readyz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().Start(mock.Anything).Return(assert.AnError)
@@ -630,6 +633,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetLogger().Return(logr.New(logMock))
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetCache().Return(nil)
+		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
 		ctrlManMock.EXPECT().AddHealthzCheck("healthz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().AddReadyzCheck("readyz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().Start(mock.Anything).Return(nil)
