@@ -39,7 +39,7 @@ func TestWorkloadRecoveryScalesUpSwitchesOffTheMaintenanceModeAndCompletesTheRes
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Restore successful").Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, scaleMock)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
@@ -76,7 +76,7 @@ func TestAFailedScaleUpReportsWorkloadsRecoveredFalseAndRetriesWithoutCompleting
 		"failed to scale up workloads after restore: assert.AnError general error for testing").Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, scaleMock)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
@@ -105,7 +105,7 @@ func TestAFailedMaintenanceModeDeactivationIsRetriedWithoutCompletingTheRestore(
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		// no recorder: a restore that has not switched off maintenance mode must not emit a success event
-		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, scaleMock)
+		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
@@ -135,7 +135,7 @@ func TestAnUnpersistableRestoreOutcomeIsRetried(t *testing.T) {
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		// no recorder - the success event must not be emitted for an outcome that was not persisted
-		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, scaleMock)
+		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile

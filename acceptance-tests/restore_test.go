@@ -16,6 +16,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -28,6 +29,12 @@ const (
 	// backupScopeLabel marks additional resources that the restore flow deletes
 	// before restoring.
 	backupScopeLabel = "k8s.cloudogu.com/backup-scope"
+	// acceptanceProviderHoldFinalizer keeps the Velero restore observable after its deletion was
+	// requested, so the spec can verify that the parent remains protected until the child is gone.
+	acceptanceProviderHoldFinalizer = "k8s.cloudogu.com/acceptance-provider-hold"
+	// acceptanceParentHoldFinalizer keeps the parent observable after the operator released it, so
+	// the deleting status and the operator finalizer removal can be asserted independently.
+	acceptanceParentHoldFinalizer = "k8s.cloudogu.com/acceptance-parent-hold"
 
 	restoreTestNamespace       = "ecosystem"
 	throwawayReplicas    int32 = 2
@@ -148,12 +155,43 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 	})
 
 	Describe("Deleting a restore", Ordered, func() {
+		BeforeAll(func(ctx SpecContext) {
+			DeferCleanup(func(ctx SpecContext) {
+				removeObjectFinalizerAndIgnoreNotFound(ctx, restoreKey, &velerov1.Restore{}, acceptanceProviderHoldFinalizer)
+				removeObjectFinalizerAndIgnoreNotFound(ctx, restoreKey, &backupv1.Restore{}, acceptanceParentHoldFinalizer)
+				deleteAndIgnoreNotFound(ctx, &velerov1.Restore{ObjectMeta: metav1.ObjectMeta{Name: restoreKey.Name, Namespace: restoreKey.Namespace}})
+				deleteAndIgnoreNotFound(ctx, newRestoreWithObjectKey(restoreKey, backupKey.Name))
+			})
+
+			By("holding the parent and provider restore so every deletion stage remains observable")
+			ensureObjectFinalizer(ctx, restoreKey, &backupv1.Restore{}, acceptanceParentHoldFinalizer)
+			ensureObjectFinalizer(ctx, restoreKey, &velerov1.Restore{}, acceptanceProviderHoldFinalizer)
+		})
+
 		It("if the restore is deleted", func(ctx SpecContext) {
 			restore := newRestoreWithObjectKey(restoreKey, backupKey.Name)
 			Expect(k8sClient.Delete(ctx, restore)).Should(Succeed())
 		})
 
-		It("the provider's restore is also deleted", func(ctx SpecContext) {
+		It("the provider restore starts terminating while the parent remains protected", func(ctx SpecContext) {
+			Eventually(func(g Gomega) {
+				veleroRestore := &velerov1.Restore{}
+				g.Expect(k8sClient.Get(ctx, restoreKey, veleroRestore)).Should(Succeed())
+				g.Expect(veleroRestore.DeletionTimestamp).ShouldNot(BeNil())
+
+				restore := &backupv1.Restore{}
+				g.Expect(k8sClient.Get(ctx, restoreKey, restore)).Should(Succeed())
+				g.Expect(restore.Finalizers).Should(ContainElement(backupv1.RestoreFinalizer),
+					"the parent must remain protected while its provider restore still exists")
+			}).
+				WithTimeout(10 * time.Minute).
+				WithPolling(5 * time.Second).
+				Should(Succeed())
+		})
+
+		It("the provider restore is deleted after its hold is released", func(ctx SpecContext) {
+			removeObjectFinalizerAndIgnoreNotFound(ctx, restoreKey, &velerov1.Restore{}, acceptanceProviderHoldFinalizer)
+
 			Eventually(func(g Gomega) {
 				veleroRestore := &velerov1.Restore{}
 				err := k8sClient.Get(ctx, restoreKey, veleroRestore)
@@ -161,6 +199,33 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 			}).
 				WithTimeout(10 * time.Minute).
 				WithPolling(10 * time.Second).
+				Should(Succeed())
+		})
+
+		It("the parent persists the deleting status and releases only the operator finalizer", func(ctx SpecContext) {
+			Eventually(func(g Gomega) {
+				restore := &backupv1.Restore{}
+				g.Expect(k8sClient.Get(ctx, restoreKey, restore)).Should(Succeed())
+				g.Expect(restore.Status.Status).Should(Equal(backupv1.RestoreStatusDeleting))
+				g.Expect(restore.Finalizers).ShouldNot(ContainElement(backupv1.RestoreFinalizer))
+				g.Expect(restore.Finalizers).Should(ContainElement(acceptanceParentHoldFinalizer),
+					"the operator must not remove finalizers owned by another controller")
+			}).
+				WithTimeout(10 * time.Minute).
+				WithPolling(5 * time.Second).
+				Should(Succeed())
+		})
+
+		It("the parent is deleted after the acceptance hold is released", func(ctx SpecContext) {
+			removeObjectFinalizerAndIgnoreNotFound(ctx, restoreKey, &backupv1.Restore{}, acceptanceParentHoldFinalizer)
+
+			Eventually(func(g Gomega) {
+				restore := &backupv1.Restore{}
+				err := k8sClient.Get(ctx, restoreKey, restore)
+				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			}).
+				WithTimeout(2 * time.Minute).
+				WithPolling(2 * time.Second).
 				Should(Succeed())
 		})
 	})
@@ -264,6 +329,43 @@ func deleteAndIgnoreNotFound(ctx SpecContext, object client.Object) {
 	if err != nil && !apierrors.IsNotFound(err) {
 		Expect(err).ShouldNot(HaveOccurred())
 	}
+}
+
+// ensureObjectFinalizer adds a test-owned finalizer and retries conflicts with other controllers.
+func ensureObjectFinalizer(ctx SpecContext, key client.ObjectKey, object client.Object, finalizer string) {
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, key, object)).Should(Succeed())
+		before := object.DeepCopyObject().(client.Object)
+		if !controllerutil.AddFinalizer(object, finalizer) {
+			return
+		}
+
+		g.Expect(k8sClient.Patch(ctx, object, client.MergeFrom(before))).Should(Succeed())
+	}).
+		WithTimeout(2 * time.Minute).
+		WithPolling(time.Second).
+		Should(Succeed())
+}
+
+// removeObjectFinalizerAndIgnoreNotFound releases a test-owned hold during the spec and cleanup.
+func removeObjectFinalizerAndIgnoreNotFound(ctx SpecContext, key client.ObjectKey, object client.Object, finalizer string) {
+	Eventually(func(g Gomega) {
+		err := k8sClient.Get(ctx, key, object)
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		g.Expect(err).ShouldNot(HaveOccurred())
+
+		before := object.DeepCopyObject().(client.Object)
+		if !controllerutil.RemoveFinalizer(object, finalizer) {
+			return
+		}
+
+		g.Expect(k8sClient.Patch(ctx, object, client.MergeFrom(before))).Should(Succeed())
+	}).
+		WithTimeout(2 * time.Minute).
+		WithPolling(time.Second).
+		Should(Succeed())
 }
 
 func newRestoreWithObjectKey(objectKey client.ObjectKey, backupName string) *backupv1.Restore {
