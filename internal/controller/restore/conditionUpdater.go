@@ -30,21 +30,13 @@ func newConditionUpdater(client restoreStatusClient) *conditionUpdater {
 // setConditions applies the given conditions to the Restore status, writes the deprecated
 // scalar status for consumers that have not migrated yet, and persists the result.
 func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Restore, conditions ...metav1.Condition) (*k8sv1.Restore, error) {
-	return u.updateStatus(ctx, restore, func(desired *k8sv1.Restore) {
-		applyConditions(desired, conditions)
-	})
-}
 
-// updateStatus applies mutate to a copy of the Restore status and persists it, unless the mutation
-// changed nothing. A conflict is resolved by re-reading the Restore and applying mutate again, so a
-// concurrent status write is never dropped.
-func (u *conditionUpdater) updateStatus(ctx context.Context, restore *k8sv1.Restore, mutate func(*k8sv1.Restore)) (*k8sv1.Restore, error) {
 	current := restore
 	result := restore
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		desired := current.DeepCopy()
-		mutate(desired)
+		applyConditions(desired, conditions)
 
 		if apiequality.Semantic.DeepEqual(current.Status, desired.Status) {
 			result = current
@@ -102,5 +94,5 @@ func applyConditions(restore *k8sv1.Restore, conditions []metav1.Condition) {
 		meta.SetStatusCondition(&restore.Status.Conditions, condition)
 	}
 
-	restore.Status.Status = legacyStatusFor(restore)
+	restore.Status.Status = legacyStatusFor(restore) // NOSONAR -- legacy restore status compatibility
 }

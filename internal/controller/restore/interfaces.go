@@ -10,7 +10,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 
@@ -24,16 +23,6 @@ type eventRecorder interface {
 
 type controllerManager interface {
 	ctrl.Manager
-}
-
-// restoreManager is the deletion side of the workflow. Creating a restore is no longer a manager
-// operation but a sequence of reconciler stages.
-type restoreManager interface {
-	deleteManager
-}
-
-type deleteManager interface {
-	delete(ctx context.Context, restore *v1.Restore) error
 }
 
 type maintenanceModeSwitch interface {

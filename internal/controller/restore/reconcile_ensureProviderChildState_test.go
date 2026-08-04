@@ -41,7 +41,7 @@ func TestAnExistingOwnedProviderChildSkipsThePreparationAndIsObservedInstead(t *
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil).Reconcile
 	}
 	// with owned child
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedRunningChild(restore))
@@ -62,13 +62,12 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 	conflicting := foreignChild(restore)
 
-	managerMock := newMockRestoreManager(t)
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason,
 		"velero restore [test-restore] conflicts with the expected child: it is not controlled by restore [test-restore] and must not be adopted").Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, managerMock, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, conflicting)
 	request := newRestoreRequest(testRestore)
@@ -96,12 +95,11 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 func TestAnUnreportableProviderChildConflictIsRetried(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
-	managerMock := newMockRestoreManager(t)
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, managerMock, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, foreignChild(restore))
 
@@ -114,7 +112,6 @@ func TestAnUnreportableProviderChildConflictIsRetried(t *testing.T) {
 func TestAnUnreadableProviderChildIsRetried(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
-	managerMock := newMockRestoreManager(t)
 	failingChildGet := interceptor.Funcs{
 		Get: func(ctx context.Context, wrapped client.WithWatch, key client.ObjectKey, object client.Object, opts ...client.GetOption) error {
 			if _, isChild := object.(*velerov1.Restore); isChild {
@@ -126,7 +123,7 @@ func TestAnUnreadableProviderChildIsRetried(t *testing.T) {
 	}
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, managerMock, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingChildGet, factory, restore)
 
