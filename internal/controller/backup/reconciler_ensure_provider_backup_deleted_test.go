@@ -19,7 +19,7 @@ import (
 
 func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 	t.Run("If the backup is not deleting, set condition and proceed to the next step", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup).
 			WithStatusSubresource(backup).
@@ -253,7 +253,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 }
 
 func newDeletedBackupForReconcilerTest(namespace string, name string) *backupv1.Backup {
-	backup := newBackupForControllerTest(namespace, name)
+	backup := newBackupForTest(namespace, name)
 	backup.Finalizers = []string{backupv1.BackupFinalizer}
 	deletionTimestamp := metav1.Now()
 	backup.DeletionTimestamp = &deletionTimestamp

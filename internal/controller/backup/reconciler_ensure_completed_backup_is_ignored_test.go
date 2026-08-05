@@ -4,63 +4,82 @@ import (
 	"context"
 	"testing"
 
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestReconcilerEnsureCompletedBackupIsIgnored(t *testing.T) {
-	t.Run("If the backup has failed then abort", func(t *testing.T) {
-		t.Skip("TODO")
-		backup := newBackupForControllerTest("ns", "backup")
+	tests := []struct {
+		name            string
+		succeededStatus metav1.ConditionStatus
+		action          action
+	}{
+		{"Ignores failed backups", metav1.ConditionFalse, Abort},
+		{"Ignores succeeded backups", metav1.ConditionTrue, Abort},
+		{"Continues with backup that are not completed yet.", metav1.ConditionUnknown, Next},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			backup := newBackupWithSucceededStatusForReconcilerTest("ns", "backup", test.succeededStatus)
+			fakeClient := newFakeClientBuilder(t).Build()
+			maintenanceGatewayMock := newMockMaintenanceGateway(t)
+
+			reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{}, nil)
+
+			nextAction, err := reconciler.ensureCompletedBackupIsIgnored(context.Background(), backup, logr.Discard())
+
+			assert.NoError(t, err)
+			assert.Equal(t, test.action, nextAction)
+		})
+
+	}
+
+	t.Run("If the backup has no succeeded condition then continue the backup", func(t *testing.T) {
+		backup := newBackupWithNoConditionsForReconcilerTest("ns", "backup")
 		fakeClient := newFakeClientBuilder(t).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		providerBackupStatusMock := newMockProviderBackupStatus(t)
-		providerBackupStatusMock.EXPECT().
-			hasFailed(mock.Anything).
-			Return(true)
 
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{}, providerBackupStatusMock)
-
-		nextAction, err := reconciler.ensureCompletedBackupIsIgnored(context.Background(), backup, logr.Discard())
-
-		assert.NoError(t, err)
-		assert.Equal(t, Abort, nextAction)
-	})
-
-	t.Run("If the backup has succeeded then abort", func(t *testing.T) {
-		t.Skip("TODO")
-		backup := newBackupForControllerTest("ns", "backup")
-		fakeClient := newFakeClientBuilder(t).Build()
-		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		providerBackupStatusMock := newMockProviderBackupStatus(t)
-		providerBackupStatusMock.EXPECT().
-			isCompleted(mock.Anything).
-			Return(true)
-
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{}, providerBackupStatusMock)
-
-		nextAction, err := reconciler.ensureCompletedBackupIsIgnored(context.Background(), backup, logr.Discard())
-
-		assert.NoError(t, err)
-		assert.Equal(t, Abort, nextAction)
-	})
-
-	t.Run("if the backup is in progress to the next step", func(t *testing.T) {
-		t.Skip("TODO")
-		backup := newBackupForControllerTest("ns", "backup")
-		fakeClient := newFakeClientBuilder(t).Build()
-		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		providerBackupStatusMock := newMockProviderBackupStatus(t)
-		providerBackupStatusMock.EXPECT().
-			isInProgress(mock.Anything).
-			Return(true)
-
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{}, providerBackupStatusMock)
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{}, nil)
 
 		nextAction, err := reconciler.ensureCompletedBackupIsIgnored(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 	})
+}
+
+func newBackupWithSucceededStatusForReconcilerTest(namespace string, name string, conditionStatus metav1.ConditionStatus) *backupv1.Backup {
+	return &backupv1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: backupv1.BackupSpec{
+			Provider: "velero",
+		},
+		Status: backupv1.BackupStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   backupv1.ConditionSucceeded,
+					Status: conditionStatus,
+					Reason: "aReason",
+				},
+			},
+		},
+	}
+}
+
+func newBackupWithNoConditionsForReconcilerTest(namespace string, name string) *backupv1.Backup {
+	return &backupv1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: backupv1.BackupSpec{
+			Provider: "velero",
+		},
+	}
 }

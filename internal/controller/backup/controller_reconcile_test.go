@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func TestControllerReconcile(t *testing.T) {
@@ -564,7 +565,7 @@ func TestControllerReconcile(t *testing.T) {
 
 }
 
-func newBackupForControllerTest(namespace string, name string) *backupv1.Backup {
+func newBackupForTest(namespace string, name string) *backupv1.Backup {
 	return &backupv1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -586,6 +587,15 @@ func newFakeClientBuilder(t *testing.T) *fake.ClientBuilder {
 	return fake.NewClientBuilder().WithScheme(scheme)
 }
 
+func newFakeClientBuilderWithCounter(t *testing.T, callCounter *callCounter) *fake.ClientBuilder {
+	return newFakeClientBuilder(t).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get:              callCounter.getCall,
+			SubResourcePatch: callCounter.subResourcePatchCall,
+			Create:           callCounter.createCall,
+		})
+}
+
 func newReconcilerRequest(namespace string, name string) ctrl.Request {
 	return ctrl.Request{NamespacedName: types.NamespacedName{
 		Namespace: namespace,
@@ -594,7 +604,7 @@ func newReconcilerRequest(namespace string, name string) ctrl.Request {
 }
 
 func newTestFixtureForControllerTest(t *testing.T) (*mockReconciler, *Controller) {
-	backup := newBackupForControllerTest("ns", "backup")
+	backup := newBackupForTest("ns", "backup")
 	fakeClient := newFakeClientBuilder(t).
 		WithObjects(backup).
 		Build()

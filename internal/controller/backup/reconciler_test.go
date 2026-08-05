@@ -1,8 +1,13 @@
 package backup
 
 import (
+	"context"
+	"reflect"
+
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func newVeleroBackupForReconcilerTest(namespace string, name string, phase velerov1.BackupPhase) *velerov1.Backup {
@@ -27,4 +32,45 @@ func newVeleroBackupStorageLocationForReconcilerTest(phase velerov1.BackupStorag
 			Phase: phase,
 		},
 	}
+}
+
+type callCounter struct {
+	configMapGetCount         int
+	veleroBackupGetCount      int
+	veleroBackupCreateCount   int
+	subResourcePatchCount     int
+	subResourcePatchCallError error
+	getCallError              error
+	createCallError           error
+}
+
+func (c *callCounter) getCall(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if c.getCallError != nil {
+		return c.getCallError
+	}
+	if reflect.TypeOf(obj) == reflect.TypeFor[*corev1.ConfigMap]() {
+		c.configMapGetCount++
+	}
+	if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.Backup]() {
+		c.veleroBackupGetCount++
+	}
+	return client.Get(ctx, key, obj, opts...)
+}
+
+func (c *callCounter) subResourcePatchCall(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	if c.subResourcePatchCallError != nil {
+		return c.subResourcePatchCallError
+	}
+	c.subResourcePatchCount++
+	return client.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+}
+
+func (c *callCounter) createCall(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+	if c.createCallError != nil {
+		return c.createCallError
+	}
+	if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.Backup]() {
+		c.veleroBackupCreateCount++
+	}
+	return client.Create(ctx, obj, opts...)
 }

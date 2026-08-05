@@ -18,7 +18,7 @@ import (
 
 func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 	t.Run("If maintenance mode is active after the velero backup completed, deactivate it, set condition and proceed to the next step", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		var veleroBackupGetCallCount = 0
 		var patchCallCount = 0
@@ -64,7 +64,7 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 	})
 
 	t.Run("Abort if the maintenance mode check failed", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup, veleroBackup).
@@ -84,7 +84,7 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 	})
 
 	t.Run("Abort if retrieving the Velero backup resource fails", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup, veleroBackup).
@@ -109,7 +109,7 @@ func TestReconcilerCheckMaintenanceModeNotActiveAfterBackup(t *testing.T) {
 	})
 
 	t.Run("Abort if patching the status fails.", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup, veleroBackup).
