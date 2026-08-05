@@ -9,9 +9,10 @@ import (
 
 func TestValidate(t *testing.T) {
 	tests := []struct {
-		name     string
-		schedule string
-		wantErr  bool
+		name       string
+		schedule   string
+		wantErr    bool
+		wantErrMsg string
 	}{
 		{
 			name:     "valid schedule",
@@ -22,6 +23,11 @@ func TestValidate(t *testing.T) {
 			name:     "invalid text",
 			schedule: "this-is not-a-cron-expression",
 			wantErr:  true,
+		},
+		{
+			name:       "empty schedule",
+			wantErr:    true,
+			wantErrMsg: "schedule must not be empty",
 		},
 	}
 
@@ -39,6 +45,9 @@ func TestValidate(t *testing.T) {
 
 			if tt.wantErr {
 				require.Error(t, err)
+				if tt.wantErrMsg != "" {
+					require.EqualError(t, err, tt.wantErrMsg)
+				}
 			} else {
 				require.NoError(t, err)
 			}

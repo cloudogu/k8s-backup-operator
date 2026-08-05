@@ -247,6 +247,15 @@ func Test_reconcileDelete(t *testing.T) {
 	}
 }
 
+func Test_patchStatus_doesNotPatchUnchangedStatus(t *testing.T) {
+	schedule := &backupv1.BackupSchedule{}
+	reconciler := &defaultReconciler{}
+
+	err := reconciler.patchStatus(testCtx, schedule.DeepCopy(), schedule.DeepCopy())
+
+	require.NoError(t, err)
+}
+
 func Test_mainRecocileLoop(t *testing.T) {
 	deletionTimestamp := metav1.Now()
 	tests := []struct {
