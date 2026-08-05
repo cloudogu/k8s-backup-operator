@@ -9,6 +9,7 @@ import (
 	"time"
 
 	restorecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/restore"
+	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scale"
@@ -36,7 +37,6 @@ import (
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
-	"github.com/cloudogu/k8s-backup-operator/pkg/backupschedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
@@ -348,7 +348,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create backup controller: %w", err)
 	}
 
-	if err = backupschedule.NewReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler, imageConfig, operatorConfig.ImagePullSecrets).SetupWithManager(k8sManager); err != nil {
+	if err = schedulecontroller.NewController(k8sClient, operatorImage, operatorConfig.ImagePullSecrets).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backupSchedule controller: %w", err)
 	}
 	// +kubebuilder:scaffold:builder
