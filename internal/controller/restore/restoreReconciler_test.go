@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -32,7 +31,7 @@ var testRestore = "test-restore"
 func TestNewRestoreReconciler(t *testing.T) {
 	t.Run("should create restore reconciler", func(t *testing.T) {
 		// when
-		actual := NewRestoreReconciler(nil, nil, "default", nil, nil, nil)
+		actual := NewRestoreReconciler(nil, nil, "default", nil, nil)
 
 		// then
 		assert.NotNil(t, actual)
@@ -60,59 +59,6 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.Equal(t, ctrl.Result{}, actual)
-	})
-
-	t.Run("deletion tests", func(t *testing.T) {
-		t.Run("should retry on deletion error", func(t *testing.T) {
-			// given
-			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := deletedRestore()
-
-			managerMock := newMockRestoreManager(t)
-			managerMock.EXPECT().delete(testCtx, matchesRestoreNamed(testRestore)).Return(assert.AnError)
-			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, v1.DeleteEventReason, "Delete failed. Reason: assert.AnError general error for testing").Return()
-
-			sut := &restoreReconciler{
-				namespace: testNamespace,
-				k8sClient: newTestClient(t, interceptor.Funcs{}, restore),
-				manager:   managerMock,
-				recorder:  recorderMock,
-			}
-
-			// when
-			actual, err := sut.Reconcile(testCtx, request)
-
-			// then
-			require.Error(t, err)
-			assert.ErrorIs(t, err, assert.AnError)
-			assert.ErrorContains(t, err, "Delete of restore test-restore failed")
-			assert.Equal(t, ctrl.Result{}, actual)
-		})
-		t.Run("should succeed with delete", func(t *testing.T) {
-			// given
-			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := deletedRestore()
-
-			managerMock := newMockRestoreManager(t)
-			managerMock.EXPECT().delete(testCtx, matchesRestoreNamed(testRestore)).Return(nil)
-			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, v1.DeleteEventReason, "Delete successful").Return()
-
-			sut := &restoreReconciler{
-				namespace: testNamespace,
-				k8sClient: newTestClient(t, interceptor.Funcs{}, restore),
-				manager:   managerMock,
-				recorder:  recorderMock,
-			}
-
-			// when
-			actual, err := sut.Reconcile(testCtx, request)
-
-			// then
-			require.NoError(t, err)
-			assert.Equal(t, ctrl.Result{}, actual)
-		})
 	})
 
 	t.Run("ignore tests", func(t *testing.T) {

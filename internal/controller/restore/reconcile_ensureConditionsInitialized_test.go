@@ -32,7 +32,7 @@ func TestTheFirstReconcileOfANewRestoreInitializesAllWorkflowConditions(t *testi
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		// no manager and no recorder: reaching the create operation would panic
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 	request := newRestoreRequest(testRestore)
@@ -63,7 +63,7 @@ func TestConditionInitializationDoesNotResetAResolvedCondition(t *testing.T) {
 	}}
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 	request := newRestoreRequest(testRestore)
@@ -89,7 +89,7 @@ func TestARestoreInterruptedAtAnUnknownOutcomeContinues(t *testing.T) {
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process").Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 
@@ -106,7 +106,7 @@ func TestALegacyRestoreWithAnUninterpretableStatusIsInitializedInstead(t *testin
 	restore.Status.Status = "some-unknown-status"
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 	request := newRestoreRequest(testRestore)
@@ -126,7 +126,7 @@ func TestAFailedConditionInitializationIsRetriedWithoutStartingTheRestore(t *tes
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		// The manager is nil, so a failing initialization must not reach any later stage.
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore)
 
