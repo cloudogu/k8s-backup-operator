@@ -100,20 +100,8 @@ func (m *DefaultManager) scaleDownDeployments(ctx context.Context, listOpts []cl
 	}
 
 	for _, deploy := range list.Items {
-		if _, alreadyScaled := deploy.Labels[labelScaledownReplicas]; alreadyScaled {
-			continue
-		}
-
-		var replicas int32
-		if deploy.Spec.Replicas != nil {
-			replicas = *deploy.Spec.Replicas
-		}
-
-		deploy.Labels[labelScaledownReplicas] = strconv.FormatInt(int64(replicas), 10)
-		deploy.Spec.Replicas = zeroReplicas()
-
-		if err := m.k8sClient.Update(ctx, &deploy); err != nil {
-			return fmt.Errorf("failed to scale down deployment %s: %w", deploy.Name, err)
+		if err := m.scaleDownWorkload(ctx, &deploy, &deploy.Spec.Replicas, "deployment"); err != nil {
+			return err
 		}
 	}
 
@@ -127,20 +115,8 @@ func (m *DefaultManager) scaleDownStatefulSets(ctx context.Context, listOpts []c
 	}
 
 	for _, sts := range list.Items {
-		if _, alreadyScaled := sts.Labels[labelScaledownReplicas]; alreadyScaled {
-			continue
-		}
-
-		var replicas int32
-		if sts.Spec.Replicas != nil {
-			replicas = *sts.Spec.Replicas
-		}
-
-		sts.Labels[labelScaledownReplicas] = strconv.FormatInt(int64(replicas), 10)
-		sts.Spec.Replicas = zeroReplicas()
-
-		if err := m.k8sClient.Update(ctx, &sts); err != nil {
-			return fmt.Errorf("failed to scale down statefulset %s: %w", sts.Name, err)
+		if err := m.scaleDownWorkload(ctx, &sts, &sts.Spec.Replicas, "statefulset"); err != nil {
+			return err
 		}
 	}
 
@@ -161,20 +137,8 @@ func (m *DefaultManager) scaleDownReplicaSets(ctx context.Context, listOpts []cl
 			continue
 		}
 
-		if _, alreadyScaled := rs.Labels[labelScaledownReplicas]; alreadyScaled {
-			continue
-		}
-
-		var replicas int32
-		if rs.Spec.Replicas != nil {
-			replicas = *rs.Spec.Replicas
-		}
-
-		rs.Labels[labelScaledownReplicas] = strconv.FormatInt(int64(replicas), 10)
-		rs.Spec.Replicas = zeroReplicas()
-
-		if err := m.k8sClient.Update(ctx, &rs); err != nil {
-			return fmt.Errorf("failed to scale down replicaset %s: %w", rs.Name, err)
+		if err := m.scaleDownWorkload(ctx, &rs, &rs.Spec.Replicas, "replicaset"); err != nil {
+			return err
 		}
 	}
 
@@ -188,20 +152,8 @@ func (m *DefaultManager) scaleDownReplicationControllers(ctx context.Context, li
 	}
 
 	for _, rc := range list.Items {
-		if _, alreadyScaled := rc.Labels[labelScaledownReplicas]; alreadyScaled {
-			continue
-		}
-
-		var replicas int32
-		if rc.Spec.Replicas != nil {
-			replicas = *rc.Spec.Replicas
-		}
-
-		rc.Labels[labelScaledownReplicas] = strconv.FormatInt(int64(replicas), 10)
-		rc.Spec.Replicas = zeroReplicas()
-
-		if err := m.k8sClient.Update(ctx, &rc); err != nil {
-			return fmt.Errorf("failed to scale down replicationcontroller %s: %w", rc.Name, err)
+		if err := m.scaleDownWorkload(ctx, &rc, &rc.Spec.Replicas, "replicationcontroller"); err != nil {
+			return err
 		}
 	}
 
@@ -215,25 +167,8 @@ func (m *DefaultManager) scaleUpDeployments(ctx context.Context, listOpts []clie
 	}
 
 	for _, deploy := range list.Items {
-		replicaStr, exists := deploy.Labels[labelScaledownReplicas]
-		if !exists {
-			continue
-		}
-
-		replicas, err := strconv.ParseInt(replicaStr, 10, 32)
-		if err != nil {
-			return fmt.Errorf("failed to parse stored replica count for deployment %s: %w", deploy.Name, err)
-		}
-
-		targetReplicas := int32(replicas)
-		if deploy.Spec.Replicas != nil && *deploy.Spec.Replicas == targetReplicas {
-			continue
-		}
-
-		deploy.Spec.Replicas = new(targetReplicas)
-
-		if lErr := m.k8sClient.Update(ctx, &deploy); lErr != nil {
-			return fmt.Errorf("failed to scale up deployment %s: %w", deploy.Name, lErr)
+		if err := m.scaleUpWorkload(ctx, &deploy, &deploy.Spec.Replicas, "deployment"); err != nil {
+			return err
 		}
 	}
 
@@ -247,25 +182,8 @@ func (m *DefaultManager) scaleUpStatefulSets(ctx context.Context, listOpts []cli
 	}
 
 	for _, sts := range list.Items {
-		replicaStr, exists := sts.Labels[labelScaledownReplicas]
-		if !exists {
-			continue
-		}
-
-		replicas, err := strconv.ParseInt(replicaStr, 10, 32)
-		if err != nil {
-			return fmt.Errorf("failed to parse stored replica count for statefulset %s: %w", sts.Name, err)
-		}
-
-		targetReplicas := int32(replicas)
-		if sts.Spec.Replicas != nil && *sts.Spec.Replicas == targetReplicas {
-			continue
-		}
-
-		sts.Spec.Replicas = new(targetReplicas)
-
-		if lErr := m.k8sClient.Update(ctx, &sts); lErr != nil {
-			return fmt.Errorf("failed to scale up statefulset %s: %w", sts.Name, lErr)
+		if err := m.scaleUpWorkload(ctx, &sts, &sts.Spec.Replicas, "statefulset"); err != nil {
+			return err
 		}
 	}
 
@@ -279,25 +197,8 @@ func (m *DefaultManager) scaleUpReplicaSets(ctx context.Context, listOpts []clie
 	}
 
 	for _, rs := range list.Items {
-		replicaStr, exists := rs.Labels[labelScaledownReplicas]
-		if !exists {
-			continue
-		}
-
-		replicas, err := strconv.ParseInt(replicaStr, 10, 32)
-		if err != nil {
-			return fmt.Errorf("failed to parse stored replica count for replicaset %s: %w", rs.Name, err)
-		}
-
-		targetReplicas := int32(replicas)
-		if rs.Spec.Replicas != nil && *rs.Spec.Replicas == targetReplicas {
-			continue
-		}
-
-		rs.Spec.Replicas = new(targetReplicas)
-
-		if lErr := m.k8sClient.Update(ctx, &rs); lErr != nil {
-			return fmt.Errorf("failed to scale up replicaset %s: %w", rs.Name, lErr)
+		if err := m.scaleUpWorkload(ctx, &rs, &rs.Spec.Replicas, "replicaset"); err != nil {
+			return err
 		}
 	}
 
@@ -311,25 +212,8 @@ func (m *DefaultManager) scaleUpReplicationControllers(ctx context.Context, list
 	}
 
 	for _, rc := range list.Items {
-		replicaStr, exists := rc.Labels[labelScaledownReplicas]
-		if !exists {
-			continue
-		}
-
-		replicas, err := strconv.ParseInt(replicaStr, 10, 32)
-		if err != nil {
-			return fmt.Errorf("failed to parse stored replica count for replicationcontroller %s: %w", rc.Name, err)
-		}
-
-		targetReplicas := int32(replicas)
-		if rc.Spec.Replicas != nil && *rc.Spec.Replicas == targetReplicas {
-			continue
-		}
-
-		rc.Spec.Replicas = new(targetReplicas)
-
-		if lErr := m.k8sClient.Update(ctx, &rc); lErr != nil {
-			return fmt.Errorf("failed to scale up replicationcontroller %s: %w", rc.Name, lErr)
+		if err := m.scaleUpWorkload(ctx, &rc, &rc.Spec.Replicas, "replicationcontroller"); err != nil {
+			return err
 		}
 	}
 
@@ -543,17 +427,84 @@ func targetReplicasForReadiness(
 }
 
 func storedTargetReplicas(labels map[string]string, resourceKind string, resourceName string) (int32, error) {
-	replicaValue, exists := labels[labelScaledownReplicas]
+	replicas, exists, err := storedTargetReplicasIfPresent(labels, resourceKind, resourceName)
+	if err != nil {
+		return 0, err
+	}
 	if !exists {
 		return 0, fmt.Errorf("%s %s has no stored replica count", resourceKind, resourceName)
 	}
 
-	replicas, err := strconv.ParseInt(replicaValue, 10, 32)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse stored replica count for %s %s: %w", resourceKind, resourceName, err)
+	return replicas, nil
+}
+
+func storedTargetReplicasIfPresent(
+	labels map[string]string,
+	resourceKind string,
+	resourceName string,
+) (int32, bool, error) {
+	replicaValue, exists := labels[labelScaledownReplicas]
+	if !exists {
+		return 0, false, nil
 	}
 
-	return int32(replicas), nil
+	replicas, err := strconv.ParseInt(replicaValue, 10, 32)
+	if err != nil {
+		return 0, true, fmt.Errorf("failed to parse stored replica count for %s %s: %w", resourceKind, resourceName, err)
+	}
+
+	return int32(replicas), true, nil
+}
+
+func (m *DefaultManager) scaleUpWorkload(
+	ctx context.Context,
+	workload client.Object,
+	replicas **int32,
+	resourceKind string,
+) error {
+	targetReplicas, exists, err := storedTargetReplicasIfPresent(
+		workload.GetLabels(),
+		resourceKind,
+		workload.GetName(),
+	)
+	if err != nil || !exists {
+		return err
+	}
+	if *replicas != nil && **replicas == targetReplicas {
+		return nil
+	}
+
+	*replicas = new(targetReplicas)
+	if err := m.k8sClient.Update(ctx, workload); err != nil {
+		return fmt.Errorf("failed to scale up %s %s: %w", resourceKind, workload.GetName(), err)
+	}
+
+	return nil
+}
+
+func (m *DefaultManager) scaleDownWorkload(
+	ctx context.Context,
+	workload client.Object,
+	replicas **int32,
+	resourceKind string,
+) error {
+	if _, alreadyScaled := workload.GetLabels()[labelScaledownReplicas]; alreadyScaled {
+		return nil
+	}
+
+	var currentReplicas int32
+	if *replicas != nil {
+		currentReplicas = **replicas
+	}
+
+	workload.GetLabels()[labelScaledownReplicas] = strconv.FormatInt(int64(currentReplicas), 10)
+	*replicas = zeroReplicas()
+
+	if err := m.k8sClient.Update(ctx, workload); err != nil {
+		return fmt.Errorf("failed to scale down %s %s: %w", resourceKind, workload.GetName(), err)
+	}
+
+	return nil
 }
 
 func zeroReplicas() *int32 {

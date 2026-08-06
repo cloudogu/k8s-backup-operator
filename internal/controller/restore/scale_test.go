@@ -1118,6 +1118,41 @@ func TestDefaultManager_ScaleUp(t *testing.T) {
 	})
 }
 
+func TestStoredTargetReplicasIfPresent(t *testing.T) {
+	t.Run("returns absent target without error", func(t *testing.T) {
+		target, exists, err := storedTargetReplicasIfPresent(nil, "deployment", "test-deploy")
+
+		require.NoError(t, err)
+		assert.False(t, exists)
+		assert.Zero(t, target)
+	})
+
+	t.Run("returns stored target", func(t *testing.T) {
+		target, exists, err := storedTargetReplicasIfPresent(
+			map[string]string{labelScaledownReplicas: "3"},
+			"deployment",
+			"test-deploy",
+		)
+
+		require.NoError(t, err)
+		assert.True(t, exists)
+		assert.Equal(t, int32(3), target)
+	})
+
+	t.Run("reports malformed stored target", func(t *testing.T) {
+		target, exists, err := storedTargetReplicasIfPresent(
+			map[string]string{labelScaledownReplicas: "invalid"},
+			"deployment",
+			"test-deploy",
+		)
+
+		require.Error(t, err)
+		assert.True(t, exists)
+		assert.Zero(t, target)
+		assert.ErrorContains(t, err, "failed to parse stored replica count for deployment test-deploy")
+	})
+}
+
 func TestFinalizeScaleUpRemovesReplicaLabelsFromEverySupportedWorkload(t *testing.T) {
 	testClient := newTestClient(t, interceptor.Funcs{}, readyWorkloads()...)
 	manager := NewScaleManager(testClient, testNamespace)
