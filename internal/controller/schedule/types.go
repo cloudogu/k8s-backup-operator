@@ -1,16 +1,13 @@
 package schedule
 
 const (
-	AcceptedCondition      = "Accepted"
-	CronJobSyncedCondition = "CronJobSynced"
-	ReadyCondition         = "Ready"
-	DeletingCondition      = "Deleting"
+	AcceptedCondition = "Accepted"
+	ReadyCondition    = "Ready"
 )
 
 const (
 	ReasonValidSpec    = "ValidSpec"
 	ReasonInvalidSpec  = "InvalidSpec"
-	ReasonSynced       = "Synced"
 	ReasonSyncFailed   = "SyncFailed"
 	ReasonDeleting     = "Deleting"
 	ReasonNotEvaluated = "NotEvaluated"

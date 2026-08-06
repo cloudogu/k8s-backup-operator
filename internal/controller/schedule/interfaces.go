@@ -20,10 +20,8 @@ type ConditionManager interface {
 	MarkAccepted(schedule *backupv1.BackupSchedule)
 	MarkInvalid(schedule *backupv1.BackupSchedule, err error)
 	MarkAcceptanceNotEvaluated(schedule *backupv1.BackupSchedule, err error)
-	MarkCronJobSynced(schedule *backupv1.BackupSchedule)
-	MarkCronJobNotSynced(schedule *backupv1.BackupSchedule, err error)
-	MarkDeleting(schedule *backupv1.BackupSchedule)
-	ComputeReady(schedule *backupv1.BackupSchedule)
+	MarkReady(schedule *backupv1.BackupSchedule)
+	MarkNotReady(schedule *backupv1.BackupSchedule, reason, message string)
 }
 
 type MetadataManager interface {

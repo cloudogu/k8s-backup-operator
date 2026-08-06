@@ -256,6 +256,8 @@ spec:
 
 `ScaleUp` liest das temporäre Replica-Label und setzt `spec.replicas` wieder auf `3`. Das Label bleibt zunächst erhalten. Die Operation ist idempotent: Ist `spec.replicas` bereits korrekt, wird kein unnötiges Update geschrieben.
 
+Die für alle unterstützten Workload-Typen identische Scale-down-Logik (vorhandenes Label erkennen, Replikazahl speichern, auf null setzen und aktualisieren) wird zentral ausgeführt. Auch das optionale Lesen und Validieren des Replica-Labels beim Scale-up verwendet einen gemeinsamen Helfer. Lediglich das Auflisten der konkreten Kubernetes-Typen und deren typspezifische Readiness-Kriterien bleiben getrennt.
+
 `ensureScaleUpInitiated` ruft `ScaleUp` absichtlich **vor** der Condition-Prüfung auf. Beispiel für ein Crash-Fenster:
 
 1. Deployment A wurde bereits auf drei Replikas gesetzt.

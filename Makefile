@@ -100,5 +100,9 @@ acceptance-test: ## Run the cluster acceptance specs. DESTRUCTIVE - disposable c
 acceptance-test-restore: ## Run only the Restore acceptance specs. DESTRUCTIVE - disposable clusters only.
 	@$(MAKE) --no-print-directory acceptance-test GINKGO_LABEL_FILTER=restore
 
+.PHONY: acceptance-test-backupschedule
+acceptance-test-backupschedule: ## Run only the BackupSchedule acceptance specs.
+	@$(MAKE) --no-print-directory acceptance-test GINKGO_LABEL_FILTER=backupschedule
+
 test-env:
 	@echo ${K8S_TEST_CLUSTER_KUBECONFIG}
