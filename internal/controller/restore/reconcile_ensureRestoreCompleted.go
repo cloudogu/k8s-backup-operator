@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +39,6 @@ func (r *restoreReconciler) ensureRestoreCompleted(
 		return restore, retryOnError(fmt.Errorf("failed to persist the completed restore %s: %w", restore.Name, err))
 	}
 
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusCompleted) // NOSONAR -- legacy restore status compatibility
 	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Restore successful")
 
 	return updated, abort()

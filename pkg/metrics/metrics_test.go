@@ -6,6 +6,7 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestUpdateBackupReconcileTotalMetric(t *testing.T) {
@@ -73,11 +74,10 @@ func TestInitRestoreStatusMetrics(t *testing.T) {
 		RestoreStatusTransitionsTotal.Reset()
 
 		InitRestoreStatusMetrics(namespace, name, backupName)
+		InitRestoreStatusMetrics(namespace, name, backupName)
 
-		valNew := testutil.ToFloat64(RestoreStatusTransitionsTotal.WithLabelValues(namespace, name, v1.RestoreStatusNew, backupName))
-		assert.Equal(t, 1.0, valNew, "expected status '%s' to be 1", v1.RestoreStatusNew)
-
-		expectedZeroStatuses := []string{v1.RestoreStatusInProgress, v1.RestoreStatusCompleted, v1.RestoreStatusFailed, v1.RestoreStatusDeleting}
+		assert.Equal(t, 5, testutil.CollectAndCount(RestoreStatusTransitionsTotal))
+		expectedZeroStatuses := []string{v1.RestoreStatusNew, v1.RestoreStatusInProgress, v1.RestoreStatusCompleted, v1.RestoreStatusFailed, v1.RestoreStatusDeleting}
 		for _, status := range expectedZeroStatuses {
 			val := testutil.ToFloat64(RestoreStatusTransitionsTotal.WithLabelValues(namespace, name, status, backupName))
 			assert.Equal(t, 0.0, val, "expected status '%s' to be initialized to 0", status)
@@ -100,4 +100,63 @@ func TestUpdateRestoreStatusMetrics(t *testing.T) {
 		current := testutil.ToFloat64(counter)
 		assert.Equal(t, initial+1, current)
 	})
+}
+
+func TestInitRestoreConditionTransitionMetrics(t *testing.T) {
+	namespace := "test-ns"
+	name := "test-restore-conditions"
+	backupName := "source-backup"
+	RestoreConditionTransitionsTotal.Reset()
+
+	InitRestoreConditionTransitionMetrics(namespace, name, backupName)
+	InitRestoreConditionTransitionMetrics(namespace, name, backupName)
+
+	conditionTypes := []string{
+		v1.ConditionSuccessful,
+		v1.ConditionPrepared,
+		v1.ConditionProviderRestoreSuccessful,
+		v1.ConditionWorkloadsRecovered,
+		v1.ConditionBackupsSynchronized,
+	}
+	conditionStatuses := []metav1.ConditionStatus{
+		metav1.ConditionUnknown,
+		metav1.ConditionTrue,
+		metav1.ConditionFalse,
+	}
+
+	assert.Equal(t, 30, testutil.CollectAndCount(RestoreConditionTransitionsTotal))
+	for _, conditionType := range conditionTypes {
+		for _, from := range conditionStatuses {
+			for _, to := range conditionStatuses {
+				if from == to {
+					continue
+				}
+
+				counter := RestoreConditionTransitionsTotal.WithLabelValues(
+					namespace,
+					name,
+					backupName,
+					conditionType,
+					string(from),
+					string(to),
+				)
+				assert.Zero(t, testutil.ToFloat64(counter))
+			}
+		}
+	}
+}
+
+func TestUpdateRestoreConditionTransitionMetric(t *testing.T) {
+	namespace := "test-ns"
+	name := "test-restore-condition-update"
+	backupName := "source-backup"
+	conditionType := v1.ConditionPrepared
+	from := string(metav1.ConditionUnknown)
+	to := string(metav1.ConditionTrue)
+	RestoreConditionTransitionsTotal.Reset()
+
+	UpdateRestoreConditionTransitionMetric(namespace, name, backupName, conditionType, from, to)
+
+	counter := RestoreConditionTransitionsTotal.WithLabelValues(namespace, name, backupName, conditionType, from, to)
+	assert.Equal(t, 1.0, testutil.ToFloat64(counter))
 }

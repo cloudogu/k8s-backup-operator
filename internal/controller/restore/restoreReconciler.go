@@ -80,6 +80,11 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	logger.Info(fmt.Sprintf("found restore resource %s", req.NamespacedName))
 
+	// Init Metric timelines for conditions
+	// - no increment, just create if not exists
+	metrics.InitRestoreConditionTransitionMetrics(restore.Namespace, restore.Name, restore.Spec.BackupName)
+	metrics.InitRestoreStatusMetrics(restore.Namespace, restore.Name, restore.Spec.BackupName)
+
 	switch requiredOperation(restore) {
 	case operationDelete:
 		return runStages(
@@ -212,7 +217,6 @@ func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restor
 // a terminal failure, before any preparation ran.
 func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, restore *k8sv1.Restore, conflictErr error) (*k8sv1.Restore, stageOutcome) {
 	r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, conflictErr.Error())
-	metrics.InitRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName)
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
 		metav1.Condition{
@@ -231,8 +235,6 @@ func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, res
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to report the provider restore conflict of restore %s: %w", restore.Name, err))
 	}
-
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed) // NOSONAR -- legacy restore status compatibility
 
 	return updated, abort()
 }
@@ -335,8 +337,6 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 		return restore, next()
 	}
 
-	//TODO: Think about this again, initializer increments the new metric on every retry
-	metrics.InitRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName)
 	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process")
 
 	if _, err := velero.EnsureRestore(ctx, r.k8sClient, restore); err != nil {
@@ -351,8 +351,6 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 
 		return restore, retryOnError(fmt.Errorf("failed to start the provider restore of restore %s: %w", restore.Name, err))
 	}
-
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusInProgress) // NOSONAR -- legacy restore status compatibility
 
 	// The child's own events drive the next reconciliation; the delay is only the fallback.
 	return restore, retryAfter(defaultRequeueDelay)
@@ -445,8 +443,6 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to report the failed provider restore of restore %s: %w", restore.Name, err))
 	}
-
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed) // NOSONAR -- legacy restore status compatibility
 
 	return updated, abort()
 }

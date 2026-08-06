@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -23,6 +24,12 @@ type conditionUpdater struct {
 	client restoreStatusClient
 }
 
+type conditionTransition struct {
+	conditionType string
+	from          metav1.ConditionStatus
+	to            metav1.ConditionStatus
+}
+
 func newConditionUpdater(client restoreStatusClient) *conditionUpdater {
 	return &conditionUpdater{client: client}
 }
@@ -34,9 +41,15 @@ func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Res
 	current := restore
 	result := restore
 
+	var persistedTransitions []conditionTransition
+	var persistedLegacyStatus = ""
+
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		persistedTransitions = nil
+
 		desired := current.DeepCopy()
-		applyConditions(desired, conditions)
+		transitions := applyConditions(desired, conditions)
+		legacyStatusChanged := current.Status.Status != desired.Status.Status
 
 		if apiequality.Semantic.DeepEqual(current.Status, desired.Status) {
 			result = current
@@ -58,6 +71,11 @@ func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Res
 			return updateErr
 		}
 
+		// only count transition of successful update
+		persistedTransitions = transitions
+		if legacyStatusChanged {
+			persistedLegacyStatus = desired.Status.Status
+		}
 		// The client updated desired in place, so it now carries the persisted resource version.
 		result = desired
 
@@ -65,6 +83,26 @@ func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Res
 	})
 	if err != nil {
 		return restore, fmt.Errorf("failed to update status of restore %q: %w", restore.Name, err)
+	}
+
+	// Update metrics
+	for _, transition := range persistedTransitions {
+		metrics.UpdateRestoreConditionTransitionMetric(
+			result.Namespace,
+			result.Name,
+			result.Spec.BackupName,
+			transition.conditionType,
+			string(transition.from),
+			string(transition.to),
+		)
+	}
+	if persistedLegacyStatus != "" {
+		metrics.UpdateRestoreStatusMetrics(
+			result.Namespace,
+			result.Name,
+			result.Spec.BackupName,
+			persistedLegacyStatus,
+		)
 	}
 
 	return result, nil
@@ -88,11 +126,30 @@ func (u *conditionUpdater) setConditionsFromLegacyStatus(ctx context.Context, re
 
 // applyConditions merges the conditions into the status and keeps the deprecated scalar status in
 // sync.
-func applyConditions(restore *k8sv1.Restore, conditions []metav1.Condition) {
+func applyConditions(restore *k8sv1.Restore, conditions []metav1.Condition) []conditionTransition {
+	var transitions []conditionTransition
 	for _, condition := range conditions {
+		previous := meta.FindStatusCondition(
+			restore.Status.Conditions,
+			condition.Type,
+		)
+		var previousStatus metav1.ConditionStatus
+		hadPrevious := previous != nil
+		if hadPrevious {
+			previousStatus = previous.Status
+		}
 		condition.ObservedGeneration = restore.Generation
 		meta.SetStatusCondition(&restore.Status.Conditions, condition)
+
+		if hadPrevious && previousStatus != condition.Status {
+			transitions = append(transitions, conditionTransition{
+				conditionType: condition.Type,
+				from:          previousStatus,
+				to:            condition.Status,
+			})
+		}
 	}
 
 	restore.Status.Status = legacyStatusFor(restore) // NOSONAR -- legacy restore status compatibility
+	return transitions
 }

@@ -3,6 +3,7 @@ package metrics
 import (
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/prometheus/client_golang/prometheus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
@@ -32,11 +33,25 @@ var (
 		},
 		[]string{"namespace", "name", "to", "backup_name"},
 	)
+	RestoreConditionTransitionsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "restore_condition_transitions_total",
+			Help: "Number of persisted restore condition status transitions.",
+		},
+		[]string{
+			"namespace",
+			"name",
+			"backup_name",
+			"condition",
+			"from",
+			"to",
+		},
+	)
 )
 
 // RegisterMetrics registers custom metrics with the global prometheus registry
 func RegisterMetrics() {
-	metrics.Registry.MustRegister(BackupReconcileTotal, BackupStatusTransitionsTotal, RestoreReconcileTotal, RestoreStatusTransitionsTotal)
+	metrics.Registry.MustRegister(BackupReconcileTotal, BackupStatusTransitionsTotal, RestoreReconcileTotal, RestoreStatusTransitionsTotal, RestoreConditionTransitionsTotal)
 }
 
 // ### Backup ###
@@ -74,12 +89,50 @@ func UpdateRestoreStatusMetrics(namespace, name, backupName, newStatus string) {
 // InitRestoreStatusMetrics initializes the metrics for a restore resource
 func InitRestoreStatusMetrics(namespace, name, backupName string) {
 	// all status values need to be initialized to 0 to monitor status increases
-	restoreStatuses := []string{v1.RestoreStatusInProgress, v1.RestoreStatusCompleted, v1.RestoreStatusFailed, v1.RestoreStatusDeleting} // NOSONAR -- legacy restore status compatibility
+	restoreStatuses := []string{v1.RestoreStatusNew, v1.RestoreStatusInProgress, v1.RestoreStatusCompleted, v1.RestoreStatusFailed, v1.RestoreStatusDeleting} // NOSONAR -- legacy restore status compatibility
 	for _, status := range restoreStatuses {
 		RestoreStatusTransitionsTotal.WithLabelValues(namespace, name, status, backupName).Add(0)
 	}
+}
 
-	UpdateRestoreStatusMetrics(namespace, name, backupName, v1.RestoreStatusNew) // NOSONAR -- legacy restore status compatibility
+// InitRestoreConditionTransitionMetrics initializes every possible status transition for all restore conditions.
+func InitRestoreConditionTransitionMetrics(namespace, name, backupName string) {
+	conditionTypes := []string{
+		v1.ConditionSuccessful,
+		v1.ConditionPrepared,
+		v1.ConditionProviderRestoreSuccessful,
+		v1.ConditionWorkloadsRecovered,
+		v1.ConditionBackupsSynchronized,
+	}
+	conditionStatuses := []metav1.ConditionStatus{
+		metav1.ConditionUnknown,
+		metav1.ConditionTrue,
+		metav1.ConditionFalse,
+	}
+
+	for _, conditionType := range conditionTypes {
+		for _, from := range conditionStatuses {
+			for _, to := range conditionStatuses {
+				if from == to {
+					continue
+				}
+
+				RestoreConditionTransitionsTotal.WithLabelValues(
+					namespace,
+					name,
+					backupName,
+					conditionType,
+					string(from),
+					string(to),
+				).Add(0)
+			}
+		}
+	}
+}
+
+// UpdateRestoreConditionTransitionMetric increments the metric for a persisted restore condition status transition.
+func UpdateRestoreConditionTransitionMetric(namespace, name, backupName, conditionType, from, to string) {
+	RestoreConditionTransitionsTotal.WithLabelValues(namespace, name, backupName, conditionType, from, to).Inc()
 }
 
 // UpdateRestoreReconcileTotalMetric increments the metric for the total number of reconciles of the restore resource

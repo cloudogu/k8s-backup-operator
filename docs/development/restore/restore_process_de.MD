@@ -102,6 +102,33 @@ Jeder neue, laufende Restore erhält zunächst diese fünf Conditions mit `Statu
 
 Eine vorhandene Condition wird bei der Initialisierung nicht auf `Unknown` zurückgesetzt. Das ist wichtig, wenn ein Status-Write erfolgreich war, der Prozess aber unmittelbar danach abstürzt.
 
+### Metrik für Condition-Übergänge
+
+Persistierte Änderungen des Status einer Restore-Condition werden mit dem Counter `restore_condition_transitions_total` erfasst. Die Metric verwendet folgende Labels:
+
+| Label | Bedeutung |
+|---|---|
+| `namespace` | Namespace des Restore. |
+| `name` | Name des Restore. |
+| `backup_name` | Name des wiederhergestellten Backups. |
+| `condition` | Typ der geänderten Condition, beispielsweise `Prepared`. |
+| `from` | Vorheriger Condition-Status: `Unknown`, `True` oder `False`. |
+| `to` | Neuer Condition-Status: `Unknown`, `True` oder `False`. |
+
+Gezählt wird ausschließlich eine tatsächliche Statusänderung einer bereits vorhandenen Condition, beispielsweise `Prepared: Unknown -> True`. Änderungen an `Reason`, `Message` oder `ObservedGeneration` bei unverändertem Status erhöhen den Counter nicht. Auch das erstmalige Anlegen einer Condition als `Unknown` gilt nicht als Übergang.
+
+Der `conditionUpdater` erhöht die Metric erst nach einem erfolgreichen Status-Write. Fehlgeschlagene Updates und verworfene Conflict-Versuche werden daher nicht gezählt. Nach einem Conflict werden die Übergänge gegen den neu gelesenen Restore-Status erneut bestimmt.
+
+Nach dem erfolgreichen Lesen eines Restore initialisiert jeder Reconcile alle sechs möglichen Wechsel zwischen `Unknown`, `True` und `False` für die fünf Workflow-Conditions mit `Add(0)`. Wiederholte Initialisierungen verändern die Counter nicht; sie sorgen lediglich dafür, dass noch nicht beobachtete Übergänge als Null-Zeitreihen verfügbar sind. Pro Restore entstehen dadurch 30 Zeitreihen. Wie alle Prometheus-Counter beginnen sie nach einem Neustart des Operators erneut bei null.
+
+Eine beispielhafte Abfrage für erfolgreich erreichte Meilensteine lautet:
+
+```promql
+sum by (condition) (
+  increase(restore_condition_transitions_total{from="Unknown", to="True"}[1h])
+)
+```
+
 ### Übersicht als Zustandsdiagramm
 
 ```mermaid
