@@ -11,12 +11,11 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/record"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/config"
@@ -402,6 +401,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetCache().Return(nil)
 		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
 		ctrlManMock.EXPECT().AddHealthzCheck("healthz", mock.Anything).Return(assert.AnError)
+		ctrlManMock.EXPECT().GetClient().Return(nil)
 
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return ctrlManMock, nil
@@ -481,6 +481,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
 		ctrlManMock.EXPECT().AddHealthzCheck("healthz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().AddReadyzCheck("readyz", mock.Anything).Return(assert.AnError)
+		ctrlManMock.EXPECT().GetClient().Return(nil)
 
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return ctrlManMock, nil
@@ -557,6 +558,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
 		ctrlManMock.EXPECT().AddHealthzCheck("healthz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().AddReadyzCheck("readyz", mock.Anything).Return(nil)
+		ctrlManMock.EXPECT().GetClient().Return(nil)
 		ctrlManMock.EXPECT().Start(mock.Anything).Return(assert.AnError)
 
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -636,6 +638,8 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
 		ctrlManMock.EXPECT().AddHealthzCheck("healthz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().AddReadyzCheck("readyz", mock.Anything).Return(nil)
+		ctrlManMock.EXPECT().GetClient().Return(nil)
+
 		ctrlManMock.EXPECT().Start(mock.Anything).Return(nil)
 
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {

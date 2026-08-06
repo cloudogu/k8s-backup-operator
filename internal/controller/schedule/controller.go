@@ -5,6 +5,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -12,6 +13,14 @@ import (
 type Controller struct {
 	client     client.Client
 	reconciler reconciler
+}
+
+// NewController creates a BackupSchedule controller backed by the default reconciler.
+func NewController(client client.Client, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *Controller {
+	return &Controller{
+		client:     client,
+		reconciler: NewReconciler(client, operatorImage, imagePullSecrets),
+	}
 }
 
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

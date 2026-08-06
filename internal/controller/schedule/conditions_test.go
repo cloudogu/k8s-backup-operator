@@ -6,6 +6,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -13,184 +14,62 @@ import (
 func TestMarkAccepted(t *testing.T) {
 	manager := conditionManager{}
 	schedule := newBackupSchedule()
-	schedule.Generation = 42
 
 	manager.MarkAccepted(schedule)
 
-	c := getCondition(t, schedule, AcceptedCondition)
-
-	assert.Equal(t, metav1.ConditionTrue, c.Status)
-	assert.Equal(t, "Backup schedule accepted", c.Message)
+	condition := getCondition(t, schedule, AcceptedCondition)
+	assert.Equal(t, metav1.ConditionTrue, condition.Status)
+	assert.Equal(t, ReasonValidSpec, condition.Reason)
+	assert.Equal(t, "Backup schedule accepted", condition.Message)
 }
 
 func TestMarkInvalid(t *testing.T) {
 	manager := conditionManager{}
 	schedule := newBackupSchedule()
 
-	manager.MarkInvalid(schedule, errors.New("invalid cron expresssion"))
+	manager.MarkInvalid(schedule, errors.New("invalid cron expression"))
 
-	c := getCondition(t, schedule, AcceptedCondition)
-
-	assert.Equal(t, metav1.ConditionFalse, c.Status)
-	assert.Equal(t, "invalid cron expresssion", c.Message)
+	condition := getCondition(t, schedule, AcceptedCondition)
+	assert.Equal(t, metav1.ConditionFalse, condition.Status)
+	assert.Equal(t, ReasonInvalidSpec, condition.Reason)
+	assert.Equal(t, "invalid cron expression", condition.Message)
 }
 
-func TestMarkCronJobSynced(t *testing.T) {
+func TestMarkAcceptanceNotEvaluated(t *testing.T) {
 	manager := conditionManager{}
 	schedule := newBackupSchedule()
 
-	manager.MarkCronJobSynced(schedule)
+	manager.MarkAcceptanceNotEvaluated(schedule, errors.New("metadata failed"))
 
-	c := getCondition(t, schedule, CronJobSyncedCondition)
-
-	assert.Equal(t, metav1.ConditionTrue, c.Status)
-	assert.Equal(t, "CronJob synced", c.Message)
+	condition := getCondition(t, schedule, AcceptedCondition)
+	assert.Equal(t, metav1.ConditionUnknown, condition.Status)
+	assert.Equal(t, ReasonNotEvaluated, condition.Reason)
+	assert.Contains(t, condition.Message, "metadata failed")
 }
 
-func TestMarkCronJobNotSynced(t *testing.T) {
+func TestMarkReady(t *testing.T) {
 	manager := conditionManager{}
 	schedule := newBackupSchedule()
 
-	manager.MarkCronJobNotSynced(schedule, errors.New("could not sync"))
+	manager.MarkReady(schedule)
 
-	c := getCondition(t, schedule, CronJobSyncedCondition)
-
-	assert.Equal(t, metav1.ConditionFalse, c.Status)
-	assert.Equal(t, "could not sync", c.Message)
+	condition := getCondition(t, schedule, ReadyCondition)
+	assert.Equal(t, metav1.ConditionTrue, condition.Status)
+	assert.Equal(t, ReasonReady, condition.Reason)
+	assert.Equal(t, "BackupSchedule is ready.", condition.Message)
 }
 
-func TestMarkDeleting(t *testing.T) {
+func TestMarkNotReady(t *testing.T) {
 	manager := conditionManager{}
 	schedule := newBackupSchedule()
 
-	manager.MarkDeleting(schedule)
+	manager.MarkNotReady(schedule, ReasonSyncFailed, "CronJob synchronization failed")
 
-	c := getCondition(t, schedule, DeletingCondition)
-
-	assert.Equal(t, metav1.ConditionTrue, c.Status)
-	assert.Equal(t, "Backup schedule is being deleted", c.Message)
+	condition := getCondition(t, schedule, ReadyCondition)
+	assert.Equal(t, metav1.ConditionFalse, condition.Status)
+	assert.Equal(t, ReasonSyncFailed, condition.Reason)
+	assert.Equal(t, "CronJob synchronization failed", condition.Message)
 }
-
-func TestComputeReadyWithEvaluatedConditions(t *testing.T) {
-	tests := []struct {
-		name           string
-		accepted       bool
-		synced         bool
-		deleting       bool
-		expectedReady  metav1.ConditionStatus
-		expectedReason string
-	}{
-		{
-			name:           "ready",
-			accepted:       true,
-			synced:         true,
-			expectedReady:  metav1.ConditionTrue,
-			expectedReason: ReasonReady,
-		},
-		{
-			name:           "invalid",
-			synced:         true,
-			expectedReady:  metav1.ConditionFalse,
-			expectedReason: ReasonInvalidSpec,
-		},
-		{
-			name:           "not synced",
-			accepted:       true,
-			expectedReady:  metav1.ConditionFalse,
-			expectedReason: ReasonSyncFailed,
-		},
-		{
-			name:           "deleting",
-			accepted:       true,
-			synced:         true,
-			deleting:       true,
-			expectedReady:  metav1.ConditionFalse,
-			expectedReason: ReasonDeleting,
-		},
-	}
-
-	manager := conditionManager{}
-
-	for _, tt := range tests {
-
-		t.Run(tt.name, func(t *testing.T) {
-			schedule := newBackupSchedule()
-
-			if tt.accepted {
-				manager.MarkAccepted(schedule)
-			} else {
-				manager.MarkInvalid(schedule, errors.New("boom"))
-			}
-
-			if tt.synced {
-				manager.MarkCronJobSynced(schedule)
-			} else {
-				manager.MarkCronJobNotSynced(schedule, errors.New("boom"))
-			}
-
-			if tt.deleting {
-				manager.MarkDeleting(schedule)
-			}
-
-			manager.ComputeReady(schedule)
-
-			ready := getCondition(t, schedule, ReadyCondition)
-
-			assert.Equal(t, tt.expectedReady, ready.Status)
-			assert.Equal(t, tt.expectedReason, ready.Reason)
-		})
-	}
-}
-
-func TestComputeReadyWithUnevaluatedPrerequisites(t *testing.T) {
-	tests := []struct {
-		name            string
-		conditions      []metav1.Condition
-		expectedMessage string
-	}{
-		{name: "no conditions", expectedMessage: "BackupSchedule spec has not been evaluated."},
-		{
-			name: "accepted condition unknown",
-			conditions: []metav1.Condition{
-				{Type: AcceptedCondition, Status: metav1.ConditionUnknown, Reason: ReasonNotEvaluated},
-			},
-			expectedMessage: "BackupSchedule spec has not been evaluated.",
-		},
-		{
-			name: "cronjob condition missing",
-			conditions: []metav1.Condition{
-				{Type: AcceptedCondition, Status: metav1.ConditionTrue, Reason: ReasonValidSpec},
-			},
-			expectedMessage: "CronJob synchronization has not been evaluated.",
-		},
-		{
-			name: "cronjob condition unknown",
-			conditions: []metav1.Condition{
-				{Type: AcceptedCondition, Status: metav1.ConditionTrue, Reason: ReasonValidSpec},
-				{Type: CronJobSyncedCondition, Status: metav1.ConditionUnknown, Reason: ReasonNotEvaluated},
-			},
-			expectedMessage: "CronJob synchronization has not been evaluated.",
-		},
-	}
-
-	manager := conditionManager{}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			schedule := newBackupSchedule()
-			schedule.Status.Conditions = tt.conditions
-
-			manager.ComputeReady(schedule)
-
-			ready := getCondition(t, schedule, ReadyCondition)
-			assert.Equal(t, metav1.ConditionUnknown, ready.Status)
-			assert.Equal(t, ReasonNotEvaluated, ready.Reason)
-			assert.Equal(t, tt.expectedMessage, ready.Message)
-		})
-	}
-}
-
-// --------------------------- helpers
 
 func newBackupSchedule() *backupv1.BackupSchedule {
 	return &backupv1.BackupSchedule{}
@@ -200,10 +79,6 @@ func getCondition(t *testing.T, schedule *backupv1.BackupSchedule, conditionName
 	t.Helper()
 
 	condition := meta.FindStatusCondition(schedule.Status.Conditions, conditionName)
-
-	if condition == nil {
-		t.Fatalf("condition was nil, expectedFinalizerAfter %s condition", conditionName)
-	}
-
+	require.NotNil(t, condition)
 	return condition
 }

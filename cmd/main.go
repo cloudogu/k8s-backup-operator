@@ -8,11 +8,13 @@ import (
 	"os"
 	"time"
 
+	backup2 "github.com/cloudogu/k8s-backup-operator/internal/controller/backup"
 	restorecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/restore"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,7 +36,6 @@ import (
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
-	"github.com/cloudogu/k8s-backup-operator/pkg/backup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/backupschedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
@@ -76,6 +77,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(k8sv1.AddToScheme(scheme))
 	utilruntime.Must(velerov1.AddToScheme(scheme))
+	utilruntime.Must(blueprintv3.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -282,13 +284,6 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
 	}
 
-	blueprintClientSet, err := blueprintv3.NewClientSet(k8sManager.GetConfig(), k8sClientSet)
-	if err != nil {
-		return fmt.Errorf("unable to create blueprint clientset: %w", err)
-	}
-
-	blueprintClient := blueprintClientSet.EcosystemV1Alpha1().Blueprints(operatorConfig.Namespace)
-
 	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create dogu client: %w", err)
@@ -336,15 +331,29 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create restore controller: %w", err)
 	}
 
-	backupManager := backup.NewBackupManager(k8sClient, ecosystemClientSet, blueprintClient, operatorConfig.Namespace, recorder, configGetter)
-	if err = (backup.NewBackupReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, backupManager, requeueHandler, configGetter)).SetupWithManager(k8sManager); err != nil {
-		return fmt.Errorf("unable to create backup controller: %w", err)
+	err = configureBackupReconcilers(k8sManager, operatorConfig.Namespace)
+	if err != nil {
+		return fmt.Errorf("error setting up backup controller with manager: %w", err)
 	}
 
 	if err = backupschedule.NewReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler, imageConfig, operatorConfig.ImagePullSecrets).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backupSchedule controller: %w", err)
 	}
 	// +kubebuilder:scaffold:builder
+
+	return nil
+}
+
+func configureBackupReconcilers(k8sManager controllerManager, namespace string) error {
+	k8sClient := k8sManager.GetClient()
+	maintenanceModeAdapter := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
+	maintenanceGateway := backup2.NewMaintenanceGateway(maintenanceModeAdapter)
+	backupReconciler := backup2.NewReconciler(k8sClient, maintenanceGateway, backup2.DefaultClock{})
+	backupController := backup2.NewController(k8sClient, backupReconciler)
+	err := backupController.SetupWithManager(k8sManager)
+	if err != nil {
+		return fmt.Errorf("error setting up backup controller with manager: %w", err)
+	}
 
 	return nil
 }

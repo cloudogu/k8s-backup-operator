@@ -13,6 +13,7 @@ rules:
   - backupstoragelocations
   verbs:
   - get
+  - watch
 - apiGroups:
   - velero.io
   resources:
