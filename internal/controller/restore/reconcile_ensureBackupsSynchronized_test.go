@@ -27,7 +27,7 @@ func TestBackupSynchronizationPersistsItsMilestoneWithoutRecoveringTheWorkloads(
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		// no scale manager - recovering the workloads in the same reconciliation would panic
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedChildInPhase(restore, velerov1.RestorePhaseCompleted))
 
@@ -48,7 +48,7 @@ func TestARestoreWithSynchronizedBackupsIsNotSynchronizedAgain(t *testing.T) {
 	installProvider(t, newMockRestoreProvider(t))
 
 	writes := &clientWrites{}
-	reconciler := NewRestoreReconciler(newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, nil, nil)
+	reconciler := NewRestoreReconciler(newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, nil)
 
 	updated, outcome := reconciler.ensureBackupsSynchronized(testCtx, restore)
 
@@ -68,7 +68,7 @@ func TestAFailedBackupSynchronizationReportsItsMilestoneFalseAndRetries(t *testi
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		// no scale manager - the workloads must not be recovered after a failed synchronization
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedChildInPhase(restore, velerov1.RestorePhaseCompleted))
 
@@ -89,7 +89,7 @@ func TestAnUnreachableProviderDefersTheBackupSynchronization(t *testing.T) {
 
 	writes := &clientWrites{}
 	// no scale manager and no recorder - nothing but the provider lookup may happen
-	reconciler := NewRestoreReconciler(newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, nil, nil)
+	reconciler := NewRestoreReconciler(newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, nil)
 
 	updated, outcome := reconciler.ensureBackupsSynchronized(testCtx, restore)
 
@@ -107,7 +107,7 @@ func TestAnUnpersistableBackupSynchronizationMilestoneIsRetried(t *testing.T) {
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		// no scale manager - the workflow must not continue with an unpersisted milestone
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, ownedChildInPhase(restore, velerov1.RestorePhaseCompleted))
 

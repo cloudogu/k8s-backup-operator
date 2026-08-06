@@ -43,7 +43,7 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, cleanupMock, scaleMock)
+		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
@@ -67,7 +67,7 @@ func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testi
 
 	// The cleanup, scale and maintenance mocks carry no expectations, so any preparation step would fail.
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, newMockCleanupManager(t), newMockScaleManager(t))
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), newMockScaleManager(t))
 		reconciler.maintenanceModeSwitch = newMockMaintenanceModeSwitch(t)
 
 		return reconciler.Reconcile
@@ -119,7 +119,7 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, cleanupMock, scaleMock)
+		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
@@ -147,7 +147,7 @@ func TestAFailedScaleDownReportsPreparedFalseAndRetriesWithoutCleaningUp(t *test
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(assert.AnError).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, newMockCleanupManager(t), scaleMock)
+		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, newMockCleanupManager(t), scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
@@ -181,7 +181,7 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(assert.AnError).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, cleanupMock, scaleMock)
+		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
@@ -211,7 +211,7 @@ func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, cleanupMock, scaleMock)
+		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
@@ -232,7 +232,7 @@ func TestAnUnreadyProviderPreventsThePreparationWithoutTouchingTheEcosystem(t *t
 	recorderMock := newMockEventRecorder(t)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, newMockCleanupManager(t), newMockScaleManager(t))
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), newMockScaleManager(t))
 		reconciler.maintenanceModeSwitch = newMockMaintenanceModeSwitch(t)
 
 		return reconciler.Reconcile

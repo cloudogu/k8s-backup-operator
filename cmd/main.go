@@ -321,16 +321,10 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
 	scaleManager := scale.NewManager(k8sClient, operatorConfig.Namespace)
 
-	restoreManager := restorecontroller.NewRestoreManager(
-		k8sClient,
-		operatorConfig.Namespace,
-		recorder,
-	)
 	restoreReconciler := restorecontroller.NewRestoreReconciler(
 		k8sClient,
 		recorder,
 		operatorConfig.Namespace,
-		restoreManager,
 		cleanupManager,
 		scaleManager,
 	)
