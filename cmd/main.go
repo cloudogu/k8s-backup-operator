@@ -274,16 +274,46 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create k8s client: %w", err)
 	}
 
-	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
+	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient)
 	if err != nil {
-		return fmt.Errorf("unable to create k8s clientset: %w", err)
+		return fmt.Errorf("failed to sync backups with provider backups on startup: %w", err)
 	}
 
-	ecosystemClientSet, err := ecosystem.NewClientSet(k8sManager.GetConfig(), k8sClientSet)
+	err = configureRestoreReconcilers(k8sManager, k8sClient, operatorConfig.Namespace, recorder, operatorConfig)
 	if err != nil {
-		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
+		return fmt.Errorf("error setting up restore controller with manager: %w", err)
 	}
 
+	err = configureBackupReconcilers(k8sManager, operatorConfig.Namespace)
+	if err != nil {
+		return fmt.Errorf("error setting up backup controller with manager: %w", err)
+	}
+
+	err = configureBackupScheduleReconcilers(ctx, k8sManager, operatorConfig.Namespace, recorder, operatorConfig)
+	if err != nil {
+		return fmt.Errorf("error setting up backup schedule controller with manager: %w", err)
+	}
+
+	// +kubebuilder:scaffold:builder
+
+	return nil
+}
+
+func configureBackupReconcilers(k8sManager controllerManager, namespace string) error {
+	k8sClient := k8sManager.GetClient()
+	maintenanceModeAdapter := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
+	maintenanceGateway := backup2.NewMaintenanceGateway(maintenanceModeAdapter)
+	backupReconciler := backup2.NewReconciler(k8sClient, maintenanceGateway, backup2.DefaultClock{})
+	backupController := backup2.NewController(k8sClient, backupReconciler)
+	err := backupController.SetupWithManager(k8sManager)
+	if err != nil {
+		return fmt.Errorf("error setting up backup controller with manager: %w", err)
+	}
+
+	return nil
+}
+
+func configureRestoreReconcilers(k8sManager controllerManager, k8sClient client.WithWatch, namespace string, recorder eventRecorder, operatorConfig *config.OperatorConfig) error {
 	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create dogu client: %w", err)
@@ -294,9 +324,31 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create dynamic client: %w", err)
 	}
 
-	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient)
+	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
+	scaleManager := restorecontroller.NewScaleManager(k8sClient, operatorConfig.Namespace)
+
+	restoreReconciler := restorecontroller.NewRestoreReconciler(
+		k8sClient,
+		recorder,
+		operatorConfig.Namespace,
+		cleanupManager,
+		scaleManager,
+	)
+	if err := restoreReconciler.SetupWithManager(k8sManager); err != nil {
+		return fmt.Errorf("unable to create restore controller: %w", err)
+	}
+	return nil
+}
+
+func configureBackupScheduleReconcilers(ctx context.Context, k8sManager controllerManager, namespace string, recorder eventRecorder, operatorConfig *config.OperatorConfig) error {
+	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
-		return fmt.Errorf("failed to sync backups with provider backups on startup: %w", err)
+		return fmt.Errorf("unable to create k8s clientset: %w", err)
+	}
+
+	ecosystemClientSet, err := ecosystem.NewClientSet(k8sManager.GetConfig(), k8sClientSet)
+	if err != nil {
+		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
 	}
 
 	imageGetter := newAdditionalImageGetter(k8sClientSet, operatorConfig.Namespace)
@@ -317,44 +369,10 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	configGetter := newBackupTimeoutGetter(configMapClient)
 
 	requeueHandler := requeue.NewRequeueHandler(ecosystemClientSet, recorder, operatorConfig.Namespace, configGetter)
-	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
-	scaleManager := restorecontroller.NewScaleManager(k8sClient, operatorConfig.Namespace)
 
-	restoreReconciler := restorecontroller.NewRestoreReconciler(
-		k8sClient,
-		recorder,
-		operatorConfig.Namespace,
-		cleanupManager,
-		scaleManager,
-	)
-	if err = restoreReconciler.SetupWithManager(k8sManager); err != nil {
-		return fmt.Errorf("unable to create restore controller: %w", err)
-	}
-
-	err = configureBackupReconcilers(k8sManager, operatorConfig.Namespace)
-	if err != nil {
-		return fmt.Errorf("error setting up backup controller with manager: %w", err)
-	}
-
-	if err = backupschedule.NewReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler, imageConfig, operatorConfig.ImagePullSecrets).SetupWithManager(k8sManager); err != nil {
+	if err := backupschedule.NewReconciler(ecosystemClientSet, recorder, operatorConfig.Namespace, requeueHandler, imageConfig, operatorConfig.ImagePullSecrets).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backupSchedule controller: %w", err)
 	}
-	// +kubebuilder:scaffold:builder
-
-	return nil
-}
-
-func configureBackupReconcilers(k8sManager controllerManager, namespace string) error {
-	k8sClient := k8sManager.GetClient()
-	maintenanceModeAdapter := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
-	maintenanceGateway := backup2.NewMaintenanceGateway(maintenanceModeAdapter)
-	backupReconciler := backup2.NewReconciler(k8sClient, maintenanceGateway, backup2.DefaultClock{})
-	backupController := backup2.NewController(k8sClient, backupReconciler)
-	err := backupController.SetupWithManager(k8sManager)
-	if err != nil {
-		return fmt.Errorf("error setting up backup controller with manager: %w", err)
-	}
-
 	return nil
 }
 
