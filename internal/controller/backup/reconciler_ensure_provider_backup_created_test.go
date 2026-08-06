@@ -4,18 +4,51 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
-	t.Run("If the velero backup does not exist, create it, set succeeded to unknown and retry", func(t *testing.T) {
+	t.Run("If the velero backup does not exist, create it, set succeeded to unknown, set start time and retry", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
+		counter := &callCounter{}
+		fakeClient := newFakeClientBuilderWithCounter(t, counter).
+			WithObjects(backup).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+
+		require.True(t, backup.Status.StartTimestamp.IsZero())
+
+		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
+
+		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+		assert.NotNil(t, completedCondition)
+		assert.Equal(t, metav1.ConditionUnknown, completedCondition.Status)
+		assert.Equal(t, reasonProviderBackupResourceDoesNotExist, completedCondition.Reason)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+
+		assert.False(t, backup.Status.StartTimestamp.IsZero())
+
+		assert.Equal(t, 1, counter.veleroBackupCreateCount)
+		assert.Equal(t, 1, counter.subResourcePatchCount)
+	})
+
+	t.Run("If the velero backup does not exist, create it, set succeeded to unknown, set start time only once and retry", func(t *testing.T) {
+		// The start time is set by using the function time.Now(). If we used time.Now() here as base time
+		// we would not be able to detect if the start time was modified. The time difference would be too small.
+		baseTime := metav1.NewTime(time.Now().Add(time.Minute))
+		backup := newBackupForTest("ns", "backup")
+		backup.Status.StartTimestamp = baseTime
 		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
 			WithObjects(backup).
@@ -32,6 +65,8 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
+
+		assert.WithinDuration(t, baseTime.Time, backup.Status.StartTimestamp.Time, time.Second)
 
 		assert.Equal(t, 1, counter.veleroBackupCreateCount)
 		assert.Equal(t, 1, counter.subResourcePatchCount)

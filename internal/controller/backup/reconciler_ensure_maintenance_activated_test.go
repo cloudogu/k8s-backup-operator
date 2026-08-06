@@ -84,8 +84,6 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		assert.Equal(t, metav1.ConditionUnknown, succeededCondition.Status)
 		assert.Equal(t, reasonMaintenanceModesIsNotActive, succeededCondition.Reason)
 
-		assert.False(t, backup.Status.StartTimestamp.IsZero())
-
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
 

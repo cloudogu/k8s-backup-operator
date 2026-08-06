@@ -37,6 +37,7 @@ func newVeleroBackupStorageLocationForReconcilerTest(phase velerov1.BackupStorag
 type callCounter struct {
 	configMapGetCount         int
 	veleroBackupGetCount      int
+	veleroBackupGetCallError  error
 	veleroBackupCreateCount   int
 	subResourcePatchCount     int
 	subResourcePatchCallError error
@@ -52,6 +53,9 @@ func (c *callCounter) getCall(ctx context.Context, client client.WithWatch, key 
 		c.configMapGetCount++
 	}
 	if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.Backup]() {
+		if c.veleroBackupGetCallError != nil {
+			return c.veleroBackupGetCallError
+		}
 		c.veleroBackupGetCount++
 	}
 	return client.Get(ctx, key, obj, opts...)
