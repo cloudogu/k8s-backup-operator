@@ -12,7 +12,7 @@ import (
 	restorecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/restore"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
-	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
+	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
