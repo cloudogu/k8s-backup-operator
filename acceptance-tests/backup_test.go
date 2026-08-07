@@ -55,13 +55,13 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 			})
 		})
 
-		It("waits until the backup has successfully completed", func(ctx SpecContext) {
+		It("waits until the backup has succeeded", func(ctx SpecContext) {
 			EventuallyShouldSucceed(func(g Gomega) {
 				backup := &backupv1.Backup{}
 				err := k8sClient.Get(ctx, backupObjectKey, backup)
 				Expect(err).ShouldNot(HaveOccurred())
 
-				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
+				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 				g.Expect(completed.Status).To(Equal(metav1.ConditionTrue))
 			})
 		})
@@ -80,13 +80,13 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
-		It("waits until the backup has successfully completed", func(ctx SpecContext) {
+		It("waits until the backup has succeeded", func(ctx SpecContext) {
 			EventuallyShouldSucceed(func(g Gomega) {
 				backup := &backupv1.Backup{}
 				err := k8sClient.Get(ctx, backupObjectKey, backup)
 				g.Expect(err).ShouldNot(HaveOccurred())
 
-				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
+				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 				g.Expect(completed).ToNot(BeNil())
 				g.Expect(completed.Status).To(Equal(metav1.ConditionTrue))
 			})
@@ -263,19 +263,19 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
 				g.Expect(completed).ToNot(BeNil())
 				g.Expect(completed.Status).To(Equal(metav1.ConditionFalse))
-				g.Expect(completed.Reason).To(Equal("TimeWindowExpiredBackupIsRunning"))
+				g.Expect(completed.Reason).To(Equal("TimeWindowExpiredBackupInProgress"))
 
 				g.Expect(backup.Status.StartTimestamp.IsZero()).To(BeFalse())
 			})
 		})
 
-		It("waits until the backup has successfully completed", func(ctx SpecContext) {
+		It("waits until the backup has succeeded", func(ctx SpecContext) {
 			EventuallyShouldSucceed(func(g Gomega) {
 				backup := &backupv1.Backup{}
 				err := k8sClient.Get(ctx, backupObjectKey, backup)
 				Expect(err).ShouldNot(HaveOccurred())
 
-				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCompleted)
+				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 				g.Expect(completed).ToNot(BeNil())
 				g.Expect(completed.Status).To(Equal(metav1.ConditionTrue))
 			})

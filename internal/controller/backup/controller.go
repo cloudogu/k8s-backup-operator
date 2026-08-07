@@ -32,7 +32,7 @@ const (
 type reconciler interface {
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureBackupAreCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
@@ -82,7 +82,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return reconcile.Result{}, err
 	}
 
-	nextAction, err = c.reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(ctx, &backup, logger)
+	nextAction, err = c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(ctx, &backup, logger)
 	if nextAction == Abort {
 		return ctrl.Result{}, err
 	}

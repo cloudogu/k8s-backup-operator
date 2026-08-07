@@ -34,7 +34,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(time.Duration(timeLimitInMinutes)*time.Minute - time.Millisecond))
 		reconciler := NewReconciler(fakeClient, nil, clockMock)
 
-		nextAction, err := reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -66,7 +66,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 
 		require.True(t, backup.Status.StartTimestamp.IsZero())
 
-		nextAction, err := reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -98,7 +98,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
 		reconciler := NewReconciler(fakeClient, nil, clockMock)
 
-		nextAction, err := reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -131,7 +131,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
 		reconciler := NewReconciler(fakeClient, nil, clockMock)
 
-		nextAction, err := reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -164,7 +164,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
 		reconciler := NewReconciler(fakeClient, nil, clockMock)
 
-		nextAction, err := reconciler.ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)

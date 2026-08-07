@@ -30,7 +30,6 @@ const (
 	reasonProviderBackupInProgress                  = "ProviderBackupInProgress"
 	reasonProviderBackupFailed                      = "ProviderBackupFailed"
 	reasonProviderBackupSucceeded                   = "ProviderBackupSucceeded"
-	reasonBackupCompleted                           = "BackupCompleted"
 	reasonBackupDeleting                            = "BackupDeleting"
 	reasonBackupNotDeleting                         = "BackupNotDeleting"
 	reasonTimeWindowNotExpired                      = "TimeWindowNotExpired"
@@ -167,22 +166,22 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 func (c *defaultReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
 	succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 	if succeededCondition == nil || succeededCondition.Status == metav1.ConditionUnknown {
-		debug(logger, "checkBackupCompletion: backup not completed -> NEXT")
+		debug(logger, "ensureCompletedBackupIsIgnored: backup not completed -> NEXT")
 		return Next, nil
 	}
 
-	debug(logger, "checkBackupCompletion: backup completed -> ABORT")
+	debug(logger, "ensureCompletedBackupIsIgnored: backup completed -> ABORT")
 	return Abort, nil
 }
 
-func (c *defaultReconciler) ensureBackupAreCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
 	timeWindowHasExpired, err := c.hasTimeWindowExpired(ctx, backup)
 	if err != nil {
 		return Abort, err
 	}
 
 	if !timeWindowHasExpired {
-		debug(logger, "checkBackupCancellation: time window has not expired -> Canceled = False, NEXT")
+		debug(logger, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has not expired -> Canceled = False, NEXT")
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
@@ -217,7 +216,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 
 	if apierrors.IsNotFound(err) {
 		debug(logger, fmt.Sprintf(
-			"ensureBackupIsPrepared: backup storage location '%s'not found -> Prepared = False, RETRY",
+			"ensureBackupIsPrepared: backup storage location '%s' not found -> Prepared = False, RETRY",
 			veleroBackupStorageName,
 		))
 
@@ -321,7 +320,7 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 	}
 
 	if veleroBackup == nil {
-		debug(logger, "ensureProviderBackupCreated: velero backup not found -> Succeeded = Unknown, RETRY")
+		debug(logger, "ensureProviderBackupCreated: provider backup not found -> Succeeded = Unknown, RETRY")
 
 		veleroBackupCr := c.createVeleroBackupResource(backup)
 		createErr := c.client.Create(ctx, veleroBackupCr)
@@ -347,7 +346,7 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 		return Retry, nil
 	}
 
-	debug(logger, "ensureProviderBackupCreated: velero backup resource found -> NEXT")
+	debug(logger, "ensureProviderBackupCreated: provider backup resource found -> NEXT")
 	return Next, nil
 }
 
@@ -455,7 +454,7 @@ func (c *defaultReconciler) createVeleroDeleteBackupRequestIfNotExists(
 	var deleteBackupRequest = &velerov1.DeleteBackupRequest{}
 	err := c.client.Get(ctx, backup.GetNamespacedName(), deleteBackupRequest)
 	if apierrors.IsNotFound(err) {
-		debug(logger, "check backup deletion: delete backup request not found -> create one")
+		debug(logger, "ensureProviderBackupDeleted: delete backup request not found -> create one")
 
 		var newDeleteBackupRequest = &velerov1.DeleteBackupRequest{
 			ObjectMeta: metav1.ObjectMeta{
@@ -477,7 +476,7 @@ func (c *defaultReconciler) createVeleroDeleteBackupRequestIfNotExists(
 		return nil, fmt.Errorf("get velero delete backup request: %w", err)
 	}
 
-	debug(logger, "check backup deletion: delete backup request already exists")
+	debug(logger, "ensureProviderBackupDeleted: delete backup request already exists")
 	return deleteBackupRequest, nil
 }
 
@@ -518,7 +517,7 @@ func (c *defaultReconciler) createVeleroBackupResource(backup *backupv1.Backup) 
 }
 
 func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
-	debug(logger, "checkBackupCancellation: time window has expired, Backup has not started -> Canceled = True, ABORT")
+	debug(logger, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup has not started -> Canceled = True, ABORT")
 
 	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
@@ -542,13 +541,13 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 
 	debug(logger,
 		fmt.Sprintf(
-			"checkBackupCancellation: time window has expired, Backup is running (Velero backup phase: '%s')",
+			"ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup is running (Velero backup phase: '%s')",
 			veleroBackup.Status.Phase,
 		),
 	)
 
 	if isProviderBackupInProgress(veleroBackup) {
-		debug(logger, "checkBackupCancellation: time window has expired, Backup is running -> Canceled = False, NEXT")
+		debug(logger, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup is running -> Canceled = False, NEXT")
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
@@ -565,7 +564,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 	}
 
 	if hasProviderBackupFailed(veleroBackup) {
-		debug(logger, "checkBackupCancellation: time window has expired, Backup failed -> Canceled = True, ABORT")
+		debug(logger, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup failed -> Canceled = True, ABORT")
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{

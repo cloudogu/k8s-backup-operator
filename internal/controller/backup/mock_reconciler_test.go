@@ -23,12 +23,12 @@ func (_m *mockReconciler) EXPECT() *mockReconciler_Expecter {
 	return &mockReconciler_Expecter{mock: &_m.Mock}
 }
 
-// ensureBackupAreCanceledAfterTimeWindowExpired provides a mock function with given fields: ctx, backup, logger
-func (_m *mockReconciler) ensureBackupAreCanceledAfterTimeWindowExpired(ctx context.Context, backup *v1.Backup, logger logr.Logger) (action, error) {
+// ensureBackupIsCanceledAfterTimeWindowExpired provides a mock function with given fields: ctx, backup, logger
+func (_m *mockReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *v1.Backup, logger logr.Logger) (action, error) {
 	ret := _m.Called(ctx, backup, logger)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ensureBackupAreCanceledAfterTimeWindowExpired")
+		panic("no return value specified for ensureBackupIsCanceledAfterTimeWindowExpired")
 	}
 
 	var r0 action
@@ -51,32 +51,32 @@ func (_m *mockReconciler) ensureBackupAreCanceledAfterTimeWindowExpired(ctx cont
 	return r0, r1
 }
 
-// mockReconciler_ensureBackupAreCanceledAfterTimeWindowExpired_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ensureBackupAreCanceledAfterTimeWindowExpired'
-type mockReconciler_ensureBackupAreCanceledAfterTimeWindowExpired_Call struct {
+// mockReconciler_ensureBackupIsCanceledAfterTimeWindowExpired_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ensureBackupIsCanceledAfterTimeWindowExpired'
+type mockReconciler_ensureBackupIsCanceledAfterTimeWindowExpired_Call struct {
 	*mock.Call
 }
 
-// ensureBackupAreCanceledAfterTimeWindowExpired is a helper method to define mock.On call
+// ensureBackupIsCanceledAfterTimeWindowExpired is a helper method to define mock.On call
 //   - ctx context.Context
 //   - backup *v1.Backup
 //   - logger logr.Logger
-func (_e *mockReconciler_Expecter) ensureBackupAreCanceledAfterTimeWindowExpired(ctx interface{}, backup interface{}, logger interface{}) *mockReconciler_ensureBackupAreCanceledAfterTimeWindowExpired_Call {
-	return &mockReconciler_ensureBackupAreCanceledAfterTimeWindowExpired_Call{Call: _e.mock.On("ensureBackupAreCanceledAfterTimeWindowExpired", ctx, backup, logger)}
+func (_e *mockReconciler_Expecter) ensureBackupIsCanceledAfterTimeWindowExpired(ctx interface{}, backup interface{}, logger interface{}) *mockReconciler_ensureBackupIsCanceledAfterTimeWindowExpired_Call {
+	return &mockReconciler_ensureBackupIsCanceledAfterTimeWindowExpired_Call{Call: _e.mock.On("ensureBackupIsCanceledAfterTimeWindowExpired", ctx, backup, logger)}
 }
 
-func (_c *mockReconciler_ensureBackupAreCanceledAfterTimeWindowExpired_Call) Run(run func(ctx context.Context, backup *v1.Backup, logger logr.Logger)) *mockReconciler_ensureBackupAreCanceledAfterTimeWindowExpired_Call {
+func (_c *mockReconciler_ensureBackupIsCanceledAfterTimeWindowExpired_Call) Run(run func(ctx context.Context, backup *v1.Backup, logger logr.Logger)) *mockReconciler_ensureBackupIsCanceledAfterTimeWindowExpired_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(*v1.Backup), args[2].(logr.Logger))
 	})
 	return _c
 }
 
-func (_c *mockReconciler_ensureBackupAreCanceledAfterTimeWindowExpired_Call) Return(_a0 action, _a1 error) *mockReconciler_ensureBackupAreCanceledAfterTimeWindowExpired_Call {
+func (_c *mockReconciler_ensureBackupIsCanceledAfterTimeWindowExpired_Call) Return(_a0 action, _a1 error) *mockReconciler_ensureBackupIsCanceledAfterTimeWindowExpired_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockReconciler_ensureBackupAreCanceledAfterTimeWindowExpired_Call) RunAndReturn(run func(context.Context, *v1.Backup, logr.Logger) (action, error)) *mockReconciler_ensureBackupAreCanceledAfterTimeWindowExpired_Call {
+func (_c *mockReconciler_ensureBackupIsCanceledAfterTimeWindowExpired_Call) RunAndReturn(run func(context.Context, *v1.Backup, logr.Logger) (action, error)) *mockReconciler_ensureBackupIsCanceledAfterTimeWindowExpired_Call {
 	_c.Call.Return(run)
 	return _c
 }

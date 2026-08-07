@@ -93,7 +93,7 @@ func TestControllerReconcile(t *testing.T) {
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -111,7 +111,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -129,7 +129,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
@@ -151,7 +151,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -172,7 +172,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -193,7 +193,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -218,7 +218,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -242,7 +242,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -266,7 +266,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -294,7 +294,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -321,7 +321,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -348,7 +348,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -379,7 +379,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -409,7 +409,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -439,7 +439,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -473,7 +473,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -506,7 +506,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
@@ -539,7 +539,7 @@ func TestControllerReconcile(t *testing.T) {
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupAreCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
