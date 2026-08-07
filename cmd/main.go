@@ -66,7 +66,7 @@ var (
 )
 
 var (
-	newAdditionalImageGetter    = additionalimages.NewGetter
+	newAdditionalImageGetter    = schedulecontroller.NewOperatorImageGetter
 	newAdditionalImageUpdater   = additionalimages.NewUpdater
 	newGarbageCollectionManager = garbagecollection.NewManager
 	newScheduledBackupManager   = scheduledbackup.NewManager

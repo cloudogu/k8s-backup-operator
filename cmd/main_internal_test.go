@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
+	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	backupconfig "github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
@@ -224,7 +225,7 @@ func Test_startOperator(t *testing.T) {
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("", assert.AnError)
-		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
@@ -284,7 +285,7 @@ func Test_startOperator(t *testing.T) {
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
-		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
@@ -347,7 +348,7 @@ func Test_startOperator(t *testing.T) {
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
-		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
@@ -419,7 +420,7 @@ func Test_startOperator(t *testing.T) {
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
-		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
@@ -499,7 +500,7 @@ func Test_startOperator(t *testing.T) {
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
-		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
@@ -580,7 +581,7 @@ func Test_startOperator(t *testing.T) {
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
-		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
@@ -661,7 +662,7 @@ func Test_startOperator(t *testing.T) {
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
-		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) additionalimages.Getter {
+		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
 		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)

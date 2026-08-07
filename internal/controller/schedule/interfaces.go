@@ -7,6 +7,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+type OperatorImageGetter interface {
+	// ImageForKey returns a container image reference from the operator's additional-images ConfigMap.
+	ImageForKey(ctx context.Context, key string) (string, error)
+}
+
 type CronJobManager interface {
 	Ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error
 	Delete(ctx context.Context, schedule *backupv1.BackupSchedule) error
