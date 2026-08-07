@@ -30,6 +30,44 @@ func TestControllerReconcile(t *testing.T) {
 		assert.Equal(t, ctrl.Result{}, result)
 	})
 
+	t.Run("synchronize a provider backup before the normal backup process", func(t *testing.T) {
+		backup := newBackupForControllerTest("ns", "backup")
+		backup.Spec.SyncedFromProvider = true
+		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
+		reconcilerMock := newMockReconciler(t)
+		controller := NewController(fakeClient, reconcilerMock)
+		reconcilerMock.EXPECT().
+			checkBackupDeletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroStatusSynced(context.Background(), mock.Anything, mock.Anything).
+			Return(Abort, nil)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, result)
+	})
+
+	t.Run("retry while synchronizing the provider backup status", func(t *testing.T) {
+		backup := newBackupForControllerTest("ns", "backup")
+		backup.Spec.SyncedFromProvider = true
+		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
+		reconcilerMock := newMockReconciler(t)
+		controller := NewController(fakeClient, reconcilerMock)
+		reconcilerMock.EXPECT().
+			checkBackupDeletion(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			checkVeleroStatusSynced(context.Background(), mock.Anything, mock.Anything).
+			Return(Retry, assert.AnError)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, result)
+	})
+
 	t.Run("check backup deletion and retry", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
@@ -600,6 +638,9 @@ func newTestFixtureForControllerTest(t *testing.T) (*mockReconciler, *Controller
 		Build()
 
 	reconcilerMock := newMockReconciler(t)
+	reconcilerMock.EXPECT().
+		checkVeleroStatusSynced(context.Background(), mock.Anything, mock.Anything).
+		Return(Next, nil).Maybe()
 	controller := NewController(fakeClient, reconcilerMock)
 	return reconcilerMock, controller
 }

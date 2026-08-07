@@ -51,6 +51,22 @@ func (r *defaultVeleroBackupReconciler) ensureBackupExists(ctx context.Context, 
 	return nil
 }
 
+func (r *defaultVeleroBackupReconciler) deleteBackupIfExists(ctx context.Context, key client.ObjectKey) error {
+	backup := &backupv1.Backup{}
+	if err := r.client.Get(ctx, key, backup); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("get cloudogu backup: %w", err)
+	}
+
+	if err := r.client.Delete(ctx, backup); err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("delete cloudogu backup: %w", err)
+	}
+
+	return nil
+}
+
 func copyDefaultLabels() map[string]string {
 	labels := make(map[string]string, len(defaultLabels))
 	for key, value := range defaultLabels {

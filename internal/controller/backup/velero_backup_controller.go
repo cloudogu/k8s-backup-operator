@@ -12,6 +12,7 @@ import (
 
 type veleroBackupReconciler interface {
 	ensureBackupExists(ctx context.Context, veleroBackup *velerov1.Backup) error
+	deleteBackupIfExists(ctx context.Context, key client.ObjectKey) error
 }
 
 // VeleroBackupController reconciles Velero backups with their cloudogu Backup counterpart.
@@ -28,7 +29,13 @@ func (c *VeleroBackupController) Reconcile(ctx context.Context, req ctrl.Request
 	// get velero backup from request
 	veleroBackup := &velerov1.Backup{}
 	if err := c.client.Get(ctx, req.NamespacedName, veleroBackup); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("get velero backup %s: %w", req.NamespacedName, err)
+		}
+		if err = c.reconciler.deleteBackupIfExists(ctx, req.NamespacedName); err != nil {
+			return ctrl.Result{}, fmt.Errorf("delete cloudogu backup for deleted velero backup %s: %w", req.NamespacedName, err)
+		}
+		return ctrl.Result{}, nil
 	}
 
 	// check backup for velero backup
@@ -44,6 +51,7 @@ func (c *VeleroBackupController) Reconcile(ctx context.Context, req ctrl.Request
 
 func (c *VeleroBackupController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("velero-backup-sync").
 		For(&velerov1.Backup{}).
 		Complete(c)
 }

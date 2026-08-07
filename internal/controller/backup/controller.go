@@ -14,6 +14,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -183,7 +184,17 @@ func (c *Controller) setupBackup(ctx context.Context, backup *backupv1.Backup, n
 // SetupWithManager sets up the controller with the Manager.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		WithEventFilter(predicate.Or(
+			predicate.GenerationChangedPredicate{},
+			predicate.Funcs{
+				UpdateFunc: func(event event.UpdateEvent) bool {
+					oldDeletionTimestamp := event.ObjectOld.GetDeletionTimestamp()
+					newDeletionTimestamp := event.ObjectNew.GetDeletionTimestamp()
+
+					return oldDeletionTimestamp == nil && newDeletionTimestamp != nil
+				},
+			},
+		)).
 		For(&backupv1.Backup{}).
 		Complete(c)
 }
