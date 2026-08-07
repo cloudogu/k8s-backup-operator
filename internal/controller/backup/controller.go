@@ -31,6 +31,7 @@ const (
 
 type reconciler interface {
 	checkBackupDeletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+	checkVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	checkBackupCompletion(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	checkBackupCancellation(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	checkVeleroBackupStorage(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
@@ -62,6 +63,14 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	nextAction, err := c.reconciler.checkBackupDeletion(ctx, &backup, logger)
+	if nextAction == Retry {
+		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+	}
+	if nextAction == Abort {
+		return ctrl.Result{}, err
+	}
+
+	nextAction, err = c.reconciler.checkVeleroStatusSynced(ctx, &backup, logger)
 	if nextAction == Retry {
 		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
 	}

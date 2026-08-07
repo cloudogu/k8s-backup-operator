@@ -356,6 +356,13 @@ func configureBackupReconcilers(k8sManager controllerManager, namespace string) 
 		return fmt.Errorf("error setting up backup controller with manager: %w", err)
 	}
 
+	veleroBackupReconciler := backup2.NewVeleroBackupReconciler(k8sClient)
+	veleroBackupController := backup2.NewVeleroBackupController(k8sClient, veleroBackupReconciler)
+	err = veleroBackupController.SetupWithManager(k8sManager)
+	if err != nil {
+		return fmt.Errorf("error setting up velero backup controller with manager: %w", err)
+	}
+
 	return nil
 }
 
