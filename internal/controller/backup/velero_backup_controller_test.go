@@ -61,6 +61,34 @@ func TestVeleroBackupController(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, deletingBackup.DeletionTimestamp.IsZero())
 		assert.Contains(t, deletingBackup.Finalizers, backupv1.BackupFinalizer)
+		deleteRequest := &velerov1.DeleteBackupRequest{}
+		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), deleteRequest))
+		assert.Equal(t, backup.Name, deleteRequest.Spec.BackupName)
+	})
+
+	t.Run("creates a delete request when the Velero backup starts deleting", func(t *testing.T) {
+		deletionTimestamp := metav1.Now()
+		veleroBackup := &velerov1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "backup",
+				Namespace:         "ns",
+				DeletionTimestamp: &deletionTimestamp,
+				Finalizers:        []string{"velero.io/test-finalizer"},
+			},
+		}
+		backup := newBackupForControllerTest("ns", "backup")
+		backup.Finalizers = []string{backupv1.BackupFinalizer}
+		fakeClient := newFakeClientBuilder(t).WithObjects(veleroBackup, backup).Build()
+		reconciler := NewVeleroBackupReconciler(fakeClient)
+		controller := NewVeleroBackupController(fakeClient, reconciler)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		require.NoError(t, err)
+		assert.Zero(t, result)
+		deleteRequest := &velerov1.DeleteBackupRequest{}
+		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), deleteRequest))
+		assert.Equal(t, backup.Name, deleteRequest.Spec.BackupName)
 	})
 
 	t.Run("does nothing if neither resource exists", func(t *testing.T) {

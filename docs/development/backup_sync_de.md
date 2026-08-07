@@ -14,3 +14,7 @@ Dies führt zu einem Backup-CR innerhalb des Clusters, der auf ein Velero-Backup
 Die Lösung hierfür ist die Synchronisierung der Velero-Backups mit den Backup-CRs, nachdem eine Wiederherstellung durchgeführt wurde.
 Bei diesem Vorgang werden Backup-CRs für Velero-Backups erstellt, die im Cluster fehlen. Außerdem werden Backup-CRs gelöscht,
 für die kein entsprechendes Velero-Backup vorhanden ist.
+
+Der Velero-Backup-Controller beobachtet außerdem manuell gestartete Löschungen. Bevor er das gleichnamige Backup-CR löscht,
+erstellt er idempotent einen Velero-`DeleteBackupRequest`. Dadurch werden auch die Daten im Backup-Storage entfernt und
+Velero stellt die gelöschte Backup-Ressource nicht erneut aus dem Storage her.

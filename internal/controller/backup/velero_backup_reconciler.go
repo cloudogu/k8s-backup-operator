@@ -60,8 +60,36 @@ func (r *defaultVeleroBackupReconciler) deleteBackupIfExists(ctx context.Context
 		return fmt.Errorf("get cloudogu backup: %w", err)
 	}
 
+	if err := r.ensureDeleteBackupRequestExists(ctx, key); err != nil {
+		return err
+	}
+
 	if err := r.client.Delete(ctx, backup); err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("delete cloudogu backup: %w", err)
+	}
+
+	return nil
+}
+
+func (r *defaultVeleroBackupReconciler) ensureDeleteBackupRequestExists(ctx context.Context, key client.ObjectKey) error {
+	deleteRequest := &velerov1.DeleteBackupRequest{}
+	if err := r.client.Get(ctx, key, deleteRequest); err == nil {
+		return nil
+	} else if !apierrors.IsNotFound(err) {
+		return fmt.Errorf("get velero delete backup request: %w", err)
+	}
+
+	deleteRequest = &velerov1.DeleteBackupRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.Name,
+			Namespace: key.Namespace,
+		},
+		Spec: velerov1.DeleteBackupRequestSpec{
+			BackupName: key.Name,
+		},
+	}
+	if err := r.client.Create(ctx, deleteRequest); err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("create velero delete backup request: %w", err)
 	}
 
 	return nil

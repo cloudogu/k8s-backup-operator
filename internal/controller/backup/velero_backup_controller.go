@@ -38,6 +38,13 @@ func (c *VeleroBackupController) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
+	if !veleroBackup.DeletionTimestamp.IsZero() {
+		if err := c.reconciler.deleteBackupIfExists(ctx, req.NamespacedName); err != nil {
+			return ctrl.Result{}, fmt.Errorf("delete cloudogu backup for deleting velero backup %s: %w", req.NamespacedName, err)
+		}
+		return ctrl.Result{}, nil
+	}
+
 	// check backup for velero backup
 	if err := c.reconciler.ensureBackupExists(ctx, veleroBackup); err != nil {
 		if apierrors.IsAlreadyExists(err) {
