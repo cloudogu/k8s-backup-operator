@@ -2,11 +2,16 @@ package restore
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -129,6 +134,16 @@ func failingDelete(err error) interceptor.Funcs {
 	}
 }
 
+// failingCreate makes every create fail with the given error, to cover a provider child that cannot
+// be created.
+func failingCreate(err error) interceptor.Funcs {
+	return interceptor.Funcs{
+		Create: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.CreateOption) error {
+			return err
+		},
+	}
+}
+
 // failingStatusUpdate makes every status write fail with the given error, for the paths that have to
 // report a status update they could not persist.
 func failingStatusUpdate(err error) interceptor.Funcs {
@@ -149,6 +164,32 @@ func failingStatusUpdateFrom(nth int, err error) interceptor.Funcs {
 			}
 
 			return wrapped.SubResource(subResource).Update(ctx, object, opts...)
+		},
+	}
+}
+
+// conflictOnFirstStatusUpdate lets another writer persist the given condition and then answers the
+// first status write with a genuine conflict.
+func conflictOnFirstStatusUpdate(t *testing.T, concurrent metav1.Condition) interceptor.Funcs {
+	seen := 0
+
+	return interceptor.Funcs{
+		SubResourceUpdate: func(ctx context.Context, wrapped client.Client, subResource string, object client.Object, opts ...client.SubResourceUpdateOption) error {
+			seen++
+			if seen > 1 {
+				return wrapped.SubResource(subResource).Update(ctx, object, opts...)
+			}
+
+			stored := &k8sv1.Restore{}
+			require.NoError(t, wrapped.Get(ctx, client.ObjectKeyFromObject(object), stored))
+			meta.SetStatusCondition(&stored.Status.Conditions, concurrent)
+			require.NoError(t, wrapped.SubResource(subResource).Update(ctx, stored))
+
+			return apierrors.NewConflict(
+				schema.GroupResource{Group: k8sv1.GroupVersion.Group, Resource: "restores"},
+				object.GetName(),
+				errors.New("the object has been modified"),
+			)
 		},
 	}
 }

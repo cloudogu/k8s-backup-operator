@@ -22,8 +22,6 @@ type Provider interface {
 	DeleteBackup(ctx context.Context, backup *v1.Backup) error
 	// CheckReady validates if the provider is ready to receive backup requests.
 	CheckReady(ctx context.Context) error
-	// WaitForRestore blocks until the provider restore of the given v1.Restore completed or failed.
-	WaitForRestore(ctx context.Context, restore *v1.Restore) error
 	// DeleteRestore just deletes the provider restore object.
 	DeleteRestore(ctx context.Context, restore *v1.Restore) error
 	// SyncBackups syncs backup CRs with provider backups.

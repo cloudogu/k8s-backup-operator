@@ -10,7 +10,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 
@@ -26,19 +25,6 @@ type controllerManager interface {
 	ctrl.Manager
 }
 
-type restoreManager interface {
-	createManager
-	deleteManager
-}
-
-type createManager interface {
-	create(ctx context.Context, restore *v1.Restore) error
-}
-
-type deleteManager interface {
-	delete(ctx context.Context, restore *v1.Restore) error
-}
-
 type maintenanceModeSwitch interface {
 	// Activate activates the maintenance mode.
 	Activate(ctx context.Context, description repository.MaintenanceModeDescription, force bool) error
@@ -51,10 +37,6 @@ type cleanupManager interface {
 	Cleanup(ctx context.Context) error
 }
 
-type restoreProvider interface {
-	provider.Provider
-}
-
 type scaleManager interface {
 	// ScaleDown finds all resources labeled with the scaledown scope label,
 	// stores their current replica count, and scales them to zero.
@@ -65,6 +47,12 @@ type scaleManager interface {
 }
 
 // used for mocks
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type restoreProvider interface {
+	provider.Provider
+}
 
 //nolint:unused
 //goland:noinspection GoUnusedType
