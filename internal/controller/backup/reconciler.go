@@ -84,12 +84,6 @@ type maintenanceGateway interface {
 	deactivateMaintenanceMode(ctx context.Context) error
 }
 
-type providerBackupStatus interface {
-	isInProgress(backup *velerov1.Backup) bool
-	isCompleted(backup *velerov1.Backup) bool
-	hasFailed(backup *velerov1.Backup) bool
-}
-
 type statusUpdate func(status *backupv1.BackupStatus)
 
 type Clock interface {
@@ -103,23 +97,16 @@ func (d DefaultClock) Now() time.Time {
 }
 
 type defaultReconciler struct {
-	client               client.Client
-	maintenanceGateway   maintenanceGateway
-	clock                Clock
-	providerBackupStatus providerBackupStatus
+	client             client.Client
+	maintenanceGateway maintenanceGateway
+	clock              Clock
 }
 
-func NewReconciler(
-	client client.Client,
-	maintenanceGateway maintenanceGateway,
-	clock Clock,
-	providerBackupStatus providerBackupStatus,
-) *defaultReconciler {
+func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway, clock Clock) *defaultReconciler {
 	return &defaultReconciler{
-		client:               client,
-		maintenanceGateway:   maintenanceGateway,
-		clock:                clock,
-		providerBackupStatus: providerBackupStatus,
+		client:             client,
+		maintenanceGateway: maintenanceGateway,
+		clock:              clock,
 	}
 }
 

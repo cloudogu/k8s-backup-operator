@@ -23,7 +23,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		require.True(t, backup.Status.StartTimestamp.IsZero())
 
@@ -54,7 +54,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
 
@@ -85,7 +85,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
 
@@ -105,7 +105,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
 
@@ -123,7 +123,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
 
@@ -141,7 +141,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
 

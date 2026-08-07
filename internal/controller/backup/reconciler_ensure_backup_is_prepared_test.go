@@ -20,7 +20,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
@@ -43,7 +43,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup, veleroBackupStorageLocation).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
@@ -66,7 +66,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup, veleroBackupStorageLocation).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
@@ -90,7 +90,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
@@ -108,7 +108,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup, veleroBackupStorageLocation).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
@@ -126,7 +126,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup, veleroBackupStorageLocation).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
@@ -143,7 +143,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, DefaultClock{}, nil)
+		reconciler := NewReconciler(fakeClient, nil, DefaultClock{})
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
 
