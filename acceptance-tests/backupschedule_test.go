@@ -7,7 +7,6 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -117,10 +116,10 @@ func expectCronJobReady(ctx SpecContext, backupScheduleObjectKey client.ObjectKe
 
 		backupSchedule := &backupv1.BackupSchedule{}
 		g.Expect(k8sClient.Get(ctx, backupScheduleObjectKey, backupSchedule)).Should(Succeed())
-		readyCondition := meta.FindStatusCondition(backupSchedule.Status.Conditions, schedulecontroller.ReadyCondition)
+		readyCondition := meta.FindStatusCondition(backupSchedule.Status.Conditions, backupv1.ConditionReady)
 		g.Expect(readyCondition).ShouldNot(BeNil())
 		g.Expect(readyCondition.Status).Should(Equal(metav1.ConditionTrue))
-		g.Expect(readyCondition.Reason).Should(Equal(schedulecontroller.ReasonReady))
+		g.Expect(readyCondition.Reason).Should(Equal(backupv1.ReasonReady))
 		g.Expect(backupSchedule.Status.Conditions).Should(HaveLen(2))
 	}).
 		WithTimeout(2 * time.Minute).
