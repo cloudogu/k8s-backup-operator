@@ -70,6 +70,7 @@ var (
 	newAdditionalImageUpdater   = additionalimages.NewUpdater
 	newGarbageCollectionManager = garbagecollection.NewManager
 	newScheduledBackupManager   = scheduledbackup.NewManager
+	newBackupTimeoutGetter      = config.NewGetter
 )
 
 func init() {
