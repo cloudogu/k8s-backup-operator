@@ -340,6 +340,8 @@ func configureRestoreReconcilers(k8sManager controllerManager, k8sClient client.
 }
 
 func configureBackupScheduleReconcilers(ctx context.Context, k8sManager controllerManager, namespace string, recorder eventRecorder, operatorConfig *config.OperatorConfig) error {
+	k8sClient := k8sManager.GetClient()
+
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create k8s clientset: %w", err)
