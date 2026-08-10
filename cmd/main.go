@@ -14,6 +14,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scale"
+	operatortime "github.com/cloudogu/k8s-backup-operator/pkg/time"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
@@ -351,7 +352,7 @@ func configureBackupReconcilers(k8sManager controllerManager, namespace string) 
 	k8sClient := k8sManager.GetClient()
 	maintenanceModeAdapter := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
 	maintenanceGateway := backup2.NewMaintenanceGateway(maintenanceModeAdapter)
-	backupReconciler := backup2.NewReconciler(k8sClient, maintenanceGateway, backup2.DefaultClock{})
+	backupReconciler := backup2.NewReconciler(k8sClient, maintenanceGateway, &operatortime.Clock{})
 	backupController := backup2.NewController(k8sClient, backupReconciler)
 	err := backupController.SetupWithManager(k8sManager)
 	if err != nil {

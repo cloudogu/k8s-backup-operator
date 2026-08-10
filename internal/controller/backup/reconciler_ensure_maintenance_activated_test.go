@@ -19,7 +19,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(true, nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock())
 
 		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
 
@@ -34,7 +34,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock())
 
 		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
 
@@ -49,7 +49,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock())
 
 		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
 
@@ -72,7 +72,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			activateMaintenanceMode(context.Background(), maintenanceModeTitle, maintenanceModeText).
 			Return(nil)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock())
 
 		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
 
@@ -95,7 +95,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, assert.AnError)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock())
 
 		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
 
@@ -113,7 +113,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			activateMaintenanceMode(context.Background(), maintenanceModeTitle, maintenanceModeText).
 			Return(assert.AnError)
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, DefaultClock{})
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock())
 
 		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
 
