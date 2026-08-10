@@ -232,14 +232,21 @@ func configureManager(ctx context.Context, k8sManager controllerManager, operato
 func getK8sManagerOptions(flags *flag.FlagSet, args []string, operatorConfig *config.OperatorConfig) ctrl.Options {
 	controllerOpts := ctrl.Options{
 		Scheme: scheme,
-		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
-			operatorConfig.Namespace: {},
-		}},
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{operatorConfig.Namespace: {}},
+		},
 		WebhookServer:    webhook.NewServer(webhook.Options{Port: 9443}),
 		LeaderElectionID: "e3f6c1a7.cloudogu.com",
 		LeaseDuration:    &leaseDuration,
 		RenewDeadline:    &renewDeadline,
 		Metrics:          server.Options{BindAddress: ":8080"},
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{
+					&velerov1.BackupStorageLocation{},
+				},
+			},
+		},
 	}
 	controllerOpts = parseManagerFlags(flags, args, controllerOpts)
 
