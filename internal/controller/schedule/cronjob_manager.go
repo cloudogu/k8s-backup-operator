@@ -44,7 +44,7 @@ func (c cronJobManager) Ensure(ctx context.Context, schedule *v1.BackupSchedule)
 			cronJob.Labels[key] = value
 		}
 
-        // set as the owner for deletion steps
+		// set as the owner for deletion steps
 		if err := controllerutil.SetControllerReference(schedule, cronJob, c.scheme); err != nil {
 			return fmt.Errorf("failed to set BackupSchedule %s as owner of CronJob %s: %w", schedule.Name, cronJob.Name, err)
 		}
@@ -74,7 +74,7 @@ func (c cronJobManager) Delete(ctx context.Context, schedule *v1.BackupSchedule)
 		},
 	}
 
-    // ignore not found errors because we only want to delete here anyway
+	// ignore not found errors because we only want to delete here anyway
 	if err := client.IgnoreNotFound(c.Client.Delete(ctx, cronJob)); err != nil {
 		return fmt.Errorf("failed to delete CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
 	}
