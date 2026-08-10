@@ -18,7 +18,7 @@ import (
 
 func TestControllerSetupBackup(t *testing.T) {
 	t.Run("It should add default labels", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
 		var updateCalled = false
 		fakeClient := newFakeClientForControllerSetupBackupTest(t, backup, blueprintList, &updateCalled)
@@ -35,7 +35,7 @@ func TestControllerSetupBackup(t *testing.T) {
 	})
 
 	t.Run("It should keep existing label while adding the default labels", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		backup.Labels = map[string]string{
 			"example.com/key1": "value1",
 			"example.com/key2": "value2",
@@ -57,7 +57,7 @@ func TestControllerSetupBackup(t *testing.T) {
 	})
 
 	t.Run("It should add the finalizer", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
 		var updateCalled = false
 		fakeClient := newFakeClientForControllerSetupBackupTest(t, backup, blueprintList, &updateCalled)
@@ -73,7 +73,7 @@ func TestControllerSetupBackup(t *testing.T) {
 	})
 
 	t.Run("It should keep existing finalizers while adding the finalizer", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		backup.Finalizers = []string{"finalizer01", "finalizer02"}
 		blueprintList := &blueprintv3.BlueprintList{
 			Items: []blueprintv3.Blueprint{},
@@ -92,7 +92,7 @@ func TestControllerSetupBackup(t *testing.T) {
 	})
 
 	t.Run("should add an annotation with the blueprint's display name and dogus", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		blueprintList := newBlueprintListForControllerSetupBackupTest(
 			"ns",
 			"blueprint",
@@ -115,7 +115,7 @@ func TestControllerSetupBackup(t *testing.T) {
 	})
 
 	t.Run("should keep existing annotations while adding the annotations for the blueprint infos", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		backup.Annotations = map[string]string{
 			"example.com/anno1": "annoVal1",
 			"example.com/anno2": "annoVal2",

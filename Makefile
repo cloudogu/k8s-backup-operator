@@ -87,7 +87,7 @@ print-debug-info: ## Generates indo and the list of environment variables requir
 
 # Optional Ginkgo label filter, e.g. GINKGO_LABEL_FILTER=restore
 GINKGO_LABEL_FILTER?=
-GINKGO_SPEC_ARGS=-p -r --tags=acceptance $(if $(GINKGO_LABEL_FILTER),--label-filter="$(GINKGO_LABEL_FILTER)")
+GINKGO_SPEC_ARGS=-p -r -v --tags=acceptance $(if $(GINKGO_LABEL_FILTER),--label-filter="$(GINKGO_LABEL_FILTER)")
 
 .PHONY: acceptance-test
 acceptance-test: ## Run the cluster acceptance specs. DESTRUCTIVE - disposable clusters only.
@@ -99,9 +99,11 @@ acceptance-test: ## Run the cluster acceptance specs. DESTRUCTIVE - disposable c
 acceptance-test-restore: ## Run only the Restore acceptance specs. DESTRUCTIVE - disposable clusters only.
 	@$(MAKE) --no-print-directory acceptance-test GINKGO_LABEL_FILTER=restore
 
+.PHONY: acceptance-test-backup
+acceptance-test-backup: ## Run only the Restore acceptance specs. DESTRUCTIVE - disposable clusters only.
+	@$(MAKE) --no-print-directory acceptance-test GINKGO_LABEL_FILTER=backup
+
+
 .PHONY: acceptance-test-backupschedule
 acceptance-test-backupschedule: ## Run only the BackupSchedule acceptance specs.
 	@$(MAKE) --no-print-directory acceptance-test GINKGO_LABEL_FILTER=backupschedule
-
-test-env:
-	@echo ${K8S_TEST_CLUSTER_KUBECONFIG}
