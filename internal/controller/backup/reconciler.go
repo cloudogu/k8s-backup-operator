@@ -2,13 +2,17 @@ package backup
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"time"
 
+	"github.com/cloudogu/ces-commons-lib/errors"
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
+	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	"github.com/go-logr/logr"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -175,6 +179,56 @@ func (c *defaultReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, 
 
 	debug(logger, "ensureCompletedBackupIsIgnored: backup completed -> ABORT")
 	return Abort, nil
+}
+
+func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+	// unify label
+	if backup.Labels == nil {
+		backup.Labels = make(map[string]string)
+	}
+	maps.Copy(backup.Labels, defaultLabels)
+
+	var blueprintList = blueprintv3.BlueprintList{}
+	err := c.client.List(ctx, &blueprintList, client.InNamespace(backup.Namespace))
+	// no blueprint or no clueprint crd
+	if err != nil {
+		if !errors.IsNotFoundError(err) && !meta.IsNoMatchError(err) {
+			return Abort, fmt.Errorf("list blueprints: %w", err)
+		}
+		blueprintList.Items = nil
+	}
+
+	// only take first blueprint
+	if len(blueprintList.Items) > 0 {
+		blueprint := blueprintList.Items[0]
+
+		if backup.Annotations == nil {
+			backup.Annotations = make(map[string]string)
+		}
+
+		dogusAsJson, jsonerr := json.Marshal(blueprint.Spec.Blueprint.Dogus)
+		if jsonerr != nil {
+			return Abort, fmt.Errorf("marshal blueprint dogus to json: %w", jsonerr)
+		}
+
+		annotation := map[string]string{
+			blueprintIdAnnotation:    blueprint.Spec.DisplayName,
+			blueprintDogusAnnotation: string(dogusAsJson),
+		}
+		maps.Copy(backup.Annotations, annotation)
+	}
+
+	// finalizer
+	controllerutil.AddFinalizer(backup, backupv1.BackupFinalizer)
+
+	// write backup
+	err = c.client.Update(ctx, backup)
+	if err != nil {
+		logger.Error(err, "failed to update backup to set labels and annotations")
+		return Abort, err
+	}
+
+	return Next, nil
 }
 
 func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
