@@ -32,7 +32,7 @@ const (
 
 type reconciler interface {
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	checkVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
@@ -71,7 +71,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	nextAction, err = c.reconciler.checkVeleroStatusSynced(ctx, &backup, logger)
+	nextAction, err = c.reconciler.ensureVeleroStatusSynced(ctx, &backup, logger)
 	if nextAction == Retry {
 		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
 	}

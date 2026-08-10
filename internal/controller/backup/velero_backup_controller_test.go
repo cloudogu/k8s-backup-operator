@@ -46,7 +46,7 @@ func TestVeleroBackupController(t *testing.T) {
 	})
 
 	t.Run("deletes the cloudogu backup after the Velero backup disappeared", func(t *testing.T) {
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		backup.Finalizers = []string{backupv1.BackupFinalizer}
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
 		reconciler := NewVeleroBackupReconciler(fakeClient)
@@ -76,7 +76,7 @@ func TestVeleroBackupController(t *testing.T) {
 				Finalizers:        []string{"velero.io/test-finalizer"},
 			},
 		}
-		backup := newBackupForControllerTest("ns", "backup")
+		backup := newBackupForTest("ns", "backup")
 		backup.Finalizers = []string{backupv1.BackupFinalizer}
 		fakeClient := newFakeClientBuilder(t).WithObjects(veleroBackup, backup).Build()
 		reconciler := NewVeleroBackupReconciler(fakeClient)
