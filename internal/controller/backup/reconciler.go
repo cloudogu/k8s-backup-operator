@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-const veleroBackupStorageName = "default"
 const (
 	reasonProviderBackupStorageLocationNotFound     = "ProviderBackupStorageLocationNotFound"
 	reasonProviderBackupStorageLocationNotAvailable = "ProviderBackupStorageLocationNotAvailable"
@@ -100,13 +99,15 @@ type defaultReconciler struct {
 	client             client.Client
 	maintenanceGateway maintenanceGateway
 	clock              Clock
+	backupStorageName  string
 }
 
-func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway, clock Clock) *defaultReconciler {
+func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway, clock Clock, backupStorageName string) *defaultReconciler {
 	return &defaultReconciler{
 		client:             client,
 		maintenanceGateway: maintenanceGateway,
 		clock:              clock,
+		backupStorageName:  backupStorageName,
 	}
 }
 
@@ -261,14 +262,14 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 	veleroBackupStorageLocation := velerov1.BackupStorageLocation{}
 	err := c.client.Get(
 		ctx,
-		types.NamespacedName{Namespace: backup.Namespace, Name: veleroBackupStorageName},
+		types.NamespacedName{Namespace: backup.Namespace, Name: c.backupStorageName},
 		&veleroBackupStorageLocation,
 	)
 
 	if apierrors.IsNotFound(err) {
 		debug(logger, fmt.Sprintf(
 			"ensureBackupIsPrepared: backup storage location '%s' not found -> Prepared = False, RETRY",
-			veleroBackupStorageName,
+			c.backupStorageName,
 		))
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
@@ -286,18 +287,18 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 	}
 
 	if err != nil {
-		return Abort, fmt.Errorf("get velero backup storage location 'name=%s': %w", veleroBackupStorageName, err)
+		return Abort, fmt.Errorf("get velero backup storage location 'name=%s': %w", c.backupStorageName, err)
 	}
 
 	if veleroBackupStorageLocation.Status.Phase != velerov1.BackupStorageLocationPhaseAvailable {
-		logger.Info(fmt.Sprintf("Velero backup storage location 'name=%s' is not available.", veleroBackupStorageName))
+		logger.Info(fmt.Sprintf("Velero backup storage location 'name=%s' is not available.", c.backupStorageName))
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 				Type:    backupv1.ConditionPrepared,
 				Status:  metav1.ConditionFalse,
 				Reason:  reasonProviderBackupStorageLocationNotAvailable,
-				Message: fmt.Sprintf("velero backup storage location 'name=%s' is not available.", veleroBackupStorageName),
+				Message: fmt.Sprintf("velero backup storage location 'name=%s' is not available.", c.backupStorageName),
 			})
 		})
 		if patchErr != nil {
@@ -311,7 +312,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 			Type:    backupv1.ConditionPrepared,
 			Status:  metav1.ConditionTrue,
 			Reason:  reasonProviderBackupStorageLocationAvailable,
-			Message: fmt.Sprintf("velero backup storage location 'name=%s' is available.", veleroBackupStorageName),
+			Message: fmt.Sprintf("velero backup storage location 'name=%s' is available.", c.backupStorageName),
 		})
 	})
 	if patchErr != nil {
@@ -631,7 +632,7 @@ func (c *defaultReconciler) createVeleroBackupResource(backup *backupv1.Backup) 
 			},
 			OrLabelSelectors:         selectors,
 			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
-			StorageLocation:          veleroBackupStorageName,
+			StorageLocation:          c.backupStorageName,
 			DefaultVolumesToFsBackup: &volumeFsBackup,
 		},
 	}

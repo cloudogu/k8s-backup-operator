@@ -15,8 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var defaultRequeueAfterTime = 5 * time.Second
-
 type action int
 
 const (
@@ -38,16 +36,18 @@ type reconciler interface {
 	ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 }
 
-func NewController(client client.Client, reconciler reconciler) *Controller {
+func NewController(client client.Client, reconciler reconciler, requeueAfter time.Duration) *Controller {
 	return &Controller{
-		client:     client,
-		reconciler: reconciler,
+		client:       client,
+		reconciler:   reconciler,
+		requeueAfter: requeueAfter,
 	}
 }
 
 type Controller struct {
-	client     client.Client
-	reconciler reconciler
+	client       client.Client
+	reconciler   reconciler
+	requeueAfter time.Duration
 }
 
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -61,7 +61,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nextAction, err := c.reconciler.ensureProviderBackupDeleted(ctx, &backup, logger)
 	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
 	}
 	if nextAction == Abort {
 		return ctrl.Result{}, err
@@ -69,7 +69,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nextAction, err = c.reconciler.ensureVeleroStatusSynced(ctx, &backup, logger)
 	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
 	}
 	if nextAction == Abort {
 		return ctrl.Result{}, err
@@ -77,7 +77,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nextAction, err = c.reconciler.ensureCompletedBackupIsIgnored(ctx, &backup, logger)
 	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
 	}
 	if nextAction == Abort {
 		return ctrl.Result{}, err
@@ -95,7 +95,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nextAction, err = c.reconciler.ensureBackupIsPrepared(ctx, &backup, logger)
 	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
 	}
 	if nextAction == Abort {
 		return ctrl.Result{}, err
@@ -103,7 +103,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nextAction, err = c.reconciler.ensureMaintenanceActivated(ctx, &backup, logger)
 	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
 	}
 	if nextAction == Abort {
 		return ctrl.Result{}, err
@@ -111,7 +111,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nextAction, err = c.reconciler.ensureProviderBackupCreated(ctx, &backup, logger)
 	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
 	}
 	if nextAction == Abort {
 		return ctrl.Result{}, err
@@ -119,7 +119,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	nextAction, err = c.reconciler.ensureProviderBackupCompleted(ctx, &backup, logger)
 	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
 	}
 	if nextAction == Abort {
 		return ctrl.Result{}, err
@@ -129,7 +129,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// to check the "Abort" action.
 	nextAction, err = c.reconciler.ensureMaintenanceDeactivated(ctx, &backup, logger)
 	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: defaultRequeueAfterTime}, err
+		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
 	}
 
 	return ctrl.Result{}, err

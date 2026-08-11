@@ -24,7 +24,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock())
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
 		require.True(t, backup.DeletionTimestamp.IsZero())
 
@@ -58,7 +58,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock())
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
@@ -100,7 +100,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock())
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
@@ -147,7 +147,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock())
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
@@ -171,7 +171,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil, newRealClock())
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
@@ -195,7 +195,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil, newRealClock())
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
@@ -219,7 +219,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil, newRealClock())
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 
@@ -241,7 +241,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, nil, newRealClock())
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
 

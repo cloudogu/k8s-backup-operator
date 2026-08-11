@@ -27,7 +27,7 @@ func TestReconcilerEnsureCompletedBackupIsIgnored(t *testing.T) {
 			fakeClient := newFakeClientBuilder(t).Build()
 			maintenanceGatewayMock := newMockMaintenanceGateway(t)
 
-			reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock())
+			reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock(), "default")
 
 			nextAction, err := reconciler.ensureCompletedBackupIsIgnored(context.Background(), backup, logr.Discard())
 
@@ -42,7 +42,7 @@ func TestReconcilerEnsureCompletedBackupIsIgnored(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 
-		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock())
+		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureCompletedBackupIsIgnored(context.Background(), backup, logr.Discard())
 

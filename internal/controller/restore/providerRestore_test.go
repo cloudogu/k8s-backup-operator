@@ -31,7 +31,7 @@ func TestProviderRestoreStageCreatesOwnedChildWithoutWaiting(t *testing.T) {
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process").Return()
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		// no manager - reaching a further stage would panic
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 
@@ -56,7 +56,7 @@ func TestARepeatedReconciliationNeverStartsASecondProviderRestore(t *testing.T) 
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process").Return()
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 	request := newRestoreRequest(testRestore)
@@ -88,7 +88,7 @@ func TestAProviderRestoreThatCannotBeStartedIsReportedAndRetried(t *testing.T) {
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingCreate(assert.AnError), factory, restore)
 
