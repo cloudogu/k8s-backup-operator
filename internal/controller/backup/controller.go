@@ -36,6 +36,8 @@ type reconciler interface {
 	ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 }
 
+type ensureFunction func(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+
 func NewController(client client.Client, reconciler reconciler, requeueAfter time.Duration) *Controller {
 	return &Controller{
 		client:       client,
@@ -59,80 +61,30 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
-	nextAction, err := c.reconciler.ensureProviderBackupDeleted(ctx, &backup, logger)
-	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
-	}
-	if nextAction == Abort {
-		return ctrl.Result{}, err
-	}
-
-	nextAction, err = c.reconciler.ensureVeleroStatusSynced(ctx, &backup, logger)
-	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
-	}
-	if nextAction == Abort {
-		return ctrl.Result{}, err
+	ensureFunctions := []ensureFunction{
+		c.reconciler.ensureProviderBackupDeleted,
+		c.reconciler.ensureVeleroStatusSynced,
+		c.reconciler.ensureCompletedBackupIsIgnored,
+		c.reconciler.ensureBackupSetup,
+		c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired,
+		c.reconciler.ensureBackupIsPrepared,
+		c.reconciler.ensureMaintenanceActivated,
+		c.reconciler.ensureProviderBackupCreated,
+		c.reconciler.ensureProviderBackupCompleted,
+		c.reconciler.ensureMaintenanceDeactivated,
 	}
 
-	nextAction, err = c.reconciler.ensureCompletedBackupIsIgnored(ctx, &backup, logger)
-	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
-	}
-	if nextAction == Abort {
-		return ctrl.Result{}, err
-	}
-
-	nextAction, err = c.reconciler.ensureBackupSetup(ctx, &backup, logger)
-	if nextAction == Abort {
-		return ctrl.Result{}, err
+	for _, ensure := range ensureFunctions {
+		nextAction, err := ensure(ctx, &backup, logger)
+		switch nextAction {
+		case Retry:
+			return ctrl.Result{RequeueAfter: c.requeueAfter}, err
+		case Abort:
+			return ctrl.Result{}, err
+		}
 	}
 
-	nextAction, err = c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(ctx, &backup, logger)
-	if nextAction == Abort {
-		return ctrl.Result{}, err
-	}
-
-	nextAction, err = c.reconciler.ensureBackupIsPrepared(ctx, &backup, logger)
-	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
-	}
-	if nextAction == Abort {
-		return ctrl.Result{}, err
-	}
-
-	nextAction, err = c.reconciler.ensureMaintenanceActivated(ctx, &backup, logger)
-	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
-	}
-	if nextAction == Abort {
-		return ctrl.Result{}, err
-	}
-
-	nextAction, err = c.reconciler.ensureProviderBackupCreated(ctx, &backup, logger)
-	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
-	}
-	if nextAction == Abort {
-		return ctrl.Result{}, err
-	}
-
-	nextAction, err = c.reconciler.ensureProviderBackupCompleted(ctx, &backup, logger)
-	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
-	}
-	if nextAction == Abort {
-		return ctrl.Result{}, err
-	}
-
-	// Since this is the last step, the "Next" and "Abort" actions lead to the same return statement. So we don't need
-	// to check the "Abort" action.
-	nextAction, err = c.reconciler.ensureMaintenanceDeactivated(ctx, &backup, logger)
-	if nextAction == Retry {
-		return ctrl.Result{RequeueAfter: c.requeueAfter}, err
-	}
-
-	return ctrl.Result{}, err
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

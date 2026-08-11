@@ -605,6 +605,48 @@ func TestControllerReconcile(t *testing.T) {
 		assert.Equal(t, ctrl.Result{}, result)
 	})
 
+	t.Run("retry when setting up the backup", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
+		reconcilerMock := newMockReconciler(t)
+		controller := NewController(fakeClient, reconcilerMock, requeueAfterTest)
+		reconcilerMock.EXPECT().
+			ensureVeleroStatusSynced(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureBackupSetup(context.Background(), mock.Anything, mock.Anything).
+			Return(Retry, assert.AnError)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, result)
+	})
+
+	t.Run("retry when checking whether the backup is canceled", func(t *testing.T) {
+		reconcilerMock, controller := newTestFixtureForControllerTest(t)
+		reconcilerMock.EXPECT().
+			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			Return(Retry, assert.AnError)
+
+		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
+
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, result)
+	})
+
 }
 
 func newBackupForTest(namespace string, name string) *backupv1.Backup {
