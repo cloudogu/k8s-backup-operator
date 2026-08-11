@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"slices"
 	"strconv"
 	"time"
@@ -177,11 +176,7 @@ func (c *defaultReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, 
 }
 
 func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
-	// unify label
-	if backup.Labels == nil {
-		backup.Labels = make(map[string]string)
-	}
-	maps.Copy(backup.Labels, defaultLabels)
+	metadataChanged := mergeMissingOrChangedValues(&backup.Labels, defaultLabels)
 
 	var blueprintList = blueprintv3.BlueprintList{}
 	err := c.client.List(ctx, &blueprintList, client.InNamespace(backup.Namespace))
@@ -197,10 +192,6 @@ func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backu
 	if len(blueprintList.Items) > 0 {
 		blueprint := blueprintList.Items[0]
 
-		if backup.Annotations == nil {
-			backup.Annotations = make(map[string]string)
-		}
-
 		dogusAsJson, jsonerr := json.Marshal(blueprint.Spec.Blueprint.Dogus)
 		if jsonerr != nil {
 			return Abort, fmt.Errorf("marshal blueprint dogus to json: %w", jsonerr)
@@ -210,11 +201,15 @@ func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backu
 			blueprintIdAnnotation:    blueprint.Spec.DisplayName,
 			blueprintDogusAnnotation: string(dogusAsJson),
 		}
-		maps.Copy(backup.Annotations, annotation)
+		metadataChanged = mergeMissingOrChangedValues(&backup.Annotations, annotation) || metadataChanged
 	}
 
 	// finalizer
-	controllerutil.AddFinalizer(backup, backupv1.BackupFinalizer)
+	metadataChanged = controllerutil.AddFinalizer(backup, backupv1.BackupFinalizer) || metadataChanged
+
+	if !metadataChanged {
+		return Next, nil
+	}
 
 	// write backup
 	err = c.client.Update(ctx, backup)
@@ -224,6 +219,23 @@ func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backu
 	}
 
 	return Next, nil
+}
+
+func mergeMissingOrChangedValues(target *map[string]string, desired map[string]string) bool {
+	changed := false
+	for key, desiredValue := range desired {
+		if currentValue, exists := (*target)[key]; exists && currentValue == desiredValue {
+			continue
+		}
+
+		if *target == nil {
+			*target = make(map[string]string)
+		}
+		(*target)[key] = desiredValue
+		changed = true
+	}
+
+	return changed
 }
 
 func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {

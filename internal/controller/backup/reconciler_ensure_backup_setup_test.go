@@ -151,6 +151,60 @@ func TestEnsureBackupSetup(t *testing.T) {
 		assert.True(t, updateCalled)
 	})
 
+	t.Run("should not update unchanged metadata", func(t *testing.T) {
+		blueprintList := newBlueprintListForEnsureBackupSetupTest(
+			"ns",
+			"blueprint",
+			"blueprint-display-name",
+			[]blueprintv3.Dogu{{Name: "dogu01"}, {Name: "dogu02"}},
+		)
+		backup := newBackupForTest("ns", "backup")
+		backup.Labels = maps.Clone(defaultLabels)
+		backup.Annotations = map[string]string{
+			blueprintIdAnnotation:    "blueprint-display-name",
+			blueprintDogusAnnotation: `[{"name":"dogu01"},{"name":"dogu02"}]`,
+		}
+		backup.Finalizers = []string{backupv1.BackupFinalizer}
+		updateCalled := false
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+		assert.False(t, updateCalled)
+	})
+
+	t.Run("should update changed managed metadata", func(t *testing.T) {
+		blueprintList := newBlueprintListForEnsureBackupSetupTest(
+			"ns",
+			"blueprint",
+			"blueprint-display-name",
+			[]blueprintv3.Dogu{{Name: "dogu01"}},
+		)
+		backup := newBackupForTest("ns", "backup")
+		backup.Labels = maps.Clone(defaultLabels)
+		backup.Labels["app"] = "outdated"
+		backup.Annotations = map[string]string{
+			blueprintIdAnnotation:    "outdated",
+			blueprintDogusAnnotation: `[{"name":"outdated"}]`,
+		}
+		backup.Finalizers = []string{backupv1.BackupFinalizer}
+		updateCalled := false
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+		assert.True(t, updateCalled)
+		assert.Equal(t, defaultLabels["app"], backup.Labels["app"])
+		assert.Equal(t, "blueprint-display-name", backup.Annotations[blueprintIdAnnotation])
+		assert.JSONEq(t, `[{"name":"dogu01"}]`, backup.Annotations[blueprintDogusAnnotation])
+	})
+
 	t.Run("should ignore a missing blueprint CRD", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		updateCalled := false
