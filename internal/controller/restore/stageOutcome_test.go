@@ -44,7 +44,7 @@ func TestStageOutcomeNeverCombinesAnErrorWithAnExplicitRequeue(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result, err := test.outcome.result()
+			result, err := test.outcome.result(requeueAfterTest)
 
 			assert.Equal(t, test.wantResult, result)
 			assert.Equal(t, test.wantErr, err)
@@ -64,7 +64,7 @@ func TestStageOutcomeCannotSilentlyDropARetry(t *testing.T) {
 
 	for name, outcome := range tests {
 		t.Run(name, func(t *testing.T) {
-			result, err := outcome.result()
+			result, err := outcome.result(requeueAfterTest)
 
 			require.NoError(t, err)
 			assert.Equal(t, defaultRequeueDelay, result.RequeueAfter)
@@ -143,7 +143,7 @@ func TestRunStagesRunsOrderedStagesUntilOneDoesNotContinue(t *testing.T) {
 			return restore, abort()
 		}
 
-		_, err := runStages(testCtx, restoreWith(k8sv1.RestoreStatusInProgress), replacing, returningNothing, observing)
+		_, err := runStages(testCtx, restoreWith(k8sv1.RestoreStatusInProgress), requeueAfterTest, replacing, returningNothing, observing)
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{k8sv1.RestoreStatusInProgress, k8sv1.RestoreStatusCompleted, k8sv1.RestoreStatusCompleted}, seen)
@@ -153,7 +153,7 @@ func TestRunStagesRunsOrderedStagesUntilOneDoesNotContinue(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			executed = nil
 
-			result, err := runStages(testCtx, restoreWith(""), test.stages...)
+			result, err := runStages(testCtx, restoreWith(""), requeueAfterTest, test.stages...)
 
 			assert.Equal(t, test.wantExecuted, executed)
 			assert.Equal(t, test.wantResult, result)

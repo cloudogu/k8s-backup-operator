@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -11,13 +12,15 @@ import (
 )
 
 const (
-	StageDevelopment       = "development"
-	StageProduction        = "production"
-	StageEnvVar            = "STAGE"
-	namespaceEnvVar        = "NAMESPACE"
-	logLevelEnvVar         = "LOG_LEVEL"
-	imagePullSecretsEnvVar = "IMAGE_PULL_SECRETS"
-	backupRetryTimeLimit   = "BACKUP_RETRY_TIME_LIMIT"
+	StageDevelopment        = "development"
+	StageProduction         = "production"
+	StageEnvVar             = "STAGE"
+	namespaceEnvVar         = "NAMESPACE"
+	logLevelEnvVar          = "LOG_LEVEL"
+	imagePullSecretsEnvVar  = "IMAGE_PULL_SECRETS"
+	backupRetryTimeLimit    = "BACKUP_RETRY_TIME_LIMIT"
+	backupRequeueTimeEnvVar = "BACKUP_REQUEUE_TIME"
+	backupStorageNameEnvVar = "BACKUP_STORAGE_NAME"
 )
 
 const (
@@ -26,6 +29,11 @@ const (
 	// OperatorImageConfigmapNameKey contains the key to retrieve this operators'
 	// container image from the OperatorAdditionalImagesConfigmapName configmap.
 	OperatorImageConfigmapNameKey = "operatorImage"
+)
+
+const (
+	defaultBackupRequeueTimeSeconds = 5
+	defaultBackupStorageName        = "default"
 )
 
 var log = ctrl.Log.WithName("config")
@@ -39,6 +47,10 @@ type OperatorConfig struct {
 	// ImagePullSecrets contains the secrets that are used to pull container images from external registries.
 	// It is used for the creation of the backup schedule cronjob.
 	ImagePullSecrets []corev1.LocalObjectReference
+	// the contiues reconcilation will retry every time (default: 5s)
+	RequeueTimeSeconds int
+	// Name for provider backup storage name (default: 'default')
+	BackupStorageName string
 }
 
 var Stage = StageProduction
@@ -77,10 +89,24 @@ func NewOperatorConfig(version string) (*OperatorConfig, error) {
 	}
 	log.Info(fmt.Sprintf("Using image pull secrets: %v", imagePullSecrets))
 
+	backupRequeueTime, err := getBackupRequeueTimeSeconds()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read backup requeue time: %w", err)
+	}
+	log.Info(fmt.Sprintf("Using backup requeue time: %v", backupRequeueTime))
+
+	backupStorageName, err := getBackupStorageName()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read backup storage name: %w", err)
+	}
+	log.Info(fmt.Sprintf("Using backup storage name: %v", backupStorageName))
+
 	return &OperatorConfig{
-		Version:          parsedVersion,
-		Namespace:        namespace,
-		ImagePullSecrets: imagePullSecrets,
+		Version:            parsedVersion,
+		Namespace:          namespace,
+		ImagePullSecrets:   imagePullSecrets,
+		RequeueTimeSeconds: backupRequeueTime,
+		BackupStorageName:  backupStorageName,
 	}, nil
 }
 
@@ -136,4 +162,38 @@ func getEnvVar(name string) (string, error) {
 		return "", fmt.Errorf("environment variable %s must be set", name)
 	}
 	return env, nil
+}
+
+func getBackupRequeueTimeSeconds() (int, error) {
+	value, found := os.LookupEnv(backupRequeueTimeEnvVar)
+	if !found || value == "" {
+		return defaultBackupRequeueTimeSeconds, nil
+	}
+
+	seconds, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf(
+			"parse environment variable %s: %w",
+			backupRequeueTimeEnvVar,
+			err,
+		)
+	}
+
+	if seconds <= 0 {
+		return 0, fmt.Errorf(
+			"environment variable %s must be greater than zero",
+			backupRequeueTimeEnvVar,
+		)
+	}
+
+	return seconds, nil
+}
+
+func getBackupStorageName() (string, error) {
+	value, found := os.LookupEnv(backupStorageNameEnvVar)
+	if !found || value == "" {
+		return defaultBackupStorageName, nil
+	}
+
+	return value, nil
 }

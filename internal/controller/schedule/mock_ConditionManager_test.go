@@ -20,39 +20,6 @@ func (_m *MockConditionManager) EXPECT() *MockConditionManager_Expecter {
 	return &MockConditionManager_Expecter{mock: &_m.Mock}
 }
 
-// ComputeReady provides a mock function with given fields: schedule
-func (_m *MockConditionManager) ComputeReady(schedule *v1.BackupSchedule) {
-	_m.Called(schedule)
-}
-
-// MockConditionManager_ComputeReady_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputeReady'
-type MockConditionManager_ComputeReady_Call struct {
-	*mock.Call
-}
-
-// ComputeReady is a helper method to define mock.On call
-//   - schedule *v1.BackupSchedule
-func (_e *MockConditionManager_Expecter) ComputeReady(schedule interface{}) *MockConditionManager_ComputeReady_Call {
-	return &MockConditionManager_ComputeReady_Call{Call: _e.mock.On("ComputeReady", schedule)}
-}
-
-func (_c *MockConditionManager_ComputeReady_Call) Run(run func(schedule *v1.BackupSchedule)) *MockConditionManager_ComputeReady_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*v1.BackupSchedule))
-	})
-	return _c
-}
-
-func (_c *MockConditionManager_ComputeReady_Call) Return() *MockConditionManager_ComputeReady_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockConditionManager_ComputeReady_Call) RunAndReturn(run func(*v1.BackupSchedule)) *MockConditionManager_ComputeReady_Call {
-	_c.Run(run)
-	return _c
-}
-
 // MarkAcceptanceNotEvaluated provides a mock function with given fields: schedule, err
 func (_m *MockConditionManager) MarkAcceptanceNotEvaluated(schedule *v1.BackupSchedule, err error) {
 	_m.Called(schedule, err)
@@ -120,106 +87,6 @@ func (_c *MockConditionManager_MarkAccepted_Call) RunAndReturn(run func(*v1.Back
 	return _c
 }
 
-// MarkCronJobNotSynced provides a mock function with given fields: schedule, err
-func (_m *MockConditionManager) MarkCronJobNotSynced(schedule *v1.BackupSchedule, err error) {
-	_m.Called(schedule, err)
-}
-
-// MockConditionManager_MarkCronJobNotSynced_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkCronJobNotSynced'
-type MockConditionManager_MarkCronJobNotSynced_Call struct {
-	*mock.Call
-}
-
-// MarkCronJobNotSynced is a helper method to define mock.On call
-//   - schedule *v1.BackupSchedule
-//   - err error
-func (_e *MockConditionManager_Expecter) MarkCronJobNotSynced(schedule interface{}, err interface{}) *MockConditionManager_MarkCronJobNotSynced_Call {
-	return &MockConditionManager_MarkCronJobNotSynced_Call{Call: _e.mock.On("MarkCronJobNotSynced", schedule, err)}
-}
-
-func (_c *MockConditionManager_MarkCronJobNotSynced_Call) Run(run func(schedule *v1.BackupSchedule, err error)) *MockConditionManager_MarkCronJobNotSynced_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*v1.BackupSchedule), args[1].(error))
-	})
-	return _c
-}
-
-func (_c *MockConditionManager_MarkCronJobNotSynced_Call) Return() *MockConditionManager_MarkCronJobNotSynced_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockConditionManager_MarkCronJobNotSynced_Call) RunAndReturn(run func(*v1.BackupSchedule, error)) *MockConditionManager_MarkCronJobNotSynced_Call {
-	_c.Run(run)
-	return _c
-}
-
-// MarkCronJobSynced provides a mock function with given fields: schedule
-func (_m *MockConditionManager) MarkCronJobSynced(schedule *v1.BackupSchedule) {
-	_m.Called(schedule)
-}
-
-// MockConditionManager_MarkCronJobSynced_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkCronJobSynced'
-type MockConditionManager_MarkCronJobSynced_Call struct {
-	*mock.Call
-}
-
-// MarkCronJobSynced is a helper method to define mock.On call
-//   - schedule *v1.BackupSchedule
-func (_e *MockConditionManager_Expecter) MarkCronJobSynced(schedule interface{}) *MockConditionManager_MarkCronJobSynced_Call {
-	return &MockConditionManager_MarkCronJobSynced_Call{Call: _e.mock.On("MarkCronJobSynced", schedule)}
-}
-
-func (_c *MockConditionManager_MarkCronJobSynced_Call) Run(run func(schedule *v1.BackupSchedule)) *MockConditionManager_MarkCronJobSynced_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*v1.BackupSchedule))
-	})
-	return _c
-}
-
-func (_c *MockConditionManager_MarkCronJobSynced_Call) Return() *MockConditionManager_MarkCronJobSynced_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockConditionManager_MarkCronJobSynced_Call) RunAndReturn(run func(*v1.BackupSchedule)) *MockConditionManager_MarkCronJobSynced_Call {
-	_c.Run(run)
-	return _c
-}
-
-// MarkDeleting provides a mock function with given fields: schedule
-func (_m *MockConditionManager) MarkDeleting(schedule *v1.BackupSchedule) {
-	_m.Called(schedule)
-}
-
-// MockConditionManager_MarkDeleting_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkDeleting'
-type MockConditionManager_MarkDeleting_Call struct {
-	*mock.Call
-}
-
-// MarkDeleting is a helper method to define mock.On call
-//   - schedule *v1.BackupSchedule
-func (_e *MockConditionManager_Expecter) MarkDeleting(schedule interface{}) *MockConditionManager_MarkDeleting_Call {
-	return &MockConditionManager_MarkDeleting_Call{Call: _e.mock.On("MarkDeleting", schedule)}
-}
-
-func (_c *MockConditionManager_MarkDeleting_Call) Run(run func(schedule *v1.BackupSchedule)) *MockConditionManager_MarkDeleting_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*v1.BackupSchedule))
-	})
-	return _c
-}
-
-func (_c *MockConditionManager_MarkDeleting_Call) Return() *MockConditionManager_MarkDeleting_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockConditionManager_MarkDeleting_Call) RunAndReturn(run func(*v1.BackupSchedule)) *MockConditionManager_MarkDeleting_Call {
-	_c.Run(run)
-	return _c
-}
-
 // MarkInvalid provides a mock function with given fields: schedule, err
 func (_m *MockConditionManager) MarkInvalid(schedule *v1.BackupSchedule, err error) {
 	_m.Called(schedule, err)
@@ -250,6 +117,74 @@ func (_c *MockConditionManager_MarkInvalid_Call) Return() *MockConditionManager_
 }
 
 func (_c *MockConditionManager_MarkInvalid_Call) RunAndReturn(run func(*v1.BackupSchedule, error)) *MockConditionManager_MarkInvalid_Call {
+	_c.Run(run)
+	return _c
+}
+
+// MarkNotReady provides a mock function with given fields: schedule, reason, message
+func (_m *MockConditionManager) MarkNotReady(schedule *v1.BackupSchedule, reason string, message string) {
+	_m.Called(schedule, reason, message)
+}
+
+// MockConditionManager_MarkNotReady_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkNotReady'
+type MockConditionManager_MarkNotReady_Call struct {
+	*mock.Call
+}
+
+// MarkNotReady is a helper method to define mock.On call
+//   - schedule *v1.BackupSchedule
+//   - reason string
+//   - message string
+func (_e *MockConditionManager_Expecter) MarkNotReady(schedule interface{}, reason interface{}, message interface{}) *MockConditionManager_MarkNotReady_Call {
+	return &MockConditionManager_MarkNotReady_Call{Call: _e.mock.On("MarkNotReady", schedule, reason, message)}
+}
+
+func (_c *MockConditionManager_MarkNotReady_Call) Run(run func(schedule *v1.BackupSchedule, reason string, message string)) *MockConditionManager_MarkNotReady_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*v1.BackupSchedule), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockConditionManager_MarkNotReady_Call) Return() *MockConditionManager_MarkNotReady_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockConditionManager_MarkNotReady_Call) RunAndReturn(run func(*v1.BackupSchedule, string, string)) *MockConditionManager_MarkNotReady_Call {
+	_c.Run(run)
+	return _c
+}
+
+// MarkReady provides a mock function with given fields: schedule
+func (_m *MockConditionManager) MarkReady(schedule *v1.BackupSchedule) {
+	_m.Called(schedule)
+}
+
+// MockConditionManager_MarkReady_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkReady'
+type MockConditionManager_MarkReady_Call struct {
+	*mock.Call
+}
+
+// MarkReady is a helper method to define mock.On call
+//   - schedule *v1.BackupSchedule
+func (_e *MockConditionManager_Expecter) MarkReady(schedule interface{}) *MockConditionManager_MarkReady_Call {
+	return &MockConditionManager_MarkReady_Call{Call: _e.mock.On("MarkReady", schedule)}
+}
+
+func (_c *MockConditionManager_MarkReady_Call) Run(run func(schedule *v1.BackupSchedule)) *MockConditionManager_MarkReady_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*v1.BackupSchedule))
+	})
+	return _c
+}
+
+func (_c *MockConditionManager_MarkReady_Call) Return() *MockConditionManager_MarkReady_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockConditionManager_MarkReady_Call) RunAndReturn(run func(*v1.BackupSchedule)) *MockConditionManager_MarkReady_Call {
 	_c.Run(run)
 	return _c
 }

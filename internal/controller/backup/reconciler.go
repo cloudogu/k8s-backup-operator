@@ -2,13 +2,17 @@ package backup
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"time"
 
+	"github.com/cloudogu/ces-commons-lib/errors"
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
+	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	"github.com/go-logr/logr"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -20,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-const veleroBackupStorageName = "default"
 const (
 	reasonProviderBackupStorageLocationNotFound     = "ProviderBackupStorageLocationNotFound"
 	reasonProviderBackupStorageLocationNotAvailable = "ProviderBackupStorageLocationNotAvailable"
@@ -92,23 +95,19 @@ type Clock interface {
 	Now() time.Time
 }
 
-type DefaultClock struct{}
-
-func (d DefaultClock) Now() time.Time {
-	return time.Now()
-}
-
 type defaultReconciler struct {
 	client             client.Client
 	maintenanceGateway maintenanceGateway
 	clock              Clock
+	backupStorageName  string
 }
 
-func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway, clock Clock) *defaultReconciler {
+func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway, clock Clock, backupStorageName string) *defaultReconciler {
 	return &defaultReconciler{
 		client:             client,
 		maintenanceGateway: maintenanceGateway,
 		clock:              clock,
+		backupStorageName:  backupStorageName,
 	}
 }
 
@@ -177,6 +176,56 @@ func (c *defaultReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, 
 	return Abort, nil
 }
 
+func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+	// unify label
+	if backup.Labels == nil {
+		backup.Labels = make(map[string]string)
+	}
+	maps.Copy(backup.Labels, defaultLabels)
+
+	var blueprintList = blueprintv3.BlueprintList{}
+	err := c.client.List(ctx, &blueprintList, client.InNamespace(backup.Namespace))
+	// no blueprint or no clueprint crd
+	if err != nil {
+		if !errors.IsNotFoundError(err) && !meta.IsNoMatchError(err) {
+			return Abort, fmt.Errorf("list blueprints: %w", err)
+		}
+		blueprintList.Items = nil
+	}
+
+	// only take first blueprint
+	if len(blueprintList.Items) > 0 {
+		blueprint := blueprintList.Items[0]
+
+		if backup.Annotations == nil {
+			backup.Annotations = make(map[string]string)
+		}
+
+		dogusAsJson, jsonerr := json.Marshal(blueprint.Spec.Blueprint.Dogus)
+		if jsonerr != nil {
+			return Abort, fmt.Errorf("marshal blueprint dogus to json: %w", jsonerr)
+		}
+
+		annotation := map[string]string{
+			blueprintIdAnnotation:    blueprint.Spec.DisplayName,
+			blueprintDogusAnnotation: string(dogusAsJson),
+		}
+		maps.Copy(backup.Annotations, annotation)
+	}
+
+	// finalizer
+	controllerutil.AddFinalizer(backup, backupv1.BackupFinalizer)
+
+	// write backup
+	err = c.client.Update(ctx, backup)
+	if err != nil {
+		logger.Error(err, "failed to update backup to set labels and annotations")
+		return Abort, err
+	}
+
+	return Next, nil
+}
+
 func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
 	timeWindowHasExpired, err := c.hasTimeWindowExpired(ctx, backup)
 	if err != nil {
@@ -213,14 +262,14 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 	veleroBackupStorageLocation := velerov1.BackupStorageLocation{}
 	err := c.client.Get(
 		ctx,
-		types.NamespacedName{Namespace: backup.Namespace, Name: veleroBackupStorageName},
+		types.NamespacedName{Namespace: backup.Namespace, Name: c.backupStorageName},
 		&veleroBackupStorageLocation,
 	)
 
 	if apierrors.IsNotFound(err) {
 		debug(logger, fmt.Sprintf(
 			"ensureBackupIsPrepared: backup storage location '%s' not found -> Prepared = False, RETRY",
-			veleroBackupStorageName,
+			c.backupStorageName,
 		))
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
@@ -238,18 +287,18 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 	}
 
 	if err != nil {
-		return Abort, fmt.Errorf("get velero backup storage location 'name=%s': %w", veleroBackupStorageName, err)
+		return Abort, fmt.Errorf("get velero backup storage location 'name=%s': %w", c.backupStorageName, err)
 	}
 
 	if veleroBackupStorageLocation.Status.Phase != velerov1.BackupStorageLocationPhaseAvailable {
-		logger.Info(fmt.Sprintf("Velero backup storage location 'name=%s' is not available.", veleroBackupStorageName))
+		logger.Info(fmt.Sprintf("Velero backup storage location 'name=%s' is not available.", c.backupStorageName))
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 				Type:    backupv1.ConditionPrepared,
 				Status:  metav1.ConditionFalse,
 				Reason:  reasonProviderBackupStorageLocationNotAvailable,
-				Message: fmt.Sprintf("velero backup storage location 'name=%s' is not available.", veleroBackupStorageName),
+				Message: fmt.Sprintf("velero backup storage location 'name=%s' is not available.", c.backupStorageName),
 			})
 		})
 		if patchErr != nil {
@@ -263,7 +312,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 			Type:    backupv1.ConditionPrepared,
 			Status:  metav1.ConditionTrue,
 			Reason:  reasonProviderBackupStorageLocationAvailable,
-			Message: fmt.Sprintf("velero backup storage location 'name=%s' is available.", veleroBackupStorageName),
+			Message: fmt.Sprintf("velero backup storage location 'name=%s' is available.", c.backupStorageName),
 		})
 	})
 	if patchErr != nil {
@@ -583,7 +632,7 @@ func (c *defaultReconciler) createVeleroBackupResource(backup *backupv1.Backup) 
 			},
 			OrLabelSelectors:         selectors,
 			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
-			StorageLocation:          veleroBackupStorageName,
+			StorageLocation:          c.backupStorageName,
 			DefaultVolumesToFsBackup: &volumeFsBackup,
 		},
 	}

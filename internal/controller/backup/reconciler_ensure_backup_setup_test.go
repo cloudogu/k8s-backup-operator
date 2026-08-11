@@ -11,25 +11,28 @@ import (
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	apiMeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-func TestControllerSetupBackup(t *testing.T) {
+func TestEnsureBackupSetup(t *testing.T) {
 	t.Run("It should add default labels", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
 		var updateCalled = false
-		fakeClient := newFakeClientForControllerSetupBackupTest(t, backup, blueprintList, &updateCalled)
-		controller := NewController(fakeClient, nil)
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		err := controller.setupBackup(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
 
 		expectedLabels := map[string]string{}
 		maps.Copy(expectedLabels, defaultLabels)
 
 		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
 		assert.True(t, reflect.DeepEqual(backup.Labels, expectedLabels))
 		assert.True(t, updateCalled)
 	})
@@ -42,16 +45,17 @@ func TestControllerSetupBackup(t *testing.T) {
 		}
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
 		var updateCalled = false
-		fakeClient := newFakeClientForControllerSetupBackupTest(t, backup, blueprintList, &updateCalled)
-		controller := NewController(fakeClient, nil)
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		err := controller.setupBackup(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
 
 		expectedLabels := map[string]string{}
 		maps.Copy(expectedLabels, backup.Labels)
 		maps.Copy(expectedLabels, defaultLabels)
 
 		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
 		assert.True(t, reflect.DeepEqual(backup.Labels, expectedLabels))
 		assert.True(t, updateCalled)
 	})
@@ -60,12 +64,13 @@ func TestControllerSetupBackup(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
 		var updateCalled = false
-		fakeClient := newFakeClientForControllerSetupBackupTest(t, backup, blueprintList, &updateCalled)
-		controller := NewController(fakeClient, nil)
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		err := controller.setupBackup(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
 
 		expectedFinalizers := []string{backupv1.BackupFinalizer}
 		assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
@@ -79,12 +84,13 @@ func TestControllerSetupBackup(t *testing.T) {
 			Items: []blueprintv3.Blueprint{},
 		}
 		var updateCalled = false
-		fakeClient := newFakeClientForControllerSetupBackupTest(t, backup, blueprintList, &updateCalled)
-		controller := NewController(fakeClient, nil)
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		err := controller.setupBackup(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
 
 		expectedFinalizers := []string{backupv1.BackupFinalizer, "finalizer01", "finalizer02"}
 		assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
@@ -93,7 +99,7 @@ func TestControllerSetupBackup(t *testing.T) {
 
 	t.Run("should add an annotation with the blueprint's display name and dogus", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
-		blueprintList := newBlueprintListForControllerSetupBackupTest(
+		blueprintList := newBlueprintListForEnsureBackupSetupTest(
 			"ns",
 			"blueprint",
 			"blueprint-display-name",
@@ -103,12 +109,13 @@ func TestControllerSetupBackup(t *testing.T) {
 			},
 		)
 		var updateCalled = false
-		fakeClient := newFakeClientForControllerSetupBackupTest(t, backup, blueprintList, &updateCalled)
-		controller := NewController(fakeClient, nil)
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		err := controller.setupBackup(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
 		assert.Equal(t, "blueprint-display-name", backup.Annotations[blueprintIdAnnotation])
 		assert.JSONEq(t, `[{"name": "dogu01"}, {"name": "dogu02"}]`, backup.Annotations[blueprintDogusAnnotation])
 		assert.True(t, updateCalled)
@@ -120,7 +127,7 @@ func TestControllerSetupBackup(t *testing.T) {
 			"example.com/anno1": "annoVal1",
 			"example.com/anno2": "annoVal2",
 		}
-		blueprintList := newBlueprintListForControllerSetupBackupTest(
+		blueprintList := newBlueprintListForEnsureBackupSetupTest(
 			"ns",
 			"blueprint",
 			"blueprint-display-name",
@@ -130,12 +137,13 @@ func TestControllerSetupBackup(t *testing.T) {
 			},
 		)
 		var updateCalled = false
-		fakeClient := newFakeClientForControllerSetupBackupTest(t, backup, blueprintList, &updateCalled)
-		controller := NewController(fakeClient, nil)
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		err := controller.setupBackup(context.Background(), backup, "ns", logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
 
 		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
 		assert.ElementsMatch(t,
 			[]string{"example.com/anno1", "example.com/anno2", blueprintIdAnnotation, blueprintDogusAnnotation},
 			slices.Collect(maps.Keys(backup.Annotations)),
@@ -143,9 +151,36 @@ func TestControllerSetupBackup(t *testing.T) {
 		assert.True(t, updateCalled)
 	})
 
+	t.Run("should ignore a missing blueprint CRD", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		updateCalled := false
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup).
+			WithInterceptorFuncs(interceptor.Funcs{
+				List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
+					return &apiMeta.NoKindMatchError{
+						GroupKind:        schema.GroupKind{Group: "k8s.cloudogu.com", Kind: "Blueprint"},
+						SearchedVersions: []string{"v3"},
+					}
+				},
+				Update: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+					updateCalled = true
+					return client.Update(ctx, obj, opts...)
+				},
+			}).
+			Build()
+		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+		assert.True(t, updateCalled)
+		assert.Contains(t, backup.Finalizers, backupv1.BackupFinalizer)
+	})
 }
 
-func newFakeClientForControllerSetupBackupTest(t *testing.T, backup *backupv1.Backup, blueprintList *blueprintv3.BlueprintList, updateCalled *bool) client.WithWatch {
+func newFakeClientForEnsureBackupSetupTest(t *testing.T, backup *backupv1.Backup, blueprintList *blueprintv3.BlueprintList, updateCalled *bool) client.WithWatch {
 	return newFakeClientBuilder(t).
 		WithObjects(backup).
 		WithLists(blueprintList).
@@ -158,7 +193,7 @@ func newFakeClientForControllerSetupBackupTest(t *testing.T, backup *backupv1.Ba
 		Build()
 }
 
-func newBlueprintListForControllerSetupBackupTest(
+func newBlueprintListForEnsureBackupSetupTest(
 	namespace string,
 	name string,
 	displayName string,
