@@ -618,7 +618,7 @@ func (c *defaultReconciler) createVeleroBackupResource(backup *backupv1.Backup) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        backup.Name,
 			Namespace:   backup.Namespace,
-			Labels:      map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"},
+			Labels:      defaultLabels,
 			Annotations: annotations.GetBackupAnnotations(backup.ObjectMeta),
 		},
 		Spec: velerov1.BackupSpec{
