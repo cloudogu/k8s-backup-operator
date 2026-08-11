@@ -95,10 +95,7 @@ func NewOperatorConfig(version string) (*OperatorConfig, error) {
 	}
 	log.Info(fmt.Sprintf("Using backup requeue time: %v", backupRequeueTime))
 
-	backupStorageName, err := getBackupStorageName()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read backup storage name: %w", err)
-	}
+	backupStorageName := getBackupStorageName()
 	log.Info(fmt.Sprintf("Using backup storage name: %v", backupStorageName))
 
 	return &OperatorConfig{
@@ -189,11 +186,11 @@ func getBackupRequeueTimeSeconds() (int, error) {
 	return seconds, nil
 }
 
-func getBackupStorageName() (string, error) {
+func getBackupStorageName() string {
 	value, found := os.LookupEnv(backupStorageNameEnvVar)
 	if !found || value == "" {
-		return defaultBackupStorageName, nil
+		return defaultBackupStorageName
 	}
 
-	return value, nil
+	return value
 }
