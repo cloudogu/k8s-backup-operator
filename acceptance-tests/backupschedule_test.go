@@ -23,6 +23,8 @@ const (
 	backupScheduleTestNamespace = "ecosystem"
 	initialSchedule             = "0 2 * * *"
 	updatedSchedule             = "15 3 * * *"
+	// valid but different image tag
+	driftedOperatorImage = "example.invalid/drifted-operator:latest"
 )
 
 var _ = Describe("BackupSchedule", Label("backupschedule"), func() {
@@ -69,6 +71,32 @@ var _ = Describe("BackupSchedule", Label("backupschedule"), func() {
 
 		It("its CronJob schedule is also updated", func(ctx SpecContext) {
 			expectCronJobReady(ctx, backupScheduleObjectKey, updatedSchedule)
+		})
+	})
+
+	Describe("Reconciling images drift in CronJob", Ordered, func() {
+		backupScheduleObjectKey := newBackupScheduleObjectKey()
+
+		BeforeAll(func(ctx SpecContext) {
+			By("creating a BackupSchedule and waiting for its CronJob to be created")
+			backupSchedule := newBackupSchedule(backupScheduleObjectKey, initialSchedule)
+			Expect(k8sClient.Create(ctx, backupSchedule)).Should(Succeed())
+			expectCronJobReady(ctx, backupScheduleObjectKey, initialSchedule)
+		})
+		AfterAll(func(ctx SpecContext) {
+			deleteAndIgnoreNotFound(ctx, newBackupSchedule(backupScheduleObjectKey, initialSchedule))
+		})
+
+		It("when the CronJob operator image is changed", func(ctx SpecContext) {
+			cronJob := &batchv1.CronJob{}
+			Expect(k8sClient.Get(ctx, cronJobObjectKey(backupScheduleObjectKey), cronJob)).Should(Succeed())
+			Expect(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers).To(HaveLen(1))
+			cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image = driftedOperatorImage
+			Expect(k8sClient.Update(ctx, cronJob)).Should(Succeed())
+		})
+
+		It("the configured operator image is restored", func(ctx SpecContext) {
+			expectCronJobUsesConfiguredOperatorImage(ctx, backupScheduleObjectKey)
 		})
 	})
 
@@ -145,12 +173,17 @@ func expectCronJobUsesConfiguredOperatorImage(ctx SpecContext, backupScheduleObj
 	Expect(exists).To(BeTrue())
 	Expect(operatorImage).NotTo(BeEmpty())
 
-	cronJob := &batchv1.CronJob{}
-	Expect(k8sClient.Get(ctx, cronJobObjectKey(backupScheduleObjectKey), cronJob)).Should(Succeed())
-
-	Expect(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers).To(HaveLen(1))
-	Expect(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image).To(Equal(operatorImage))
+	Eventually(func(g Gomega) {
+		cronJob := &batchv1.CronJob{}
+		g.Expect(k8sClient.Get(ctx, cronJobObjectKey(backupScheduleObjectKey), cronJob)).Should(Succeed())
+		g.Expect(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers).To(HaveLen(1))
+		g.Expect(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image).To(Equal(operatorImage))
+	}).
+		WithTimeout(2 * time.Minute).
+		WithPolling(time.Second).
+		Should(Succeed())
 }
+
 func newBackupScheduleObjectKey() client.ObjectKey {
 	return client.ObjectKey{
 		Namespace: backupScheduleTestNamespace,

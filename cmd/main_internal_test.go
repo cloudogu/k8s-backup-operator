@@ -7,7 +7,6 @@ import (
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
-	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	backupconfig "github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
@@ -16,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/config"
@@ -194,13 +192,11 @@ func Test_startOperator(t *testing.T) {
 		oldGetConfigFunc := ctrl.GetConfigOrDie
 		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
-		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
-			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		restConfig := &rest.Config{}
@@ -228,10 +224,6 @@ func Test_startOperator(t *testing.T) {
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
-		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
-			return additionalImageUpdaterMock
-		}
 
 		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
 
@@ -244,67 +236,6 @@ func Test_startOperator(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to get operator image")
 		assert.ErrorContains(t, err, "unable to configure manager: unable to configure reconciler")
 	})
-	t.Run("should fail update additional images", func(t *testing.T) {
-		// given
-		t.Setenv("NAMESPACE", "ecosystem")
-		t.Setenv("STAGE", "development")
-		t.Setenv("BACKUP_RETRY_TIME_LIMIT", "10")
-
-		oldNewManagerFunc := ctrl.NewManager
-		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldNewVeleroProviderFunc := provider.NewVeleroProvider
-		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
-		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
-		defer func() {
-			ctrl.NewManager = oldNewManagerFunc
-			ctrl.GetConfigOrDie = oldGetConfigFunc
-			provider.NewVeleroProvider = oldNewVeleroProviderFunc
-			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
-			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
-		}()
-
-		restConfig := &rest.Config{}
-		recorderMock := newMockEventRecorder(t)
-		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
-		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
-
-		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
-			return ctrlManMock, nil
-		}
-		ctrl.GetConfigOrDie = func() *rest.Config {
-			return restConfig
-		}
-
-		providerMock := newMockBackupProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-
-		additionalImageGetterMock := newMockAdditionalImageGetter(t)
-		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
-		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
-			return additionalImageGetterMock
-		}
-		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(assert.AnError)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
-			return additionalImageUpdaterMock
-		}
-
-		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
-
-		// when
-		err := startOperator(testCtx, flags, []string{})
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to update additional images in existing resources")
-		assert.ErrorContains(t, err, "unable to configure manager: unable to configure reconciler")
-	})
 	t.Run("should fail to configure reconciler", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
@@ -315,13 +246,11 @@ func Test_startOperator(t *testing.T) {
 		oldGetConfigFunc := ctrl.GetConfigOrDie
 		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
-		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
-			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		restConfig := &rest.Config{}
@@ -351,11 +280,6 @@ func Test_startOperator(t *testing.T) {
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
-		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
-			return additionalImageUpdaterMock
-		}
 
 		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
 
@@ -376,13 +300,11 @@ func Test_startOperator(t *testing.T) {
 		oldGetConfigFunc := ctrl.GetConfigOrDie
 		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
-		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
-			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		logMock := newMockLogSink(t)
@@ -423,11 +345,6 @@ func Test_startOperator(t *testing.T) {
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
-		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
-			return additionalImageUpdaterMock
-		}
 
 		configGetterMock := newMockConfigGetter(t)
 		newBackupTimeoutGetter = func(_ backupconfig.ConfigMapInterface) backupconfig.Getter {
@@ -455,13 +372,11 @@ func Test_startOperator(t *testing.T) {
 		oldGetConfigFunc := ctrl.GetConfigOrDie
 		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
-		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
-			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		logMock := newMockLogSink(t)
@@ -503,11 +418,6 @@ func Test_startOperator(t *testing.T) {
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
-		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
-			return additionalImageUpdaterMock
-		}
 
 		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
 
@@ -531,14 +441,12 @@ func Test_startOperator(t *testing.T) {
 		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldSignalHandlerFunc := ctrl.SetupSignalHandler
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
-		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			ctrl.SetupSignalHandler = oldSignalHandlerFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
-			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		logMock := newMockLogSink(t)
@@ -584,11 +492,6 @@ func Test_startOperator(t *testing.T) {
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
 		}
-		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
-			return additionalImageUpdaterMock
-		}
 
 		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
 
@@ -611,14 +514,12 @@ func Test_startOperator(t *testing.T) {
 		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldSignalHandlerFunc := ctrl.SetupSignalHandler
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
-		oldNewAdditionalImageUpdaterFunc := newAdditionalImageUpdater
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			ctrl.SetupSignalHandler = oldSignalHandlerFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
-			newAdditionalImageUpdater = oldNewAdditionalImageUpdaterFunc
 		}()
 
 		logMock := newMockLogSink(t)
@@ -664,11 +565,6 @@ func Test_startOperator(t *testing.T) {
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
-		}
-		additionalImageUpdaterMock := newMockAdditionalImageUpdater(t)
-		additionalImageUpdaterMock.EXPECT().Update(testCtx, additionalimages.ImageConfig{OperatorImage: "bitnamilegacy/kubectl:1.27.7"}).Return(nil)
-		newAdditionalImageUpdater = func(_ ecosystem.Interface, _ string, _ record.EventRecorder) additionalimages.Updater {
-			return additionalImageUpdaterMock
 		}
 
 		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
