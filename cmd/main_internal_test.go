@@ -204,6 +204,14 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
+		skipNameValidation := true
+		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
+		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
+		ctrlManMock.EXPECT().GetLogger().Return(logr.Discard())
+		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
+		ctrlManMock.EXPECT().GetCache().Return(nil)
+		ctrlManMock.EXPECT().GetRESTMapper().Return(nil)
+		ctrlManMock.EXPECT().GetClient().Return(nil)
 
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return ctrlManMock, nil
@@ -245,12 +253,10 @@ func Test_startOperator(t *testing.T) {
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
 		oldNewVeleroProviderFunc := provider.NewVeleroProvider
-		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
 			provider.NewVeleroProvider = oldNewVeleroProviderFunc
-			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 		}()
 
 		restConfig := &rest.Config{}
@@ -273,12 +279,6 @@ func Test_startOperator(t *testing.T) {
 		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
 		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
 			return providerMock
-		}
-
-		additionalImageGetterMock := newMockAdditionalImageGetter(t)
-		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
-		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
-			return additionalImageGetterMock
 		}
 
 		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
