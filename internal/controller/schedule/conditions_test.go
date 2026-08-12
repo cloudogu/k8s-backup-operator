@@ -17,9 +17,9 @@ func TestMarkAccepted(t *testing.T) {
 
 	manager.MarkAccepted(schedule)
 
-	condition := getCondition(t, schedule, AcceptedCondition)
+	condition := getCondition(t, schedule, backupv1.ConditionAccepted)
 	assert.Equal(t, metav1.ConditionTrue, condition.Status)
-	assert.Equal(t, ReasonValidSpec, condition.Reason)
+	assert.Equal(t, backupv1.ReasonValidSpec, condition.Reason)
 	assert.Equal(t, "Backup schedule accepted", condition.Message)
 }
 
@@ -29,9 +29,9 @@ func TestMarkInvalid(t *testing.T) {
 
 	manager.MarkInvalid(schedule, errors.New("invalid cron expression"))
 
-	condition := getCondition(t, schedule, AcceptedCondition)
+	condition := getCondition(t, schedule, backupv1.ConditionAccepted)
 	assert.Equal(t, metav1.ConditionFalse, condition.Status)
-	assert.Equal(t, ReasonInvalidSpec, condition.Reason)
+	assert.Equal(t, backupv1.ReasonInvalidSpec, condition.Reason)
 	assert.Equal(t, "invalid cron expression", condition.Message)
 }
 
@@ -41,9 +41,9 @@ func TestMarkAcceptanceNotEvaluated(t *testing.T) {
 
 	manager.MarkAcceptanceNotEvaluated(schedule, errors.New("metadata failed"))
 
-	condition := getCondition(t, schedule, AcceptedCondition)
+	condition := getCondition(t, schedule, backupv1.ConditionAccepted)
 	assert.Equal(t, metav1.ConditionUnknown, condition.Status)
-	assert.Equal(t, ReasonNotEvaluated, condition.Reason)
+	assert.Equal(t, backupv1.ReasonNotEvaluated, condition.Reason)
 	assert.Contains(t, condition.Message, "metadata failed")
 }
 
@@ -53,9 +53,9 @@ func TestMarkReady(t *testing.T) {
 
 	manager.MarkReady(schedule)
 
-	condition := getCondition(t, schedule, ReadyCondition)
+	condition := getCondition(t, schedule, backupv1.ConditionReady)
 	assert.Equal(t, metav1.ConditionTrue, condition.Status)
-	assert.Equal(t, ReasonReady, condition.Reason)
+	assert.Equal(t, backupv1.ReasonReady, condition.Reason)
 	assert.Equal(t, "BackupSchedule is ready.", condition.Message)
 }
 
@@ -63,11 +63,11 @@ func TestMarkNotReady(t *testing.T) {
 	manager := conditionManager{}
 	schedule := newBackupSchedule()
 
-	manager.MarkNotReady(schedule, ReasonSyncFailed, "CronJob synchronization failed")
+	manager.MarkNotReady(schedule, backupv1.ReasonSyncFailed, "CronJob synchronization failed")
 
-	condition := getCondition(t, schedule, ReadyCondition)
+	condition := getCondition(t, schedule, backupv1.ConditionReady)
 	assert.Equal(t, metav1.ConditionFalse, condition.Status)
-	assert.Equal(t, ReasonSyncFailed, condition.Reason)
+	assert.Equal(t, backupv1.ReasonSyncFailed, condition.Reason)
 	assert.Equal(t, "CronJob synchronization failed", condition.Message)
 }
 

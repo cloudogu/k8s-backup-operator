@@ -105,7 +105,7 @@ func Test_reconcileNormal(t *testing.T) {
 			expectedAccepted:        metav1.ConditionTrue,
 			expectAcceptedCondition: true,
 			expectedReady:           metav1.ConditionTrue,
-			expectedReadyReason:     ReasonReady,
+			expectedReadyReason:     backupv1.ReasonReady,
 		},
 		{
 			name: "validator error",
@@ -117,7 +117,7 @@ func Test_reconcileNormal(t *testing.T) {
 			expectedAccepted:        metav1.ConditionFalse,
 			expectAcceptedCondition: true,
 			expectedReady:           metav1.ConditionFalse,
-			expectedReadyReason:     ReasonInvalidSpec,
+			expectedReadyReason:     backupv1.ReasonInvalidSpec,
 		},
 		{
 			name: "metadata error",
@@ -129,8 +129,8 @@ func Test_reconcileNormal(t *testing.T) {
 			expectedAccepted:        metav1.ConditionUnknown,
 			expectAcceptedCondition: true,
 			expectedReady:           metav1.ConditionFalse,
-			expectedReadyReason:     ReasonNotEvaluated,
-			expectedAcceptedReason:  ReasonNotEvaluated,
+			expectedReadyReason:     backupv1.ReasonNotEvaluated,
+			expectedAcceptedReason:  backupv1.ReasonNotEvaluated,
 		},
 		{
 			name: "cronjob error",
@@ -145,7 +145,7 @@ func Test_reconcileNormal(t *testing.T) {
 			expectedAccepted:        metav1.ConditionTrue,
 			expectAcceptedCondition: true,
 			expectedReady:           metav1.ConditionFalse,
-			expectedReadyReason:     ReasonSyncFailed,
+			expectedReadyReason:     backupv1.ReasonSyncFailed,
 		},
 	}
 
@@ -175,8 +175,8 @@ func Test_reconcileNormal(t *testing.T) {
 			assert.Equal(t, tt.expectCronJobsEnsureCalled, testCronJobs.ensureCalled)
 			assert.Equal(t, tt.expectDeleteCalled, testCronJobs.deleteCalled)
 
-			accepted := meta.FindStatusCondition(schedule.Status.Conditions, AcceptedCondition)
-			ready := meta.FindStatusCondition(schedule.Status.Conditions, ReadyCondition)
+			accepted := meta.FindStatusCondition(schedule.Status.Conditions, backupv1.ConditionAccepted)
+			ready := meta.FindStatusCondition(schedule.Status.Conditions, backupv1.ConditionReady)
 
 			if tt.expectAcceptedCondition {
 				require.NotNil(t, accepted)
@@ -333,10 +333,10 @@ func testDeletion(t *testing.T, metadata *fakeMetaData, fakeClient client.Client
 		stored := &backupv1.BackupSchedule{}
 		require.NoError(t, fakeClient.Get(testCtx, client.ObjectKeyFromObject(schedule), stored))
 
-		ready := meta.FindStatusCondition(stored.Status.Conditions, ReadyCondition)
+		ready := meta.FindStatusCondition(stored.Status.Conditions, backupv1.ConditionReady)
 		require.NotNil(t, ready)
 		assert.Equal(t, metav1.ConditionFalse, ready.Status)
-		assert.Equal(t, ReasonDeleting, ready.Reason)
+		assert.Equal(t, backupv1.ReasonDeleting, ready.Reason)
 		assert.Len(t, stored.Status.Conditions, 1)
 	}
 }

@@ -10,43 +10,43 @@ type conditionManager struct{}
 
 func (c conditionManager) MarkAccepted(schedule *v1.BackupSchedule) {
 	setCondition(schedule, metav1.Condition{
-		Type:    AcceptedCondition,
+		Type:    v1.ConditionAccepted,
 		Status:  metav1.ConditionTrue,
-		Reason:  ReasonValidSpec,
+		Reason:  v1.ReasonValidSpec,
 		Message: "Backup schedule accepted",
 	})
 }
 
 func (c conditionManager) MarkInvalid(schedule *v1.BackupSchedule, err error) {
 	setCondition(schedule, metav1.Condition{
-		Type:    AcceptedCondition,
+		Type:    v1.ConditionAccepted,
 		Status:  metav1.ConditionFalse,
-		Reason:  ReasonInvalidSpec,
+		Reason:  v1.ReasonInvalidSpec,
 		Message: err.Error(),
 	})
 }
 
 func (c conditionManager) MarkAcceptanceNotEvaluated(schedule *v1.BackupSchedule, err error) {
 	setCondition(schedule, metav1.Condition{
-		Type:    AcceptedCondition,
+		Type:    v1.ConditionAccepted,
 		Status:  metav1.ConditionUnknown,
-		Reason:  ReasonNotEvaluated,
+		Reason:  v1.ReasonNotEvaluated,
 		Message: "Required metadata could not be persisted: " + err.Error(),
 	})
 }
 
 func (c conditionManager) MarkReady(schedule *v1.BackupSchedule) {
 	setCondition(schedule, metav1.Condition{
-		Type:    ReadyCondition,
+		Type:    v1.ConditionReady,
 		Status:  metav1.ConditionTrue,
-		Reason:  ReasonReady,
+		Reason:  v1.ReasonReady,
 		Message: "BackupSchedule is ready.",
 	})
 }
 
 func (c conditionManager) MarkNotReady(schedule *v1.BackupSchedule, reason, message string) {
 	setCondition(schedule, metav1.Condition{
-		Type:    ReadyCondition,
+		Type:    v1.ConditionReady,
 		Status:  metav1.ConditionFalse,
 		Reason:  reason,
 		Message: message,
