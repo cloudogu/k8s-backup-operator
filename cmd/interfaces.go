@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
+	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
@@ -46,19 +46,13 @@ type backupProvider interface {
 //nolint:unused
 //goland:noinspection GoUnusedType
 type additionalImageGetter interface {
-	additionalimages.Getter
+	schedulecontroller.OperatorImageGetter
 }
 
 //nolint:unused
 //goland:noinspection GoUnusedType
 type configGetter interface {
 	config.Getter
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type additionalImageUpdater interface {
-	additionalimages.Updater
 }
 
 //nolint:unused

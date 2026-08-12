@@ -37,7 +37,6 @@ import (
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/additionalimages"
 	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
@@ -66,8 +65,7 @@ var (
 )
 
 var (
-	newAdditionalImageGetter    = additionalimages.NewGetter
-	newAdditionalImageUpdater   = additionalimages.NewUpdater
+	newAdditionalImageGetter    = schedulecontroller.NewOperatorImageGetter
 	newGarbageCollectionManager = garbagecollection.NewManager
 	newScheduledBackupManager   = scheduledbackup.NewManager
 	newBackupTimeoutGetter      = config.NewGetter
@@ -286,11 +284,6 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create k8s clientset: %w", err)
 	}
 
-	ecosystemClientSet, err := ecosystem.NewClientSet(k8sManager.GetConfig(), k8sClientSet)
-	if err != nil {
-		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
-	}
-
 	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create dogu client: %w", err)
@@ -310,14 +303,6 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	operatorImage, err := imageGetter.ImageForKey(ctx, config.OperatorImageConfigmapNameKey)
 	if err != nil {
 		return fmt.Errorf("failed to get operator image: %w", err)
-	}
-
-	imageConfig := additionalimages.ImageConfig{OperatorImage: operatorImage}
-
-	additionalImageUpdater := newAdditionalImageUpdater(ecosystemClientSet, operatorConfig.Namespace, recorder)
-	err = additionalImageUpdater.Update(ctx, imageConfig)
-	if err != nil {
-		return fmt.Errorf("failed to update additional images in existing resources: %w", err)
 	}
 
 	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
