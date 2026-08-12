@@ -18,7 +18,7 @@ func TestMaintenanceModeDeactivationPersistsItsProgressAndRequeues(t *testing.T)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
-	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil)
+	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
 	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(testCtx, restore)
@@ -38,7 +38,7 @@ func TestMaintenanceModeDeactivationIsEnsuredAgainBeforeProceeding(t *testing.T)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
-		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, nil,
+		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, nil, requeueAfterTest,
 	)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
@@ -56,7 +56,7 @@ func TestFailedMaintenanceModeDeactivationUsesBackoffWithoutChangingProgress(t *
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(assert.AnError).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
-	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil)
+	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
 	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(testCtx, restore)
@@ -76,7 +76,7 @@ func TestUnpersistableMaintenanceModeDeactivationIsRetried(t *testing.T) {
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore),
-		nil, testNamespace, nil, nil,
+		nil, testNamespace, nil, nil, requeueAfterTest,
 	)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 

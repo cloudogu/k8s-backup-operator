@@ -31,7 +31,7 @@ func TestWorkloadsNotReadyPersistWaitingReasonAndRequeue(t *testing.T) {
 	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(false, nil).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
-	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock)
+	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock, requeueAfterTest)
 
 	updated, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
 
@@ -50,7 +50,7 @@ func TestWorkloadsStillNotReadyRequeueWithoutAnotherStatusWrite(t *testing.T) {
 	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(false, nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
-		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock,
+		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest,
 	)
 
 	updated, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
@@ -67,7 +67,7 @@ func TestReadyWorkloadsPersistReadyReasonAndRequeue(t *testing.T) {
 	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(true, nil).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
-	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock)
+	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock, requeueAfterTest)
 
 	_, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
 
@@ -83,7 +83,7 @@ func TestPersistedReadyReasonIsRecheckedBeforeProceeding(t *testing.T) {
 	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(true, nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
-		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock,
+		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest,
 	)
 
 	updated, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
@@ -100,7 +100,7 @@ func TestWorkloadReadinessDoesNotResetFinalizedRecoveryProgress(t *testing.T) {
 	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(true, nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
-		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock,
+		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest,
 	)
 
 	_, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
@@ -115,7 +115,7 @@ func TestWorkloadReadinessRegressionReturnsToWaiting(t *testing.T) {
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(false, nil).Once()
 	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
-	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock)
+	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock, requeueAfterTest)
 
 	_, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
 
@@ -130,7 +130,7 @@ func TestWorkloadReadinessObservationErrorUsesBackoffWithoutChangingStatus(t *te
 	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(false, assert.AnError).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
-		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock,
+		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest,
 	)
 
 	updated, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
@@ -149,7 +149,7 @@ func TestUnpersistableWorkloadReadinessIsRetried(t *testing.T) {
 	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(true, nil).Once()
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore),
-		nil, testNamespace, nil, scaleMock,
+		nil, testNamespace, nil, scaleMock, requeueAfterTest,
 	)
 
 	_, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
