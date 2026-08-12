@@ -11,6 +11,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
@@ -717,5 +718,6 @@ func createScheme(t *testing.T) *runtime.Scheme {
 	assert.NoError(t, err)
 
 	scheme.AddKnownTypes(gv, &v1.Backup{}, &v1.Restore{}, &v1.BackupSchedule{})
+	require.NoError(t, velerov1.AddToScheme(scheme))
 	return scheme
 }

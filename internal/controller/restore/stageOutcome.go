@@ -9,7 +9,7 @@ import (
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
-// defaultRequeueDelay is used when a stage asks for a controlled retry without a usable delay.
+// defaultRequeueDelay is used as fallback when a stage asks for a controlled retry without a usable delay.
 const defaultRequeueDelay = 5 * time.Second
 
 // providerObservationRecoveryDelay is the delay a stage uses while it waits for the provider to
@@ -40,11 +40,6 @@ func next() stageOutcome {
 }
 
 func retryAfter(delay time.Duration) stageOutcome {
-	// delay = 0 would be no requeue at all
-	if delay <= 0 {
-		delay = defaultRequeueDelay
-	}
-
 	return stageOutcome{action: actionRetry, requeueAfter: delay}
 }
 
@@ -67,13 +62,17 @@ func abort() stageOutcome {
 // result translates the outcome into the reconciler return values. This is the single place that
 // decides how outcomes reach controller-runtime: an error is never combined with an explicit
 // requeue, because controller-runtime would ignore the requeue and log the combination.
-func (o stageOutcome) result() (ctrl.Result, error) {
+func (o stageOutcome) result(defaultRequeueDelay time.Duration) (ctrl.Result, error) {
 	if o.err != nil {
 		return ctrl.Result{}, o.err
 	}
 
 	if o.action == actionRetry {
-		return ctrl.Result{RequeueAfter: o.requeueAfter}, nil
+		delay := o.requeueAfter
+		if delay <= 0 {
+			delay = defaultRequeueDelay
+		}
+		return ctrl.Result{RequeueAfter: delay}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -87,7 +86,7 @@ type reconcileStage func(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Re
 // runStages executes the stages in order until one of them does not report next, and returns that
 // stage's result. Each stage sees the Restore as the preceding stages left it. Running out of stages
 // ends the reconciliation without a requeue.
-func runStages(ctx context.Context, restore *k8sv1.Restore, stages ...reconcileStage) (ctrl.Result, error) {
+func runStages(ctx context.Context, restore *k8sv1.Restore, defaultRequeueDelay time.Duration, stages ...reconcileStage) (ctrl.Result, error) {
 	for _, stage := range stages {
 		updated, outcome := stage(ctx, restore)
 		if updated != nil {
@@ -95,9 +94,9 @@ func runStages(ctx context.Context, restore *k8sv1.Restore, stages ...reconcileS
 		}
 
 		if outcome.action != actionNext {
-			return outcome.result()
+			return outcome.result(defaultRequeueDelay)
 		}
 	}
 
-	return abort().result()
+	return abort().result(defaultRequeueDelay)
 }

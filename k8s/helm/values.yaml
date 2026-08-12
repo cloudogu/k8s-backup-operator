@@ -37,3 +37,5 @@ metrics:
       release: prometheus
 backup:
   retryTimeLimit: "60"
+  requeueTime: "5"
+  backupStorageName: "default"

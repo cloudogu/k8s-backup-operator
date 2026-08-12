@@ -26,7 +26,7 @@ func TestEnsureDeletingStatusPersistsTheLegacyStatusAndEndsTheReconciliation(t *
 	restore := deletedRestore()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
-	reconciler := &restoreReconciler{k8sClient: testClient}
+	reconciler := &restoreReconciler{k8sClient: testClient, requeueDelay: requeueAfterTest}
 
 	updated, outcome := reconciler.ensureDeletingStatus(testCtx, restore)
 

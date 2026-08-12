@@ -38,7 +38,7 @@ func TestEnsureProviderRestoreDeletedDeletesAnOwnedChildAndWaitsForItsDisappeara
 	child := velero.BuildRestore(restore)
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore, child)
-	reconciler := &restoreReconciler{k8sClient: testClient}
+	reconciler := &restoreReconciler{k8sClient: testClient, requeueDelay: requeueAfterTest}
 
 	updated, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
 
@@ -60,7 +60,7 @@ func TestEnsureProviderRestoreDeletedDeletesAnUnownedChildOfALegacyRestore(t *te
 	child.OwnerReferences = nil
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore, child)
-	reconciler := &restoreReconciler{k8sClient: testClient}
+	reconciler := &restoreReconciler{k8sClient: testClient, requeueDelay: requeueAfterTest}
 
 	_, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
 
@@ -100,7 +100,8 @@ func TestEnsureProviderRestoreDeletedWaitsForATerminatingOwnedChildWithoutDeleti
 	child.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	writes := &clientWrites{}
 	reconciler := &restoreReconciler{
-		k8sClient: newTestClientWithParent(t, writes.interceptor(), restore, child),
+		k8sClient:    newTestClientWithParent(t, writes.interceptor(), restore, child),
+		requeueDelay: requeueAfterTest,
 	}
 
 	updated, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)

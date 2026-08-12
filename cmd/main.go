@@ -13,6 +13,7 @@ import (
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
+	operatortime "github.com/cloudogu/k8s-backup-operator/pkg/time"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
@@ -288,7 +289,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("error setting up restore controller with manager: %w", err)
 	}
 
-	err = configureBackupReconcilers(k8sManager, operatorConfig.Namespace)
+	err = configureBackupReconcilers(k8sManager, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("error setting up backup controller with manager: %w", err)
 	}
@@ -302,15 +303,24 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	return nil
 }
 
-func configureBackupReconcilers(k8sManager controllerManager, namespace string) error {
+func configureBackupReconcilers(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
 	k8sClient := k8sManager.GetClient()
-	maintenanceModeAdapter := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace)
+	maintenanceModeAdapter := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, operatorConfig.Namespace)
 	maintenanceGateway := backup2.NewMaintenanceGateway(maintenanceModeAdapter)
-	backupReconciler := backup2.NewReconciler(k8sClient, maintenanceGateway, backup2.DefaultClock{})
-	backupController := backup2.NewController(k8sClient, backupReconciler)
+	backupReconciler := backup2.NewReconciler(k8sClient, maintenanceGateway, &operatortime.Clock{}, operatorConfig.BackupStorageName)
+
+	requeueAfter := time.Duration(operatorConfig.RequeueTimeSeconds) * time.Second
+	backupController := backup2.NewController(k8sClient, backupReconciler, requeueAfter)
 	err := backupController.SetupWithManager(k8sManager)
 	if err != nil {
 		return fmt.Errorf("error setting up backup controller with manager: %w", err)
+	}
+
+	veleroBackupReconciler := backup2.NewVeleroBackupReconciler(k8sClient)
+	veleroBackupController := backup2.NewVeleroBackupController(k8sClient, veleroBackupReconciler)
+	err = veleroBackupController.SetupWithManager(k8sManager)
+	if err != nil {
+		return fmt.Errorf("error setting up velero backup controller with manager: %w", err)
 	}
 
 	return nil
