@@ -340,12 +340,14 @@ func configureRestoreReconcilers(k8sManager controllerManager, k8sClient client.
 	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
 	scaleManager := restorecontroller.NewScaleManager(k8sClient, operatorConfig.Namespace)
 
+	requeueAfter := time.Duration(operatorConfig.RequeueTimeSeconds) * time.Second
 	restoreReconciler := restorecontroller.NewRestoreReconciler(
 		k8sClient,
 		recorder,
 		operatorConfig.Namespace,
 		cleanupManager,
 		scaleManager,
+		requeueAfter,
 	)
 	if err := restoreReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
