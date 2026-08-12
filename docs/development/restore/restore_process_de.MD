@@ -6,7 +6,7 @@ Das zentrale Sicherheitsziel lautet:
 
 > Ein Restore ist erst erfolgreich abgeschlossen, wenn der Provider-Restore erfolgreich war, die Workloads ihre Soll-Replikazahl tatsächlich erreicht haben, die temporären Recovery-Labels entfernt wurden und der Maintenance Mode deaktiviert wurde.
 
-Insbesondere reicht das bloße Setzen von `spec.replicas` nicht aus. Solange `Successful=True` noch nicht geschrieben wurde, bleibt das namespaceweite Restore-Lease für andere Restores gesperrt.
+Insbesondere reicht das bloße Setzen von `spec.replicas` nicht aus. Auf dem Erfolgsweg bleibt das namespaceweite Restore-Lease für andere Restores gesperrt, bis `Successful=True` geschrieben wurde. Allgemein wird ein Lease erst übernehmbar, wenn der Holder terminal ist, also `Successful=True` oder `Successful=False` trägt, oder nicht mehr eindeutig existiert.
 
 ## Begriffe und beteiligte Ressourcen
 
@@ -19,7 +19,7 @@ Insbesondere reicht das bloße Setzen von `spec.replicas` nicht aus. Solange `Su
 - **Scope-Label**: `k8s.cloudogu.com/restore-scaledown-scope`; dauerhaftes Opt-in eines Workloads für Scale-down und Readiness-Prüfung.
 - **Replica-Label**: `k8s.cloudogu.com/restore-scaledown-replicas`; temporäre Speicherung der ursprünglichen Replikazahl.
 
-Unterstützte skalierbare Workloads sind `Deployment`, `StatefulSet`, nicht von anderen Objekten kontrollierte `ReplicaSet` sowie `ReplicationController`.
+Unterstützte skalierbare Workloads sind `Deployment`, `StatefulSet`, `ReplicaSet` sowie `ReplicationController`. Beim Scale-down werden `ReplicaSet`-Objekte mit mindestens einer OwnerReference übersprungen, damit beispielsweise ein Deployment nicht zusätzlich über sein verwaltetes ReplicaSet skaliert wird. Scale-up, Readiness-Prüfung und Label-Bereinigung listen dagegen alle mit dem Scope-Label markierten ReplicaSets; normalerweise besitzen verwaltete ReplicaSets kein eigenes Scope-Label.
 
 ## Grundmodell des Reconcilers
 
@@ -35,6 +35,8 @@ flowchart TD
 ```
 
 `Successful=True` und `Successful=False` sind terminal. `Successful=Unknown` ist ausdrücklich nicht terminal und bedeutet, dass der Workflow weiterarbeiten oder warten muss. Das veraltete skalare Feld `status.status` wird weiterhin für ältere Clients gespiegelt, die Steuerung erfolgt jedoch über Conditions.
+
+Der Controller beobachtet sowohl Parent-`Restore`-Ressourcen als auch owned Velero-`Restore`-Children. Es gibt bewusst weder einen controllerweiten Event-Filter noch eine `GenerationChangedPredicate`: Provider-Phasenwechsel sowie Status-, Finalizer- und Löschereignisse des Parents müssen einen Reconcile auslösen können.
 
 ### Stage-Ergebnisse
 
@@ -136,9 +138,10 @@ stateDiagram-v2
     [*] --> Pending
     Pending --> WaitingForActiveRestore: Lease ist aktiv belegt
     WaitingForActiveRestore --> RestoreLeaseAcquired: Lease übernommen
-    Pending --> RestoreLeaseAcquired: Lease selbst angelegt
+    Pending --> PreparationCompleted: eigenes Lease angelegt; Vorbereitung erfolgreich
+    Pending --> PreparationFailed: eigenes Lease angelegt; Vorbereitung fehlgeschlagen
     RestoreLeaseAcquired --> PreparationCompleted: Vorbereitung erfolgreich
-    RestoreLeaseAcquired --> PreparationFailed: Scale-down oder Cleanup fehlgeschlagen
+    RestoreLeaseAcquired --> PreparationFailed: Vorbereitung fehlgeschlagen
     PreparationFailed --> PreparationCompleted: Retry erfolgreich
     PreparationCompleted --> ProviderRestorePending
     ProviderRestorePending --> ProviderRestoreRunning
@@ -175,6 +178,24 @@ Das Diagramm fasst Reasons verschiedener Conditions zusammen. Die folgenden Absc
 | `True/False/Unknown` | `MigratedFromLegacyStatus` | Aus dem alten skalaren Status eines mit einer älteren Operator-Version angelegten Restore abgeleitet. |
 
 `Successful=True` wird ausschließlich in `ensureRestoreCompleted` zusammen mit `WorkloadsRecovered=True` geschrieben. Dies ist die entscheidende Änderung gegenüber einem Ablauf, der bereits nach dem Anstoßen des Scale-up als abgeschlossen galt.
+
+### Legacy-Kompatibilitätsstatus
+
+Jeder Status-Write synchronisiert zusätzlich das veraltete Feld `status.status`. Die Abbildung lautet:
+
+| Zustand | `status.status` |
+|---|---|
+| `metadata.deletionTimestamp` gesetzt | `deleting` |
+| keine `Successful`-Condition, Workflow bereits beobachtet | `inProgress` |
+| `Successful=Unknown` | `inProgress` |
+| `Successful=True` | `completed` |
+| `Successful=False` | `failed` |
+
+Bei älteren Restores ohne `Successful`-Condition wird umgekehrt ein vorhandenes `completed`, `failed` oder `inProgress` einmalig als `Successful=True`, `False` beziehungsweise `Unknown` mit `Reason=MigratedFromLegacyStatus` persistiert. Eine bereits vorhandene Condition hat immer Vorrang vor dem Legacy-Feld. Ein unbekannter, neuer oder löschender Legacy-Status wird nicht als Ergebnis interpretiert.
+
+### Metadaten vor dem Workflow
+
+Vor Lease und destruktiver Vorbereitung stellt `ensureMetadata` den Operator-Finalizer sowie die CES-Labels `app=ces` und `k8s.cloudogu.com/part-of=backup` sicher. Beide Änderungen werden in einem gemeinsamen, no-op-fähigen Parent-Update geschrieben. Ein tatsächlicher Write beendet den aktuellen Reconcile, damit die folgenden Mutationen mit der persistierten Ressource arbeiten.
 
 ### `Prepared`
 
@@ -285,6 +306,8 @@ Auch nach einem persistierten `WorkloadsReady` wird die Readiness beim nächsten
 
 Ein Zielwert `0` ist gültig: Ein zuvor bewusst auf null skalierter Workload ist bereit, wenn seine beobachteten Statuswerte ebenfalls null sind. Ein ungültiger Wert im Replica-Label oder ein fehlender Zielwert ist ein Beobachtungsfehler und führt zu einem Retry mit Backoff.
 
+Eine leere Auswahl ist ebenfalls ready: Wenn kein unterstützter Workload das Scope-Label trägt, liefern alle vier Listenprüfungen `true` und der Workflow darf mit der Finalisierung fortfahren.
+
 ### 3. Scale-up finalisieren
 
 Erst nach bestätigter Readiness entfernt `FinalizeScaleUp` das temporäre Label `k8s.cloudogu.com/restore-scaledown-replicas`. Das dauerhafte Scope-Label bleibt erhalten. Es ist die Konfiguration, die den Workload auch für zukünftige Restores auswählt und ihn nach der Label-Bereinigung weiterhin beobachtbar macht.
@@ -347,7 +370,9 @@ sequenceDiagram
 
 Ein Zeitablauf allein macht ein Lease nie stale. Ein Provider-Restore kann legitim sehr lange dauern. Übernommen wird das Lease nur, wenn der exakte Holder nicht mehr existiert, seine UID nicht mehr zum benannten Objekt passt oder der Holder terminal (`Successful=True` oder `Successful=False`) ist. Updates verwenden die Kubernetes-`resourceVersion` als Compare-and-swap; bei Konflikten wird neu gelesen.
 
-Teilweise fehlende Holder-Informationen werden repariert, wenn UID oder Name den aktiven Restore eindeutig identifizieren. Fehlen beide Angaben, bleibt der Workflow mit `InvalidRestoreLease` gesperrt, weil eine automatische Übernahme nicht sicher wäre.
+Teilweise fehlende Holder-Informationen werden repariert, wenn UID oder Name den aktiven Restore eindeutig identifizieren. Fehlen beide Angaben, bleibt der Workflow mit `InvalidRestoreLease` gesperrt, weil eine automatische Übernahme nicht sicher wäre. Dieser Zustand wird als Fehler zurückgegeben und deshalb mit dem Backoff von `controller-runtime` erneut geprüft; eine automatische Übernahme findet trotzdem nicht statt.
+
+Beim erstmaligen Erstellen des Lease bleibt `Successful` zunächst auf `Unknown/Pending`. `RestoreLeaseAcquired` wird nur geschrieben, wenn ein zuvor wartender oder durch ein ungültiges Lease blockierter Restore später nachweislich selbst Holder ist. `acquireTime`, `renewTime` und `leaseTransitions` werden beim Anlegen beziehungsweise Übernehmen gesetzt; das Lease wird während eines laufenden Restore nicht periodisch erneuert, weil Zeitablauf kein Übernahmekriterium ist.
 
 ## Fehler- und Wiederanlaufverhalten
 
@@ -377,7 +402,7 @@ flowchart LR
     E --> F[Kubernetes löscht Parent]
 ```
 
-Die Delete-Anforderung an den Provider-Child wird nicht mit dessen tatsächlicher Entfernung verwechselt. Der Parent behält seinen Operator-Finalizer, bis ein späteres `Get` bestätigt, dass der Child nicht mehr existiert. Fremde gleichnamige Children werden nicht gelöscht und blockieren die Parent-Löschung nicht. Andere, dem Operator nicht gehörende Finalizer bleiben unangetastet.
+Die Delete-Anforderung an den Provider-Child wird nicht mit dessen tatsächlicher Entfernung verwechselt. Der Parent behält seinen Operator-Finalizer, bis ein späteres `Get` bestätigt, dass der Child nicht mehr existiert. Fremde gleichnamige Children werden nicht gelöscht und blockieren die Parent-Löschung nicht. Eine gezielte Ausnahme gilt für Restores mit `Reason=MigratedFromLegacyStatus`: Deren Provider-Children können aus der Zeit vor OwnerReferences stammen und werden deshalb auch ohne nachweisbare Ownership gelöscht. Andere, dem Operator nicht gehörende Finalizer bleiben unangetastet.
 
 ## Acceptance-Tests
 
