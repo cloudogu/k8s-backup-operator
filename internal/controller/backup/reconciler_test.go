@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 
+	operatortime "github.com/cloudogu/k8s-backup-operator/pkg/time"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,4 +78,8 @@ func (c *callCounter) createCall(ctx context.Context, client client.WithWatch, o
 		c.veleroBackupCreateCount++
 	}
 	return client.Create(ctx, obj, opts...)
+}
+
+func newRealClock() Clock {
+	return &operatortime.Clock{}
 }

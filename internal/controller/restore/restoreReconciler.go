@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
@@ -41,6 +42,7 @@ func NewRestoreReconciler(
 	namespace string,
 	cleanup cleanupManager,
 	scaleManager scaleManager,
+	requeueDelay time.Duration,
 ) *restoreReconciler {
 	return &restoreReconciler{
 		k8sClient:             k8sClient,
@@ -49,6 +51,7 @@ func NewRestoreReconciler(
 		cleanup:               cleanup,
 		scaleManager:          scaleManager,
 		maintenanceModeSwitch: repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace),
+		requeueDelay:          requeueDelay,
 	}
 }
 
@@ -60,6 +63,7 @@ type restoreReconciler struct {
 	cleanup               cleanupManager
 	scaleManager          scaleManager
 	maintenanceModeSwitch maintenanceModeSwitch
+	requeueDelay          time.Duration
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -85,6 +89,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return runStages(
 			ctx,
 			restore,
+			r.requeueDelay,
 			r.ensureProviderRestoreDeleted,
 			r.ensureDeletingStatus,
 			r.ensureDeletionFinalized,
@@ -93,12 +98,14 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return runStages(
 			ctx,
 			restore,
+			r.requeueDelay,
 			r.ensureLegacyConditionsMigrated,
 		)
 	case operationCreate:
 		return runStages(
 			ctx,
 			restore,
+			r.requeueDelay,
 			r.ensureLegacyConditionsMigrated,
 			r.ensureConditionsInitialized,
 			r.ensureMetadata,
@@ -144,7 +151,7 @@ func (r *restoreReconciler) ensureConditionsInitialized(ctx context.Context, res
 	}
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
-	return initialized, retryAfter(defaultRequeueDelay)
+	return initialized, retryAfter(r.requeueDelay)
 }
 
 // ensureLegacyConditionsMigrated persists the Successful condition derived from the
@@ -172,7 +179,7 @@ func (r *restoreReconciler) ensureMetadata(ctx context.Context, restore *k8sv1.R
 
 	if written {
 		// retry after defaultDelay is a fallback since the metadata write triggers an instant requeue anyway
-		return restore, retryAfter(defaultRequeueDelay)
+		return restore, retryAfter(r.requeueDelay)
 	}
 
 	return restore, next()
@@ -279,7 +286,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	}
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
-	return updated, retryAfter(defaultRequeueDelay)
+	return updated, retryAfter(r.requeueDelay)
 }
 
 // isAlreadyPrepared reports whether the destructive preparation must be skipped because it has
@@ -350,7 +357,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusInProgress) // NOSONAR -- legacy restore status compatibility
 
 	// The child's own events drive the next reconciliation; the delay is only the fallback.
-	return restore, retryAfter(defaultRequeueDelay)
+	return restore, retryAfter(r.requeueDelay)
 }
 
 // ensureProviderCompletion observes the owned provider restore without blocking. If the restore is not
@@ -368,7 +375,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 	if child == nil {
 		// The child vanished between the stages. There is nothing to observe, and the next
 		// reconciliation lets the provider restore stage create it again.
-		return restore, retryAfter(defaultRequeueDelay)
+		return restore, retryAfter(r.requeueDelay)
 	}
 
 	status, reason := observeProviderRestoreState(velero.ObserveRestorePhase(child.Status.Phase))
@@ -396,7 +403,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 
 	if status == metav1.ConditionTrue {
 		// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
-		return updated, retryAfter(defaultRequeueDelay)
+		return updated, retryAfter(r.requeueDelay)
 	}
 
 	return updated, retryAfter(providerObservationRecoveryDelay)
@@ -470,7 +477,7 @@ func (r *restoreReconciler) ensureBackupsSynchronized(ctx context.Context, resto
 	}
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
-	return updated, retryAfter(defaultRequeueDelay)
+	return updated, retryAfter(r.requeueDelay)
 }
 
 // ensureWorkloadsRecovered ends the workflow: the workloads are scaled up again, the unavailability
@@ -525,7 +532,7 @@ func (r *restoreReconciler) ensureDeletingStatus(ctx context.Context, restore *k
 		))
 	}
 
-	return updated, retryAfter(defaultRequeueDelay)
+	return updated, retryAfter(r.requeueDelay)
 }
 
 // ensureProviderRestoreDeleted removes the provider child before the parent is allowed to disappear.
@@ -575,7 +582,7 @@ func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, re
 
 	// if the child is still deleting, we have to wait (requeue)
 	if child.DeletionTimestamp != nil && !child.DeletionTimestamp.IsZero() {
-		return restore, retryAfter(defaultRequeueDelay)
+		return restore, retryAfter(r.requeueDelay)
 	}
 
 	// trigger actual provider restore deletion
@@ -589,7 +596,7 @@ func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, re
 
 	// Delete only acknowledges acceptance of the deletion request. Only a subsequent
 	// Get can determine whether the child has actually been removed.
-	return restore, retryAfter(defaultRequeueDelay)
+	return restore, retryAfter(r.requeueDelay)
 
 }
 

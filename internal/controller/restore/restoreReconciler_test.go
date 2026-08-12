@@ -28,10 +28,12 @@ var testCtx = context.TODO()
 var testNamespace = "ecosystem-test"
 var testRestore = "test-restore"
 
+const requeueAfterTest = time.Duration(5) * time.Second
+
 func TestNewRestoreReconciler(t *testing.T) {
 	t.Run("should create restore reconciler", func(t *testing.T) {
 		// when
-		actual := NewRestoreReconciler(nil, nil, "default", nil, nil)
+		actual := NewRestoreReconciler(nil, nil, "default", nil, nil, requeueAfterTest)
 
 		// then
 		assert.NotNil(t, actual)
