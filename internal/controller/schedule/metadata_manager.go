@@ -16,11 +16,11 @@ const (
 	LabelValuePartOf = "backup"
 )
 
-type metadataManager struct {
+type defaultMetadataManager struct {
 	client client.Client
 }
 
-func (m metadataManager) Ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error {
+func (m defaultMetadataManager) ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	before := schedule.DeepCopy()
 	changed := false
 
@@ -41,7 +41,7 @@ func (m metadataManager) Ensure(ctx context.Context, schedule *backupv1.BackupSc
 	return m.client.Patch(ctx, schedule, client.MergeFrom(before))
 }
 
-func (m metadataManager) Remove(ctx context.Context, schedule *backupv1.BackupSchedule) error {
+func (m defaultMetadataManager) remove(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	if !controllerutil.ContainsFinalizer(schedule, backupv1.BackupScheduleFinalizer) {
 		return nil
 	}

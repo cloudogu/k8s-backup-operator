@@ -69,13 +69,13 @@ func TestMetadataManagerEnsureAndRemove(t *testing.T) {
 				WithScheme(scheme).
 				WithObjects(schedule).
 				Build()
-			manager := metadataManager{client: fakeClient}
+			manager := defaultMetadataManager{client: fakeClient}
 
 			var err error
 			if tt.testEnsure {
-				err = manager.Ensure(context.Background(), schedule)
+				err = manager.ensure(context.Background(), schedule)
 			} else {
-				err = manager.Remove(context.Background(), schedule)
+				err = manager.remove(context.Background(), schedule)
 			}
 			require.NoError(t, err)
 

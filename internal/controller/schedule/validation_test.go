@@ -31,7 +31,7 @@ func TestValidate(t *testing.T) {
 		},
 	}
 
-	v := validator{}
+	v := defaultValidator{}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestValidate(t *testing.T) {
 				},
 			}
 
-			err := v.Validate(schedule)
+			err := v.validate(schedule)
 
 			if tt.wantErr {
 				require.Error(t, err)

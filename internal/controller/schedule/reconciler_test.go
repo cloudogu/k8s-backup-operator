@@ -23,7 +23,7 @@ type fakeValidator struct {
 	err             error
 }
 
-func (v *fakeValidator) Validate(*backupv1.BackupSchedule) error {
+func (v *fakeValidator) validate(*backupv1.BackupSchedule) error {
 	v.validatorCalled = true
 	return v.err
 }
@@ -35,12 +35,12 @@ type fakeCronJobManager struct {
 	deleteErr    error
 }
 
-func (m *fakeCronJobManager) Ensure(ctx context.Context, s *backupv1.BackupSchedule) error {
+func (m *fakeCronJobManager) ensure(ctx context.Context, s *backupv1.BackupSchedule) error {
 	m.ensureCalled = true
 	return m.ensureErr
 }
 
-func (m *fakeCronJobManager) Delete(ctx context.Context, s *backupv1.BackupSchedule) error {
+func (m *fakeCronJobManager) delete(ctx context.Context, s *backupv1.BackupSchedule) error {
 	m.deleteCalled = true
 	return m.deleteErr
 }
@@ -53,12 +53,12 @@ type fakeMetaData struct {
 	onRemove     func(*backupv1.BackupSchedule)
 }
 
-func (m *fakeMetaData) Ensure(ctx context.Context, s *backupv1.BackupSchedule) error {
+func (m *fakeMetaData) ensure(ctx context.Context, s *backupv1.BackupSchedule) error {
 	m.ensureCalled = true
 	return m.ensureErr
 }
 
-func (m *fakeMetaData) Remove(ctx context.Context, s *backupv1.BackupSchedule) error {
+func (m *fakeMetaData) remove(ctx context.Context, s *backupv1.BackupSchedule) error {
 	m.removeCalled = true
 	if m.onRemove != nil {
 		m.onRemove(s)
@@ -66,12 +66,12 @@ func (m *fakeMetaData) Remove(ctx context.Context, s *backupv1.BackupSchedule) e
 	return m.removeErr
 }
 
-func newTestReconciler(client client.Client, validator Validator, cronJobs CronJobManager, metaData MetadataManager) *defaultReconciler {
+func newTestReconciler(client client.Client, validator validator, cronJobs cronJobManager, metaData metadataManager) *defaultReconciler {
 	return &defaultReconciler{
 		client:     client,
 		validator:  validator,
 		cronJobs:   cronJobs,
-		conditions: conditionManager{},
+		conditions: defaultConditionManager{},
 		metadata:   metaData,
 	}
 }
@@ -312,7 +312,7 @@ func Test_mainRecocileLoop(t *testing.T) {
 				testDeletion(t, metadata, fakeClient)
 			}
 
-			_, err := reconciler.Reconcile(testCtx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(schedule)})
+			_, err := reconciler.reconcile(testCtx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(schedule)})
 
 			if tt.expectError {
 				require.Error(t, err)

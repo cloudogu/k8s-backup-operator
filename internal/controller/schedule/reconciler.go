@@ -15,20 +15,20 @@ import (
 type defaultReconciler struct {
 	client client.Client
 
-	metadata   MetadataManager
-	cronJobs   CronJobManager
-	validator  Validator
-	conditions ConditionManager
+	metadata   metadataManager
+	cronJobs   cronJobManager
+	validator  validator
+	conditions conditionManager
 }
 
-// NewReconciler creates a new BackupScheduleReconciler instance.
-func NewReconciler(client client.Client, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *defaultReconciler {
+// newReconciler creates a new BackupSchedule reconciler instance.
+func newReconciler(client client.Client, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *defaultReconciler {
 	return &defaultReconciler{
 		client:     client,
-		metadata:   metadataManager{client: client},
-		conditions: conditionManager{},
-		validator:  validator{},
-		cronJobs: cronJobManager{
+		metadata:   defaultMetadataManager{client: client},
+		conditions: defaultConditionManager{},
+		validator:  defaultValidator{},
+		cronJobs: defaultCronJobManager{
 			Client:           client,
 			scheme:           client.Scheme(),
 			operatorImage:    operatorImage,
@@ -38,7 +38,7 @@ func NewReconciler(client client.Client, operatorImage string, imagePullSecrets 
 	}
 }
 
-func (r *defaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *defaultReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	schedule, err := r.getBackupSchedule(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -50,7 +50,7 @@ func (r *defaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// set the deletion state before doing anything else
 		// Removing the finalizer may delete the resource immediately
 		// leading to an error when patching
-		r.conditions.MarkNotReady(schedule, backupv1.ReasonDeleting, "BackupSchedule is being deleted.")
+		r.conditions.markNotReady(schedule, backupv1.ReasonDeleting, "BackupSchedule is being deleted.")
 		if err := r.patchStatus(ctx, original, schedule); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -74,12 +74,12 @@ func (r *defaultReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	if err := r.cronJobs.Delete(ctx, schedule); err != nil {
+	if err := r.cronJobs.delete(ctx, schedule); err != nil {
 		return err
 	}
 
 	// only need to remove finalizers, not labels
-	if err := r.metadata.Remove(ctx, schedule); err != nil {
+	if err := r.metadata.remove(ctx, schedule); err != nil {
 		return err
 	}
 
@@ -87,30 +87,30 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 }
 
 func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	if err := r.metadata.Ensure(ctx, schedule); err != nil {
-		r.conditions.MarkAcceptanceNotEvaluated(schedule, err)
-		r.conditions.MarkNotReady(schedule, backupv1.ReasonNotEvaluated, "Required metadata could not be persisted: "+err.Error())
+	if err := r.metadata.ensure(ctx, schedule); err != nil {
+		r.conditions.markAcceptanceNotEvaluated(schedule, err)
+		r.conditions.markNotReady(schedule, backupv1.ReasonNotEvaluated, "Required metadata could not be persisted: "+err.Error())
 		return err
 	}
 
-	if err := r.validator.Validate(schedule); err != nil {
-		r.conditions.MarkInvalid(schedule, err)
-		r.conditions.MarkNotReady(schedule, backupv1.ReasonInvalidSpec, "BackupSchedule spec is invalid: "+err.Error())
+	if err := r.validator.validate(schedule); err != nil {
+		r.conditions.markInvalid(schedule, err)
+		r.conditions.markNotReady(schedule, backupv1.ReasonInvalidSpec, "BackupSchedule spec is invalid: "+err.Error())
 
 		// Spec is invalid.
 		// Don't return an error because retrying won't help.
 		return nil
 	}
 
-	r.conditions.MarkAccepted(schedule)
+	r.conditions.markAccepted(schedule)
 
-	if err := r.cronJobs.Ensure(ctx, schedule); err != nil {
-		r.conditions.MarkNotReady(schedule, backupv1.ReasonSyncFailed, "CronJob synchronization failed: "+err.Error())
+	if err := r.cronJobs.ensure(ctx, schedule); err != nil {
+		r.conditions.markNotReady(schedule, backupv1.ReasonSyncFailed, "CronJob synchronization failed: "+err.Error())
 
 		return err
 	}
 
-	r.conditions.MarkReady(schedule)
+	r.conditions.markReady(schedule)
 
 	return nil
 }

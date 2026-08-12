@@ -20,7 +20,7 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 	t.Run("ensure should create a new cronjob if none exists", func(t *testing.T) {
 		scheme := newCronJobManagerTestScheme(t)
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
-		manager := cronJobManager{
+		manager := defaultCronJobManager{
 			Client:           fakeClient,
 			scheme:           scheme,
 			operatorImage:    "example.com/backup-operator:1.2.3",
@@ -29,7 +29,7 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 		}
 		schedule := newCronJobManagerTestSchedule()
 
-		require.NoError(t, manager.Ensure(context.Background(), schedule))
+		require.NoError(t, manager.ensure(context.Background(), schedule))
 
 		stored := &batchv1.CronJob{}
 		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKey{
@@ -60,14 +60,14 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 			Spec: batchv1.CronJobSpec{Schedule: "0 0 * * *"},
 		}
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).Build()
-		manager := cronJobManager{
+		manager := defaultCronJobManager{
 			Client:        fakeClient,
 			scheme:        scheme,
 			operatorImage: "example.com/backup-operator:2.0.0",
 			pullPolicy:    corev1.PullIfNotPresent,
 		}
 
-		require.NoError(t, manager.Ensure(context.Background(), schedule))
+		require.NoError(t, manager.ensure(context.Background(), schedule))
 
 		stored := &batchv1.CronJob{}
 		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(existing), stored))
@@ -89,9 +89,9 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 				},
 			}).
 			Build()
-		manager := cronJobManager{Client: fakeClient, scheme: scheme}
+		manager := defaultCronJobManager{Client: fakeClient, scheme: scheme}
 
-		err := manager.Ensure(context.Background(), newCronJobManagerTestSchedule())
+		err := manager.ensure(context.Background(), newCronJobManagerTestSchedule())
 
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
@@ -102,9 +102,9 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 		scheme := runtime.NewScheme()
 		require.NoError(t, batchv1.AddToScheme(scheme))
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
-		manager := cronJobManager{Client: fakeClient, scheme: scheme}
+		manager := defaultCronJobManager{Client: fakeClient, scheme: scheme}
 
-		err := manager.Ensure(context.Background(), newCronJobManagerTestSchedule())
+		err := manager.ensure(context.Background(), newCronJobManagerTestSchedule())
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to create CronJob")
@@ -119,11 +119,11 @@ func TestCronJobManagerDelete(t *testing.T) {
 		Name: schedule.CronJobName(), Namespace: schedule.Namespace,
 	}}
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cronJob).Build()
-	manager := cronJobManager{Client: fakeClient, scheme: scheme}
+	manager := defaultCronJobManager{Client: fakeClient, scheme: scheme}
 
-	require.NoError(t, manager.Delete(context.Background(), schedule))
+	require.NoError(t, manager.delete(context.Background(), schedule))
 	// twice to check for idempotence
-	require.NoError(t, manager.Delete(context.Background(), schedule))
+	require.NoError(t, manager.delete(context.Background(), schedule))
 
 	stored := &batchv1.CronJob{}
 	err := fakeClient.Get(context.Background(), client.ObjectKeyFromObject(cronJob), stored)
@@ -141,9 +141,9 @@ func TestCronJobManagerDeleteReturnsError(t *testing.T) {
 			},
 		}).
 		Build()
-	manager := cronJobManager{Client: fakeClient, scheme: scheme}
+	manager := defaultCronJobManager{Client: fakeClient, scheme: scheme}
 
-	err := manager.Delete(context.Background(), newCronJobManagerTestSchedule())
+	err := manager.delete(context.Background(), newCronJobManagerTestSchedule())
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, assert.AnError)

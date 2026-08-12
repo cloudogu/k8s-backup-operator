@@ -20,7 +20,7 @@ var defaultLabels = map[string]string{
 	"app.kubernetes.io/part-of":    "k8s-backup-operator",
 }
 
-type cronJobManager struct {
+type defaultCronJobManager struct {
 	client.Client
 	scheme           *runtime.Scheme
 	operatorImage    string
@@ -28,7 +28,7 @@ type cronJobManager struct {
 	imagePullSecrets []corev1.LocalObjectReference
 }
 
-func (c cronJobManager) Ensure(ctx context.Context, schedule *v1.BackupSchedule) error {
+func (c defaultCronJobManager) ensure(ctx context.Context, schedule *v1.BackupSchedule) error {
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      schedule.CronJobName(),
@@ -66,7 +66,7 @@ func (c cronJobManager) Ensure(ctx context.Context, schedule *v1.BackupSchedule)
 	return nil
 }
 
-func (c cronJobManager) Delete(ctx context.Context, schedule *v1.BackupSchedule) error {
+func (c defaultCronJobManager) delete(ctx context.Context, schedule *v1.BackupSchedule) error {
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      schedule.CronJobName(),
