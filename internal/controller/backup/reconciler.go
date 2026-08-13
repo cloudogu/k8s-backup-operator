@@ -88,8 +88,6 @@ type maintenanceGateway interface {
 	deactivateMaintenanceMode(ctx context.Context) error
 }
 
-type statusUpdate func(status *backupv1.BackupStatus)
-
 type Clock interface {
 	Now() time.Time
 }
@@ -504,10 +502,7 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 }
 
 func (c *defaultReconciler) patchStatus(ctx context.Context, backup *backupv1.Backup, updateFn statusUpdate) error {
-	backupBeforePatch := backup.DeepCopy()
-	updateFn(&backup.Status)
-
-	return c.client.Status().Patch(ctx, backup, client.MergeFrom(backupBeforePatch))
+	return newConditionsUpdater(c.client).updateStatus(ctx, backup, updateFn)
 }
 
 func (c *defaultReconciler) ensureVeleroStatusSynced(

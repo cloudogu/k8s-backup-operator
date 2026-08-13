@@ -26,6 +26,20 @@ var (
 		[]string{"namespace", "name", "to"},
 	)
 
+	BackupConditionTransitionsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "backup_condition_transitions_total",
+			Help: "Number of persisted backup condition status transitions.",
+		},
+		[]string{
+			"namespace",
+			"name",
+			"condition",
+			"from",
+			"to",
+		},
+	)
+
 	RestoreStatusTransitionsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "restore_status_transitions_total",
@@ -51,7 +65,14 @@ var (
 
 // RegisterMetrics registers custom metrics with the global prometheus registry
 func RegisterMetrics() {
-	metrics.Registry.MustRegister(BackupReconcileTotal, BackupStatusTransitionsTotal, RestoreReconcileTotal, RestoreStatusTransitionsTotal, RestoreConditionTransitionsTotal)
+	metrics.Registry.MustRegister(
+		BackupReconcileTotal,
+		BackupStatusTransitionsTotal,
+		BackupConditionTransitionsTotal,
+		RestoreReconcileTotal,
+		RestoreStatusTransitionsTotal,
+		RestoreConditionTransitionsTotal,
+	)
 }
 
 // ### Backup ###
@@ -71,6 +92,44 @@ func InitBackupStatusMetrics(namespace, name string) {
 	}
 
 	UpdateBackupStatusMetrics(namespace, name, v1.BackupStatusNew)
+}
+
+// InitBackupConditionTransitionMetrics initializes every possible status transition for all backup conditions.
+func InitBackupConditionTransitionMetrics(namespace, name string) {
+	conditionTypes := []string{
+		v1.ConditionPrepared,
+		v1.ConditionCompleted,
+		v1.ConditionDeleting,
+		v1.ConditionCanceled,
+		v1.ConditionSucceeded,
+	}
+	conditionStatuses := []metav1.ConditionStatus{
+		metav1.ConditionUnknown,
+		metav1.ConditionTrue,
+		metav1.ConditionFalse,
+	}
+
+	for _, conditionType := range conditionTypes {
+		for _, from := range conditionStatuses {
+			for _, to := range conditionStatuses {
+				if from == to {
+					continue
+				}
+				BackupConditionTransitionsTotal.WithLabelValues(
+					namespace,
+					name,
+					conditionType,
+					string(from),
+					string(to),
+				).Add(0)
+			}
+		}
+	}
+}
+
+// UpdateBackupConditionTransitionMetric increments the metric for a persisted backup condition status transition.
+func UpdateBackupConditionTransitionMetric(namespace, name, conditionType, from, to string) {
+	BackupConditionTransitionsTotal.WithLabelValues(namespace, name, conditionType, from, to).Inc()
 }
 
 // UpdateBackupReconcileTotalMetric increments the metric for the total number of reconciles of the backup resource

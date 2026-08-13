@@ -123,6 +123,8 @@ Gezählt wird ausschließlich eine tatsächliche Statusänderung einer bereits v
 
 Der `conditionUpdater` erhöht die Metric erst nach einem erfolgreichen Status-Write. Fehlgeschlagene Updates und verworfene Conflict-Versuche werden daher nicht gezählt. Nach einem Conflict werden die Übergänge gegen den neu gelesenen Restore-Status erneut bestimmt.
 
+Der Backup-Controller verwendet mit `backup_condition_transitions_total` dieselbe Zählsemantik, jedoch ohne das Restore-spezifische Label `backup_name`.
+
 Nach dem erfolgreichen Lesen eines Restore initialisiert jeder Reconcile alle sechs möglichen Wechsel zwischen `Unknown`, `True` und `False` für die fünf Workflow-Conditions mit `Add(0)`. Wiederholte Initialisierungen verändern die Counter nicht; sie sorgen lediglich dafür, dass noch nicht beobachtete Übergänge als Null-Zeitreihen verfügbar sind. Pro Restore entstehen dadurch 30 Zeitreihen. Wie alle Prometheus-Counter beginnen sie nach einem Neustart des Operators erneut bei null.
 
 Eine beispielhafte Abfrage für erfolgreich erreichte Meilensteine lautet:

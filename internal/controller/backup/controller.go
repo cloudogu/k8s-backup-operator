@@ -60,6 +60,8 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err := c.client.Get(ctx, req.NamespacedName, &backup); err != nil {
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
+	// Initialize all possible condition transition time series without incrementing them.
+	metrics.InitBackupConditionTransitionMetrics(backup.Namespace, backup.Name)
 
 	ensureFunctions := []ensureFunction{
 		c.reconciler.ensureProviderBackupDeleted,

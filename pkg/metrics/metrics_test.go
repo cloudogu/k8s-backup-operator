@@ -55,6 +55,60 @@ func TestUpdateBackupStatusMetrics(t *testing.T) {
 	})
 }
 
+func TestInitBackupConditionTransitionMetrics(t *testing.T) {
+	namespace := "test-ns"
+	name := "test-backup-conditions"
+	BackupConditionTransitionsTotal.Reset()
+
+	InitBackupConditionTransitionMetrics(namespace, name)
+	InitBackupConditionTransitionMetrics(namespace, name)
+
+	conditionTypes := []string{
+		v1.ConditionPrepared,
+		v1.ConditionCompleted,
+		v1.ConditionDeleting,
+		v1.ConditionCanceled,
+		v1.ConditionSucceeded,
+	}
+	conditionStatuses := []metav1.ConditionStatus{
+		metav1.ConditionUnknown,
+		metav1.ConditionTrue,
+		metav1.ConditionFalse,
+	}
+
+	assert.Equal(t, 30, testutil.CollectAndCount(BackupConditionTransitionsTotal))
+	for _, conditionType := range conditionTypes {
+		for _, from := range conditionStatuses {
+			for _, to := range conditionStatuses {
+				if from == to {
+					continue
+				}
+				counter := BackupConditionTransitionsTotal.WithLabelValues(
+					namespace,
+					name,
+					conditionType,
+					string(from),
+					string(to),
+				)
+				assert.Zero(t, testutil.ToFloat64(counter))
+			}
+		}
+	}
+}
+
+func TestUpdateBackupConditionTransitionMetric(t *testing.T) {
+	namespace := "test-ns"
+	name := "test-backup-condition-update"
+	conditionType := v1.ConditionPrepared
+	from := string(metav1.ConditionUnknown)
+	to := string(metav1.ConditionTrue)
+	BackupConditionTransitionsTotal.Reset()
+
+	UpdateBackupConditionTransitionMetric(namespace, name, conditionType, from, to)
+
+	counter := BackupConditionTransitionsTotal.WithLabelValues(namespace, name, conditionType, from, to)
+	assert.Equal(t, 1.0, testutil.ToFloat64(counter))
+}
 func TestUpdateRestoreReconcileTotalMetric(t *testing.T) {
 	t.Run("should increment restore reconcile total metric", func(t *testing.T) {
 		initial := testutil.ToFloat64(RestoreReconcileTotal)

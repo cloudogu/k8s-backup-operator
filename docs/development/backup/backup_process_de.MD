@@ -323,9 +323,34 @@ Der Controller wartet nicht auf den Status des DeleteRequests, sondern prüft be
 
 ## Status-Persistenz und Idempotenz
 
-Condition-Änderungen werden mit einem Status-`MergeFrom`-Patch geschrieben. `meta.SetStatusCondition` erhält bei unverändertem Status die vorhandene Transition-Zeit. Metadaten werden nur bei tatsächlicher Abweichung aktualisiert. Provider-Ressourcen und DeleteRequests werden vor dem Erzeugen gelesen, sodass wiederholte Reconciles keine Duplikate anlegen.
+Condition-Änderungen werden zentral über den `conditionsUpdater` mit einem Status-`MergeFrom`-Patch geschrieben. `meta.SetStatusCondition` erhält bei unverändertem Status die vorhandene Transition-Zeit. Metadaten werden nur bei tatsächlicher Abweichung aktualisiert. Provider-Ressourcen und DeleteRequests werden vor dem Erzeugen gelesen, sodass wiederholte Reconciles keine Duplikate anlegen.
 
-Der aktuelle Backup-Pfad besitzt noch kein dem Restore entsprechendes Condition-Transition-Metric. Er erhöht bei jedem Backup-Reconcile lediglich `backup_reconcile_total`. `backup_status_transitions_total` wird noch von den älteren `pkg/backup`-Managern verwendet, nicht von den normalen Condition-Übergängen dieses Controllers.
+### Metrik für Condition-Übergänge
+
+Persistierte Statuswechsel einer Backup-Condition werden mit `backup_condition_transitions_total` erfasst. Die Labels sind:
+
+| Label | Bedeutung |
+|---|---|
+| `namespace` | Namespace des Backups. |
+| `name` | Name des Backups. |
+| `condition` | Condition-Typ: `Prepared`, `Completed`, `Deleting`, `Canceled` oder `Succeeded`. |
+| `from` | Vorheriger Status: `Unknown`, `True` oder `False`. |
+| `to` | Neuer Status: `Unknown`, `True` oder `False`. |
+
+Der `conditionsUpdater` bestimmt die Übergänge vor dem Patch, erhöht die Counter aber erst nach einem erfolgreichen Status-Write. Fehlgeschlagene Patches werden daher nicht gezählt. Das erstmalige Anlegen einer Condition sowie Änderungen nur an `Reason`, `Message` oder Transition-Zeit gelten nicht als Statusübergang.
+
+Nach dem Lesen eines Backups initialisiert jeder Reconcile alle sechs möglichen Wechsel für alle fünf Condition-Typen mit `Add(0)`. Dadurch stehen pro Backup 30 Zeitreihen zur Verfügung, auch wenn ein bestimmter Übergang noch nie aufgetreten ist. Wiederholte Initialisierungen verändern die Counter nicht.
+
+Eine beispielhafte Abfrage erfolgreicher Übergänge lautet:
+
+```promql
+sum by (condition) (
+  increase(backup_condition_transitions_total{to="True"}[1h])
+)
+```
+
+`backup_reconcile_total` zählt weiterhin alle Backup-Reconciles. `backup_status_transitions_total` wird von den älteren `pkg/backup`-Managern für das skalare Legacy-Feld verwendet und ist von den Condition-Übergängen getrennt.
+
 
 ## Acceptance-Tests
 
