@@ -50,6 +50,8 @@ func (m defaultMetadataManager) ensure(ctx context.Context, schedule *backupv1.B
 }
 
 func (m defaultMetadataManager) remove(ctx context.Context, schedule *backupv1.BackupSchedule) error {
+	logger := log.FromContext(ctx)
+
 	if !controllerutil.ContainsFinalizer(schedule, backupv1.BackupScheduleFinalizer) {
 		return nil
 	}
