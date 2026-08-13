@@ -30,6 +30,8 @@ type maintenanceModeSwitch interface {
 	Activate(ctx context.Context, description repository.MaintenanceModeDescription, force bool) error
 	// Deactivate deactivates the maintenance mode.
 	Deactivate(ctx context.Context, force bool) error
+	// GetStatus checks if the maintenance mode is active and returns its contents.
+	GetStatus(ctx context.Context) (repository.MaintenanceModeDescription, bool, error)
 }
 
 type cleanupManager interface {

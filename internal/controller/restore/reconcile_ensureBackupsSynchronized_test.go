@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -25,9 +26,14 @@ func TestBackupSynchronizationPersistsItsMilestoneWithoutRecoveringTheWorkloads(
 
 	expectBackupSynchronization(t, nil)
 
+	maintenanceMock := newMockMaintenanceModeSwitch(t)
+	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
+		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest)
+		reconciler.maintenanceModeSwitch = maintenanceMock
 		// no scale manager - recovering the workloads in the same reconciliation would panic
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest).Reconcile
+		return reconciler.Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedChildInPhase(restore, velerov1.RestorePhaseCompleted))
 

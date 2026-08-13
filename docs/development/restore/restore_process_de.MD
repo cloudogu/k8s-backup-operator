@@ -61,8 +61,9 @@ flowchart TD
     B --> C[Metadaten und Finalizer sicherstellen]
     C --> D[Vorhandenen Provider-Child prüfen]
     D --> E[Restore-Lease sicherstellen]
-    E --> F[Maintenance Mode, Scale-down, Cleanup]
-    F --> G[Provider-Restore anlegen]
+    E --> F[Scale-down und Cleanup]
+    F --> FM[Maintenance Mode best-effort aktivieren]
+    FM --> G[Provider-Restore anlegen]
     G --> H{Provider beendet?}
     H -- nein --> H
     H -- fehlgeschlagen --> X[Successful=False; terminal]
@@ -83,14 +84,15 @@ In Methodennamen lautet die Folge:
 4. `ensureProviderChildState`
 5. `ensureActiveRestoreLease`
 6. `ensurePreparation`
-7. `ensureProviderRestore`
-8. `ensureProviderCompletion`
-9. `ensureBackupsSynchronized`
-10. `ensureScaleUpInitiated`
-11. `ensureWorkloadsReady`
-12. `ensureScaleUpFinalized`
-13. `ensureMaintenanceModeDeactivated`
-14. `ensureRestoreCompleted`
+7. `ensureMaintenanceModeActivated`
+8. `ensureProviderRestore`
+9. `ensureProviderCompletion`
+10. `ensureBackupsSynchronized`
+11. `ensureScaleUpInitiated`
+12. `ensureWorkloadsReady`
+13. `ensureScaleUpFinalized`
+14. `ensureMaintenanceModeDeactivated`
+15. `ensureRestoreCompleted`
 
 ## Conditions und Übergänge
 
@@ -203,9 +205,9 @@ Vor Lease und destruktiver Vorbereitung stellt `ensureMetadata` den Operator-Fin
 |---|---|---|
 | `Unknown` | `Pending` | Vorbereitung noch nicht abgeschlossen. |
 | `False` | `PreparationFailed` | Scale-down oder Cleanup schlug fehl; der Vorgang wird mit Backoff wiederholt. |
-| `True` | `PreparationCompleted` | Maintenance Mode wurde best-effort aktiviert, Workloads wurden herunterskaliert und Restore-Ressourcen bereinigt. |
+| `True` | `PreparationCompleted` | Workloads wurden herunterskaliert und Restore-Ressourcen bereinigt. |
 
-Die Aktivierung des Maintenance Mode ist bewusst best-effort. Ein Fehler wird protokolliert, verhindert den Restore aber nicht. Scale-down und Cleanup dagegen müssen erfolgreich sein.
+Nach der Preparation aktiviert die eigene Stage `ensureMaintenanceModeActivated` den Maintenance Mode best-effort. Sie prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Die Stage persistiert keine Condition und darf im selben Reconcile direkt zum Provider-Restore weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein.
 
 Vor der destruktiven Vorbereitung wird geprüft, ob der Provider verfügbar ist. Existiert bereits ein eindeutig zugehöriger Provider-Child, gilt die Vorbereitung ebenfalls als bereits erfolgt. So wird das kritische Crash-Fenster zwischen Child-Erstellung und Parent-Status-Write nicht mit einem zweiten Cleanup beantwortet.
 
@@ -423,12 +425,14 @@ Vor dem Test wird außerdem geprüft, ob ein Deployment noch ein temporäres `re
 Die Spec erzeugt ein Wegwerf-Deployment mit zwei Replikas und Scope-Label sowie eine zusätzliche, nach dem Backup erzeugte ConfigMap mit Backup-Scope-Label. Anschließend prüft sie:
 
 1. Der Provider-Restore wird angelegt.
-2. Der Parent erreicht den Legacy-Kompatibilitätsstatus `completed`.
-3. Die nicht im Backup enthaltene ConfigMap bleibt nach dem Cleanup gelöscht.
-4. Das Deployment wird auf exakt zwei Replikas zurückskaliert.
-5. Das temporäre Replica-Label wurde entfernt.
-6. Alle PVCs sind `Bound` und alle Deployments haben ihre gewünschte Anzahl `ReadyReplicas`.
-7. Ein erzwungener Reconcile eines bereits abgeschlossenen Restore verändert weder Status noch Replikazahl.
+2. Sobald der Provider-Restore sichtbar ist, ist der Maintenance Mode mit Titel und Text des Restore aktiv.
+3. Der Parent erreicht den Legacy-Kompatibilitätsstatus `completed`.
+4. Nach dem Abschluss ist der Maintenance Mode wieder inaktiv.
+5. Die nicht im Backup enthaltene ConfigMap bleibt nach dem Cleanup gelöscht.
+6. Das Deployment wird auf exakt zwei Replikas zurückskaliert.
+7. Das temporäre Replica-Label wurde entfernt.
+8. Alle PVCs sind `Bound` und alle Deployments haben ihre gewünschte Anzahl `ReadyReplicas`.
+9. Ein erzwungener Reconcile eines bereits abgeschlossenen Restore verändert weder Status noch Replikazahl.
 
 Die PVC- und Workload-Konvergenz wird bis zu 15 Minuten gepollt. Ein terminal fehlgeschlagener Backup- oder Restore-Status bricht das Warten frühzeitig ab und hängt den beobachteten Status an den Ginkgo-Fehler an.
 

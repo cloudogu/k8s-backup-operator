@@ -117,6 +117,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.ensureProviderChildState,
 			r.ensureActiveRestoreLease,
 			r.ensurePreparation,
+			r.ensureMaintenanceModeActivated,
 			r.ensureProviderRestore,
 			r.ensureProviderCompletion,
 			r.ensureBackupsSynchronized,
@@ -246,9 +247,8 @@ func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, res
 	return updated, abort()
 }
 
-// ensurePreparation runs the destructive preparation of the ecosystem — maintenance mode, scale-down
-// and cleanup. Maintenance mode is activated best-effort: a restore is more valuable than the
-// unavailability notice, so a failed activation is logged and the workflow continues.
+// ensurePreparation runs the destructive preparation of the ecosystem: scale-down and cleanup.
+// Maintenance-mode activation is a separate stage after this preparation.
 func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	prepared, err := r.isAlreadyPrepared(ctx, restore)
 	if err != nil {
@@ -265,15 +265,6 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
 	}
 
-	logger := log.FromContext(ctx)
-
-	err = r.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
-	maintenanceMessage := "maintenance mode is active,"
-	if err != nil {
-		logger.Error(err, "The Maintenance mode could not be activated. Continuing anyways...")
-		maintenanceMessage = ""
-	}
-
 	if err := r.scaleManager.ScaleDown(ctx); err != nil {
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to scale down workloads before restore: %w", err))
 	}
@@ -286,7 +277,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		Type:    k8sv1.ConditionPrepared,
 		Status:  metav1.ConditionTrue,
 		Reason:  ReasonPreparationCompleted,
-		Message: fmt.Sprintf("The ecosystem was prepared for the restore: %s workloads are scaled down and the resources to be restored are removed.", maintenanceMessage),
+		Message: "The ecosystem was prepared for the restore: workloads are scaled down and the resources to be restored are removed.",
 	})
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to persist the preparation of restore %s: %w", restore.Name, err))

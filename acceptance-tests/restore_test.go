@@ -7,6 +7,7 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -96,6 +97,14 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 			Eventually(func(g Gomega) {
 				veleroRestore := &velerov1.Restore{}
 				g.Expect(k8sClient.Get(ctx, restoreKey, veleroRestore)).Should(Succeed())
+
+				maintenanceMode := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, restoreTestNamespace)
+				description, active, err := maintenanceMode.GetStatus(ctx)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(active).Should(BeTrue(),
+					"maintenance mode must be active before the provider restore starts")
+				g.Expect(description.Title).Should(Equal("Service temporary unavailable"))
+				g.Expect(description.Text).Should(Equal("Restore in progress"))
 			}).
 				WithTimeout(10 * time.Minute).
 				WithPolling(5 * time.Second).
@@ -104,6 +113,17 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 
 		It("the restore reaches the completed status", func(ctx SpecContext) {
 			expectRestoreStatus(ctx, restoreKey, backupv1.RestoreStatusCompleted)
+
+			maintenanceMode := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, restoreTestNamespace)
+			Eventually(func(g Gomega) {
+				_, active, err := maintenanceMode.GetStatus(ctx)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(active).Should(BeFalse(),
+					"a completed restore must have deactivated maintenance mode")
+			}).
+				WithTimeout(2 * time.Minute).
+				WithPolling(2 * time.Second).
+				Should(Succeed())
 		})
 
 		It("the labeled additional resource was deleted by the cleanup", func(ctx SpecContext) {

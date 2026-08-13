@@ -6,6 +6,7 @@ import (
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -40,8 +41,13 @@ func foreignChild(parent *k8sv1.Restore) *velerov1.Restore {
 func TestAnExistingOwnedProviderChildSkipsThePreparationAndIsObservedInstead(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
+	maintenanceMock := newMockMaintenanceModeSwitch(t)
+	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest).Reconcile
+		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest)
+		reconciler.maintenanceModeSwitch = maintenanceMock
+		return reconciler.Reconcile
 	}
 	// with owned child
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedRunningChild(restore))

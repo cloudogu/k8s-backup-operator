@@ -5,6 +5,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -97,6 +98,8 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	installProvider(t, providerMock)
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
+	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
+	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 	maintenanceMock.EXPECT().Activate(testCtx, mock.Anything, false).Return(nil).Once()
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Twice()
 	cleanupMock := newMockCleanupManager(t)
@@ -203,6 +206,7 @@ func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheP
 	installProvider(t, providerMock)
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
+	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil)
 	maintenanceMock.EXPECT().Activate(testCtx, mock.Anything, false).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
@@ -257,6 +261,7 @@ func TestATransientStageFailureIsRetriedWithoutRepeatingAnEarlierDestructiveStag
 	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(true, nil).Times(4)
 	scaleMock.EXPECT().FinalizeScaleUp(testCtx).Return(nil).Times(3)
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
+	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Twice()
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, backupv1.ErrorOnCreateEventReason, mock.Anything).Return()
