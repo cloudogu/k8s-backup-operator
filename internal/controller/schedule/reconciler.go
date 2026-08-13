@@ -100,7 +100,7 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	logger := log.FromContext(ctx)
 
-	logger.V(1).Info("BackupSchedule reconciliation for  backupschedule")
+	logger.V(1).Info("BackupSchedule reconciliation for backupschedule")
 	if err := r.metadata.ensure(ctx, schedule); err != nil {
 		r.conditions.markAcceptanceNotEvaluated(schedule, err)
 		r.conditions.markNotReady(schedule, backupv1.ReasonNotEvaluated, "Required metadata could not be persisted: "+err.Error())
@@ -112,7 +112,7 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 		r.conditions.markNotReady(schedule, backupv1.ReasonInvalidSpec, "BackupSchedule spec is invalid: "+err.Error())
 		logger.Info("BackupSchedule spec is invalid, skipping CronJob synchronization", "error", err)
 
-        // invalid spec should not be reconciled again before it is edited
+		// invalid spec should not be reconciled again before it is edited
 		return nil
 	}
 

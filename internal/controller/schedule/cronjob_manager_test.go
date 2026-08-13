@@ -43,12 +43,12 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 		assert.Equal(t, manager.pullPolicy, container.ImagePullPolicy)
 		assert.Equal(t, manager.imagePullSecrets, stored.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets)
 		assert.Equal(t, defaultLabels, stored.Labels)
-		// owner reference is backup schdule
+		// owner reference is backup schedule
 		require.Len(t, stored.OwnerReferences, 1)
 		assert.Equal(t, schedule.Name, stored.OwnerReferences[0].Name)
 		assert.True(t, *stored.OwnerReferences[0].Controller)
 	})
-	t.Run("ensure should sync an existing cronjob when backuschedule is changed", func(t *testing.T) {
+	t.Run("ensure should sync an existing cronjob when backupschedule is changed", func(t *testing.T) {
 		scheme := newCronJobManagerTestScheme(t)
 		schedule := newCronJobManagerTestSchedule()
 		existing := &batchv1.CronJob{

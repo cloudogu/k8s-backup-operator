@@ -3,6 +3,7 @@ package schedule
 import (
 	"context"
 	"fmt"
+
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +45,7 @@ func (oig *operatorImageGetter) ImageForKey(ctx context.Context, key string) (st
 
 	imageTag := configMap.Data[key]
 	if imageTag == "" {
-		return "", fmt.Errorf("image %q in configmap %q be empty", key, config.OperatorAdditionalImagesConfigmapName)
+		return "", fmt.Errorf("image %q in configmap %q is empty", key, config.OperatorAdditionalImagesConfigmapName)
 	}
 
 	err = verifyImageTag(imageTag)
