@@ -7,9 +7,11 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type defaultReconciler struct {
@@ -39,14 +41,22 @@ func newReconciler(client client.Client, operatorImage string, imagePullSecrets 
 }
 
 func (r *defaultReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	logger.V(1).Info("starting BackupSchedule reconciliation")
 	schedule, err := r.getBackupSchedule(ctx, req.NamespacedName)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("BackupSchedule for reconcile no longer exists")
+		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	original := schedule.DeepCopy()
 
 	if !schedule.DeletionTimestamp.IsZero() {
+		logger.Info("reconciling BackupSchedule: deletion")
+
 		// set the deletion state before doing anything else
 		// Removing the finalizer may delete the resource immediately
 		// leading to an error when patching
@@ -69,6 +79,7 @@ func (r *defaultReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, reconcileErr
 	}
 
+	logger.V(1).Info("BackupSchedule reconciliation completed")
 	return ctrl.Result{}, nil
 
 }
@@ -87,6 +98,9 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 }
 
 func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
+	logger := log.FromContext(ctx)
+
+	logger.V(1).Info("BackupSchedule reconciliation for  backupschedule")
 	if err := r.metadata.ensure(ctx, schedule); err != nil {
 		r.conditions.markAcceptanceNotEvaluated(schedule, err)
 		r.conditions.markNotReady(schedule, backupv1.ReasonNotEvaluated, "Required metadata could not be persisted: "+err.Error())
@@ -96,9 +110,9 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 	if err := r.validator.validate(schedule); err != nil {
 		r.conditions.markInvalid(schedule, err)
 		r.conditions.markNotReady(schedule, backupv1.ReasonInvalidSpec, "BackupSchedule spec is invalid: "+err.Error())
+		logger.Info("BackupSchedule spec is invalid, skipping CronJob synchronization", "error", err)
 
-		// Spec is invalid.
-		// Don't return an error because retrying won't help.
+        // invalid spec should not be reconciled again before it is edited
 		return nil
 	}
 
@@ -116,11 +130,18 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 }
 
 func (r *defaultReconciler) patchStatus(ctx context.Context, before, after *backupv1.BackupSchedule) error {
+	logger := log.FromContext(ctx)
+
 	if equality.Semantic.DeepEqual(before.Status, after.Status) {
 		return nil
 	}
 
-	return r.client.Status().Patch(ctx, after, client.MergeFrom(before))
+	if err := r.client.Status().Patch(ctx, after, client.MergeFrom(before)); err != nil {
+		return err
+	}
+
+	logger.V(1).Info("patched BackupSchedule status")
+	return nil
 }
 
 func (r *defaultReconciler) getBackupSchedule(ctx context.Context, name types.NamespacedName) (*backupv1.BackupSchedule, error) {

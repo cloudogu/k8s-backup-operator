@@ -7,10 +7,12 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var defaultLabels = map[string]string{
@@ -29,6 +31,8 @@ type defaultCronJobManager struct {
 }
 
 func (c defaultCronJobManager) ensure(ctx context.Context, schedule *v1.BackupSchedule) error {
+	logger := log.FromContext(ctx)
+
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      schedule.CronJobName(),
@@ -36,7 +40,7 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *v1.BackupSc
 		},
 	}
 
-	_, err := controllerutil.CreateOrPatch(ctx, c.Client, cronJob, func() error {
+	operation, err := controllerutil.CreateOrPatch(ctx, c.Client, cronJob, func() error {
 		if cronJob.Labels == nil {
 			cronJob.Labels = map[string]string{}
 		}
@@ -63,10 +67,18 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *v1.BackupSc
 		return fmt.Errorf("failed to create CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
 	}
 
+	if operation == controllerutil.OperationResultNone {
+		logger.V(1).Info("CronJob is up to date", "cronJob", cronJob.Name)
+	} else {
+		logger.Info("synchronized CronJob", "cronJob", cronJob.Name, "operation", operation)
+	}
+
 	return nil
 }
 
 func (c defaultCronJobManager) delete(ctx context.Context, schedule *v1.BackupSchedule) error {
+	logger := log.FromContext(ctx)
+
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      schedule.CronJobName(),
@@ -74,10 +86,15 @@ func (c defaultCronJobManager) delete(ctx context.Context, schedule *v1.BackupSc
 		},
 	}
 
-	// ignore not found errors because we only want to delete here anyway
-	if err := client.IgnoreNotFound(c.Client.Delete(ctx, cronJob)); err != nil {
+	err := c.Client.Delete(ctx, cronJob)
+	if apierrors.IsNotFound(err) {
+		logger.V(1).Info("CronJob is already deleted", "cronJob", cronJob.Name)
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("failed to delete CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
 	}
 
+	logger.Info("requested CronJob deletion", "cronJob", cronJob.Name)
 	return nil
 }
