@@ -284,7 +284,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("failed to sync backups with provider backups on startup: %w", err)
 	}
 
-	err = configureRestoreReconcilers(k8sManager, k8sClient, operatorConfig.Namespace, recorder, operatorConfig)
+	err = configureRestoreReconciler(k8sManager, k8sClient, operatorConfig.Namespace, recorder, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("error setting up restore controller with manager: %w", err)
 	}
@@ -294,7 +294,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("error setting up backup controller with manager: %w", err)
 	}
 
-	err = configureBackupScheduleReconcilers(ctx, k8sManager, k8sClient, operatorConfig)
+	err = configureBackupScheduleReconciler(ctx, k8sManager, k8sClient, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("error setting up backup schedule controller with manager: %w", err)
 	}
@@ -326,7 +326,7 @@ func configureBackupReconcilers(k8sManager controllerManager, operatorConfig *co
 	return nil
 }
 
-func configureRestoreReconcilers(k8sManager controllerManager, k8sClient client.WithWatch, namespace string, recorder eventRecorder, operatorConfig *config.OperatorConfig) error {
+func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.WithWatch, namespace string, recorder eventRecorder, operatorConfig *config.OperatorConfig) error {
 	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create dogu client: %w", err)
@@ -355,7 +355,7 @@ func configureRestoreReconcilers(k8sManager controllerManager, k8sClient client.
 	return nil
 }
 
-func configureBackupScheduleReconcilers(ctx context.Context, k8sManager controllerManager, k8sClient client.WithWatch, operatorConfig *config.OperatorConfig) error {
+func configureBackupScheduleReconciler(ctx context.Context, k8sManager controllerManager, k8sClient client.WithWatch, operatorConfig *config.OperatorConfig) error {
 
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {

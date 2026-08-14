@@ -66,7 +66,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	metrics.InitBackupConditionTransitionMetrics(backup.Namespace, backup.Name)
 
 	ensureFunctions := []ensureFunction{
-		c.reconciler.ensureBackupLeaseReleased,
+		c.reconciler.ensureBackupLeaseReleased, // cleanup leases of deleted/failed backups
 		c.reconciler.ensureProviderBackupDeleted,
 		c.reconciler.ensureVeleroStatusSynced,
 		c.reconciler.ensureCompletedBackupIsIgnored,
@@ -78,6 +78,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		c.reconciler.ensureProviderBackupCreated,
 		c.reconciler.ensureProviderBackupCompleted,
 		c.reconciler.ensureMaintenanceDeactivated,
+		c.reconciler.ensureBackupLeaseReleased, // close current backup reconcile
 	}
 
 	for _, ensure := range ensureFunctions {

@@ -286,17 +286,14 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 
 				var observedHolderKey client.ObjectKey
 				var observedWaiterKey client.ObjectKey
-				switch lease.Annotations[restoreLeaseHolderNameAnnotation] {
-				case firstKey.Name:
+				if lease.Annotations[restoreLeaseHolderNameAnnotation] == firstKey.Name {
 					observedHolderKey, observedWaiterKey = firstKey, secondKey
-				case secondKey.Name:
+				} else {
 					observedHolderKey, observedWaiterKey = secondKey, firstKey
-				default:
-					g.Expect(lease.Annotations[restoreLeaseHolderNameAnnotation]).Should(
-						Or(Equal(firstKey.Name), Equal(secondKey.Name)),
-						"the lease must be held by one of the competing restores")
-					return
 				}
+				g.Expect(lease.Annotations[restoreLeaseHolderNameAnnotation]).Should(
+					Or(Equal(firstKey.Name), Equal(secondKey.Name)),
+					"the lease must be held by one of the competing restores")
 
 				holder := &backupv1.Restore{}
 				g.Expect(k8sClient.Get(ctx, observedHolderKey, holder)).Should(Succeed())

@@ -1,10 +1,10 @@
 # Restore-Prozess
 
-Diese Dokumentation beschreibt den Restore-Workflow des `k8s-backup-operator` aus Entwicklersicht. Maßgeblich ist der aktuell implementierte, zustandsbasierte Ablauf im Paket `internal/controller/restore`. Ein Reconcile führt nicht den gesamten Restore synchron aus. Stattdessen konvergiert er genau bis zur nächsten Stage, die eine Mutation schreibt, warten muss oder einen Fehler meldet.
+Diese Dokumentation beschreibt den Restore-Workflow des `k8s-backup-operator` aus Entwicklersicht.
 
 Das zentrale Sicherheitsziel lautet:
 
-> Ein Restore ist erst erfolgreich abgeschlossen, wenn der Provider-Restore erfolgreich war, die Workloads ihre Soll-Replikazahl tatsächlich erreicht haben, die temporären Recovery-Labels entfernt wurden und der Maintenance Mode deaktiviert wurde.
+> Ein Restore ist erst erfolgreich abgeschlossen, wenn der Provider-Restore erfolgreich war, die Workloads ihre Soll-Replikazahl tatsächlich erreicht haben, die temporären Recovery-Labels entfernt wurden und der Wartungsmodus deaktiviert wurde.
 
 Insbesondere reicht das bloße Setzen von `spec.replicas` nicht aus. Auf dem Erfolgsweg bleibt das namespaceweite Backup-/Restore-Lease für Backups und Restores gesperrt, bis `Successful=True` geschrieben wurde. Allgemein wird ein Lease erst übernehmbar, wenn der Holder terminal ist, also `Successful=True` oder `Successful=False` trägt, oder nicht mehr eindeutig existiert.
 
@@ -62,7 +62,7 @@ flowchart TD
     C --> D[Vorhandenen Provider-Child prüfen]
     D --> E[Restore-Lease sicherstellen]
     E --> F[Scale-down und Cleanup]
-    F --> FM[Maintenance Mode best-effort aktivieren]
+    F --> FM[Wartungsmodus best-effort aktivieren]
     FM --> G[Provider-Restore anlegen]
     G --> H{Provider beendet?}
     H -- nein --> H
@@ -72,7 +72,7 @@ flowchart TD
     J --> K{Alle Workloads ready?}
     K -- nein --> K
     K -- ja --> L[Scale-up finalisieren]
-    L --> M[Maintenance Mode deaktivieren]
+    L --> M[Wartungsmodus deaktivieren]
     M --> N[WorkloadsRecovered=True und Successful=True]
 ```
 
@@ -209,7 +209,7 @@ Vor Lease und destruktiver Vorbereitung stellt `ensureMetadata` den Operator-Fin
 | `False` | `PreparationFailed` | Scale-down oder Cleanup schlug fehl; der Vorgang wird mit Backoff wiederholt. |
 | `True` | `PreparationCompleted` | Workloads wurden herunterskaliert und Restore-Ressourcen bereinigt. |
 
-Nach der Preparation aktiviert die eigene Stage `ensureMaintenanceModeActivated` den Maintenance Mode best-effort. Sie prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Die Stage persistiert keine Condition und darf im selben Reconcile direkt zum Provider-Restore weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein.
+Nach der Preparation aktiviert die eigene Stage `ensureMaintenanceModeActivated` den Wartungsmodus best-effort. Sie prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Die Stage persistiert keine Condition und darf im selben Reconcile direkt zum Provider-Restore weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein.
 
 Vor der destruktiven Vorbereitung wird geprüft, ob der Provider verfügbar ist. Existiert bereits ein eindeutig zugehöriger Provider-Child, gilt die Vorbereitung ebenfalls als bereits erfolgt. So wird das kritische Crash-Fenster zwischen Child-Erstellung und Parent-Status-Write nicht mit einem zweiten Cleanup beantwortet.
 
@@ -233,7 +233,7 @@ Bei einem Provider-Fehler werden außerdem gesetzt:
 - `BackupsSynchronized=False/SynchronizationNotAttemptedAfterProviderFailure`
 - `Successful=False/ProviderRestoreFailed`
 
-Die Workloads bleiben in diesem Fehlerpfad absichtlich herunterskaliert. Der Maintenance Mode wird best-effort deaktiviert. Weil `Successful=False` terminal ist, kann das Lease anschließend von einem anderen Restore übernommen werden. Entwickler müssen dieses bewusst andere Sicherheitsmodell des Fehlerpfads bei Änderungen berücksichtigen.
+Die Workloads bleiben in diesem Fehlerpfad absichtlich herunterskaliert. Der Wartungsmodus wird best-effort deaktiviert. Weil `Successful=False` terminal ist, kann das Lease anschließend von einem anderen Restore übernommen werden. Entwickler müssen dieses bewusst andere Sicherheitsmodell des Fehlerpfads bei Änderungen berücksichtigen.
 
 ### `BackupsSynchronized`
 
@@ -255,7 +255,7 @@ Diese Condition bildet mehrere nicht-terminale Recovery-Schritte ab. Bis zum let
 | `Unknown` | `WaitingForWorkloads` | `ensureWorkloadsReady` | Mindestens ein Workload hat seinen Zielzustand noch nicht erreicht. Requeue nach fünf Sekunden. |
 | `Unknown` | `WorkloadsReady` | `ensureWorkloadsReady` | Alle beobachteten Workloads erfüllen sämtliche Readiness-Kriterien. |
 | `Unknown` | `ScaleUpFinalized` | `ensureScaleUpFinalized` | Temporäre Replica-Labels wurden entfernt. |
-| `Unknown` | `MaintenanceModeDeactivated` | `ensureMaintenanceModeDeactivated` | Maintenance Mode wurde erfolgreich deaktiviert. |
+| `Unknown` | `MaintenanceModeDeactivated` | `ensureMaintenanceModeDeactivated` | Wartungsmodus wurde erfolgreich deaktiviert. |
 | `True` | `WorkloadRecoveryCompleted` | `ensureRestoreCompleted` | Recovery ist vollständig abgeschlossen. |
 | `False` | `WorkloadRecoveryFailed` | Scale-up/Finalisierung | Ein Recovery-Schritt schlug fehl und wird erneut versucht. |
 | `False` | `RecoveryNotAttemptedAfterProviderFailure` | Provider-Fehlerpfad | Recovery wurde absichtlich nicht gestartet. |
@@ -318,9 +318,9 @@ Erst nach bestätigter Readiness entfernt `FinalizeScaleUp` das temporäre Label
 
 Die Finalisierung ist ebenfalls idempotent. Bei einem Teilfehler können bereits bereinigte Objekte im nächsten Reconcile übersprungen und die verbliebenen Labels entfernt werden. `ensureScaleUpFinalized` führt deshalb die externe Aktion vor seiner Condition-Prüfung aus.
 
-### 4. Maintenance Mode deaktivieren
+### 4. Wartungsmodus deaktivieren
 
-Der Maintenance Mode wird erst deaktiviert, nachdem alle Workloads ready und alle temporären Replica-Labels bereinigt sind. Anders als bei der Aktivierung ist ein Fehler hier nicht best-effort: `ensureMaintenanceModeDeactivated` liefert einen Fehler und versucht die Deaktivierung erneut. Die Aktion findet wiederum vor der Condition-Prüfung statt, um einen Absturz vor dem Status-Write sicher abzufangen.
+Der Wartungsmodus wird erst deaktiviert, nachdem alle Workloads ready und alle temporären Replica-Labels bereinigt sind. Anders als bei der Aktivierung ist ein Fehler hier nicht best-effort: `ensureMaintenanceModeDeactivated` liefert einen Fehler und versucht die Deaktivierung erneut. Die Aktion findet wiederum vor der Condition-Prüfung statt, um einen Absturz vor dem Status-Write sicher abzufangen.
 
 ### 5. Restore abschließen
 
@@ -369,7 +369,7 @@ sequenceDiagram
         R1->>W: Readiness prüfen
     end
     R1->>W: Replica-Labels entfernen
-    R1->>R1: Maintenance Mode deaktivieren
+    R1->>R1: Wartungsmodus deaktivieren
     R1->>R1: Successful=True, RestoreCompleted
     R2->>L: Terminalen Holder erkennen und Lease übernehmen
     R2->>R2: Successful=Unknown, RestoreLeaseAcquired
@@ -433,9 +433,9 @@ Vor dem Test wird außerdem geprüft, ob ein Deployment noch ein temporäres `re
 Die Spec erzeugt ein Wegwerf-Deployment mit zwei Replikas und Scope-Label sowie eine zusätzliche, nach dem Backup erzeugte ConfigMap mit Backup-Scope-Label. Anschließend prüft sie:
 
 1. Der Provider-Restore wird angelegt.
-2. Sobald der Provider-Restore sichtbar ist, ist der Maintenance Mode mit Titel und Text des Restore aktiv.
+2. Sobald der Provider-Restore sichtbar ist, ist der Wartungsmodus mit Titel und Text des Restore aktiv.
 3. Der Parent erreicht den Legacy-Kompatibilitätsstatus `completed`.
-4. Nach dem Abschluss ist der Maintenance Mode wieder inaktiv.
+4. Nach dem Abschluss ist der Wartungsmodus wieder inaktiv.
 5. Die nicht im Backup enthaltene ConfigMap bleibt nach dem Cleanup gelöscht.
 6. Das Deployment wird auf exakt zwei Replikas zurückskaliert.
 7. Das temporäre Replica-Label wurde entfernt.
@@ -557,7 +557,7 @@ Die Envtest-basierte Suite ist von den echten Cluster-Acceptance-Tests getrennt:
 make k8s-integration-test
 ```
 
-Dieses Target verwendet den Build-Tag `k8s_integration` und Kubebuilder-Assets. Es validiert Controller-Verhalten gegen einen lokalen API-Server, ersetzt aber nicht die destruktiven Ende-zu-Ende-Prüfungen mit echtem Provider, Storage, Dogus und Maintenance Mode.
+Dieses Target verwendet den Build-Tag `k8s_integration` und Kubebuilder-Assets. Es validiert Controller-Verhalten gegen einen lokalen API-Server, ersetzt aber nicht die destruktiven Ende-zu-Ende-Prüfungen mit echtem Provider, Storage, Dogus und Wartungsmodus.
 
 ## Hinweise für Erweiterungen
 
