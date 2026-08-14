@@ -248,7 +248,7 @@ func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx con
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 				Type:    backupv1.ConditionCanceled,
-				Status:  metav1.ConditionUnknown,
+				Status:  metav1.ConditionFalse,
 				Reason:  reasonTimeWindowNotExpired,
 				Message: "The time window has not expired.",
 			})
@@ -528,7 +528,7 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		Message: "The backup already exists in Velero.",
 	}
 	completed := metav1.Condition{
-		Type:   backupv1.ConditionCompleted,
+		Type:   backupv1.ConditionSucceeded,
 		Status: metav1.ConditionFalse,
 	}
 
@@ -557,15 +557,6 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		}
 		if veleroBackup.Status.CompletionTimestamp != nil {
 			status.CompletionTimestamp = *veleroBackup.Status.CompletionTimestamp
-		}
-
-		switch {
-		case veleroBackup.Status.Phase == velerov1.BackupPhaseCompleted:
-			status.Status = backupv1.BackupStatusCompleted
-		case slices.Contains(veleroBackupFailedPhases, veleroBackup.Status.Phase):
-			status.Status = backupv1.BackupStatusFailed
-		default:
-			status.Status = backupv1.BackupStatusInProgress
 		}
 	}); err != nil {
 		return Abort, fmt.Errorf("patch backup status synchronized from Velero: %w", err)

@@ -237,7 +237,7 @@ Der lokale Workflow verwendet vier Conditions; eine fünfte kommt beim Provider-
 
 | Status | Reason | Bedeutung |
 |---|---|---|
-| `Unknown` | `TimeWindowNotExpired` | Startzeitfenster ist noch offen. |
+| `False` | `TimeWindowNotExpired` | Startzeitfenster ist noch offen; der Backup wurde nicht abgebrochen. |
 | `True` | `TimeWindowExpiredBackupNotStarted` | Backup wurde vor Ablauf nicht gestartet. |
 | `False` | `TimeWindowExpiredBackupInProgress` | Backup lief beim Ablauf bereits und darf fortfahren. |
 | `True` | `TimeWindowExpiredBackupFailed` | Provider war beim Ablauf bereits fehlgeschlagen. |
@@ -274,7 +274,7 @@ Für `spec.syncedFromProvider=true` schreibt `ensureVeleroStatusSynced` statt `S
 | `False` | `VeleroBackupFailed` | Velero meldet eine bekannte Fehlerphase. |
 | `True` | `VeleroStatusSynced` | Velero-Backup ist `Completed`. |
 
-Zusätzlich werden Velero-Zeitstempel und das Legacy-Feld `status.status` als `in progress`, `failed` oder `completed` gespiegelt. Dieser Legacy-Statuspfad wird im aktuellen Controller nur für importierte Provider-Backups geschrieben.
+Zusätzlich werden Velero-Zeitstempel gespiegelt. Das Legacy-Feld `status.status` wird wie bei lokalen Backups zentral vom `conditionsUpdater` aus den Conditions abgeleitet.
 
 ## Velero-Backup-Synchronisierung
 
@@ -323,7 +323,19 @@ Der Controller wartet nicht auf den Status des DeleteRequests, sondern prüft be
 
 ## Status-Persistenz und Idempotenz
 
-Condition-Änderungen werden zentral über den `conditionsUpdater` mit einem Status-`MergeFrom`-Patch geschrieben. `meta.SetStatusCondition` erhält bei unverändertem Status die vorhandene Transition-Zeit. Metadaten werden nur bei tatsächlicher Abweichung aktualisiert. Provider-Ressourcen und DeleteRequests werden vor dem Erzeugen gelesen, sodass wiederholte Reconciles keine Duplikate anlegen.
+Condition-Änderungen werden zentral über den `conditionsUpdater` mit einem Status-`MergeFrom`-Patch geschrieben. Dabei wird auch das von externen Systemen verwendete Legacy-Feld `status.status` bei lokalen und importierten Backups synchronisiert:
+
+| Condition-Zustand | `status.status` |
+|---|---|
+| laufender Workflow oder nicht-terminale Condition | `in progress` |
+| `Succeeded=True` oder importiertes `Completed=True` | `completed` |
+| `Succeeded=False`, `Canceled=True` oder fehlgeschlagener Import | `failed` |
+| `Deleting=True` | `deleting` |
+| noch keine Condition | bisheriger Wert, bei einem neuen Backup also leer |
+
+`Deleting=True` hat Vorrang vor terminalen Erfolgs- oder Fehlerconditions. Der Updater erhöht `backup_status_transitions_total` erst nach einem erfolgreichen Patch und nur, wenn sich die skalare Phase tatsächlich geändert hat.
+
+`meta.SetStatusCondition` erhält bei unverändertem Status die vorhandene Transition-Zeit. Metadaten werden nur bei tatsächlicher Abweichung aktualisiert. Provider-Ressourcen und DeleteRequests werden vor dem Erzeugen gelesen, sodass wiederholte Reconciles keine Duplikate anlegen.
 
 ### Metrik für Condition-Übergänge
 
@@ -349,7 +361,7 @@ sum by (condition) (
 )
 ```
 
-`backup_reconcile_total` zählt weiterhin alle Backup-Reconciles. `backup_status_transitions_total` wird von den älteren `pkg/backup`-Managern für das skalare Legacy-Feld verwendet und ist von den Condition-Übergängen getrennt.
+`backup_reconcile_total` zählt weiterhin alle Backup-Reconciles. `backup_status_transitions_total` zählt die persistierten Wechsel des skalaren Legacy-Felds und bleibt von den Condition-Übergängen getrennt.
 
 
 ## Acceptance-Tests

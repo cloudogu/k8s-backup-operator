@@ -50,7 +50,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		assert.True(t, backup.Status.StartTimestamp.Equal(&start))
 		assert.True(t, backup.Status.CompletionTimestamp.Equal(&completion))
 		assertCondition(t, backup, backupv1.ConditionPrepared, metav1.ConditionTrue, reasonVeleroStatusSynced)
-		assertCondition(t, backup, backupv1.ConditionCompleted, metav1.ConditionTrue, reasonVeleroStatusSynced)
+		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionTrue, reasonVeleroStatusSynced)
 	})
 
 	t.Run("running Velero backup is synchronized and retried", func(t *testing.T) {
@@ -67,8 +67,8 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
-		assert.Equal(t, backupv1.BackupStatusInProgress, backup.Status.Status)
-		assertCondition(t, backup, backupv1.ConditionCompleted, metav1.ConditionFalse, reasonVeleroBackupRunning)
+		assert.Equal(t, backupv1.BackupStatusFailed, backup.Status.Status)
+		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionFalse, reasonVeleroBackupRunning)
 	})
 
 	t.Run("failed Velero backup is synchronized and aborted", func(t *testing.T) {
@@ -86,7 +86,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
 		assert.Equal(t, backupv1.BackupStatusFailed, backup.Status.Status)
-		assertCondition(t, backup, backupv1.ConditionCompleted, metav1.ConditionFalse, reasonVeleroBackupFailed)
+		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionFalse, reasonVeleroBackupFailed)
 	})
 
 	t.Run("reading the Velero backup fails", func(t *testing.T) {
@@ -132,11 +132,11 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, Abort, nextAction)
 			assert.Equal(t, backupv1.BackupStatusFailed, backup.Status.Status)
-			assertCondition(t, backup, backupv1.ConditionCompleted, metav1.ConditionFalse, reasonVeleroBackupFailed)
+			assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionFalse, reasonVeleroBackupFailed)
 		})
 	}
 
-	t.Run("unknown phase is treated as running", func(t *testing.T) {
+	t.Run("unknown phase is treated as failed", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		backup.Spec.SyncedFromProvider = true
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhase("Unexpected"))
@@ -147,8 +147,8 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
-		assert.Equal(t, backupv1.BackupStatusInProgress, backup.Status.Status)
-		assertCondition(t, backup, backupv1.ConditionCompleted, metav1.ConditionFalse, reasonVeleroBackupRunning)
+		assert.Equal(t, backupv1.BackupStatusFailed, backup.Status.Status)
+		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionFalse, reasonVeleroBackupRunning)
 	})
 
 	t.Run("missing timestamps remain empty", func(t *testing.T) {

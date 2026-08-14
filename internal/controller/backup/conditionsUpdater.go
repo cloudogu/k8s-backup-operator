@@ -5,6 +5,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -25,8 +26,8 @@ func newConditionsUpdater(k8sClient client.Client) *conditionsUpdater {
 	return &conditionsUpdater{client: k8sClient}
 }
 
-// updateStatus applies a status mutation and records condition status transitions only after the
-// resulting patch was persisted successfully.
+// updateStatus applies a status mutation, synchronizes the legacy scalar phase, and records status
+// transitions only after the resulting patch was persisted successfully.
 func (u *conditionsUpdater) updateStatus(
 	ctx context.Context,
 	backup *backupv1.Backup,
@@ -34,6 +35,9 @@ func (u *conditionsUpdater) updateStatus(
 ) error {
 	backupBeforePatch := backup.DeepCopy()
 	updateFn(&backup.Status)
+	backup.Status.Status = legacyBackupStatusFor(backup)
+	legacyStatusChanged := backupBeforePatch.Status.Status != backup.Status.Status
+
 	transitions := determineBackupConditionTransitions(
 		backupBeforePatch.Status.Conditions,
 		backup.Status.Conditions,
@@ -50,6 +54,14 @@ func (u *conditionsUpdater) updateStatus(
 			transition.conditionType,
 			string(transition.from),
 			string(transition.to),
+		)
+	}
+
+	if legacyStatusChanged {
+		metrics.UpdateBackupStatusMetrics(
+			backup.Namespace,
+			backup.Name,
+			backup.Status.Status,
 		)
 	}
 
@@ -80,4 +92,29 @@ func determineBackupConditionTransitions(
 	}
 
 	return transitions
+}
+
+// legacyBackupStatusFor derives the deprecated scalar phase consumed by clients that have not yet
+// migrated to conditions.
+func legacyBackupStatusFor(backup *backupv1.Backup) string {
+	if meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionDeleting) {
+		return backupv1.BackupStatusDeleting
+	}
+	if meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled) {
+		return backupv1.BackupStatusFailed
+	}
+	if succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded); succeeded != nil {
+		switch succeeded.Status {
+		case metav1.ConditionTrue:
+			return backupv1.BackupStatusCompleted
+		case metav1.ConditionFalse:
+			return backupv1.BackupStatusFailed
+		default:
+			return backupv1.BackupStatusInProgress
+		}
+	}
+	if len(backup.Status.Conditions) > 0 {
+		return backupv1.BackupStatusInProgress
+	}
+	return backup.Status.Status
 }
