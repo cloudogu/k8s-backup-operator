@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +41,7 @@ func TestControllerReconcile(t *testing.T) {
 		backup.Spec.SyncedFromProvider = true
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
 		reconcilerMock := newMockReconciler(t)
+		allowLeaseStages(reconcilerMock)
 		controller := NewController(fakeClient, reconcilerMock, requeueAfterTest)
 		reconcilerMock.EXPECT().
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
@@ -59,6 +61,7 @@ func TestControllerReconcile(t *testing.T) {
 		backup.Spec.SyncedFromProvider = true
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
 		reconcilerMock := newMockReconciler(t)
+		allowLeaseStages(reconcilerMock)
 		controller := NewController(fakeClient, reconcilerMock, requeueAfterTest)
 		reconcilerMock.EXPECT().
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
@@ -609,6 +612,7 @@ func TestControllerReconcile(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
 		reconcilerMock := newMockReconciler(t)
+		allowLeaseStages(reconcilerMock)
 		controller := NewController(fakeClient, reconcilerMock, requeueAfterTest)
 		reconcilerMock.EXPECT().
 			ensureVeleroStatusSynced(context.Background(), mock.Anything, mock.Anything).
@@ -666,6 +670,7 @@ func newFakeClientBuilder(t *testing.T) *fake.ClientBuilder {
 	require.NoError(t, backupv1.AddToScheme(scheme))
 	require.NoError(t, blueprintv3.AddToScheme(scheme))
 	require.NoError(t, velerov1.AddToScheme(scheme))
+	require.NoError(t, coordinationv1.AddToScheme(scheme))
 	require.NoError(t, corev1.AddToScheme(scheme))
 
 	return fake.NewClientBuilder().WithScheme(scheme)
@@ -687,6 +692,11 @@ func newReconcilerRequest(namespace string, name string) ctrl.Request {
 	}}
 }
 
+func allowLeaseStages(reconcilerMock *mockReconciler) {
+	reconcilerMock.EXPECT().ensureBackupLeaseReleased(mock.Anything, mock.Anything, mock.Anything).Return(Next, nil).Maybe()
+	reconcilerMock.EXPECT().ensureActiveBackupLease(mock.Anything, mock.Anything, mock.Anything).Return(Next, nil).Maybe()
+}
+
 func newTestFixtureForControllerTest(t *testing.T) (*mockReconciler, *Controller) {
 	backup := newBackupForTest("ns", "backup")
 	fakeClient := newFakeClientBuilder(t).
@@ -694,6 +704,7 @@ func newTestFixtureForControllerTest(t *testing.T) (*mockReconciler, *Controller
 		Build()
 
 	reconcilerMock := newMockReconciler(t)
+	allowLeaseStages(reconcilerMock)
 	reconcilerMock.EXPECT().
 		ensureVeleroStatusSynced(context.Background(), mock.Anything, mock.Anything).
 		Return(Next, nil).Maybe()

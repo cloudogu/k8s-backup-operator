@@ -3,6 +3,7 @@ package restore
 import (
 	"context"
 	"errors"
+	"github.com/cloudogu/k8s-backup-operator/internal/leases"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -124,7 +125,7 @@ func withActiveRestoreLease(objects []client.Object) []client.Object {
 	}
 
 	for _, object := range objects {
-		if restore, ok := object.(*k8sv1.Restore); ok {
+		if restore, ok := object.(*k8sv1.Restore); ok && !isTerminal(restore) {
 			withLease := append([]client.Object(nil), objects...)
 
 			return append(withLease, newRestoreLease(restore))
@@ -228,4 +229,9 @@ func failingUpdate(err error) interceptor.Funcs {
 			return err
 		},
 	}
+}
+
+// newRestoreLease creates the shared operation Lease used by Restore workflow fixtures.
+func newRestoreLease(restore *k8sv1.Restore) *coordinationv1.Lease {
+	return leases.NewLease(restore.Namespace, restoreLeaseName, restore, restoreLeaseHolderKind)
 }

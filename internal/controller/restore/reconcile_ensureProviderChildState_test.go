@@ -84,7 +84,7 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 		require.NoError(t, errs[index])
 		assert.Equal(t, ctrl.Result{}, results[index], "a conflict is terminal, so it must not be requeued")
 	}
-	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
+	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), deleteOf(newRestoreLease(restore))}, fixture.clientActions.snapshot(),
 		"the conflict must be reported exactly once and the child must not be touched")
 
 	stored := &k8sv1.Restore{}

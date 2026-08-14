@@ -123,7 +123,7 @@ func TestAFailedProviderRestoreIsTerminalWithoutRecoveringTheWorkloads(t *testin
 			require.NoError(t, errs[1])
 			assert.Equal(t, ctrl.Result{}, results[0], "a terminal failure must not be requeued")
 			assert.Equal(t, ctrl.Result{}, results[1])
-			assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
+			assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), deleteOf(newRestoreLease(restore))}, fixture.clientActions.snapshot(),
 				"the failure must be reported exactly once, in one write")
 
 			assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionFalse, ReasonProviderRestoreFailed)

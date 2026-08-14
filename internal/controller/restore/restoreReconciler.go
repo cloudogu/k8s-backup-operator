@@ -97,6 +97,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.requeueDelay,
 			r.ensureProviderRestoreDeleted,
 			r.ensureDeletingStatus,
+			r.ensureRestoreLeaseReleased,
 			r.ensureDeletionFinalized,
 		)
 	case operationIgnore:
@@ -105,6 +106,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			restore,
 			r.requeueDelay,
 			r.ensureLegacyConditionsMigrated,
+			r.ensureRestoreLeaseReleased,
 		)
 	case operationCreate:
 		return runStages(

@@ -185,14 +185,15 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 		require.Equal(t, metav1.ConditionTrue, condition.Status, "condition %s must be resolved", conditionType)
 	}
 
-	// The finished restore is terminal, so further reconciliations do nothing at all.
+	// The first terminal reconciliation releases the shared lease; subsequent ones are read-only.
 	before := len(fixture.clientActions.snapshot())
 	settled, settledErrs := fixture.reconcileTimes(testCtx, request, 2)
 	for index := range settled {
 		require.NoError(t, settledErrs[index])
 		require.Equal(t, ctrl.Result{}, settled[index])
 	}
-	require.Len(t, fixture.clientActions.snapshot(), before, "a completed restore must not be written again")
+	require.Len(t, fixture.clientActions.snapshot(), before+1, "a completed restore must release its lease exactly once")
+	require.Equal(t, deleteOf(newRestoreLease(restore)), fixture.clientActions.snapshot()[before])
 }
 
 // A crash after the cleanup but before the child creation leaves a Restore whose

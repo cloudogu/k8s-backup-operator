@@ -76,13 +76,15 @@ Der separate Velero-Controller trägt den Namen `velero-backup-sync`, beobachtet
 
 ```mermaid
 flowchart TD
-    A[Backup lesen] --> B[Provider-Backup-Löschung behandeln]
+    A[Backup lesen] --> X[Eigenes Lease bei terminalem oder gelöschtem Backup freigeben]
+    X --> B[Provider-Backup-Löschung behandeln]
     B --> C[Von Velero importierten Status synchronisieren]
     C --> D[Terminales lokales Backup ignorieren]
     D --> E[Labels, Blueprint-Annotationen und Finalizer sicherstellen]
     E --> F[Zeitfenster prüfen]
     F --> G[BackupStorageLocation prüfen]
-    G --> H[Maintenance Mode aktivieren]
+    G --> L[Gemeinsames Backup-/Restore-Lease beanspruchen]
+    L --> H[Maintenance Mode aktivieren]
     H --> I[Velero-Backup sicherstellen]
     I --> J[Velero-Phase beobachten]
     J --> K[Maintenance Mode deaktivieren]
@@ -90,18 +92,20 @@ flowchart TD
 
 Die Methodenfolge lautet:
 
-1. `ensureProviderBackupDeleted`
-2. `ensureVeleroStatusSynced`
-3. `ensureCompletedBackupIsIgnored`
-4. `ensureBackupSetup`
-5. `ensureBackupIsCanceledAfterTimeWindowExpired`
-6. `ensureBackupIsPrepared`
-7. `ensureMaintenanceActivated`
-8. `ensureProviderBackupCreated`
-9. `ensureProviderBackupCompleted`
-10. `ensureMaintenanceDeactivated`
+1. `ensureBackupLeaseReleased`
+2. `ensureProviderBackupDeleted`
+3. `ensureVeleroStatusSynced`
+4. `ensureCompletedBackupIsIgnored`
+5. `ensureBackupSetup`
+6. `ensureBackupIsCanceledAfterTimeWindowExpired`
+7. `ensureBackupIsPrepared`
+8. `ensureActiveBackupLease`
+9. `ensureMaintenanceActivated`
+10. `ensureProviderBackupCreated`
+11. `ensureProviderBackupCompleted`
+12. `ensureMaintenanceDeactivated`
 
-Löschung und Provider-Synchronisierung stehen bewusst vor der Terminalprüfung. Ein bereits abgeschlossenes lokales Backup wird ansonsten anhand von `Succeeded=True` oder `Succeeded=False` ignoriert.
+Die Lease-Freigabe steht am Anfang, damit terminale oder zu löschende Backups sie vor einem `Abort` oder `Retry` erreichen. Sie verändert den Maintenance Mode nicht; dafür bleibt ausschließlich `ensureMaintenanceDeactivated` zuständig.
 
 ## Erfolgreicher lokaler Backup-Ablauf
 
@@ -124,7 +128,7 @@ sequenceDiagram
     loop bis Velero terminal ist
         B->>V: Backup-Phase lesen
         V-->>B: New/InProgress/Finalizing/WaitingForPluginOperations
-        B->>B: Succeeded=Unknown; zeitgesteuerter Retry
+        B->>B: Succeeded=Unknown zeitgesteuerter Retry
     end
     V-->>B: Completed
     B->>B: Succeeded=True und CompletionTimestamp setzen
@@ -157,7 +161,7 @@ stateDiagram-v2
     TimeWindowNotExpired --> TimeWindowExpiredBackupInProgress: Zeit abgelaufen, Provider läuft
     TimeWindowNotExpired --> TimeWindowExpiredBackupFailed: Zeit abgelaufen, Provider fehlgeschlagen
     TimeWindowNotExpired --> TimeWindowExpiredBackupSucceeded: Zeit abgelaufen, Provider erfolgreich
-    TimeWindowExpiredBackupNotStarted --> [*]: Canceled=True; kein Provider-Backup
+    TimeWindowExpiredBackupNotStarted --> [*]: Canceled=True kein Provider-Backup
     TimeWindowExpiredBackupFailed --> [*]: Canceled=True
     TimeWindowExpiredBackupInProgress --> ProviderObservation: Canceled=False
     TimeWindowExpiredBackupSucceeded --> ProviderObservation: Canceled=False
@@ -170,6 +174,14 @@ Fehlt die ConfigMap oder der Schlüssel, oder ist der Wert nicht numerisch, ende
 ### Vorbereitung
 
 `ensureBackupIsPrepared` liest die konfigurierte Velero-`BackupStorageLocation`. Nur `status.phase=Available` ergibt `Prepared=True`. Eine fehlende oder nicht verfügbare Location ergibt `Prepared=False` und einen kontrollierten Retry. Andere API-Fehler werden zurückgegeben.
+
+### Gemeinsames Backup-/Restore-Lease
+
+Nach erfolgreicher Vorbereitung und vor der Aktivierung des Maintenance Mode beansprucht `ensureActiveBackupLease` das namespaceweite Kubernetes-`Lease` `k8s-backup-operator-restore`. Dasselbe Lease verwendet der Restore-Controller. Backup und Restore können ihre kritischen Abschnitte im selben Namespace dadurch nicht gleichzeitig ausführen.
+
+Der Holder wird durch `spec.holderIdentity` (UID), `k8s.cloudogu.com/restore-lease-holder-name` (Name) und `k8s.cloudogu.com/lease-holder-kind` (`Backup` oder `Restore`) beschrieben. Jeder Controller registriert nur den Resolver für seinen eigenen Ressourcentyp. Ein gesetzter fremder oder unbekannter Holder-Typ wird als aktiv behandelt und nicht übernommen; die beiden Workflows müssen sich daher nicht gegenseitig kennen. Ein eigenes Lease wird idempotent akzeptiert. Zeitablauf allein macht ein Lease nicht stale.
+
+`ensureBackupLeaseReleased` läuft am Anfang jedes Reconcile. Die Stage löscht ausschließlich das eigene Lease, wenn der Backup terminal (`Succeeded=True`, `Succeeded=False` oder `Canceled=True`) oder zum Löschen markiert ist. Für laufende Backups und fremde Holder ist sie ein No-op. UID- und `resourceVersion`-Preconditions verhindern, dass ein inzwischen neu vergebenes Lease gelöscht wird. Die Stage ändert bewusst nicht den Maintenance Mode; alle terminalen Backup-Pfade müssen dessen Deaktivierung selbst sicherstellen.
 
 ### Maintenance Mode
 

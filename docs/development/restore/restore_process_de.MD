@@ -6,7 +6,7 @@ Das zentrale Sicherheitsziel lautet:
 
 > Ein Restore ist erst erfolgreich abgeschlossen, wenn der Provider-Restore erfolgreich war, die Workloads ihre Soll-Replikazahl tatsächlich erreicht haben, die temporären Recovery-Labels entfernt wurden und der Maintenance Mode deaktiviert wurde.
 
-Insbesondere reicht das bloße Setzen von `spec.replicas` nicht aus. Auf dem Erfolgsweg bleibt das namespaceweite Restore-Lease für andere Restores gesperrt, bis `Successful=True` geschrieben wurde. Allgemein wird ein Lease erst übernehmbar, wenn der Holder terminal ist, also `Successful=True` oder `Successful=False` trägt, oder nicht mehr eindeutig existiert.
+Insbesondere reicht das bloße Setzen von `spec.replicas` nicht aus. Auf dem Erfolgsweg bleibt das namespaceweite Backup-/Restore-Lease für Backups und Restores gesperrt, bis `Successful=True` geschrieben wurde. Allgemein wird ein Lease erst übernehmbar, wenn der Holder terminal ist, also `Successful=True` oder `Successful=False` trägt, oder nicht mehr eindeutig existiert.
 
 ## Begriffe und beteiligte Ressourcen
 
@@ -15,7 +15,7 @@ Insbesondere reicht das bloße Setzen von `spec.replicas` nicht aus. Auf dem Erf
 - **Stage**: eine idempotente `ensure...`-Methode des Reconcilers.
 - **Condition**: beobachtbarer Teilstatus in `Restore.status.conditions`.
 - **Reason**: feinere Zustandsangabe innerhalb einer Condition.
-- **Restore-Lease**: das Kubernetes-`Lease` `k8s-backup-operator-restore`, das Restores innerhalb eines Namespace serialisiert.
+- **Backup-/Restore-Lease**: das Kubernetes-`Lease` `k8s-backup-operator-restore`, das Backups und Restores innerhalb eines Namespace gegenseitig ausschließt.
 - **Scope-Label**: `k8s.cloudogu.com/restore-scaledown-scope`; dauerhaftes Opt-in eines Workloads für Scale-down und Readiness-Prüfung.
 - **Replica-Label**: `k8s.cloudogu.com/restore-scaledown-replicas`; temporäre Speicherung der ursprünglichen Replikazahl.
 
@@ -66,7 +66,7 @@ flowchart TD
     FM --> G[Provider-Restore anlegen]
     G --> H{Provider beendet?}
     H -- nein --> H
-    H -- fehlgeschlagen --> X[Successful=False; terminal]
+    H -- fehlgeschlagen --> X[Successful=False terminal]
     H -- erfolgreich --> I[Backup-Ressourcen synchronisieren]
     I --> J[Scale-up initiieren]
     J --> K{Alle Workloads ready?}
@@ -346,9 +346,12 @@ status:
 
 Dadurch gibt es keinen beobachtbaren Zustand, in dem `Successful=True` bereits gesetzt, `WorkloadsRecovered` aber noch unvollständig ist.
 
-## Lease und konkurrierende Restores
+## Gemeinsames Lease für Backup und Restore
 
-Das Lease ist namespaceweit und hat einen festen Namen. `spec.holderIdentity` enthält die unveränderliche UID des Restore; die Annotation `k8s.cloudogu.com/restore-lease-holder-name` enthält zusätzlich dessen Namen.
+Das Lease ist namespaceweit und hat den festen Namen `k8s-backup-operator-restore`. Die generische Acquire-, Resolver- und Release-Logik liegt in `internal/leases`; Backup und Restore behalten ihre workflow-spezifischen Stages. `spec.holderIdentity` enthält die UID, die Annotation `k8s.cloudogu.com/restore-lease-holder-name` den Namen und `k8s.cloudogu.com/lease-holder-kind` den Typ `Backup` oder `Restore`.
+
+Der Restore registriert nur den Restore-Resolver, der Backup-Controller nur den Backup-Resolver. Ein gesetzter fremder Holder-Typ wird als aktiv behandelt: Hält ein Backup das Lease, erhält der Restore `StateWaiting`, setzt `Successful=Unknown/WaitingForActiveRestore` und startet keine destruktive Stage. Umgekehrt wartet ein Backup auf einen Restore-Holder. So bleiben beide Controller voneinander entkoppelt.
+
 
 ```mermaid
 sequenceDiagram
@@ -376,6 +379,8 @@ Ein Zeitablauf allein macht ein Lease nie stale. Ein Provider-Restore kann legit
 
 Teilweise fehlende Holder-Informationen werden repariert, wenn UID oder Name den aktiven Restore eindeutig identifizieren. Fehlen beide Angaben, bleibt der Workflow mit `InvalidRestoreLease` gesperrt, weil eine automatische Übernahme nicht sicher wäre. Dieser Zustand wird als Fehler zurückgegeben und deshalb mit dem Backoff von `controller-runtime` erneut geprüft; eine automatische Übernahme findet trotzdem nicht statt.
 
+Ein terminaler Restore gibt sein eigenes Lease im Ignore-Zweig mit `ensureRestoreLeaseReleased` frei. Im Delete-Zweig geschieht dies nach der bestätigten Entfernung des Provider-Childs und vor dem Entfernen des Parent-Finalizers. Kind, Name und UID müssen exakt passen; UID- und `resourceVersion`-Preconditions schützen ein inzwischen neu vergebenes Lease.
+
 Beim erstmaligen Erstellen des Lease bleibt `Successful` zunächst auf `Unknown/Pending`. `RestoreLeaseAcquired` wird nur geschrieben, wenn ein zuvor wartender oder durch ein ungültiges Lease blockierter Restore später nachweislich selbst Holder ist. `acquireTime`, `renewTime` und `leaseTransitions` werden beim Anlegen beziehungsweise Übernehmen gesetzt; das Lease wird während eines laufenden Restore nicht periodisch erneuert, weil Zeitablauf kein Übernahmekriterium ist.
 
 ## Fehler- und Wiederanlaufverhalten
@@ -402,8 +407,9 @@ flowchart LR
     B --> C{Child wirklich verschwunden?}
     C -- nein --> B
     C -- ja --> D[Legacy-Status deleting schreiben]
-    D --> E[Operator-Finalizer entfernen]
-    E --> F[Kubernetes löscht Parent]
+    D --> E[Eigenes Lease freigeben]
+    E --> F[Operator-Finalizer entfernen]
+    F --> G[Kubernetes löscht Parent]
 ```
 
 Die Delete-Anforderung an den Provider-Child wird nicht mit dessen tatsächlicher Entfernung verwechselt. Der Parent behält seinen Operator-Finalizer, bis ein späteres `Get` bestätigt, dass der Child nicht mehr existiert. Fremde gleichnamige Children werden nicht gelöscht und blockieren die Parent-Löschung nicht. Eine gezielte Ausnahme gilt für Restores mit `Reason=MigratedFromLegacyStatus`: Deren Provider-Children können aus der Zeit vor OwnerReferences stammen und werden deshalb auch ohne nachweisbare Ownership gelöscht. Andere, dem Operator nicht gehörende Finalizer bleiben unangetastet.

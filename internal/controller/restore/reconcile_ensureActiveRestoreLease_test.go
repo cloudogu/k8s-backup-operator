@@ -74,13 +74,13 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		{
 			name:          "should return an error when reading the lease fails",
 			getError:      assert.AnError,
-			wantErrorText: "failed to get restore lease",
+			wantErrorText: "failed to get lease",
 		},
 		{
 			name:          "should return an error when creating the lease fails",
 			getError:      leaseNotFound(),
 			createError:   assert.AnError,
-			wantErrorText: "failed to create restore lease",
+			wantErrorText: "failed to create lease",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -196,7 +196,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
 
 		require.Error(t, actualOutcome.err)
-		assert.ErrorContains(t, actualOutcome.err, "without holder identity or name")
+		assert.ErrorContains(t, actualOutcome.err, "without a resolvable holder")
 		condition := findSuccessfulCondition(actualRestore)
 		require.NotNil(t, condition)
 		assert.Equal(t, metav1.ConditionUnknown, condition.Status)
@@ -313,7 +313,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		assert.Same(t, restore, actualRestore)
 		require.Error(t, actualOutcome.err)
 		assert.ErrorIs(t, actualOutcome.err, assert.AnError)
-		assert.ErrorContains(t, actualOutcome.err, "failed to verify holder UID")
+		assert.ErrorContains(t, actualOutcome.err, "failed to resolve holder")
 	})
 
 	for _, test := range []struct {
@@ -348,7 +348,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			if test.wantError {
 				require.Error(t, actualOutcome.err)
 				assert.ErrorIs(t, actualOutcome.err, assert.AnError)
-				assert.ErrorContains(t, actualOutcome.err, "failed to repair restore lease")
+				assert.ErrorContains(t, actualOutcome.err, "failed to repair lease")
 			} else {
 				assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
 			}
@@ -450,7 +450,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		assert.Same(t, restore, actualRestore)
 		require.Error(t, actualOutcome.err)
 		assert.ErrorIs(t, actualOutcome.err, assert.AnError)
-		assert.ErrorContains(t, actualOutcome.err, "failed to verify holder")
+		assert.ErrorContains(t, actualOutcome.err, "failed to resolve holder")
 	})
 
 	for _, test := range []struct {
@@ -485,7 +485,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			if test.wantError {
 				require.Error(t, actualOutcome.err)
 				assert.ErrorIs(t, actualOutcome.err, test.updateError)
-				assert.ErrorContains(t, actualOutcome.err, "failed to take over stale restore lease")
+				assert.ErrorContains(t, actualOutcome.err, "failed to take over stale lease")
 			} else {
 				assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
 			}
