@@ -120,7 +120,7 @@ sequenceDiagram
 
 ### Setup und Metadaten
 
-`ensureBackupSetup` konvergiert folgende Metadaten:
+`ensureBackupSetup` setzt folgende Metadaten:
 
 - Labels `app=ces` und `k8s.cloudogu.com/part-of=backup`
 - Finalizer `cloudogu-backup-finalizer`
@@ -150,7 +150,7 @@ stateDiagram-v2
     TimeWindowExpiredBackupSucceeded --> ProviderObservation: Canceled=False
 ```
 
-Das Zeitfenster beendet einen bereits laufenden Provider-Backup nicht. Es verhindert nur einen verspäteten Start. Ein laufender Backup darf fertig werden. Ein beim Ablauf bereits fehlgeschlagener Backup wird als `Canceled=True` terminal für diesen Reconcile behandelt.
+Existiert kein Blueprint, läuft der Workflow ohne Blueprint-Annotationen weiter. Andere Fehler beim Listen oder Serialisieren brechen den Reconcile mit Fehler ab. Vorhandene fremde Labels, Annotationen und Finalizer bleiben erhalten; verwaltete Werte werden bei Abweichung korrigiert.
 
 Fehlt die ConfigMap oder der Schlüssel, oder ist der Wert nicht numerisch, endet der Reconcile mit Fehler. `StartTimestamp` ist die Grenze zwischen „noch nicht gestartet“ und „bereits gestartet“.
 
@@ -249,15 +249,15 @@ Der lokale Workflow verwendet vier Conditions; eine fünfte kommt beim Provider-
 
 ### `Succeeded`
 
-| Status | Reason | Bedeutung |
-|---|---|---|
-| `Unknown` | `MaintenanceModesIsNotActive` | Wartungsmodus wurde gerade aktiviert; Workflow läuft weiter. |
-| `Unknown` | `ProviderBackupResourceDoesNotExist` | Provider-Child wurde gerade erzeugt. |
-| `Unknown` | `ProviderBackupInProgress` | Provider arbeitet. |
-| `False` | `ProviderBackupFailed` | Provider ist terminal fehlgeschlagen. |
-| `True` | `ProviderBackupSucceeded` | Provider ist erfolgreich abgeschlossen. |
+| Status | Reason | Bedeutung                                                                                                              |
+|---|---|------------------------------------------------------------------------------------------------------------------------|
+| `Unknown` | `MaintenanceModesIsNotActive` | Das Aktivieren des Wartungsmodus wurde angestosse, der Modus ist aber aktuell noch nicht aktiv; Workflow läuft weiter. |
+| `Unknown` | `ProviderBackupResourceDoesNotExist` | Provider-Child wurde gerade erzeugt.                                                                                   |
+| `Unknown` | `ProviderBackupInProgress` | Provider arbeitet.                                                                                                     |
+| `False` | `ProviderBackupFailed` | Provider ist terminal fehlgeschlagen.                                                                                  |
+| `True` | `ProviderBackupSucceeded` | Provider ist erfolgreich abgeschlossen.                                                                                |
 
-`Succeeded=True` und `Succeeded=False` werden von `ensureCompletedBackupIsIgnored` als terminal behandelt. Der Name `MaintenanceModesIsNotActive` beschreibt historisch den Zustand vor der erfolgreichen Aktivierung und ist orthografisch Teil der beobachtbaren API.
+`Succeeded=True` und `Succeeded=False` werden von `ensureCompletedBackupIsIgnored` als terminal behandelt. Der Name `MaintenanceModesIsNotActive` beschreibt historisch den Zustand vor der erfolgreichen Aktivierung.
 
 ### `Completed` bei Provider-Importen
 

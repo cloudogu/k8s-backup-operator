@@ -69,6 +69,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		c.reconciler.ensureBackupLeaseReleased, // cleanup leases of deleted/failed backups
 		c.reconciler.ensureProviderBackupDeleted,
 		c.reconciler.ensureVeleroStatusSynced,
+		c.reconciler.ensureMaintenanceDeactivated,
 		c.reconciler.ensureCompletedBackupIsIgnored,
 		c.reconciler.ensureBackupSetup,
 		c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired,
