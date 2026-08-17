@@ -337,13 +337,3 @@ Die Cluster-Tests liegen in `acceptance-tests/backup_test.go` und tragen das Gin
 K8S_TEST_CLUSTER_KUBECONFIG=/absoluter/pfad/kubeconfig \
   make acceptance-test GINKGO_LABEL_FILTER=backup
 ```
-
-## Hinweise für Erweiterungen
-
-- Neue Stages müssen in ihrer Position in der festen Ensure-Liste bewertet werden; die Reihenfolge bestimmt Terminalität und Wiederanlaufverhalten.
-- Ein Status-Write allein erzeugt wegen des Generation-Filters keinen Reconcile. Wartende Stages müssen deshalb zuverlässig `Retry` liefern oder eine beobachtete Ressource ändern.
-- Neue Velero-Phasen müssen sowohl für lokale Backups als auch für importierte Backups explizit klassifiziert werden; beide Pfade behandeln unbekannte Phasen derzeit unterschiedlich.
-- Wartungsmodus, Start-/CompletionTimestamp und Time-window-Semantik müssen bei Crash- und Fehlerfenstern idempotent bleiben.
-- Änderungen am Backup-Scope müssen Include-Ressourcentypen und Labelselektoren gemeinsam berücksichtigen.
-- Löschänderungen müssen sowohl den Backup-CR- als auch den Velero-getriebenen Pfad berücksichtigen, um Schleifen oder verwaiste Storage-Daten zu vermeiden.
-- Änderungen sollten fokussierte Unit-Tests und, bei Provider-, Maintenance- oder Delete-Semantik, das passende Acceptance-Szenario erhalten.

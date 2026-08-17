@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	DefaultName          = "k8s-backup-operator-restore"
-	HolderNameAnnotation = "k8s.cloudogu.com/restore-lease-holder-name"
+	DefaultName          = "k8s-backup-operator-lease"
+	HolderNameAnnotation = "k8s.cloudogu.com/backup-operator-lease-holder-name"
 	HolderKindAnnotation = "k8s.cloudogu.com/lease-holder-kind"
 )
 
