@@ -86,7 +86,7 @@ func (c defaultCronJobManager) delete(ctx context.Context, schedule *v1.BackupSc
 		},
 	}
 
-	err := c.Client.Delete(ctx, cronJob)
+	err := c.Delete(ctx, cronJob)
 	if apierrors.IsNotFound(err) {
 		logger.V(1).Info("CronJob is already deleted", "cronJob", cronJob.Name)
 		return nil
