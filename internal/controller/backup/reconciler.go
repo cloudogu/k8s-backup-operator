@@ -67,11 +67,11 @@ var veleroBackupIsRunningPhases = []velerov1.BackupPhase{
 	velerov1.BackupPhaseInProgress,
 	velerov1.BackupPhaseFinalizing,
 	velerov1.BackupPhaseWaitingForPluginOperations,
+	velerov1.BackupPhaseWaitingForPluginOperationsPartiallyFailed,
 }
 
 var veleroBackupFailedPhases = []velerov1.BackupPhase{
 	velerov1.BackupPhaseFailedValidation,
-	velerov1.BackupPhaseWaitingForPluginOperationsPartiallyFailed,
 	velerov1.BackupPhaseFinalizingPartiallyFailed,
 	velerov1.BackupPhasePartiallyFailed,
 	velerov1.BackupPhaseFailed,
@@ -529,7 +529,7 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 	}
 	completed := metav1.Condition{
 		Type:   backupv1.ConditionSucceeded,
-		Status: metav1.ConditionFalse,
+		Status: metav1.ConditionUnknown,
 	}
 
 	nextAction := Retry
@@ -540,6 +540,7 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		completed.Message = "The completed backup status was synchronized from Velero."
 		nextAction = Abort
 	case slices.Contains(veleroBackupFailedPhases, veleroBackup.Status.Phase):
+		completed.Status = metav1.ConditionFalse
 		completed.Reason = reasonVeleroBackupFailed
 		completed.Message = fmt.Sprintf("The Velero backup failed in phase %s.", veleroBackup.Status.Phase)
 		nextAction = Abort

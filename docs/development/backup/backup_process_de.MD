@@ -210,8 +210,8 @@ Die Werte von `dogu.name` und `backup-scope` werden für die Auswahl nicht ausge
 
 | Kategorie | Velero-Phasen | Ergebnis |
 |---|---|---|
-| laufend | `New`, `InProgress`, `Finalizing`, `WaitingForPluginOperations` | `Succeeded=Unknown/ProviderBackupInProgress`, Retry |
-| fehlgeschlagen | `FailedValidation`, `WaitingForPluginOperationsPartiallyFailed`, `FinalizingPartiallyFailed`, `PartiallyFailed`, `Failed` | `Succeeded=False/ProviderBackupFailed` |
+| laufend | `New`, `InProgress`, `Finalizing`, `WaitingForPluginOperations`, `WaitingForPluginOperationsPartiallyFailed` | `Succeeded=Unknown/ProviderBackupInProgress`, Retry |
+| fehlgeschlagen | `FailedValidation`, `FinalizingPartiallyFailed`, `PartiallyFailed`, `Failed` | `Succeeded=False/ProviderBackupFailed` |
 | erfolgreich | `Completed` | `Succeeded=True/ProviderBackupSucceeded` |
 | nicht erwartet | beispielsweise `Deleting` | Fehler; kein impliziter Erfolg |
 
@@ -219,7 +219,7 @@ Beim Anlegen des Provider-Backups wird `StartTimestamp` nur gesetzt, wenn er noc
 
 ## Conditions
 
-Der lokale Workflow verwendet vier Conditions; eine fünfte kommt beim Provider-Import hinzu:
+Lokale und aus dem Provider importierte Backups verwenden dieselben vier Conditions:
 
 ### `Deleting`
 
@@ -254,22 +254,15 @@ Der lokale Workflow verwendet vier Conditions; eine fünfte kommt beim Provider-
 | `Unknown` | `MaintenanceModesIsNotActive` | Das Aktivieren des Wartungsmodus wurde angestosse, der Modus ist aber aktuell noch nicht aktiv; Workflow läuft weiter. |
 | `Unknown` | `ProviderBackupResourceDoesNotExist` | Provider-Child wurde gerade erzeugt.                                                                                   |
 | `Unknown` | `ProviderBackupInProgress` | Provider arbeitet.                                                                                                     |
+| `Unknown` | `VeleroBackupRunning` | Ein importierter Velero-Backup ist noch nicht terminal; unbekannte Phasen gelten ebenfalls als laufend.                |
 | `False` | `ProviderBackupFailed` | Provider ist terminal fehlgeschlagen.                                                                                  |
+| `False` | `VeleroBackupFailed` | Ein importierter Velero-Backup meldet eine bekannte Fehlerphase.                                                       |
 | `True` | `ProviderBackupSucceeded` | Provider ist erfolgreich abgeschlossen.                                                                                |
+| `True` | `VeleroStatusSynced` | Ein importierter Velero-Backup ist `Completed`.                                                                        |
 
 `Succeeded=True` und `Succeeded=False` werden von `ensureCompletedBackupIsIgnored` als terminal behandelt. Der Name `MaintenanceModesIsNotActive` beschreibt historisch den Zustand vor der erfolgreichen Aktivierung.
 
-### `Completed` bei Provider-Importen
-
-Für `spec.syncedFromProvider=true` schreibt `ensureVeleroStatusSynced` statt `Succeeded` die Condition `Completed`:
-
-| Status | Reason | Bedeutung |
-|---|---|---|
-| `False` | `VeleroBackupRunning` | Velero ist nicht terminal; unbekannte Phasen gelten hier ebenfalls als laufend. |
-| `False` | `VeleroBackupFailed` | Velero meldet eine bekannte Fehlerphase. |
-| `True` | `VeleroStatusSynced` | Velero-Backup ist `Completed`. |
-
-Zusätzlich werden Velero-Zeitstempel gespiegelt. Das Legacy-Feld `status.status` wird wie bei lokalen Backups zentral vom `conditionsUpdater` aus den Conditions abgeleitet.
+Für `spec.syncedFromProvider=true` schreibt `ensureVeleroStatusSynced` den beobachteten Zustand ebenfalls in `Succeeded`. `WaitingForPluginOperationsPartiallyFailed` bleibt dabei nicht-terminal, weil Velero noch Plugin-Operationen ausführt; erst eine spätere terminale partielle Fehlerphase setzt `Succeeded=False`. Zusätzlich werden Velero-Zeitstempel gespiegelt. Das Legacy-Feld `status.status` wird wie bei lokalen Backups zentral vom `conditionsUpdater` aus den Conditions abgeleitet.
 
 ## Velero-Backup-Synchronisierung
 
@@ -323,8 +316,8 @@ Condition-Änderungen werden zentral über den `conditionsUpdater` mit einem Sta
 | Condition-Zustand | `status.status` |
 |---|---|
 | laufender Workflow oder nicht-terminale Condition | `in progress` |
-| `Succeeded=True` oder importiertes `Completed=True` | `completed` |
-| `Succeeded=False`, `Canceled=True` oder fehlgeschlagener Import | `failed` |
+| `Succeeded=True` | `completed` |
+| `Succeeded=False` oder `Canceled=True` | `failed` |
 | `Deleting=True` | `deleting` |
 | noch keine Condition | bisheriger Wert, bei einem neuen Backup also leer |
 
@@ -340,13 +333,13 @@ Persistierte Statuswechsel einer Backup-Condition werden mit `backup_condition_t
 |---|---|
 | `namespace` | Namespace des Backups. |
 | `name` | Name des Backups. |
-| `condition` | Condition-Typ: `Prepared`, `Completed`, `Deleting`, `Canceled` oder `Succeeded`. |
+| `condition` | Condition-Typ: `Prepared`, `Deleting`, `Canceled` oder `Succeeded`. |
 | `from` | Vorheriger Status: `Unknown`, `True` oder `False`. |
 | `to` | Neuer Status: `Unknown`, `True` oder `False`. |
 
 Der `conditionsUpdater` bestimmt die Übergänge vor dem Patch, erhöht die Counter aber erst nach einem erfolgreichen Status-Write. Fehlgeschlagene Patches werden daher nicht gezählt. Das erstmalige Anlegen einer Condition sowie Änderungen nur an `Reason`, `Message` oder Transition-Zeit gelten nicht als Statusübergang.
 
-Nach dem Lesen eines Backups initialisiert jeder Reconcile alle sechs möglichen Wechsel für alle fünf Condition-Typen mit `Add(0)`. Dadurch stehen pro Backup 30 Zeitreihen zur Verfügung, auch wenn ein bestimmter Übergang noch nie aufgetreten ist. Wiederholte Initialisierungen verändern die Counter nicht.
+Nach dem Lesen eines Backups initialisiert jeder Reconcile alle sechs möglichen Wechsel für alle vier Condition-Typen mit `Add(0)`. Dadurch stehen pro Backup 24 Zeitreihen zur Verfügung, auch wenn ein bestimmter Übergang noch nie aufgetreten ist. Wiederholte Initialisierungen verändern die Counter nicht.
 
 Eine beispielhafte Abfrage erfolgreicher Übergänge lautet:
 

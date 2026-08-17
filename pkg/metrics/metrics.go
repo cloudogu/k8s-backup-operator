@@ -98,7 +98,6 @@ func InitBackupStatusMetrics(namespace, name string) {
 func InitBackupConditionTransitionMetrics(namespace, name string) {
 	conditionTypes := []string{
 		v1.ConditionPrepared,
-		v1.ConditionCompleted,
 		v1.ConditionDeleting,
 		v1.ConditionCanceled,
 		v1.ConditionSucceeded,

@@ -65,7 +65,6 @@ func TestInitBackupConditionTransitionMetrics(t *testing.T) {
 
 	conditionTypes := []string{
 		v1.ConditionPrepared,
-		v1.ConditionCompleted,
 		v1.ConditionDeleting,
 		v1.ConditionCanceled,
 		v1.ConditionSucceeded,
@@ -76,7 +75,7 @@ func TestInitBackupConditionTransitionMetrics(t *testing.T) {
 		metav1.ConditionFalse,
 	}
 
-	assert.Equal(t, 30, testutil.CollectAndCount(BackupConditionTransitionsTotal))
+	assert.Equal(t, 24, testutil.CollectAndCount(BackupConditionTransitionsTotal))
 	for _, conditionType := range conditionTypes {
 		for _, from := range conditionStatuses {
 			for _, to := range conditionStatuses {

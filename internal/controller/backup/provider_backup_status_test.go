@@ -23,7 +23,7 @@ func TestProviderBackupStatus(t *testing.T) {
 
 		// has failed
 		{phase: velerov1.BackupPhaseFailedValidation, succeeded: false, failed: true, inProgress: false},
-		{phase: velerov1.BackupPhaseWaitingForPluginOperationsPartiallyFailed, succeeded: false, failed: true, inProgress: false},
+		{phase: velerov1.BackupPhaseWaitingForPluginOperationsPartiallyFailed, succeeded: false, failed: false, inProgress: true},
 		{phase: velerov1.BackupPhaseFinalizingPartiallyFailed, succeeded: false, failed: true, inProgress: false},
 		{phase: velerov1.BackupPhasePartiallyFailed, succeeded: false, failed: true, inProgress: false},
 		{phase: velerov1.BackupPhaseFailed, succeeded: false, failed: true, inProgress: false},

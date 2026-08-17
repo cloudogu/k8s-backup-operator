@@ -109,7 +109,7 @@ func TestLegacyBackupStatusFor(t *testing.T) {
 		{name: "maps deleting backup to deleting with highest priority", conditions: []metav1.Condition{{Type: backupv1.ConditionDeleting, Status: metav1.ConditionTrue}, {Type: backupv1.ConditionSucceeded, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusDeleting},
 		{name: "maps completed import to completed", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusCompleted},
 		{name: "maps failed import to failed", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionFalse, Reason: reasonVeleroBackupFailed}}, expected: backupv1.BackupStatusFailed},
-		{name: "maps running import to in progress", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionFalse, Reason: reasonVeleroBackupRunning}}, expected: backupv1.BackupStatusFailed},
+		{name: "maps running import to in progress", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionUnknown, Reason: reasonVeleroBackupRunning}}, expected: backupv1.BackupStatusInProgress},
 	}
 
 	for _, tt := range tests {
