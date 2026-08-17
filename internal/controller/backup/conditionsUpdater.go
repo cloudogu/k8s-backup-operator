@@ -73,21 +73,21 @@ func determineBackupConditionTransitions(
 	after []metav1.Condition,
 ) []backupConditionTransition {
 	previousStatuses := make(map[string]metav1.ConditionStatus, len(before))
-	for _, condition := range before {
-		previousStatuses[condition.Type] = condition.Status
+	for _, beforeCondition := range before {
+		previousStatuses[beforeCondition.Type] = beforeCondition.Status
 	}
 
 	var transitions []backupConditionTransition
-	for _, condition := range after {
-		previousStatus, existed := previousStatuses[condition.Type]
-		if !existed || previousStatus == condition.Status {
+	for _, afterCondition := range after {
+		previousStatus, existed := previousStatuses[afterCondition.Type]
+		if !existed || previousStatus == afterCondition.Status {
 			continue
 		}
 
 		transitions = append(transitions, backupConditionTransition{
-			conditionType: condition.Type,
+			conditionType: afterCondition.Type,
 			from:          previousStatus,
-			to:            condition.Status,
+			to:            afterCondition.Status,
 		})
 	}
 

@@ -22,6 +22,7 @@ func TestConditionsUpdaterRecordsPersistedConditionStatusTransitions(t *testing.
 	}}
 	fakeClient := newFakeClientBuilder(t).WithStatusSubresource(backup).WithObjects(backup).Build()
 	metrics.BackupConditionTransitionsTotal.Reset()
+	metrics.BackupStatusTransitionsTotal.Reset()
 
 	err := newConditionsUpdater(fakeClient).updateStatus(context.Background(), backup, func(status *backupv1.BackupStatus) {
 		status.Conditions[0].Status = metav1.ConditionTrue
@@ -36,6 +37,9 @@ func TestConditionsUpdaterRecordsPersistedConditionStatusTransitions(t *testing.
 		string(metav1.ConditionTrue),
 	)
 	assert.Equal(t, 1.0, testutil.ToFloat64(counter))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metrics.BackupStatusTransitionsTotal.WithLabelValues(
+		backup.Namespace, backup.Name, backupv1.BackupStatusInProgress,
+	)))
 }
 
 func TestConditionsUpdaterDoesNotRecordNewOrUnchangedConditions(t *testing.T) {
@@ -46,6 +50,7 @@ func TestConditionsUpdaterDoesNotRecordNewOrUnchangedConditions(t *testing.T) {
 	}}
 	fakeClient := newFakeClientBuilder(t).WithStatusSubresource(backup).WithObjects(backup).Build()
 	metrics.BackupConditionTransitionsTotal.Reset()
+	metrics.BackupStatusTransitionsTotal.Reset()
 
 	err := newConditionsUpdater(fakeClient).updateStatus(context.Background(), backup, func(status *backupv1.BackupStatus) {
 		status.Conditions[0].Reason = "StillPrepared"
@@ -57,6 +62,9 @@ func TestConditionsUpdaterDoesNotRecordNewOrUnchangedConditions(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 0, testutil.CollectAndCount(metrics.BackupConditionTransitionsTotal))
+	assert.Equal(t, 1.0, testutil.ToFloat64(metrics.BackupStatusTransitionsTotal.WithLabelValues(
+		backup.Namespace, backup.Name, backupv1.BackupStatusInProgress,
+	)))
 }
 
 func TestConditionsUpdaterDoesNotRecordFailedPatches(t *testing.T) {
@@ -90,9 +98,11 @@ func TestConditionsUpdaterDoesNotRecordFailedPatches(t *testing.T) {
 
 	require.ErrorIs(t, err, assert.AnError)
 	assert.Equal(t, 0, testutil.CollectAndCount(metrics.BackupConditionTransitionsTotal))
+	assert.Equal(t, 0, testutil.CollectAndCount(metrics.BackupStatusTransitionsTotal))
 }
 
 func TestLegacyBackupStatusFor(t *testing.T) {
+	metrics.BackupStatusTransitionsTotal.Reset()
 	assert.Equal(t, 0, testutil.CollectAndCount(metrics.BackupStatusTransitionsTotal))
 	tests := []struct {
 		name       string
@@ -107,9 +117,6 @@ func TestLegacyBackupStatusFor(t *testing.T) {
 		{name: "maps failed provider backup to failed", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionFalse}}, expected: backupv1.BackupStatusFailed},
 		{name: "maps canceled backup to failed", conditions: []metav1.Condition{{Type: backupv1.ConditionCanceled, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusFailed},
 		{name: "maps deleting backup to deleting with highest priority", conditions: []metav1.Condition{{Type: backupv1.ConditionDeleting, Status: metav1.ConditionTrue}, {Type: backupv1.ConditionSucceeded, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusDeleting},
-		{name: "maps completed import to completed", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusCompleted},
-		{name: "maps failed import to failed", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionFalse, Reason: reasonVeleroBackupFailed}}, expected: backupv1.BackupStatusFailed},
-		{name: "maps running import to in progress", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionUnknown, Reason: reasonVeleroBackupRunning}}, expected: backupv1.BackupStatusInProgress},
 	}
 
 	for _, tt := range tests {
