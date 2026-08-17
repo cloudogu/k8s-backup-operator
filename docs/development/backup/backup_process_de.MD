@@ -295,16 +295,19 @@ sequenceDiagram
     participant K as Kubernetes
 
     U->>K: Backup-CR löschen
-    K->>B: deletionTimestamp
-    B->>V: gleichnamigen Provider-Backup lesen
-    alt Provider-Backup existiert
-        B->>D: DeleteBackupRequest idempotent anlegen
+
+    loop Solange der Provider-Backup existiert
+        B->>V: Provider-Backup lesen
+        V-->>B: Provider-Backup vorhanden
+        B->>D: DeleteBackupRequest idempotent sicherstellen
         B->>B: Deleting=True
-        B->>B: zeitgesteuerter Retry
-    else Provider-Backup fehlt
-        B->>K: cloudogu-backup-finalizer entfernen
-        K-->>U: Parent darf verschwinden
+        B-->>B: zeitgesteuerter Retry
     end
+
+    B->>V: Provider-Backup erneut lesen
+    V-->>B: Provider-Backup fehlt
+    B->>K: cloudogu-backup-finalizer entfernen
+    K-->>U: Parent darf verschwinden
 ```
 
 Der Controller wartet nicht auf den Status des DeleteRequests, sondern prüft bei jedem Retry, ob der Velero-Backup noch existiert. Erst nach dessen Verschwinden wird der Backup-Finalizer aus der Finalizer-Liste entfernt und der Parent aktualisiert. Andere Finalizer bleiben erhalten.
@@ -321,57 +324,18 @@ Condition-Änderungen werden zentral über den `conditionsUpdater` mit einem Sta
 | `Deleting=True` | `deleting` |
 | noch keine Condition | bisheriger Wert, bei einem neuen Backup also leer |
 
-`Deleting=True` hat Vorrang vor terminalen Erfolgs- oder Fehlerconditions. Der Updater erhöht `backup_status_transitions_total` erst nach einem erfolgreichen Patch und nur, wenn sich die skalare Phase tatsächlich geändert hat.
+`Deleting=True` hat Vorrang vor terminalen Erfolgs- oder Fehlerconditions. 
 
-`meta.SetStatusCondition` erhält bei unverändertem Status die vorhandene Transition-Zeit. Metadaten werden nur bei tatsächlicher Abweichung aktualisiert. Provider-Ressourcen und DeleteRequests werden vor dem Erzeugen gelesen, sodass wiederholte Reconciles keine Duplikate anlegen.
-
-### Metrik für Condition-Übergänge
-
-Persistierte Statuswechsel einer Backup-Condition werden mit `backup_condition_transitions_total` erfasst. Die Labels sind:
-
-| Label | Bedeutung |
-|---|---|
-| `namespace` | Namespace des Backups. |
-| `name` | Name des Backups. |
-| `condition` | Condition-Typ: `Prepared`, `Deleting`, `Canceled` oder `Succeeded`. |
-| `from` | Vorheriger Status: `Unknown`, `True` oder `False`. |
-| `to` | Neuer Status: `Unknown`, `True` oder `False`. |
-
-Der `conditionsUpdater` bestimmt die Übergänge vor dem Patch, erhöht die Counter aber erst nach einem erfolgreichen Status-Write. Fehlgeschlagene Patches werden daher nicht gezählt. Das erstmalige Anlegen einer Condition sowie Änderungen nur an `Reason`, `Message` oder Transition-Zeit gelten nicht als Statusübergang.
-
-Nach dem Lesen eines Backups initialisiert jeder Reconcile alle sechs möglichen Wechsel für alle vier Condition-Typen mit `Add(0)`. Dadurch stehen pro Backup 24 Zeitreihen zur Verfügung, auch wenn ein bestimmter Übergang noch nie aufgetreten ist. Wiederholte Initialisierungen verändern die Counter nicht.
-
-Eine beispielhafte Abfrage erfolgreicher Übergänge lautet:
-
-```promql
-sum by (condition) (
-  increase(backup_condition_transitions_total{to="True"}[1h])
-)
-```
-
-`backup_reconcile_total` zählt weiterhin alle Backup-Reconciles. `backup_status_transitions_total` zählt die persistierten Wechsel des skalaren Legacy-Felds und bleibt von den Condition-Übergängen getrennt.
-
+`meta.SetStatusCondition` erhält bei unverändertem Status die vorhandene Transition-Zeit. 
+Status und Conditions werden nur bei tatsächlicher Abweichung aktualisiert. 
 
 ## Acceptance-Tests
 
-Die Cluster-Tests liegen in `acceptance-tests/backup_test.go`, tragen das Ginkgo-Label `backup` und decken folgende Szenarien ab:
-
-1. Backup-CR erzeugen, Velero-Backup beobachten und auf `Succeeded=True` warten.
-2. Erfolgreichen Backup löschen und prüfen, dass auch der Provider-Backup verschwindet.
-3. Noch nicht gestarteten Backup nach abgelaufenem Zeitfenster mit `Canceled=True` beenden.
-4. Bereits laufenden Backup trotz abgelaufenem Zeitfenster weiterlaufen und erfolgreich abschließen lassen.
-
-Die Tests verändern zeitweise die BackupStorageLocation und `retryTimeLimit`; sie sind deshalb destruktive Cluster-Tests und nicht mit Unit-Tests gleichzusetzen.
+Die Cluster-Tests liegen in `acceptance-tests/backup_test.go` und tragen das Ginkgo-Label `backup`:
 
 ```bash
 K8S_TEST_CLUSTER_KUBECONFIG=/absoluter/pfad/kubeconfig \
   make acceptance-test GINKGO_LABEL_FILTER=backup
-```
-
-Die Unit-Tests des aktuellen Controllers laufen mit:
-
-```bash
-go test ./internal/controller/backup
 ```
 
 ## Hinweise für Erweiterungen
