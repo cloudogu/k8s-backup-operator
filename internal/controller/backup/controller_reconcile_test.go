@@ -95,7 +95,7 @@ func TestControllerReconcile(t *testing.T) {
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -134,6 +134,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		// The next step was called.
@@ -153,6 +156,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -169,6 +175,9 @@ func TestControllerReconcile(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
@@ -193,6 +202,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -214,6 +226,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -233,6 +248,9 @@ func TestControllerReconcile(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
@@ -260,6 +278,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -284,6 +305,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -306,6 +330,9 @@ func TestControllerReconcile(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
@@ -336,6 +363,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -363,6 +393,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -388,6 +421,9 @@ func TestControllerReconcile(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
@@ -421,6 +457,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -451,6 +490,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -479,6 +521,9 @@ func TestControllerReconcile(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
@@ -515,6 +560,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil).Once()
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -547,6 +595,9 @@ func TestControllerReconcile(t *testing.T) {
 		reconcilerMock.EXPECT().
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil).Once()
 		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
@@ -621,6 +672,9 @@ func TestControllerReconcile(t *testing.T) {
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
@@ -637,6 +691,9 @@ func TestControllerReconcile(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
 			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			Return(Next, nil)
+		reconcilerMock.EXPECT().
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
 			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
