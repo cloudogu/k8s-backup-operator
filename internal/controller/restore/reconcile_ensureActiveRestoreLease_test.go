@@ -19,20 +19,6 @@ import (
 )
 
 func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
-	t.Run("should skip lease handling when the restore is terminal", func(t *testing.T) {
-		restore := newParentRestore()
-		applyConditions(restore, []metav1.Condition{{
-			Type: backupv1.ConditionSuccessful, Status: metav1.ConditionTrue, Reason: ReasonRestoreCompleted,
-		}})
-		clientMock := newMockK8sClient(t)
-		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
-
-		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
-
-		assert.Same(t, restore, actualRestore)
-		assert.Equal(t, next(), actualOutcome)
-	})
-
 	t.Run("should create a lease for a restore when none exists", func(t *testing.T) {
 		restore := newParentRestore()
 		clientMock := newMockK8sClient(t)

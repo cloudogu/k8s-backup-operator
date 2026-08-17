@@ -527,7 +527,7 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		Reason:  reasonVeleroStatusSynced,
 		Message: "The backup already exists in Velero.",
 	}
-	completed := metav1.Condition{
+	succeeded := metav1.Condition{
 		Type:   backupv1.ConditionSucceeded,
 		Status: metav1.ConditionUnknown,
 	}
@@ -535,23 +535,23 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 	nextAction := Retry
 	switch {
 	case veleroBackup.Status.Phase == velerov1.BackupPhaseCompleted:
-		completed.Status = metav1.ConditionTrue
-		completed.Reason = reasonVeleroStatusSynced
-		completed.Message = "The completed backup status was synchronized from Velero."
+		succeeded.Status = metav1.ConditionTrue
+		succeeded.Reason = reasonVeleroStatusSynced
+		succeeded.Message = "The completed backup status was synchronized from Velero."
 		nextAction = Abort
 	case slices.Contains(veleroBackupFailedPhases, veleroBackup.Status.Phase):
-		completed.Status = metav1.ConditionFalse
-		completed.Reason = reasonVeleroBackupFailed
-		completed.Message = fmt.Sprintf("The Velero backup failed in phase %s.", veleroBackup.Status.Phase)
+		succeeded.Status = metav1.ConditionFalse
+		succeeded.Reason = reasonVeleroBackupFailed
+		succeeded.Message = fmt.Sprintf("The Velero backup failed in phase %s.", veleroBackup.Status.Phase)
 		nextAction = Abort
 	default:
-		completed.Reason = reasonVeleroBackupRunning
-		completed.Message = fmt.Sprintf("The Velero backup is in phase %s.", veleroBackup.Status.Phase)
+		succeeded.Reason = reasonVeleroBackupRunning
+		succeeded.Message = fmt.Sprintf("The Velero backup is in phase %s.", veleroBackup.Status.Phase)
 	}
 
 	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, prepared)
-		meta.SetStatusCondition(&status.Conditions, completed)
+		meta.SetStatusCondition(&status.Conditions, succeeded)
 
 		if veleroBackup.Status.StartTimestamp != nil {
 			status.StartTimestamp = *veleroBackup.Status.StartTimestamp
