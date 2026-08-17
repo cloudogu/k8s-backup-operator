@@ -17,6 +17,10 @@ const backupLeaseHolderKind = "Backup"
 func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup, _ logr.Logger) (action, error) {
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
 	result, err := manager.Acquire(ctx, backup, backupLeaseHolderKind)
+	return backupLeaseAction(backup, result, err)
+}
+
+func backupLeaseAction(backup *backupv1.Backup, result leases.Result, err error) (action, error) {
 	if err != nil {
 		return Abort, fmt.Errorf("acquire backup lease for backup %s: %w", backup.Name, err)
 	}
@@ -33,9 +37,8 @@ func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup 
 }
 
 func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup, _ logr.Logger) (action, error) {
-	succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
-	terminal := hasBackupSucceededOrFailed(succeeded) || meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled)
-	if !terminal && backup.DeletionTimestamp.IsZero() {
+	resolver := backupHolderResolver{client: c.client}
+	if !resolver.IsTerminal(backup) && backup.DeletionTimestamp.IsZero() {
 		return Next, nil
 	}
 
