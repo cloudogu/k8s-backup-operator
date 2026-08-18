@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
-	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"

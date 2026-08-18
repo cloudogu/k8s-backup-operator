@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
-	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/requeue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 

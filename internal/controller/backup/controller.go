@@ -5,7 +5,7 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
+	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"

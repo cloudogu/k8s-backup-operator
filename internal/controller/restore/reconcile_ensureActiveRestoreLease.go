@@ -6,6 +6,7 @@ import (
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
+	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -78,6 +79,9 @@ func (r *restoreReconciler) reportWaitingForLease(ctx context.Context, restore *
 
 func (r *restoreReconciler) reportInvalidRestoreLease(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	leaseError := fmt.Errorf("restore is blocked by invalid lease %s/%s without a resolvable holder", r.namespace, restoreLeaseName)
+	// use metrics to notify administrators
+	metrics.UpdateInvalidLeaseTotalMetric(restore.Namespace, restore.Name)
+
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
 		Type: k8sv1.ConditionSuccessful, Status: metav1.ConditionUnknown,
 		Reason:  ReasonInvalidRestoreLease,

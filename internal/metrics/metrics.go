@@ -61,6 +61,13 @@ var (
 			"to",
 		},
 	)
+	InvalidLeaseTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "backup_operator_invalid_lease_total",
+			Help: "Number of invalid lease acquire attempts",
+		},
+		[]string{"namespace", "name"},
+	)
 )
 
 // RegisterMetrics registers custom metrics with the global prometheus registry
@@ -72,6 +79,7 @@ func RegisterMetrics() {
 		RestoreReconcileTotal,
 		RestoreStatusTransitionsTotal,
 		RestoreConditionTransitionsTotal,
+		InvalidLeaseTotal,
 	)
 }
 
@@ -196,4 +204,9 @@ func UpdateRestoreConditionTransitionMetric(namespace, name, backupName, conditi
 // UpdateRestoreReconcileTotalMetric increments the metric for the total number of reconciles of the restore resource
 func UpdateRestoreReconcileTotalMetric() {
 	RestoreReconcileTotal.Inc()
+}
+
+// UpdateInvalidLeaseTotalMetric increments the metric for the total number of failed acquire lease attempts
+func UpdateInvalidLeaseTotalMetric(namespace, name string) {
+	InvalidLeaseTotal.WithLabelValues(namespace, name).Inc()
 }

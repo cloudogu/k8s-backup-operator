@@ -11,7 +11,7 @@ import (
 	backup2 "github.com/cloudogu/k8s-backup-operator/internal/controller/backup"
 	restorecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/restore"
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
-	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
+	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	operatortime "github.com/cloudogu/k8s-backup-operator/pkg/time"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"

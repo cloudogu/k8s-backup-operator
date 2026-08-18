@@ -16,8 +16,8 @@ func (r *restoreReconciler) ensureMaintenanceModeActivated(
 	restore *k8sv1.Restore,
 ) (*k8sv1.Restore, stageOutcome) {
 
-	_, status, err := r.maintenanceModeSwitch.GetStatus(ctx)
-	if !status {
+	_, isActive, err := r.maintenanceModeSwitch.GetStatus(ctx)
+	if !isActive {
 		err = r.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
 		if err != nil {
 			logger := log.FromContext(ctx)

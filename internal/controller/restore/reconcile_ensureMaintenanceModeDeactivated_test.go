@@ -28,6 +28,7 @@ func TestMaintenanceModeDeactivationPersistsItsProgressAndRequeues(t *testing.T)
 	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonMaintenanceModeDeactivated)
 	condition := meta.FindStatusCondition(updated.Status.Conditions, k8sv1.ConditionWorkloadsRecovered)
 	require.NotNil(t, condition)
+	assert.Equal(t, metav1.ConditionUnknown, condition.Status)
 	assert.Equal(t, ReasonMaintenanceModeDeactivated, condition.Reason)
 }
 
