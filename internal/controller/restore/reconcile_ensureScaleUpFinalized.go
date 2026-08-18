@@ -10,8 +10,9 @@ import (
 )
 
 // ensureScaleUpFinalized removes the temporary replica labels after workload readiness was
-// observed. FinalizeScaleUp runs before the condition check so a retry can complete a cleanup that
-// was interrupted between workload updates and the Restore status update.
+// observed.
+// FinalizeScaleUp runs before the condition check so retries finish removing
+// replica labels before the finalized state is persisted in the Restore status.
 func (r *restoreReconciler) ensureScaleUpFinalized(
 	ctx context.Context,
 	restore *k8sv1.Restore,
