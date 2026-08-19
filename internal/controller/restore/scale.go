@@ -95,128 +95,100 @@ func (m *DefaultManager) ScaleUp(ctx context.Context) error {
 
 func (m *DefaultManager) scaleDownDeployments(ctx context.Context, listOpts []client.ListOption) error {
 	list := &appsv1.DeploymentList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return fmt.Errorf("failed to list deployments for scaledown: %w", err)
-	}
-
-	for _, deploy := range list.Items {
-		if err := m.scaleDownWorkload(ctx, &deploy, &deploy.Spec.Replicas, "deployment"); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return forEachWorkload(ctx, m.k8sClient, list, listOpts, "failed to list deployments for scaledown", func() []appsv1.Deployment {
+		return list.Items
+	}, func(deploy *appsv1.Deployment) error {
+		return m.scaleDownWorkload(ctx, deploy, &deploy.Spec.Replicas, "deployment")
+	})
 }
 
 func (m *DefaultManager) scaleDownStatefulSets(ctx context.Context, listOpts []client.ListOption) error {
 	list := &appsv1.StatefulSetList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return fmt.Errorf("failed to list statefulsets for scaledown: %w", err)
-	}
-
-	for _, sts := range list.Items {
-		if err := m.scaleDownWorkload(ctx, &sts, &sts.Spec.Replicas, "statefulset"); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return forEachWorkload(ctx, m.k8sClient, list, listOpts, "failed to list statefulsets for scaledown", func() []appsv1.StatefulSet {
+		return list.Items
+	}, func(sts *appsv1.StatefulSet) error {
+		return m.scaleDownWorkload(ctx, sts, &sts.Spec.Replicas, "statefulset")
+	})
 }
 
 func (m *DefaultManager) scaleDownReplicaSets(ctx context.Context, listOpts []client.ListOption) error {
 	logger := log.FromContext(ctx)
 
 	list := &appsv1.ReplicaSetList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return fmt.Errorf("failed to list replicasets for scaledown: %w", err)
-	}
-
-	for _, rs := range list.Items {
+	return forEachWorkload(ctx, m.k8sClient, list, listOpts, "failed to list replicasets for scaledown", func() []appsv1.ReplicaSet {
+		return list.Items
+	}, func(rs *appsv1.ReplicaSet) error {
 		if len(rs.OwnerReferences) > 0 {
 			logger.Info("skipping replicaset with owner references for scaledown", "name", rs.Name)
-			continue
+			return nil
 		}
-
-		if err := m.scaleDownWorkload(ctx, &rs, &rs.Spec.Replicas, "replicaset"); err != nil {
-			return err
-		}
-	}
-
-	return nil
+		return m.scaleDownWorkload(ctx, rs, &rs.Spec.Replicas, "replicaset")
+	})
 }
 
 func (m *DefaultManager) scaleDownReplicationControllers(ctx context.Context, listOpts []client.ListOption) error {
 	list := &corev1.ReplicationControllerList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return fmt.Errorf("failed to list replicationcontrollers for scaledown: %w", err)
-	}
-
-	for _, rc := range list.Items {
-		if err := m.scaleDownWorkload(ctx, &rc, &rc.Spec.Replicas, "replicationcontroller"); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return forEachWorkload(ctx, m.k8sClient, list, listOpts, "failed to list replicationcontrollers for scaledown", func() []corev1.ReplicationController {
+		return list.Items
+	}, func(rc *corev1.ReplicationController) error {
+		return m.scaleDownWorkload(ctx, rc, &rc.Spec.Replicas, "replicationcontroller")
+	})
 }
 
 func (m *DefaultManager) scaleUpDeployments(ctx context.Context, listOpts []client.ListOption) error {
 	list := &appsv1.DeploymentList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return fmt.Errorf("failed to list deployments for scaleup: %w", err)
-	}
-
-	for _, deploy := range list.Items {
-		if err := m.scaleUpWorkload(ctx, &deploy, &deploy.Spec.Replicas, "deployment"); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return forEachWorkload(ctx, m.k8sClient, list, listOpts, "failed to list deployments for scaleup", func() []appsv1.Deployment {
+		return list.Items
+	}, func(deploy *appsv1.Deployment) error {
+		return m.scaleUpWorkload(ctx, deploy, &deploy.Spec.Replicas, "deployment")
+	})
 }
 
 func (m *DefaultManager) scaleUpStatefulSets(ctx context.Context, listOpts []client.ListOption) error {
 	list := &appsv1.StatefulSetList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return fmt.Errorf("failed to list statefulsets for scaleup: %w", err)
-	}
-
-	for _, sts := range list.Items {
-		if err := m.scaleUpWorkload(ctx, &sts, &sts.Spec.Replicas, "statefulset"); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return forEachWorkload(ctx, m.k8sClient, list, listOpts, "failed to list statefulsets for scaleup", func() []appsv1.StatefulSet {
+		return list.Items
+	}, func(sts *appsv1.StatefulSet) error {
+		return m.scaleUpWorkload(ctx, sts, &sts.Spec.Replicas, "statefulset")
+	})
 }
 
 func (m *DefaultManager) scaleUpReplicaSets(ctx context.Context, listOpts []client.ListOption) error {
 	list := &appsv1.ReplicaSetList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return fmt.Errorf("failed to list replicasets for scaleup: %w", err)
-	}
-
-	for _, rs := range list.Items {
-		if err := m.scaleUpWorkload(ctx, &rs, &rs.Spec.Replicas, "replicaset"); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return forEachWorkload(ctx, m.k8sClient, list, listOpts, "failed to list replicasets for scaleup", func() []appsv1.ReplicaSet {
+		return list.Items
+	}, func(rs *appsv1.ReplicaSet) error {
+		return m.scaleUpWorkload(ctx, rs, &rs.Spec.Replicas, "replicaset")
+	})
 }
 
 func (m *DefaultManager) scaleUpReplicationControllers(ctx context.Context, listOpts []client.ListOption) error {
 	list := &corev1.ReplicationControllerList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return fmt.Errorf("failed to list replicationcontrollers for scaleup: %w", err)
-	}
+	return forEachWorkload(ctx, m.k8sClient, list, listOpts, "failed to list replicationcontrollers for scaleup", func() []corev1.ReplicationController {
+		return list.Items
+	}, func(rc *corev1.ReplicationController) error {
+		return m.scaleUpWorkload(ctx, rc, &rc.Spec.Replicas, "replicationcontroller")
+	})
+}
 
-	for _, rc := range list.Items {
-		if err := m.scaleUpWorkload(ctx, &rc, &rc.Spec.Replicas, "replicationcontroller"); err != nil {
+func forEachWorkload[T any](
+	ctx context.Context,
+	k8sClient k8sClient,
+	list client.ObjectList,
+	listOpts []client.ListOption,
+	listError string,
+	items func() []T,
+	apply func(*T) error,
+) error {
+	if err := k8sClient.List(ctx, list, listOpts...); err != nil {
+		return fmt.Errorf("%s: %w", listError, err)
+	}
+	workloadItems := items()
+	for i := range workloadItems {
+		if err := apply(&workloadItems[i]); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -229,46 +201,45 @@ func (m *DefaultManager) FinalizeScaleUp(ctx context.Context) error {
 	}
 
 	deployments := &appsv1.DeploymentList{}
-	if err := m.k8sClient.List(ctx, deployments, listOpts...); err != nil {
-		return fmt.Errorf("failed to list deployments for scale-up finalization: %w", err)
-	}
-	for i := range deployments.Items {
-		if err := m.removeStoredReplicasLabel(ctx, &deployments.Items[i], "deployment"); err != nil {
-			return err
-		}
+	if err := finalizeWorkloads(ctx, m, deployments, listOpts, "failed to list deployments for scale-up finalization", "deployment", func() []appsv1.Deployment {
+		return deployments.Items
+	}, func(deployment *appsv1.Deployment) client.Object { return deployment }); err != nil {
+		return err
 	}
 
 	statefulSets := &appsv1.StatefulSetList{}
-	if err := m.k8sClient.List(ctx, statefulSets, listOpts...); err != nil {
-		return fmt.Errorf("failed to list statefulsets for scale-up finalization: %w", err)
-	}
-	for i := range statefulSets.Items {
-		if err := m.removeStoredReplicasLabel(ctx, &statefulSets.Items[i], "statefulset"); err != nil {
-			return err
-		}
+	if err := finalizeWorkloads(ctx, m, statefulSets, listOpts, "failed to list statefulsets for scale-up finalization", "statefulset", func() []appsv1.StatefulSet {
+		return statefulSets.Items
+	}, func(statefulSet *appsv1.StatefulSet) client.Object { return statefulSet }); err != nil {
+		return err
 	}
 
 	replicaSets := &appsv1.ReplicaSetList{}
-	if err := m.k8sClient.List(ctx, replicaSets, listOpts...); err != nil {
-		return fmt.Errorf("failed to list replicasets for scale-up finalization: %w", err)
-	}
-	for i := range replicaSets.Items {
-		if err := m.removeStoredReplicasLabel(ctx, &replicaSets.Items[i], "replicaset"); err != nil {
-			return err
-		}
+	if err := finalizeWorkloads(ctx, m, replicaSets, listOpts, "failed to list replicasets for scale-up finalization", "replicaset", func() []appsv1.ReplicaSet {
+		return replicaSets.Items
+	}, func(replicaSet *appsv1.ReplicaSet) client.Object { return replicaSet }); err != nil {
+		return err
 	}
 
 	replicationControllers := &corev1.ReplicationControllerList{}
-	if err := m.k8sClient.List(ctx, replicationControllers, listOpts...); err != nil {
-		return fmt.Errorf("failed to list replicationcontrollers for scale-up finalization: %w", err)
-	}
-	for i := range replicationControllers.Items {
-		if err := m.removeStoredReplicasLabel(ctx, &replicationControllers.Items[i], "replicationcontroller"); err != nil {
-			return err
-		}
-	}
+	return finalizeWorkloads(ctx, m, replicationControllers, listOpts, "failed to list replicationcontrollers for scale-up finalization", "replicationcontroller", func() []corev1.ReplicationController {
+		return replicationControllers.Items
+	}, func(replicationController *corev1.ReplicationController) client.Object { return replicationController })
+}
 
-	return nil
+func finalizeWorkloads[T any](
+	ctx context.Context,
+	manager *DefaultManager,
+	list client.ObjectList,
+	listOpts []client.ListOption,
+	listError string,
+	resourceKind string,
+	items func() []T,
+	object func(*T) client.Object,
+) error {
+	return forEachWorkload(ctx, manager.k8sClient, list, listOpts, listError, items, func(workload *T) error {
+		return manager.removeStoredReplicasLabel(ctx, object(workload), resourceKind)
+	})
 }
 
 func (m *DefaultManager) removeStoredReplicasLabel(ctx context.Context, workload client.Object, resourceKind string) error {
@@ -314,100 +285,106 @@ func (m *DefaultManager) AreWorkloadsReady(ctx context.Context) (bool, error) {
 
 func (m *DefaultManager) deploymentsReady(ctx context.Context, listOpts []client.ListOption) (bool, error) {
 	list := &appsv1.DeploymentList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return false, fmt.Errorf("failed to list deployments for readiness check: %w", err)
-	}
-
-	ready := true
-	for i := range list.Items {
-		deployment := &list.Items[i]
-		target, err := targetReplicasForReadiness(deployment.Labels, deployment.Spec.Replicas, "deployment", deployment.Name)
-		if err != nil {
-			return false, err
+	return workloadsReady(ctx, m.k8sClient, list, listOpts, "failed to list deployments for readiness check", func() []appsv1.Deployment {
+		return list.Items
+	}, func(deployment *appsv1.Deployment) workloadReadiness {
+		return workloadReadiness{
+			labels: deployment.Labels, desiredReplicas: deployment.Spec.Replicas,
+			resourceKind: "deployment", resourceName: deployment.Name,
+			generation: deployment.Generation, observedGeneration: deployment.Status.ObservedGeneration,
+			replicas: deployment.Status.Replicas, readyReplicas: deployment.Status.ReadyReplicas,
+			availableReplicas: deployment.Status.AvailableReplicas,
+			additionalChecks: func(target int32) bool {
+				return deployment.Status.UpdatedReplicas == target && deployment.Status.UnavailableReplicas == 0
+			},
 		}
-
-		ready = ready && deployment.Spec.Replicas != nil && *deployment.Spec.Replicas == target &&
-			deployment.Status.ObservedGeneration >= deployment.Generation &&
-			deployment.Status.Replicas == target &&
-			deployment.Status.UpdatedReplicas == target &&
-			deployment.Status.ReadyReplicas == target &&
-			deployment.Status.AvailableReplicas == target &&
-			deployment.Status.UnavailableReplicas == 0
-	}
-
-	return ready, nil
+	})
 }
 
 func (m *DefaultManager) statefulSetsReady(ctx context.Context, listOpts []client.ListOption) (bool, error) {
 	list := &appsv1.StatefulSetList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return false, fmt.Errorf("failed to list statefulsets for readiness check: %w", err)
-	}
-
-	ready := true
-	for i := range list.Items {
-		statefulSet := &list.Items[i]
-		target, err := targetReplicasForReadiness(statefulSet.Labels, statefulSet.Spec.Replicas, "statefulset", statefulSet.Name)
-		if err != nil {
-			return false, err
+	return workloadsReady(ctx, m.k8sClient, list, listOpts, "failed to list statefulsets for readiness check", func() []appsv1.StatefulSet {
+		return list.Items
+	}, func(statefulSet *appsv1.StatefulSet) workloadReadiness {
+		return workloadReadiness{
+			labels: statefulSet.Labels, desiredReplicas: statefulSet.Spec.Replicas,
+			resourceKind: "statefulset", resourceName: statefulSet.Name,
+			generation: statefulSet.Generation, observedGeneration: statefulSet.Status.ObservedGeneration,
+			replicas: statefulSet.Status.Replicas, readyReplicas: statefulSet.Status.ReadyReplicas,
+			availableReplicas: statefulSet.Status.AvailableReplicas, additionalChecks: noAdditionalReadinessChecks,
 		}
-
-		ready = ready && statefulSet.Spec.Replicas != nil && *statefulSet.Spec.Replicas == target &&
-			statefulSet.Status.ObservedGeneration >= statefulSet.Generation &&
-			statefulSet.Status.Replicas == target &&
-			statefulSet.Status.ReadyReplicas == target &&
-			statefulSet.Status.AvailableReplicas == target
-	}
-
-	return ready, nil
+	})
 }
 
 func (m *DefaultManager) replicaSetsReady(ctx context.Context, listOpts []client.ListOption) (bool, error) {
 	list := &appsv1.ReplicaSetList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return false, fmt.Errorf("failed to list replicasets for readiness check: %w", err)
-	}
-
-	ready := true
-	for i := range list.Items {
-		replicaSet := &list.Items[i]
-		target, err := targetReplicasForReadiness(replicaSet.Labels, replicaSet.Spec.Replicas, "replicaset", replicaSet.Name)
-		if err != nil {
-			return false, err
+	return workloadsReady(ctx, m.k8sClient, list, listOpts, "failed to list replicasets for readiness check", func() []appsv1.ReplicaSet {
+		return list.Items
+	}, func(replicaSet *appsv1.ReplicaSet) workloadReadiness {
+		return workloadReadiness{
+			labels: replicaSet.Labels, desiredReplicas: replicaSet.Spec.Replicas,
+			resourceKind: "replicaset", resourceName: replicaSet.Name,
+			generation: replicaSet.Generation, observedGeneration: replicaSet.Status.ObservedGeneration,
+			replicas: replicaSet.Status.Replicas, readyReplicas: replicaSet.Status.ReadyReplicas,
+			availableReplicas: replicaSet.Status.AvailableReplicas, additionalChecks: noAdditionalReadinessChecks,
 		}
-
-		ready = ready && replicaSet.Spec.Replicas != nil && *replicaSet.Spec.Replicas == target &&
-			replicaSet.Status.ObservedGeneration >= replicaSet.Generation &&
-			replicaSet.Status.Replicas == target &&
-			replicaSet.Status.ReadyReplicas == target &&
-			replicaSet.Status.AvailableReplicas == target
-	}
-
-	return ready, nil
+	})
 }
 
 func (m *DefaultManager) replicationControllersReady(ctx context.Context, listOpts []client.ListOption) (bool, error) {
 	list := &corev1.ReplicationControllerList{}
-	if err := m.k8sClient.List(ctx, list, listOpts...); err != nil {
-		return false, fmt.Errorf("failed to list replicationcontrollers for readiness check: %w", err)
-	}
-
-	ready := true
-	for i := range list.Items {
-		replicationController := &list.Items[i]
-		target, err := targetReplicasForReadiness(replicationController.Labels, replicationController.Spec.Replicas, "replicationcontroller", replicationController.Name)
-		if err != nil {
-			return false, err
+	return workloadsReady(ctx, m.k8sClient, list, listOpts, "failed to list replicationcontrollers for readiness check", func() []corev1.ReplicationController {
+		return list.Items
+	}, func(replicationController *corev1.ReplicationController) workloadReadiness {
+		return workloadReadiness{
+			labels: replicationController.Labels, desiredReplicas: replicationController.Spec.Replicas,
+			resourceKind: "replicationcontroller", resourceName: replicationController.Name,
+			generation: replicationController.Generation, observedGeneration: replicationController.Status.ObservedGeneration,
+			replicas: replicationController.Status.Replicas, readyReplicas: replicationController.Status.ReadyReplicas,
+			availableReplicas: replicationController.Status.AvailableReplicas, additionalChecks: noAdditionalReadinessChecks,
 		}
+	})
+}
 
-		ready = ready && replicationController.Spec.Replicas != nil && *replicationController.Spec.Replicas == target &&
-			replicationController.Status.ObservedGeneration >= replicationController.Generation &&
-			replicationController.Status.Replicas == target &&
-			replicationController.Status.ReadyReplicas == target &&
-			replicationController.Status.AvailableReplicas == target
-	}
+type workloadReadiness struct {
+	labels             map[string]string
+	desiredReplicas    *int32
+	resourceKind       string
+	resourceName       string
+	generation         int64
+	observedGeneration int64
+	replicas           int32
+	readyReplicas      int32
+	availableReplicas  int32
+	additionalChecks   func(target int32) bool
+}
 
-	return ready, nil
+func workloadsReady[T any](
+	ctx context.Context,
+	k8sClient k8sClient,
+	list client.ObjectList,
+	listOpts []client.ListOption,
+	listError string,
+	items func() []T,
+	readiness func(*T) workloadReadiness,
+) (bool, error) {
+	allReady := true
+	err := forEachWorkload(ctx, k8sClient, list, listOpts, listError, items, func(workload *T) error {
+		state := readiness(workload)
+		target, err := targetReplicasForReadiness(state.labels, state.desiredReplicas, state.resourceKind, state.resourceName)
+		if err != nil {
+			return err
+		}
+		allReady = allReady && state.desiredReplicas != nil && *state.desiredReplicas == target &&
+			state.observedGeneration >= state.generation && state.replicas == target &&
+			state.readyReplicas == target && state.availableReplicas == target && state.additionalChecks(target)
+		return nil
+	})
+	return allReady, err
+}
+
+func noAdditionalReadinessChecks(int32) bool {
+	return true
 }
 
 func targetReplicasForReadiness(
