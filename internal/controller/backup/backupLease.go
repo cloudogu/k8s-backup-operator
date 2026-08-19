@@ -41,7 +41,7 @@ func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backu
 		return Next, nil
 	}
 
-	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
+	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, resolver)
 	if _, err := manager.Release(ctx, backup, backupLeaseHolderKind); err != nil {
 		return Abort, fmt.Errorf("release backup lease for backup %s: %w", backup.Name, err)
 	}

@@ -163,8 +163,8 @@ Die Werte von `dogu.name` und `backup-scope` werden für die Auswahl nicht ausge
 
 | Kategorie | Velero-Phasen | Ergebnis |
 |---|---|---|
-| laufend | `New`, `InProgress`, `Finalizing`, `WaitingForPluginOperations`, `WaitingForPluginOperationsPartiallyFailed` | `Succeeded=Unknown/ProviderBackupInProgress`, Retry |
-| fehlgeschlagen | `FailedValidation`, `FinalizingPartiallyFailed`, `PartiallyFailed`, `Failed` | `Succeeded=False/ProviderBackupFailed` |
+| laufend | `New`, `InProgress`, `Finalizing`, `FinalizingPartiallyFailed`, `WaitingForPluginOperations`, `WaitingForPluginOperationsPartiallyFailed` | `Succeeded=Unknown/ProviderBackupInProgress`, Retry |
+| fehlgeschlagen | `FailedValidation`, `PartiallyFailed`, `Failed` | `Succeeded=False/ProviderBackupFailed` |
 | erfolgreich | `Completed` | `Succeeded=True/ProviderBackupSucceeded` |
 | nicht erwartet | beispielsweise `Deleting` | Fehler; kein impliziter Erfolg |
 
@@ -202,20 +202,20 @@ Lokale und aus dem Provider importierte Backups verwenden dieselben vier Conditi
 
 ### `Succeeded`
 
-| Status | Reason | Bedeutung                                                                                                              |
-|---|---|------------------------------------------------------------------------------------------------------------------------|
-| `Unknown` | `MaintenanceModesIsNotActive` | Das Aktivieren des Wartungsmodus wurde angestosse, der Modus ist aber aktuell noch nicht aktiv; Workflow läuft weiter. |
-| `Unknown` | `ProviderBackupResourceDoesNotExist` | Provider-Child wurde gerade erzeugt.                                                                                   |
-| `Unknown` | `ProviderBackupInProgress` | Provider arbeitet.                                                                                                     |
-| `Unknown` | `VeleroBackupRunning` | Ein importierter Velero-Backup ist noch nicht terminal; unbekannte Phasen gelten ebenfalls als laufend.                |
-| `False` | `ProviderBackupFailed` | Provider ist terminal fehlgeschlagen.                                                                                  |
-| `False` | `VeleroBackupFailed` | Ein importierter Velero-Backup meldet eine bekannte Fehlerphase.                                                       |
-| `True` | `ProviderBackupSucceeded` | Provider ist erfolgreich abgeschlossen.                                                                                |
-| `True` | `VeleroStatusSynced` | Ein importierter Velero-Backup ist `Completed`.                                                                        |
+| Status | Reason | Bedeutung                                                                                                               |
+|---|---|-------------------------------------------------------------------------------------------------------------------------|
+| `Unknown` | `MaintenanceModesIsNotActive` | Das Aktivieren des Wartungsmodus wurde angestossen, der Modus ist aber aktuell noch nicht aktiv; Workflow läuft weiter. |
+| `Unknown` | `ProviderBackupResourceDoesNotExist` | Provider-Child wurde gerade erzeugt.                                                                                    |
+| `Unknown` | `ProviderBackupInProgress` | Provider arbeitet.                                                                                                      |
+| `Unknown` | `VeleroBackupRunning` | Ein importierter Velero-Backup ist noch nicht terminal; unbekannte Phasen gelten ebenfalls als laufend.                 |
+| `False` | `ProviderBackupFailed` | Provider ist terminal fehlgeschlagen.                                                                                   |
+| `False` | `VeleroBackupFailed` | Ein importierter Velero-Backup meldet eine bekannte Fehlerphase.                                                        |
+| `True` | `ProviderBackupSucceeded` | Provider ist erfolgreich abgeschlossen.                                                                                 |
+| `True` | `VeleroStatusSynced` | Ein importierter Velero-Backup ist `Completed`.                                                                         |
 
 `Succeeded=True` und `Succeeded=False` werden von `ensureCompletedBackupIsIgnored` als terminal behandelt. Der Name `MaintenanceModesIsNotActive` beschreibt historisch den Zustand vor der erfolgreichen Aktivierung.
 
-Für `spec.syncedFromProvider=true` schreibt `ensureVeleroStatusSynced` den beobachteten Zustand ebenfalls in `Succeeded`. `WaitingForPluginOperationsPartiallyFailed` bleibt dabei nicht-terminal, weil Velero noch Plugin-Operationen ausführt; erst eine spätere terminale partielle Fehlerphase setzt `Succeeded=False`. Zusätzlich werden Velero-Zeitstempel gespiegelt. Das Legacy-Feld `status.status` wird wie bei lokalen Backups zentral vom `conditionsUpdater` aus den Conditions abgeleitet.
+Für `spec.syncedFromProvider=true` schreibt `ensureVeleroStatusSynced` den beobachteten Zustand ebenfalls in `Succeeded`. `WaitingForPluginOperationsPartiallyFailed` und `FinalizingPartiallyFailed` bleiben dabei nicht-terminal, weil Velero noch Plugin- beziehungsweise Finalisierungsarbeiten ausführt; erst die spätere terminale Phase `PartiallyFailed` setzt `Succeeded=False`. Zusätzlich werden Velero-Zeitstempel gespiegelt. Das Legacy-Feld `status.status` wird wie bei lokalen Backups zentral vom `conditionsUpdater` aus den Conditions abgeleitet.
 
 ## Velero-Backup-Synchronisierung
 

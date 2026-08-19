@@ -68,10 +68,7 @@ func (m *Manager) Acquire(ctx context.Context, holder client.Object, kind string
 	err := m.client.Get(ctx, key, lease)
 	if apierrors.IsNotFound(err) {
 		lease = NewLease(m.namespace, m.name, holder, kind)
-		if createErr := m.client.Create(ctx, lease); createErr != nil {
-			if apierrors.IsAlreadyExists(createErr) {
-				return Result{State: StateChanged}, nil
-			}
+		if createErr := m.client.Create(ctx, lease); createErr != nil && !apierrors.IsAlreadyExists(createErr) {
 			return Result{}, fmt.Errorf("failed to create lease %s/%s: %w", key.Namespace, key.Name, createErr)
 		}
 		return Result{State: StateChanged}, nil
