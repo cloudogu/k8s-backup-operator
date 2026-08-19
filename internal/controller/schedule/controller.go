@@ -23,11 +23,12 @@ func NewController(client client.Client, recorder eventRecorder, operatorImage s
 	}
 }
 
+// Reconcile delegates a BackupSchedule reconciliation request to the configured reconciler.
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	return c.reconciler.reconcile(ctx, req)
 }
 
-// SetupWithManager sets up the controller with the Manager and registers the watcher
+// SetupWithManager registers the BackupSchedule controller and its owned CronJob watcher with the manager.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&backupv1.BackupSchedule{}).

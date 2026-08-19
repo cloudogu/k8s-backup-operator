@@ -10,6 +10,7 @@ import (
 
 type defaultValidator struct{}
 
+// validate checks that the BackupSchedule contains a non-empty standard cron expression.
 func (v defaultValidator) validate(schedule *backupv1.BackupSchedule) error {
 	if schedule.Spec.Schedule == "" {
 		return errors.New("schedule must not be empty")

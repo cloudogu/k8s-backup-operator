@@ -21,6 +21,7 @@ type defaultMetadataManager struct {
 	client client.Client
 }
 
+// ensure adds the required BackupSchedule finalizer and labels, patching only when metadata changes.
 func (m defaultMetadataManager) ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	logger := log.FromContext(ctx)
 
@@ -49,6 +50,7 @@ func (m defaultMetadataManager) ensure(ctx context.Context, schedule *backupv1.B
 	return nil
 }
 
+// remove deletes the BackupSchedule finalizer when present without changing other metadata.
 func (m defaultMetadataManager) remove(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	logger := log.FromContext(ctx)
 
