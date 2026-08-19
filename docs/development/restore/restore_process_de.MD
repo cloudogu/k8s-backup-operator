@@ -89,40 +89,11 @@ Jeder neue, laufende Restore erhält zunächst diese fünf Conditions mit `Statu
 
 Eine vorhandene Condition wird bei der Initialisierung nicht auf `Unknown` zurückgesetzt. Das ist wichtig, wenn ein Status-Write erfolgreich war, der Prozess aber unmittelbar danach abstürzt.
 
-### Übersicht als Zustandsdiagramm
-
-```mermaid
-stateDiagram-v2
-    [*] --> Pending
-    Pending --> WaitingForActiveRestore: Lease ist aktiv belegt
-    WaitingForActiveRestore --> RestoreLeaseAcquired: Lease übernommen
-    Pending --> PreparationCompleted: eigenes Lease angelegt - Vorbereitung erfolgreich
-    Pending --> PreparationFailed: eigenes Lease angelegt - Vorbereitung fehlgeschlagen
-    RestoreLeaseAcquired --> PreparationCompleted: Vorbereitung erfolgreich
-    RestoreLeaseAcquired --> PreparationFailed: Vorbereitung fehlgeschlagen
-    PreparationFailed --> PreparationCompleted: Retry erfolgreich
-    PreparationCompleted --> ProviderRestorePending
-    ProviderRestorePending --> ProviderRestoreRunning
-    ProviderRestoreRunning --> ProviderRestoreCompleted
-    ProviderRestorePending --> ProviderRestoreFailed
-    ProviderRestoreRunning --> ProviderRestoreFailed
-    ProviderRestoreCompleted --> BackupSynchronizationCompleted
-    BackupSynchronizationCompleted --> ScaleUpInitiated
-    ScaleUpInitiated --> WaitingForWorkloads
-    WaitingForWorkloads --> WaitingForWorkloads: noch nicht ready
-    WaitingForWorkloads --> WorkloadsReady: alle Zielzustände erreicht
-    WorkloadsReady --> WaitingForWorkloads: Readiness ist wieder regressiert
-    WorkloadsReady --> ScaleUpFinalized
-    ScaleUpFinalized --> MaintenanceModeDeactivated
-    MaintenanceModeDeactivated --> RestoreCompleted
-    RestoreCompleted --> [*]
-```
-
-Das Diagramm fasst Reasons verschiedener Conditions zusammen. Die folgenden Abschnitte ordnen sie exakt zu.
-
 ### `Successful`
 
 `Successful` ist die übergeordnete und lease-relevante Abschluss-Condition.
+
+Ein gültiges Operations-Lease enthält immer gemeinsam Holder-UID, Holder-Name und Holder-Kind. Fehlt eines dieser Felder, meldet der Manager das Lease als ungültig; eine Rekonstruktion über andere Ressourcen oder eine automatische Reparatur findet nicht statt.
 
 | Status | Reason | Bedeutung                                                                                                                           |
 |---|---|-------------------------------------------------------------------------------------------------------------------------------------|

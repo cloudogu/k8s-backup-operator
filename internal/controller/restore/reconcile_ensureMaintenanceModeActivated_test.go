@@ -48,8 +48,15 @@ func TestMaintenanceModeActivationStillActivatesWhenStatusCheckFailsAndReportsIn
 		Title: maintenanceModeTitle,
 		Text:  maintenanceModeText,
 	}, false).Return(nil).Once()
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Eventf(
+		restore,
+		corev1.EventTypeNormal,
+		ReasonMaintenanceModeActivated,
+		"Could not get maintenance mode status; continuing restore.",
+	).Once()
 
-	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock}
+	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
 	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
 
 	require.Same(t, restore, actual)
@@ -64,8 +71,15 @@ func TestMaintenanceModeActivationSkipsActivationWhenStatusCheckReportsActiveWit
 		GetStatus(testCtx).
 		Return(repository.MaintenanceModeDescription{}, true, assert.AnError).
 		Once()
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Eventf(
+		restore,
+		corev1.EventTypeNormal,
+		ReasonMaintenanceModeActivated,
+		"Could not get maintenance mode status; continuing restore.",
+	).Once()
 
-	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock}
+	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
 	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
 
 	require.Same(t, restore, actual)

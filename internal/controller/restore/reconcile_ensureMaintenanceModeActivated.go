@@ -17,6 +17,11 @@ func (r *restoreReconciler) ensureMaintenanceModeActivated(
 ) (*k8sv1.Restore, stageOutcome) {
 
 	_, isActive, err := r.maintenanceModeSwitch.GetStatus(ctx)
+	if err != nil {
+		logger := log.FromContext(ctx)
+		logger.Error(err, "The maintenance mode status could not be determined.. Continuing anyways...")
+		r.recorder.Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Could not get maintenance mode status; continuing restore.")
+	}
 	if !isActive {
 		err = r.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
 		if err != nil {

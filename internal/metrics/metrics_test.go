@@ -206,26 +206,51 @@ func TestInitRestoreConditionTransitionMetrics(t *testing.T) {
 		metav1.ConditionFalse,
 	}
 
-	assert.Equal(t, 30, testutil.CollectAndCount(RestoreConditionTransitionsTotal))
+	type conditionTransition struct {
+		condition string
+		from      string
+		to        string
+	}
+	expectedTransitions := map[conditionTransition]struct{}{}
 	for _, conditionType := range conditionTypes {
 		for _, from := range conditionStatuses {
 			for _, to := range conditionStatuses {
 				if from == to {
 					continue
 				}
-
-				counter := RestoreConditionTransitionsTotal.WithLabelValues(
-					namespace,
-					name,
-					backupName,
-					conditionType,
-					string(from),
-					string(to),
-				)
-				assert.Zero(t, testutil.ToFloat64(counter))
+				expectedTransitions[conditionTransition{condition: conditionType, from: string(from), to: string(to)}] = struct{}{}
 			}
 		}
 	}
+
+	metrics := make(chan prometheus.Metric)
+	go func() {
+		RestoreConditionTransitionsTotal.Collect(metrics)
+		close(metrics)
+	}()
+	for metric := range metrics {
+		metricDTO := &dto.Metric{}
+		assert.NoError(t, metric.Write(metricDTO))
+
+		labels := make(map[string]string, len(metricDTO.Label))
+		for _, label := range metricDTO.Label {
+			labels[label.GetName()] = label.GetValue()
+		}
+		assert.Len(t, labels, 6)
+		assert.Equal(t, namespace, labels["namespace"])
+		assert.Equal(t, name, labels["name"])
+		assert.Equal(t, backupName, labels["backup_name"])
+		assert.Zero(t, metricDTO.GetCounter().GetValue())
+
+		transition := conditionTransition{
+			condition: labels["condition"],
+			from:      labels["from"],
+			to:        labels["to"],
+		}
+		assert.Contains(t, expectedTransitions, transition)
+		delete(expectedTransitions, transition)
+	}
+	assert.Empty(t, expectedTransitions)
 }
 
 func TestUpdateRestoreConditionTransitionMetric(t *testing.T) {

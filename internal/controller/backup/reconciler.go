@@ -67,13 +67,13 @@ var veleroBackupIsRunningPhases = []velerov1.BackupPhase{
 	velerov1.BackupPhaseNew,
 	velerov1.BackupPhaseInProgress,
 	velerov1.BackupPhaseFinalizing,
+	velerov1.BackupPhaseFinalizingPartiallyFailed,
 	velerov1.BackupPhaseWaitingForPluginOperations,
 	velerov1.BackupPhaseWaitingForPluginOperationsPartiallyFailed,
 }
 
 var veleroBackupFailedPhases = []velerov1.BackupPhase{
 	velerov1.BackupPhaseFailedValidation,
-	velerov1.BackupPhaseFinalizingPartiallyFailed,
 	velerov1.BackupPhasePartiallyFailed,
 	velerov1.BackupPhaseFailed,
 }
