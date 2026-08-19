@@ -15,8 +15,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	cronJobCreatedEventReason               = "CronJobCreated"
+	cronJobUpdatedEventReason               = "CronJobUpdated"
+	cronJobSynchronizationFailedEventReason = "CronJobSynchronizationFailed"
+	invalidScheduleEventReason              = "InvalidSchedule"
+	cronJobDeletionRequestedEventReason     = "CronJobDeletionRequested"
+	cronJobDeletionFailedEventReason        = "CronJobDeletionFailed"
+	finalizerRemovalFailedEventReason       = "FinalizerRemovalFailed"
+)
+
 type defaultReconciler struct {
-	client client.Client
+	client   client.Client
+	recorder eventRecorder
 
 	metadata   metadataManager
 	cronJobs   cronJobManager
@@ -25,14 +36,16 @@ type defaultReconciler struct {
 }
 
 // newReconciler creates a new BackupSchedule reconciler instance.
-func newReconciler(client client.Client, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *defaultReconciler {
+func newReconciler(client client.Client, recorder eventRecorder, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *defaultReconciler {
 	return &defaultReconciler{
 		client:     client,
+		recorder:   recorder,
 		metadata:   defaultMetadataManager{client: client},
 		conditions: defaultConditionManager{},
 		validator:  defaultValidator{},
 		cronJobs: defaultCronJobManager{
 			Client:           client,
+			recorder:         recorder,
 			scheme:           client.Scheme(),
 			operatorImage:    operatorImage,
 			pullPolicy:       config.GetStagePullPolicy(),
@@ -92,6 +105,9 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 
 	// only need to remove finalizers, not labels
 	if err := r.metadata.remove(ctx, schedule); err != nil {
+		r.recorder.Eventf(schedule, corev1.EventTypeWarning, finalizerRemovalFailedEventReason,
+			"Failed to remove finalizer %q from BackupSchedule: %v", backupv1.BackupScheduleFinalizer, err,
+		)
 		return err
 	}
 
@@ -111,7 +127,11 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 	if err := r.validator.validate(schedule); err != nil {
 		r.conditions.markInvalid(schedule, err)
 		r.conditions.markNotReady(schedule, backupv1.ReasonInvalidSpec, "BackupSchedule spec is invalid: "+err.Error())
-		logger.Info("BackupSchedule spec is invalid, skipping CronJob synchronization", "error", err)
+		r.recorder.Eventf(
+			schedule, corev1.EventTypeWarning, invalidScheduleEventReason,
+			"BackupSchedule has an invalid schedule: %v", err,
+		)
+		logger.Error(err, "BackupSchedule spec is invalid, skipping CronJob synchronization")
 
 		// invalid spec should not be reconciled again before it is edited
 		return nil

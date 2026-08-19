@@ -4,12 +4,17 @@ import (
 	"context"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type OperatorImageGetter interface {
 	// ImageForKey returns a container image reference from the operator's additional-images ConfigMap.
 	ImageForKey(ctx context.Context, key string) (string, error)
+}
+
+type eventRecorder interface {
+	record.EventRecorder
 }
 
 type cronJobManager interface {

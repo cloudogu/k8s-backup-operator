@@ -24,6 +24,7 @@ var defaultLabels = map[string]string{
 
 type defaultCronJobManager struct {
 	client.Client
+	recorder         eventRecorder
 	scheme           *runtime.Scheme
 	operatorImage    string
 	pullPolicy       corev1.PullPolicy
@@ -64,12 +65,29 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *v1.BackupSc
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
+		c.recorder.Eventf(
+			schedule, corev1.EventTypeWarning, cronJobSynchronizationFailedEventReason,
+			"Failed to synchronize CronJob %q: %v", cronJob.Name, err,
+		)
+		return fmt.Errorf("failed to synchronize CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
 	}
 
-	if operation == controllerutil.OperationResultNone {
+	switch operation {
+	case controllerutil.OperationResultCreated:
+		c.recorder.Eventf(
+			schedule, corev1.EventTypeNormal, cronJobCreatedEventReason,
+			"Created CronJob %q.", cronJob.Name,
+		)
+	case controllerutil.OperationResultUpdated:
+		c.recorder.Eventf(
+			schedule, corev1.EventTypeNormal, cronJobUpdatedEventReason,
+			"Updated CronJob %q.", cronJob.Name,
+		)
+	case controllerutil.OperationResultNone:
 		debug(logger, "CronJob is up to date", "cronJob", cronJob.Name)
-	} else {
+	}
+
+	if operation != controllerutil.OperationResultNone {
 		logger.Info("synchronized CronJob", "cronJob", cronJob.Name, "operation", operation)
 	}
 
@@ -92,9 +110,16 @@ func (c defaultCronJobManager) delete(ctx context.Context, schedule *v1.BackupSc
 		return nil
 	}
 	if err != nil {
+		c.recorder.Eventf(schedule, corev1.EventTypeWarning, cronJobDeletionFailedEventReason,
+			"Failed to delete CronJob %q: %v", cronJob.Name, err,
+		)
 		return fmt.Errorf("failed to delete CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
 	}
 
+	c.recorder.Eventf(
+		schedule, corev1.EventTypeNormal, cronJobDeletionRequestedEventReason,
+		"Requested deletion of CronJob %q.", cronJob.Name,
+	)
 	logger.Info("requested CronJob deletion", "cronJob", cronJob.Name)
 	return nil
 }

@@ -20,8 +20,10 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 	t.Run("ensure should create a new cronjob if none exists", func(t *testing.T) {
 		scheme := newCronJobManagerTestScheme(t)
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+		recorder := newFakeEventRecorder()
 		manager := defaultCronJobManager{
 			Client:           fakeClient,
+			recorder:         recorder,
 			scheme:           scheme,
 			operatorImage:    "example.com/backup-operator:1.2.3",
 			pullPolicy:       corev1.PullAlways,
@@ -47,6 +49,11 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 		require.Len(t, stored.OwnerReferences, 1)
 		assert.Equal(t, schedule.Name, stored.OwnerReferences[0].Name)
 		assert.True(t, *stored.OwnerReferences[0].Controller)
+		requireRecordedEvent(t, recorder, schedule, corev1.EventTypeNormal, cronJobCreatedEventReason, `Created CronJob "backup-schedule-daily".`)
+
+		// A converged CronJob must not produce another lifecycle event.
+		require.NoError(t, manager.ensure(context.Background(), schedule))
+		requireNoRecordedEvent(t, recorder)
 	})
 	t.Run("ensure should sync an existing cronjob when backupschedule is changed", func(t *testing.T) {
 		scheme := newCronJobManagerTestScheme(t)
@@ -60,8 +67,10 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 			Spec: batchv1.CronJobSpec{Schedule: "0 0 * * *"},
 		}
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).Build()
+		recorder := newFakeEventRecorder()
 		manager := defaultCronJobManager{
 			Client:        fakeClient,
+			recorder:      recorder,
 			scheme:        scheme,
 			operatorImage: "example.com/backup-operator:2.0.0",
 			pullPolicy:    corev1.PullIfNotPresent,
@@ -77,6 +86,7 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 		for key, value := range defaultLabels {
 			assert.Equal(t, value, stored.Labels[key])
 		}
+		requireRecordedEvent(t, recorder, schedule, corev1.EventTypeNormal, cronJobUpdatedEventReason, `Updated CronJob "backup-schedule-daily".`)
 	})
 
 	t.Run("ensure should fail if cronjob can't be created", func(t *testing.T) {
@@ -89,26 +99,32 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 				},
 			}).
 			Build()
-		manager := defaultCronJobManager{Client: fakeClient, scheme: scheme}
+		recorder := newFakeEventRecorder()
+		manager := defaultCronJobManager{Client: fakeClient, recorder: recorder, scheme: scheme}
+		schedule := newCronJobManagerTestSchedule()
 
-		err := manager.ensure(context.Background(), newCronJobManagerTestSchedule())
+		err := manager.ensure(context.Background(), schedule)
 
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to create CronJob")
+		assert.ErrorContains(t, err, "failed to synchronize CronJob")
+		requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, cronJobSynchronizationFailedEventReason, `Failed to synchronize CronJob "backup-schedule-daily"`, assert.AnError.Error())
 	})
 
 	t.Run("ensure should fail if owner reference can't be set", func(t *testing.T) {
 		scheme := runtime.NewScheme()
 		require.NoError(t, batchv1.AddToScheme(scheme))
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
-		manager := defaultCronJobManager{Client: fakeClient, scheme: scheme}
+		recorder := newFakeEventRecorder()
+		manager := defaultCronJobManager{Client: fakeClient, recorder: recorder, scheme: scheme}
+		schedule := newCronJobManagerTestSchedule()
 
-		err := manager.ensure(context.Background(), newCronJobManagerTestSchedule())
+		err := manager.ensure(context.Background(), schedule)
 
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to create CronJob")
+		assert.ErrorContains(t, err, "failed to synchronize CronJob")
 		assert.ErrorContains(t, err, "failed to set BackupSchedule daily as owner")
+		requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, cronJobSynchronizationFailedEventReason, `Failed to synchronize CronJob "backup-schedule-daily"`, "failed to set BackupSchedule daily as owner")
 	})
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -20,11 +21,14 @@ func TestCronJobManagerDelete(t *testing.T) {
 		Name: schedule.CronJobName(), Namespace: schedule.Namespace,
 	}}
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cronJob).Build()
-	manager := defaultCronJobManager{Client: fakeClient, scheme: scheme}
+	recorder := newFakeEventRecorder()
+	manager := defaultCronJobManager{Client: fakeClient, recorder: recorder, scheme: scheme}
 
 	require.NoError(t, manager.delete(context.Background(), schedule))
+	requireRecordedEvent(t, recorder, schedule, corev1.EventTypeNormal, cronJobDeletionRequestedEventReason, `Requested deletion of CronJob "backup-schedule-daily".`)
 	// twice to check for idempotence
 	require.NoError(t, manager.delete(context.Background(), schedule))
+	requireNoRecordedEvent(t, recorder)
 
 	stored := &batchv1.CronJob{}
 	err := fakeClient.Get(context.Background(), client.ObjectKeyFromObject(cronJob), stored)
@@ -42,11 +46,14 @@ func TestCronJobManagerDeleteReturnsError(t *testing.T) {
 			},
 		}).
 		Build()
-	manager := defaultCronJobManager{Client: fakeClient, scheme: scheme}
+	recorder := newFakeEventRecorder()
+	manager := defaultCronJobManager{Client: fakeClient, recorder: recorder, scheme: scheme}
+	schedule := newCronJobManagerTestSchedule()
 
-	err := manager.delete(context.Background(), newCronJobManagerTestSchedule())
+	err := manager.delete(context.Background(), schedule)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, assert.AnError)
 	assert.ErrorContains(t, err, "failed to delete CronJob")
+	requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, cronJobDeletionFailedEventReason, `Failed to delete CronJob "backup-schedule-daily"`, assert.AnError.Error())
 }

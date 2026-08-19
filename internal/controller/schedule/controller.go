@@ -16,10 +16,10 @@ type Controller struct {
 }
 
 // NewController creates a BackupSchedule controller backed by the default reconciler.
-func NewController(client client.Client, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *Controller {
+func NewController(client client.Client, recorder eventRecorder, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *Controller {
 	return &Controller{
 		client:     client,
-		reconciler: newReconciler(client, operatorImage, imagePullSecrets),
+		reconciler: newReconciler(client, recorder, operatorImage, imagePullSecrets),
 	}
 }
 
