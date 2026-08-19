@@ -5,6 +5,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +44,7 @@ func newReconciler(client client.Client, operatorImage string, imagePullSecrets 
 func (r *defaultReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	logger.V(1).Info("starting BackupSchedule reconciliation")
+	debug(logger, "starting BackupSchedule reconciliation")
 	schedule, err := r.getBackupSchedule(ctx, req.NamespacedName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -79,7 +80,7 @@ func (r *defaultReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, reconcileErr
 	}
 
-	logger.V(1).Info("BackupSchedule reconciliation completed")
+	debug(logger, "BackupSchedule reconciliation completed")
 	return ctrl.Result{}, nil
 
 }
@@ -100,7 +101,7 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	logger := log.FromContext(ctx)
 
-	logger.V(1).Info("BackupSchedule reconciliation for backupschedule")
+	debug(logger, "BackupSchedule reconciliation for backupschedule")
 	if err := r.metadata.ensure(ctx, schedule); err != nil {
 		r.conditions.markAcceptanceNotEvaluated(schedule, err)
 		r.conditions.markNotReady(schedule, backupv1.ReasonNotEvaluated, "Required metadata could not be persisted: "+err.Error())
@@ -140,7 +141,7 @@ func (r *defaultReconciler) patchStatus(ctx context.Context, before, after *back
 		return err
 	}
 
-	logger.V(1).Info("patched BackupSchedule status")
+	debug(logger, "patched BackupSchedule status")
 	return nil
 }
 
@@ -152,4 +153,8 @@ func (r *defaultReconciler) getBackupSchedule(ctx context.Context, name types.Na
 	}
 
 	return schedule, nil
+}
+
+func debug(logger logr.Logger, message string, keysAndValues ...any) {
+	logger.V(1).Info(message, keysAndValues...)
 }

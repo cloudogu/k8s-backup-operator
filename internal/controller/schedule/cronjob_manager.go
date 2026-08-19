@@ -68,7 +68,7 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *v1.BackupSc
 	}
 
 	if operation == controllerutil.OperationResultNone {
-		logger.V(1).Info("CronJob is up to date", "cronJob", cronJob.Name)
+		debug(logger, "CronJob is up to date", "cronJob", cronJob.Name)
 	} else {
 		logger.Info("synchronized CronJob", "cronJob", cronJob.Name, "operation", operation)
 	}
@@ -88,7 +88,7 @@ func (c defaultCronJobManager) delete(ctx context.Context, schedule *v1.BackupSc
 
 	err := c.Delete(ctx, cronJob)
 	if apierrors.IsNotFound(err) {
-		logger.V(1).Info("CronJob is already deleted", "cronJob", cronJob.Name)
+		debug(logger, "CronJob is already deleted", "cronJob", cronJob.Name)
 		return nil
 	}
 	if err != nil {
