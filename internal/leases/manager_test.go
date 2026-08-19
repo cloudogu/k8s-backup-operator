@@ -65,6 +65,29 @@ func TestManagerAcquire(t *testing.T) {
 		assert.Equal(t, holder.Name, result.HolderName)
 	})
 
+	for _, test := range []struct {
+		name   string
+		mutate func(*coordinationv1.Lease)
+	}{
+		{name: "missing holder UID", mutate: func(lease *coordinationv1.Lease) { lease.Spec.HolderIdentity = nil }},
+		{name: "missing holder name", mutate: func(lease *coordinationv1.Lease) { delete(lease.Annotations, HolderNameAnnotation) }},
+		{name: "missing holder kind", mutate: func(lease *coordinationv1.Lease) { delete(lease.Annotations, HolderKindAnnotation) }},
+	} {
+		t.Run("reports an invalid lease with "+test.name, func(t *testing.T) {
+			holder := testHolder("restore-a", "restore-a-uid")
+			contender := testHolder("backup-a", "backup-a-uid")
+			lease := NewLease(testNamespace, testLeaseName, holder, testKind)
+			test.mutate(lease)
+			k8sClient := newLeaseTestClient(t, holder, contender, lease)
+			manager := NewManager(k8sClient, testNamespace, testLeaseName, configMapResolver{client: k8sClient})
+
+			result, err := manager.Acquire(ctx, contender, testKind)
+
+			require.NoError(t, err)
+			assert.Equal(t, StateInvalid, result.State)
+		})
+	}
+
 	t.Run("takes over a lease whose holder disappeared", func(t *testing.T) {
 		oldHolder := testHolder("restore-a", "restore-a-uid")
 		contender := testHolder("backup-a", "backup-a-uid")
@@ -114,19 +137,6 @@ func (r configMapResolver) Get(ctx context.Context, namespace, name string) (cli
 	holder := &corev1.ConfigMap{}
 	err := r.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, holder)
 	return holder, err
-}
-
-func (r configMapResolver) FindByUID(ctx context.Context, namespace string, uid types.UID) (client.Object, error) {
-	holders := &corev1.ConfigMapList{}
-	if err := r.client.List(ctx, holders, client.InNamespace(namespace)); err != nil {
-		return nil, err
-	}
-	for i := range holders.Items {
-		if holders.Items[i].UID == uid {
-			return &holders.Items[i], nil
-		}
-	}
-	return nil, nil
 }
 
 func (configMapResolver) IsTerminal(holder client.Object) bool {

@@ -8,7 +8,6 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -61,19 +60,6 @@ func (r backupHolderResolver) Get(ctx context.Context, namespace, name string) (
 		return nil, err
 	}
 	return holder, nil
-}
-
-func (r backupHolderResolver) FindByUID(ctx context.Context, namespace string, uid types.UID) (client.Object, error) {
-	backups := &backupv1.BackupList{}
-	if err := r.client.List(ctx, backups, client.InNamespace(namespace)); err != nil {
-		return nil, err
-	}
-	for i := range backups.Items {
-		if backups.Items[i].UID == uid {
-			return &backups.Items[i], nil
-		}
-	}
-	return nil, nil
 }
 
 func (backupHolderResolver) IsTerminal(holder client.Object) bool {

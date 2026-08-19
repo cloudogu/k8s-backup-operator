@@ -9,53 +9,6 @@ Der Backup-Bereich besteht aus zwei Controllern:
 
 Der derzeit konkret implementierte Provider ist Velero. CES-Backup und Velero-Backup verwenden denselben Namen und Namespace.
 
-## Architektur
-
-```mermaid
-classDiagram
-    class BackupController {
-        +Reconcile(ctx, request)
-        +SetupWithManager(manager)
-    }
-    class BackupReconciler {
-        +ensureProviderBackupDeleted()
-        +ensureVeleroStatusSynced()
-        +ensureBackupSetup()
-        +ensureBackupIsPrepared()
-        +ensureProviderBackupCreated()
-        +ensureProviderBackupCompleted()
-    }
-    class MaintenanceGateway {
-        +isMaintenanceModeActive()
-        +activateMaintenanceMode()
-        +deactivateMaintenanceMode()
-    }
-    class VeleroBackupController {
-        +Reconcile(ctx, request)
-        +SetupWithManager(manager)
-    }
-    class VeleroBackupReconciler {
-        +ensureBackupExists()
-        +deleteBackupIfExists()
-        +ensureDeleteBackupRequestExists()
-    }
-    class BackupCR
-    class VeleroBackup
-    class DeleteBackupRequest
-    class BackupStorageLocation
-
-    BackupController --> BackupCR : beobachtet
-    BackupController --> BackupReconciler
-    BackupReconciler --> MaintenanceGateway
-    BackupReconciler --> VeleroBackup : erzeugt und beobachtet
-    BackupReconciler --> DeleteBackupRequest : erzeugt beim Löschen
-    BackupReconciler --> BackupStorageLocation : prüft Verfügbarkeit
-    VeleroBackupController --> VeleroBackup : beobachtet
-    VeleroBackupController --> VeleroBackupReconciler
-    VeleroBackupReconciler --> BackupCR : synchronisiert
-    VeleroBackupReconciler --> DeleteBackupRequest : sichert Storage-Löschung
-```
-
 ## Controller-Steuerung
 
 Der Backup-Controller führt eine feste Liste von `ensure...`-Methoden aus. Jede Stage liefert eine Aktion:
@@ -127,7 +80,7 @@ sequenceDiagram
 - Annotation `backup.cloudogu.com/blueprintId` mit dem Display-Namen des ersten Blueprints im Namespace
 - Annotation `backup.cloudogu.com/dogus` mit dessen Dogu-Liste als JSON
 
-Existiert kein Blueprint oder ist dessen CRD nicht installiert, läuft der Workflow ohne Blueprint-Annotationen weiter. Andere Fehler beim Listen oder Serialisieren brechen den Reconcile mit Fehler ab. Vorhandene fremde Labels, Annotationen und Finalizer bleiben erhalten; verwaltete Werte werden bei Abweichung korrigiert. Sind alle Werte bereits korrekt, erfolgt kein Update.
+Existiert kein Blueprint, läuft der Workflow ohne Blueprint-Annotationen weiter. Andere Fehler beim Listen oder Serialisieren brechen den Reconcile mit Fehler ab. Vorhandene fremde Labels, Annotationen und Finalizer bleiben erhalten; verwaltete Werte werden bei Abweichung korrigiert.
 
 ### Zeitfenster und Abbruch
 
@@ -162,7 +115,7 @@ Fehlt die ConfigMap oder der Schlüssel, oder ist der Wert nicht numerisch, ende
 
 Nach erfolgreicher Vorbereitung und vor der Aktivierung des Wartungsmodus beansprucht `ensureActiveBackupLease` das namespaceweite Kubernetes-`Lease` `k8s-backup-operator-restore`. Dasselbe Lease verwendet der Restore-Controller. Backup und Restore können ihre kritischen Abschnitte im selben Namespace dadurch nicht gleichzeitig ausführen.
 
-Der Holder wird durch `spec.holderIdentity` (UID), `k8s.cloudogu.com/restore-lease-holder-name` (Name) und `k8s.cloudogu.com/lease-holder-kind` (`Backup` oder `Restore`) beschrieben. Jeder Controller registriert nur den Resolver für seinen eigenen Ressourcentyp. Ein gesetzter fremder oder unbekannter Holder-Typ wird als aktiv behandelt und nicht übernommen; die beiden Workflows müssen sich daher nicht gegenseitig kennen. Ein eigenes Lease wird idempotent akzeptiert. Zeitablauf allein macht ein Lease nicht stale.
+Der Holder wird durch `spec.holderIdentity` (UID), `k8s.cloudogu.com/backup-operator-lease-holder-name` (Name) und `k8s.cloudogu.com/lease-holder-kind` (`Backup` oder `Restore`) beschrieben. Alle drei Felder werden gemeinsam geschrieben und müssen vorhanden sein; unvollständige Leases gelten als ungültig und werden nicht heuristisch repariert. Jeder Controller registriert nur den Resolver für seinen eigenen Ressourcentyp. Ein gesetzter fremder oder unbekannter Holder-Typ wird als aktiv behandelt und nicht übernommen; die beiden Workflows müssen sich daher nicht gegenseitig kennen. Ein eigenes Lease wird idempotent akzeptiert. Zeitablauf allein macht ein Lease nicht stale.
 
 `ensureBackupLeaseReleased` läuft am Anfang jedes Reconcile. Die Stage löscht ausschließlich das eigene Lease, wenn der Backup terminal (`Succeeded=True`, `Succeeded=False` oder `Canceled=True`) oder zum Löschen markiert ist. Für laufende Backups und fremde Holder ist sie ein No-op. UID- und `resourceVersion`-Preconditions verhindern, dass ein inzwischen neu vergebenes Lease gelöscht wird. Die Stage ändert bewusst nicht den Wartungsmodus; alle terminalen Backup-Pfade müssen dessen Deaktivierung selbst sicherstellen.
 

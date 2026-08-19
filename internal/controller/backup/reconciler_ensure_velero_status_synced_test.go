@@ -136,7 +136,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		})
 	}
 
-	t.Run("unknown phase is treated as failed", func(t *testing.T) {
+	t.Run("unknown phase is treated as running", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		backup.Spec.SyncedFromProvider = true
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhase("Unexpected"))

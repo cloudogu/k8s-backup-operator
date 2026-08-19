@@ -32,10 +32,18 @@ type Result struct {
 	HolderName string
 }
 
+type inspectionResult struct {
+	activeHolder client.Object
+	invalid      bool
+}
+
+type resolutionResult struct {
+	holder client.Object
+}
+
 type Resolver interface {
 	Kind() string
 	Get(ctx context.Context, namespace, name string) (client.Object, error)
-	FindByUID(ctx context.Context, namespace string, uid types.UID) (client.Object, error)
 	IsTerminal(holder client.Object) bool
 }
 
@@ -83,24 +91,15 @@ func (m *Manager) Acquire(ctx context.Context, holder client.Object, kind string
 		}
 	}
 
-	activeHolder, changed, invalid, inspectErr := m.inspect(ctx, lease)
+	inspection, inspectErr := m.inspect(ctx, lease)
 	if inspectErr != nil {
 		return Result{}, inspectErr
 	}
-	if invalid {
+	if inspection.invalid {
 		return Result{State: StateInvalid}, nil
 	}
-	if activeHolder != nil {
-		if changed {
-			if updateErr := m.client.Update(ctx, lease); updateErr != nil {
-				if apierrors.IsConflict(updateErr) {
-					return Result{State: StateChanged}, nil
-				}
-				return Result{}, fmt.Errorf("failed to repair lease %s/%s: %w", key.Namespace, key.Name, updateErr)
-			}
-			return Result{State: StateChanged}, nil
-		}
-		return Result{State: StateWaiting, HolderName: activeHolder.GetName()}, nil
+	if inspection.activeHolder != nil {
+		return Result{State: StateWaiting, HolderName: inspection.activeHolder.GetName()}, nil
 	}
 
 	Claim(lease, holder, kind)
@@ -162,81 +161,46 @@ func HolderUID(lease *coordinationv1.Lease) types.UID {
 	return types.UID(ptr.Deref(lease.Spec.HolderIdentity, ""))
 }
 
-func (m *Manager) inspect(ctx context.Context, lease *coordinationv1.Lease) (client.Object, bool, bool, error) {
+// inspect determines whether a structurally valid lease still has an active holder.
+func (m *Manager) inspect(ctx context.Context, lease *coordinationv1.Lease) (inspectionResult, error) {
 	uid := HolderUID(lease)
 	name := lease.Annotations[HolderNameAnnotation]
 	kind := lease.Annotations[HolderKindAnnotation]
-	if uid == "" && name == "" {
-		return nil, false, true, nil
-	}
-	if kind != "" {
-		resolver, ok := m.resolvers[kind]
-		if !ok {
-			return nil, false, true, nil
-		}
-		return m.resolve(ctx, lease, resolver, name, uid)
+
+	// Claim always writes UID, name, and kind together. Missing identity data therefore indicates a
+	// malformed or externally modified lease and must not be repaired heuristically.
+	if uid == "" || name == "" || kind == "" {
+		return inspectionResult{invalid: true}, nil
 	}
 
-	var resolved client.Object
-	var resolvedKind string
-	for resolverKind, resolver := range m.resolvers {
-		holder, _, _, err := m.resolve(ctx, lease.DeepCopy(), resolver, name, uid)
-		if err != nil {
-			return nil, false, false, err
-		}
-		if holder == nil || resolver.IsTerminal(holder) {
-			continue
-		}
-		if resolved != nil {
-			return nil, false, true, nil
-		}
-		resolved = holder
-		resolvedKind = resolverKind
+	resolver, ok := m.resolvers[kind]
+	if !ok {
+		// Acquire handles known foreign workflow kinds before inspection. Reaching this branch means
+		// that the lease kind cannot be interpreted safely by this manager.
+		return inspectionResult{invalid: true}, nil
 	}
-	if resolved == nil {
-		return nil, false, false, nil
-	}
-	if lease.Annotations == nil {
-		lease.Annotations = map[string]string{}
-	}
-	lease.Annotations[HolderKindAnnotation] = resolvedKind
-	lease.Annotations[HolderNameAnnotation] = resolved.GetName()
-	lease.Spec.HolderIdentity = ptr.To(string(resolved.GetUID()))
-	return resolved, true, false, nil
+
+	resolution, err := m.resolve(ctx, lease, resolver, name, uid)
+	return inspectionResult{activeHolder: resolution.holder}, err
 }
 
-func (m *Manager) resolve(ctx context.Context, lease *coordinationv1.Lease, resolver Resolver, name string, uid types.UID) (client.Object, bool, bool, error) {
-	var holder client.Object
-	var err error
-	if name == "" {
-		holder, err = resolver.FindByUID(ctx, lease.Namespace, uid)
-	} else {
-		holder, err = resolver.Get(ctx, lease.Namespace, name)
-		if apierrors.IsNotFound(err) {
-			err = nil
-			holder = nil
-		}
+// resolve looks up the named holder and verifies that it is the non-terminal object identified by the lease UID.
+func (m *Manager) resolve(ctx context.Context, lease *coordinationv1.Lease, resolver Resolver, name string, uid types.UID) (resolutionResult, error) {
+	holder, err := resolver.Get(ctx, lease.Namespace, name)
+	if apierrors.IsNotFound(err) {
+		// A deleted holder makes the lease stale; this is an expected result rather than an error.
+		return resolutionResult{}, nil
 	}
 	if err != nil {
-		return nil, false, false, fmt.Errorf("failed to resolve holder of lease %s/%s: %w", lease.Namespace, lease.Name, err)
+		return resolutionResult{}, fmt.Errorf("failed to resolve holder of lease %s/%s: %w", lease.Namespace, lease.Name, err)
 	}
+	// Terminal holders no longer block another operation from acquiring the lease.
 	if holder == nil || resolver.IsTerminal(holder) {
-		return nil, false, false, nil
+		return resolutionResult{}, nil
 	}
-	if uid != "" && holder.GetUID() != uid {
-		return nil, false, false, nil
+	// A matching name with a different UID represents a replacement object, not the original holder.
+	if holder.GetUID() != uid {
+		return resolutionResult{}, nil
 	}
-	changed := false
-	if lease.Annotations == nil {
-		lease.Annotations = map[string]string{}
-	}
-	if name == "" {
-		lease.Annotations[HolderNameAnnotation] = holder.GetName()
-		changed = true
-	}
-	if uid == "" {
-		lease.Spec.HolderIdentity = ptr.To(string(holder.GetUID()))
-		changed = true
-	}
-	return holder, changed, false, nil
+	return resolutionResult{holder: holder}, nil
 }

@@ -172,22 +172,6 @@ func TestBackupHolderResolver(t *testing.T) {
 	_, err = resolver.Get(ctx, "ns", "missing")
 	assert.Error(t, err)
 
-	found, err = resolver.FindByUID(ctx, "ns", second.UID)
-	require.NoError(t, err)
-	require.NotNil(t, found)
-	assert.Equal(t, second.Name, found.GetName())
-
-	found, err = resolver.FindByUID(ctx, "ns", types.UID("missing"))
-	require.NoError(t, err)
-	assert.Nil(t, found)
-
-	listErrorResolver := backupHolderResolver{client: newFakeClientBuilder(t).WithInterceptorFuncs(interceptor.Funcs{
-		List: func(_ context.Context, _ client.WithWatch, _ client.ObjectList, _ ...client.ListOption) error {
-			return errors.New("list failed")
-		},
-	}).Build()}
-	_, err = listErrorResolver.FindByUID(ctx, "ns", first.UID)
-	require.ErrorContains(t, err, "list failed")
 }
 
 func TestBackupHolderResolverTerminalStates(t *testing.T) {

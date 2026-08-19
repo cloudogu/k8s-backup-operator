@@ -8,7 +8,6 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
 	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -19,7 +18,7 @@ const (
 )
 
 // ensureActiveRestoreLease remains a Restore workflow stage while delegating the generic lease
-// acquisition, holder resolution, repair and takeover mechanics to internal/leases.
+// acquisition, holder validation, resolution and takeover mechanics to internal/leases.
 func (r *restoreReconciler) ensureActiveRestoreLease(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	if requiredOperation(restore) != operationCreate {
 		return restore, next()
@@ -105,19 +104,6 @@ func (r restoreHolderResolver) Get(ctx context.Context, namespace, name string) 
 		return nil, err
 	}
 	return holder, nil
-}
-
-func (r restoreHolderResolver) FindByUID(ctx context.Context, namespace string, uid types.UID) (client.Object, error) {
-	restores := &k8sv1.RestoreList{}
-	if err := r.client.List(ctx, restores, client.InNamespace(namespace)); err != nil {
-		return nil, err
-	}
-	for i := range restores.Items {
-		if restores.Items[i].UID == uid {
-			return &restores.Items[i], nil
-		}
-	}
-	return nil, nil
 }
 
 func (restoreHolderResolver) IsTerminal(holder client.Object) bool {
