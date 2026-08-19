@@ -221,7 +221,7 @@ func (m *DefaultManager) scaleUpReplicationControllers(ctx context.Context, list
 }
 
 // FinalizeScaleUp removes the temporary replica labels after every workload became ready.
-// Repeated calls are safe and finish a partially completed label cleanup.
+// Repeated calls are safe and finish a partially completed label removal.
 func (m *DefaultManager) FinalizeScaleUp(ctx context.Context) error {
 	listOpts := []client.ListOption{
 		client.InNamespace(m.namespace),

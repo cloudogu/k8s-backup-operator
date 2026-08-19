@@ -250,7 +250,6 @@ func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, res
 }
 
 // ensurePreparation runs the destructive preparation of the ecosystem: scale-down and cleanup.
-// Maintenance-mode activation is a separate stage after this preparation.
 func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	prepared, err := r.isAlreadyPrepared(ctx, restore)
 	if err != nil {

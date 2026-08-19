@@ -1187,7 +1187,7 @@ func TestFinalizeScaleUpIsIdempotent(t *testing.T) {
 	require.NoError(t, manager.FinalizeScaleUp(testCtx))
 }
 
-func TestFinalizeScaleUpCanFinishAPartiallyFailedCleanup(t *testing.T) {
+func TestFinalizeScaleUpCanFinishAPartiallyFailedLabelRemoval(t *testing.T) {
 	failStatefulSetOnce := true
 	failingUpdate := interceptor.Funcs{
 		Update: func(ctx context.Context, wrapped client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
