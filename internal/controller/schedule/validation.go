@@ -8,9 +8,9 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-type validator struct{}
+type defaultValidator struct{}
 
-func (v validator) Validate(schedule *backupv1.BackupSchedule) error {
+func (v defaultValidator) validate(schedule *backupv1.BackupSchedule) error {
 	if schedule.Spec.Schedule == "" {
 		return errors.New("schedule must not be empty")
 	}

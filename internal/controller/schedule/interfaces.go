@@ -12,28 +12,28 @@ type OperatorImageGetter interface {
 	ImageForKey(ctx context.Context, key string) (string, error)
 }
 
-type CronJobManager interface {
-	Ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error
-	Delete(ctx context.Context, schedule *backupv1.BackupSchedule) error
+type cronJobManager interface {
+	ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error
+	delete(ctx context.Context, schedule *backupv1.BackupSchedule) error
 }
 
-type Validator interface {
-	Validate(schedule *backupv1.BackupSchedule) error
+type validator interface {
+	validate(schedule *backupv1.BackupSchedule) error
 }
 
-type ConditionManager interface {
-	MarkAccepted(schedule *backupv1.BackupSchedule)
-	MarkInvalid(schedule *backupv1.BackupSchedule, err error)
-	MarkAcceptanceNotEvaluated(schedule *backupv1.BackupSchedule, err error)
-	MarkReady(schedule *backupv1.BackupSchedule)
-	MarkNotReady(schedule *backupv1.BackupSchedule, reason, message string)
+type conditionManager interface {
+	markAccepted(schedule *backupv1.BackupSchedule)
+	markInvalid(schedule *backupv1.BackupSchedule, err error)
+	markAcceptanceNotEvaluated(schedule *backupv1.BackupSchedule, err error)
+	markReady(schedule *backupv1.BackupSchedule)
+	markNotReady(schedule *backupv1.BackupSchedule, reason, message string)
 }
 
-type MetadataManager interface {
-	Ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error
-	Remove(ctx context.Context, schedule *backupv1.BackupSchedule) error
+type metadataManager interface {
+	ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error
+	remove(ctx context.Context, schedule *backupv1.BackupSchedule) error
 }
 
 type reconciler interface {
-	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
+	reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 }

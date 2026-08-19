@@ -3,8 +3,9 @@ package schedule
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/kubernetes/fake"
 	"testing"
+
+	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,7 +49,7 @@ func TestOperatorImageGetter_ImageForKey(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "image \"operatorImage\" in configmap \"k8s-backup-operator-additional-images\" be empty")
+		assert.ErrorContains(t, err, "image \"operatorImage\" in configmap \"k8s-backup-operator-additional-images\" is empty")
 	})
 	t.Run("should fail on invalid image tag", func(t *testing.T) {
 		// given
