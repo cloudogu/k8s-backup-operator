@@ -33,6 +33,7 @@ const (
 	reasonProviderBackupFailed                      = "ProviderBackupFailed"
 	reasonProviderBackupSucceeded                   = "ProviderBackupSucceeded"
 	reasonBackupDeleting                            = "BackupDeleting"
+	reasonWaitingForProviderBackupCompletion        = "WaitingForProviderBackupCompletion"
 	reasonBackupNotDeleting                         = "BackupNotDeleting"
 	reasonTimeWindowNotExpired                      = "TimeWindowNotExpired"
 	reasonTimeWindowExpiredBackupNotStarted         = "TimeWindowExpiredBackupNotStarted"
@@ -127,6 +128,26 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			return Abort, nil
 		}
 
+		if isProviderBackupInProgress(veleroBackup) {
+			if cleanupErr := c.deleteVeleroDeleteBackupRequestIfExists(ctx, backup, logger); cleanupErr != nil {
+				return Abort, cleanupErr
+			}
+
+			patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+				meta.SetStatusCondition(&status.Conditions, metav1.Condition{
+					Type:    backupv1.ConditionDeleting,
+					Status:  metav1.ConditionTrue,
+					Reason:  reasonWaitingForProviderBackupCompletion,
+					Message: fmt.Sprintf("Waiting for the provider backup to complete before deleting it (phase: %s)", veleroBackup.Status.Phase),
+				})
+			})
+			if patchErr != nil {
+				return Abort, fmt.Errorf("patch conditions while waiting for provider backup completion: %w", patchErr)
+			}
+
+			return Retry, nil
+		}
+
 		deleteReq, createErr := c.createVeleroDeleteBackupRequestIfNotExists(ctx, backup, logger)
 		if createErr != nil {
 			return Abort, createErr
@@ -160,6 +181,28 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 	}
 
 	return Next, nil
+}
+
+func (c *defaultReconciler) deleteVeleroDeleteBackupRequestIfExists(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	logger logr.Logger,
+) error {
+	deleteBackupRequest := &velerov1.DeleteBackupRequest{}
+	err := c.client.Get(ctx, backup.GetNamespacedName(), deleteBackupRequest)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("get velero delete backup request while provider backup is running: %w", err)
+	}
+
+	debug(logger, "ensureProviderBackupDeleted: provider backup is running -> delete existing delete backup request")
+	if err = c.client.Delete(ctx, deleteBackupRequest); err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("delete velero delete backup request while provider backup is running: %w", err)
+	}
+
+	return nil
 }
 
 func (c *defaultReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {

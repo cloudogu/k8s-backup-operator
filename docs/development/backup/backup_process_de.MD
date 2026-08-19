@@ -299,8 +299,13 @@ sequenceDiagram
     loop Solange der Provider-Backup existiert
         B->>V: Provider-Backup lesen
         V-->>B: Provider-Backup vorhanden
-        B->>D: DeleteBackupRequest idempotent sicherstellen
-        B->>B: Deleting=True
+        alt Provider-Backup läuft noch
+            B->>D: vorhandenen DeleteBackupRequest entfernen
+            B->>B: Deleting=True, WaitingForProviderBackupCompletion
+        else Provider-Backup ist terminal
+            B->>D: DeleteBackupRequest idempotent sicherstellen
+            B->>B: Deleting=True, BackupDeleting
+        end
         B-->>B: zeitgesteuerter Retry
     end
 
@@ -309,6 +314,8 @@ sequenceDiagram
     B->>K: cloudogu-backup-finalizer entfernen
     K-->>U: Parent darf verschwinden
 ```
+
+Bei laufenden Velero-Phasen (`New`, `InProgress`, `Finalizing` und den Phasen für ausstehende Plugin-Operationen) legt der Controller noch keinen DeleteRequest an. Einen bereits vorhandenen DeleteRequest entfernt er, damit Velero das laufende Backup regulär abschließen kann. Die Condition `Deleting=True` mit Reason `WaitingForProviderBackupCompletion` macht diesen Wartezustand sichtbar. Erst bei einem nicht mehr laufenden Provider-Backup wird der DeleteRequest sichergestellt.
 
 Der Controller wartet nicht auf den Status des DeleteRequests, sondern prüft bei jedem Retry, ob der Velero-Backup noch existiert. Erst nach dessen Verschwinden wird der Backup-Finalizer aus der Finalizer-Liste entfernt und der Parent aktualisiert. Andere Finalizer bleiben erhalten.
 
