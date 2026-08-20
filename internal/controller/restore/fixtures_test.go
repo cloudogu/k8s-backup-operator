@@ -22,6 +22,11 @@ const (
 	testBackup     = "test-backup"
 )
 
+// recoverableRestore is a Restore whose provider restore succeeded and whose backups are synchronized.
+func recoverableRestore() *k8sv1.Restore {
+	return withBackupsSynchronized(withProviderRestoreSuccess(startableRestore()))
+}
+
 func newParentRestore() *k8sv1.Restore {
 	return &k8sv1.Restore{
 		ObjectMeta: metav1.ObjectMeta{Name: testRestore, Namespace: testNamespace, UID: testRestoreUID},

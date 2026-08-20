@@ -8,9 +8,9 @@ import (
 	"time"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	annotationsPkg "github.com/cloudogu/k8s-backup-operator/pkg/annotations"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
-	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"

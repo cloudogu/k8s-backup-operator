@@ -217,6 +217,15 @@ func updateOf(object client.Object) recordedClientAction {
 	}
 }
 
+// deleteOf is the action deletion of the given object records.
+func deleteOf(object client.Object) recordedClientAction {
+	return recordedClientAction{
+		Verb: "delete",
+		Type: reflect.TypeOf(object),
+		Key:  client.ObjectKeyFromObject(object),
+	}
+}
+
 // statusUpdateOf is the action a status write of the given object records.
 func statusUpdateOf(object client.Object) recordedClientAction {
 	return recordedClientAction{

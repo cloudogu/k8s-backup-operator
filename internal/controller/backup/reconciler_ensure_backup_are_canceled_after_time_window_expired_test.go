@@ -17,7 +17,7 @@ import (
 )
 
 func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
-	t.Run("If the time window has not yet expired, set canceled to unknown and proceed to the next step", func(t *testing.T) {
+	t.Run("If the time window has not yet expired, set canceled to false and proceed to the next step", func(t *testing.T) {
 		baseTime := time.Now()
 		timeLimitInMinutes := 10
 		backup := newBackupForTest("ns", "backup")
@@ -41,7 +41,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 
 		canceledCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
 		assert.NotNil(t, canceledCondition)
-		assert.Equal(t, metav1.ConditionUnknown, canceledCondition.Status)
+		assert.Equal(t, metav1.ConditionFalse, canceledCondition.Status)
 		assert.Equal(t, reasonTimeWindowNotExpired, canceledCondition.Reason)
 
 		assert.Equal(t, 1, counter.configMapGetCount)

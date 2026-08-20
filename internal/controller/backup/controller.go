@@ -5,7 +5,7 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
+	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,12 +24,14 @@ const (
 )
 
 type reconciler interface {
+	ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+	ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
 	ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
@@ -60,18 +62,24 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err := c.client.Get(ctx, req.NamespacedName, &backup); err != nil {
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
+	// Initialize all possible condition transition time series without incrementing them.
+	metrics.InitBackupConditionTransitionMetrics(backup.Namespace, backup.Name)
 
 	ensureFunctions := []ensureFunction{
+		c.reconciler.ensureBackupLeaseReleased, // cleanup leases of deleted/failed backups
 		c.reconciler.ensureProviderBackupDeleted,
 		c.reconciler.ensureVeleroStatusSynced,
+		c.reconciler.ensureMaintenanceDeactivated,
 		c.reconciler.ensureCompletedBackupIsIgnored,
 		c.reconciler.ensureBackupSetup,
 		c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired,
 		c.reconciler.ensureBackupIsPrepared,
+		c.reconciler.ensureActiveBackupLease,
 		c.reconciler.ensureMaintenanceActivated,
 		c.reconciler.ensureProviderBackupCreated,
 		c.reconciler.ensureProviderBackupCompleted,
 		c.reconciler.ensureMaintenanceDeactivated,
+		c.reconciler.ensureBackupLeaseReleased, // close current backup reconcile
 	}
 
 	for _, ensure := range ensureFunctions {

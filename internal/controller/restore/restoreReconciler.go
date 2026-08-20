@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
-	"github.com/cloudogu/k8s-backup-operator/pkg/metrics"
 	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -84,6 +84,11 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	logger.Info(fmt.Sprintf("found restore resource %s", req.NamespacedName))
 
+	// Init Metric timelines for conditions
+	// - no increment, just create if not exists
+	metrics.InitRestoreConditionTransitionMetrics(restore.Namespace, restore.Name, restore.Spec.BackupName)
+	metrics.InitRestoreStatusMetrics(restore.Namespace, restore.Name, restore.Spec.BackupName)
+
 	switch requiredOperation(restore) {
 	case operationDelete:
 		return runStages(
@@ -92,6 +97,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.requeueDelay,
 			r.ensureProviderRestoreDeleted,
 			r.ensureDeletingStatus,
+			r.ensureRestoreLeaseReleased,
 			r.ensureDeletionFinalized,
 		)
 	case operationIgnore:
@@ -100,6 +106,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			restore,
 			r.requeueDelay,
 			r.ensureLegacyConditionsMigrated,
+			r.ensureRestoreLeaseReleased,
 		)
 	case operationCreate:
 		return runStages(
@@ -110,11 +117,17 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.ensureConditionsInitialized,
 			r.ensureMetadata,
 			r.ensureProviderChildState,
+			r.ensureActiveRestoreLease,
 			r.ensurePreparation,
+			r.ensureMaintenanceModeActivated,
 			r.ensureProviderRestore,
 			r.ensureProviderCompletion,
 			r.ensureBackupsSynchronized,
-			r.ensureWorkloadsRecovered,
+			r.ensureScaleUpInitiated,
+			r.ensureWorkloadsReady,
+			r.ensureScaleUpFinalized,
+			r.ensureMaintenanceModeDeactivated,
+			r.ensureRestoreCompleted,
 		)
 	default:
 		return ctrl.Result{}, nil
@@ -214,7 +227,6 @@ func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restor
 // a terminal failure, before any preparation ran.
 func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, restore *k8sv1.Restore, conflictErr error) (*k8sv1.Restore, stageOutcome) {
 	r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, conflictErr.Error())
-	metrics.InitRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName)
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
 		metav1.Condition{
@@ -234,14 +246,10 @@ func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, res
 		return restore, retryOnError(fmt.Errorf("failed to report the provider restore conflict of restore %s: %w", restore.Name, err))
 	}
 
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed) // NOSONAR -- legacy restore status compatibility
-
 	return updated, abort()
 }
 
-// ensurePreparation runs the destructive preparation of the ecosystem — maintenance mode, scale-down
-// and cleanup. Maintenance mode is activated best-effort: a restore is more valuable than the
-// unavailability notice, so a failed activation is logged and the workflow continues.
+// ensurePreparation runs the destructive preparation of the ecosystem: scale-down and cleanup.
 func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	prepared, err := r.isAlreadyPrepared(ctx, restore)
 	if err != nil {
@@ -258,15 +266,6 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
 	}
 
-	logger := log.FromContext(ctx)
-
-	err = r.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
-	maintenanceMessage := "maintenance mode is active,"
-	if err != nil {
-		logger.Error(err, "The Maintenance mode could not be activated. Continuing anyways...")
-		maintenanceMessage = ""
-	}
-
 	if err := r.scaleManager.ScaleDown(ctx); err != nil {
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to scale down workloads before restore: %w", err))
 	}
@@ -279,7 +278,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		Type:    k8sv1.ConditionPrepared,
 		Status:  metav1.ConditionTrue,
 		Reason:  ReasonPreparationCompleted,
-		Message: fmt.Sprintf("The ecosystem was prepared for the restore: %s workloads are scaled down and the resources to be restored are removed.", maintenanceMessage),
+		Message: "The ecosystem was prepared for the restore: workloads are scaled down and the resources to be restored are removed.",
 	})
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to persist the preparation of restore %s: %w", restore.Name, err))
@@ -337,8 +336,6 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 		return restore, next()
 	}
 
-	//TODO: Think about this again, initializer increments the new metric on every retry
-	metrics.InitRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName)
 	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process")
 
 	if _, err := velero.EnsureRestore(ctx, r.k8sClient, restore); err != nil {
@@ -353,8 +350,6 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 
 		return restore, retryOnError(fmt.Errorf("failed to start the provider restore of restore %s: %w", restore.Name, err))
 	}
-
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusInProgress) // NOSONAR -- legacy restore status compatibility
 
 	// The child's own events drive the next reconciliation; the delay is only the fallback.
 	return restore, retryAfter(r.requeueDelay)
@@ -448,8 +443,6 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 		return restore, retryOnError(fmt.Errorf("failed to report the failed provider restore of restore %s: %w", restore.Name, err))
 	}
 
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusFailed) // NOSONAR -- legacy restore status compatibility
-
 	return updated, abort()
 }
 
@@ -478,39 +471,6 @@ func (r *restoreReconciler) ensureBackupsSynchronized(ctx context.Context, resto
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
 	return updated, retryAfter(r.requeueDelay)
-}
-
-// ensureWorkloadsRecovered ends the workflow: the workloads are scaled up again, the unavailability
-// notice is taken down and the restore is reported as successful.
-func (r *restoreReconciler) ensureWorkloadsRecovered(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
-	if err := r.scaleManager.ScaleUp(ctx); err != nil {
-		return r.reportUnreachedMilestone(ctx, restore, k8sv1.ConditionWorkloadsRecovered, ReasonWorkloadRecoveryFailed,
-			fmt.Errorf("failed to scale up workloads after restore: %w", err))
-	}
-
-	// Taking maintenance mode down is best-effort, like the activation: the workloads are up
-	// again, so a remaining notice is a nuisance and not a reason to fail a successful restore.
-	if err := r.maintenanceModeSwitch.Deactivate(ctx, false); err != nil {
-		return restore, retryOnError(fmt.Errorf("The maintenance mode could not be deactivated after the restore %s: %w", restore.Name, err))
-	}
-
-	// Both milestones are written together because they are reached together: the restore is
-	// successful exactly because the workloads were recovered.
-	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
-		reachedMilestone(k8sv1.ConditionWorkloadsRecovered, ReasonWorkloadRecoveryCompleted,
-			"The workloads were scaled up again and the maintenance mode was switched off."),
-		reachedMilestone(k8sv1.ConditionSuccessful, ReasonRestoreCompleted,
-			"The restore workflow finished successfully."),
-	)
-	if err != nil {
-		return restore, retryOnError(fmt.Errorf("failed to persist the workload recovery of restore %s: %w", restore.Name, err))
-	}
-
-	metrics.UpdateRestoreStatusMetrics(r.namespace, restore.Name, restore.Spec.BackupName, k8sv1.RestoreStatusCompleted) // NOSONAR -- legacy restore status compatibility
-	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Restore successful")
-
-	// The restore is terminal now, so there is nothing left to do.
-	return updated, abort()
 }
 
 // ensureDeletingStatus persists the deprecated scalar deleting status for consumers that have not

@@ -66,13 +66,13 @@ var veleroBackupIsRunningPhases = []velerov1.BackupPhase{
 	velerov1.BackupPhaseNew,
 	velerov1.BackupPhaseInProgress,
 	velerov1.BackupPhaseFinalizing,
+	velerov1.BackupPhaseFinalizingPartiallyFailed,
 	velerov1.BackupPhaseWaitingForPluginOperations,
+	velerov1.BackupPhaseWaitingForPluginOperationsPartiallyFailed,
 }
 
 var veleroBackupFailedPhases = []velerov1.BackupPhase{
 	velerov1.BackupPhaseFailedValidation,
-	velerov1.BackupPhaseWaitingForPluginOperationsPartiallyFailed,
-	velerov1.BackupPhaseFinalizingPartiallyFailed,
 	velerov1.BackupPhasePartiallyFailed,
 	velerov1.BackupPhaseFailed,
 }
@@ -87,8 +87,6 @@ type maintenanceGateway interface {
 	activateMaintenanceMode(ctx context.Context, title string, text string) error
 	deactivateMaintenanceMode(ctx context.Context) error
 }
-
-type statusUpdate func(status *backupv1.BackupStatus)
 
 type Clock interface {
 	Now() time.Time
@@ -250,7 +248,7 @@ func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx con
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 				Type:    backupv1.ConditionCanceled,
-				Status:  metav1.ConditionUnknown,
+				Status:  metav1.ConditionFalse,
 				Reason:  reasonTimeWindowNotExpired,
 				Message: "The time window has not expired.",
 			})
@@ -504,10 +502,7 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 }
 
 func (c *defaultReconciler) patchStatus(ctx context.Context, backup *backupv1.Backup, updateFn statusUpdate) error {
-	backupBeforePatch := backup.DeepCopy()
-	updateFn(&backup.Status)
-
-	return c.client.Status().Patch(ctx, backup, client.MergeFrom(backupBeforePatch))
+	return newConditionsUpdater(c.client).updateStatus(ctx, backup, updateFn)
 }
 
 func (c *defaultReconciler) ensureVeleroStatusSynced(
@@ -532,45 +527,37 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		Reason:  reasonVeleroStatusSynced,
 		Message: "The backup already exists in Velero.",
 	}
-	completed := metav1.Condition{
-		Type:   backupv1.ConditionCompleted,
-		Status: metav1.ConditionFalse,
+	succeeded := metav1.Condition{
+		Type:   backupv1.ConditionSucceeded,
+		Status: metav1.ConditionUnknown,
 	}
 
 	nextAction := Retry
 	switch {
 	case veleroBackup.Status.Phase == velerov1.BackupPhaseCompleted:
-		completed.Status = metav1.ConditionTrue
-		completed.Reason = reasonVeleroStatusSynced
-		completed.Message = "The completed backup status was synchronized from Velero."
+		succeeded.Status = metav1.ConditionTrue
+		succeeded.Reason = reasonVeleroStatusSynced
+		succeeded.Message = "The completed backup status was synchronized from Velero."
 		nextAction = Abort
 	case slices.Contains(veleroBackupFailedPhases, veleroBackup.Status.Phase):
-		completed.Reason = reasonVeleroBackupFailed
-		completed.Message = fmt.Sprintf("The Velero backup failed in phase %s.", veleroBackup.Status.Phase)
+		succeeded.Status = metav1.ConditionFalse
+		succeeded.Reason = reasonVeleroBackupFailed
+		succeeded.Message = fmt.Sprintf("The Velero backup failed in phase %s.", veleroBackup.Status.Phase)
 		nextAction = Abort
 	default:
-		completed.Reason = reasonVeleroBackupRunning
-		completed.Message = fmt.Sprintf("The Velero backup is in phase %s.", veleroBackup.Status.Phase)
+		succeeded.Reason = reasonVeleroBackupRunning
+		succeeded.Message = fmt.Sprintf("The Velero backup is in phase %s.", veleroBackup.Status.Phase)
 	}
 
 	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, prepared)
-		meta.SetStatusCondition(&status.Conditions, completed)
+		meta.SetStatusCondition(&status.Conditions, succeeded)
 
 		if veleroBackup.Status.StartTimestamp != nil {
 			status.StartTimestamp = *veleroBackup.Status.StartTimestamp
 		}
 		if veleroBackup.Status.CompletionTimestamp != nil {
 			status.CompletionTimestamp = *veleroBackup.Status.CompletionTimestamp
-		}
-
-		switch {
-		case veleroBackup.Status.Phase == velerov1.BackupPhaseCompleted:
-			status.Status = backupv1.BackupStatusCompleted
-		case slices.Contains(veleroBackupFailedPhases, veleroBackup.Status.Phase):
-			status.Status = backupv1.BackupStatusFailed
-		default:
-			status.Status = backupv1.BackupStatusInProgress
 		}
 	}); err != nil {
 		return Abort, fmt.Errorf("patch backup status synchronized from Velero: %w", err)
