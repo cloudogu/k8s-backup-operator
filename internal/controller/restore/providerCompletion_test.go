@@ -64,19 +64,17 @@ func TestAnUndecidedProviderRestoreEndsTheReconciliationWithoutAnOutcome(t *test
 func TestACompletedProviderRestoreResolvesItsMilestoneAndThenContinuesTheWorkflow(t *testing.T) {
 	restore := startableRestore()
 
-	// The next stage after the resolved milestone is the backup synchronization.
-	expectBackupSynchronization(t, nil)
-
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason,
 		"Successfully completed the provider restore [%s]", testRestore).Return()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	scaleMock := newMockScaleManager(t)
+	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, scaleMock, requeueAfterTest)
 		reconciler.maintenanceModeSwitch = maintenanceMock
-		// no scale manager - the workflow must not reach the recovery in these two reconciliations
 		return reconciler.Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore,
@@ -91,7 +89,7 @@ func TestACompletedProviderRestoreResolvesItsMilestoneAndThenContinuesTheWorkflo
 	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
 		"one milestone per reconciliation, and the child must never be written")
 	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionTrue, ReasonProviderRestoreCompleted)
-	assertPersistedCondition(t, fixture.client, k8sv1.ConditionBackupsSynchronized, metav1.ConditionTrue, ReasonBackupSynchronizationCompleted)
+	assertPersistedCondition(t, fixture.client, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonScaleUpInitiated)
 }
 
 func TestAFailedProviderRestoreIsTerminalWithoutRecoveringTheWorkloads(t *testing.T) {
@@ -128,7 +126,6 @@ func TestAFailedProviderRestoreIsTerminalWithoutRecoveringTheWorkloads(t *testin
 
 			assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionFalse, ReasonProviderRestoreFailed)
 			assertPersistedCondition(t, fixture.client, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionFalse, ReasonRecoveryNotAttemptedAfterProviderFailure)
-			assertPersistedCondition(t, fixture.client, k8sv1.ConditionBackupsSynchronized, metav1.ConditionFalse, ReasonSynchronizationNotAttemptedAfterProviderFailure)
 			assertPersistedCondition(t, fixture.client, k8sv1.ConditionSuccessful, metav1.ConditionFalse, ReasonProviderRestoreFailed)
 			assertPersistedCondition(t, fixture.client, k8sv1.ConditionPrepared, metav1.ConditionTrue, ReasonPreparationCompleted)
 		})

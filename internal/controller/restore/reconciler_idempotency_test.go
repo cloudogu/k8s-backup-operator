@@ -94,7 +94,6 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 
 	providerMock := newMockRestoreProvider(t)
 	providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-	providerMock.EXPECT().SyncBackups(testCtx).Return(nil).Once()
 	installProvider(t, providerMock)
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
@@ -149,16 +148,15 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	fixture.restart(factory)
 	advanceChildTo(t, fixture, velerov1.RestorePhaseCompleted)
 
-	finishing, finishingErrs := fixture.reconcileTimes(testCtx, request, 7)
+	finishing, finishingErrs := fixture.reconcileTimes(testCtx, request, 6)
 	for index := range finishingErrs {
 		require.NoError(t, finishingErrs[index])
 	}
 	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, finishing[0], "the resolved provider milestone ends its reconciliation")
-	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, finishing[1], "the synchronized backups end their reconciliation")
-	for index := 2; index < 6; index++ {
-		require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, finishing[index], "recovery stage %d must end its reconciliation", index-1)
+	for index := 1; index < 5; index++ {
+		require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, finishing[index], "recovery stage %d must end its reconciliation", index)
 	}
-	require.Equal(t, ctrl.Result{}, finishing[6], "the finished workflow must not be requeued")
+	require.Equal(t, ctrl.Result{}, finishing[5], "the finished workflow must not be requeued")
 
 	require.Equal(t, []recordedClientAction{
 		statusUpdateOf(restore),                // the initialized conditions
@@ -168,7 +166,6 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 		statusUpdateOf(restore),                // ProviderRestoreSuccessful=Unknown, pending
 		statusUpdateOf(restore),                // ProviderRestoreSuccessful=Unknown, running
 		statusUpdateOf(restore),                // ProviderRestoreSuccessful=True
-		statusUpdateOf(restore),                // BackupsSynchronized=True
 		statusUpdateOf(restore),                // ScaleUpInitiated
 		statusUpdateOf(restore),                // WorkloadsReady
 		statusUpdateOf(restore),                // ScaleUpFinalized
@@ -244,20 +241,15 @@ func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheP
 	assertPersistedCondition(t, fixture.client, backupv1.ConditionPrepared, metav1.ConditionTrue, ReasonPreparationCompleted)
 }
 
-// The synchronization is the stage under test because it sits behind every destructive one,
-// so a regression is observable as a repeated scale-down, cleanup or child creation.
+// The scale-up is the stage under test because it sits behind every destructive one, so a
+// regression is observable as a repeated scale-down, cleanup or child creation.
 func TestATransientStageFailureIsRetriedWithoutRepeatingAnEarlierDestructiveStage(t *testing.T) {
-	restore := synchronizableRestore()
-
-	providerMock := newMockRestoreProvider(t)
-	providerMock.EXPECT().CheckReady(testCtx).Return(nil).Twice()
-	providerMock.EXPECT().SyncBackups(testCtx).Return(assert.AnError).Once()
-	providerMock.EXPECT().SyncBackups(testCtx).Return(nil).Once()
-	installProvider(t, providerMock)
+	restore := recoverableRestore()
 
 	// No cleanup manager at all, and a scale manager that may only scale up: regressing to the
 	// preparation panics or fails on an unexpected call.
 	scaleMock := newMockScaleManager(t)
+	scaleMock.EXPECT().ScaleUp(testCtx).Return(assert.AnError).Once()
 	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Times(5)
 	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(true, nil).Times(4)
 	scaleMock.EXPECT().FinalizeScaleUp(testCtx).Return(nil).Times(3)
@@ -281,21 +273,20 @@ func TestATransientStageFailureIsRetriedWithoutRepeatingAnEarlierDestructiveStag
 	failed, failedErrs := fixture.reconcileTimes(testCtx, request, 1)
 	require.ErrorIs(t, failedErrs[0], assert.AnError)
 	require.Equal(t, ctrl.Result{}, failed[0], "the error carries the retry, so there must be no explicit requeue")
-	assertPersistedCondition(t, fixture.client, backupv1.ConditionBackupsSynchronized, metav1.ConditionFalse, ReasonBackupSynchronizationFailed)
+	assertPersistedCondition(t, fixture.client, backupv1.ConditionWorkloadsRecovered, metav1.ConditionFalse, ReasonWorkloadRecoveryFailed)
 	assertSuccessfulCondition(t, fixture.client, restore.Name, metav1.ConditionUnknown, ReasonPending)
 
-	recovered, recoveredErrs := fixture.reconcileTimes(testCtx, request, 6)
+	recovered, recoveredErrs := fixture.reconcileTimes(testCtx, request, 5)
 	for index := range recovered {
 		require.NoError(t, recoveredErrs[index], "reconciliation %d after the failure", index+1)
 	}
-	for index := 0; index < 5; index++ {
+	for index := 0; index < 4; index++ {
 		require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, recovered[index], "stage %d after retry must end its reconciliation", index+1)
 	}
-	require.Equal(t, ctrl.Result{}, recovered[5], "the finished workflow must not be requeued")
+	require.Equal(t, ctrl.Result{}, recovered[4], "the finished workflow must not be requeued")
 
 	require.Equal(t, []recordedClientAction{
-		statusUpdateOf(restore), // BackupsSynchronized=False, retried
-		statusUpdateOf(restore), // BackupsSynchronized=True on the retry
+		statusUpdateOf(restore), // WorkloadsRecovered=False, retried
 		statusUpdateOf(restore), // ScaleUpInitiated
 		statusUpdateOf(restore), // WorkloadsReady
 		statusUpdateOf(restore), // ScaleUpFinalized
