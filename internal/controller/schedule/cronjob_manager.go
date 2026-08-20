@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -12,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var defaultLabels = map[string]string{
@@ -31,7 +31,6 @@ type defaultCronJobManager struct {
 }
 
 func (c defaultCronJobManager) ensure(ctx context.Context, schedule *v1.BackupSchedule) error {
-	logger := log.FromContext(ctx)
 
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -68,16 +67,15 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *v1.BackupSc
 	}
 
 	if operation == controllerutil.OperationResultNone {
-		debug(logger, "CronJob is up to date", "cronJob", cronJob.Name)
+		logging.Debug(ctx, "CronJob is up to date", "cronJob", cronJob.Name)
 	} else {
-		logger.Info("synchronized CronJob", "cronJob", cronJob.Name, "operation", operation)
+		logging.Info(ctx, "synchronized CronJob", "cronJob", cronJob.Name, "operation", operation)
 	}
 
 	return nil
 }
 
 func (c defaultCronJobManager) delete(ctx context.Context, schedule *v1.BackupSchedule) error {
-	logger := log.FromContext(ctx)
 
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -88,13 +86,13 @@ func (c defaultCronJobManager) delete(ctx context.Context, schedule *v1.BackupSc
 
 	err := c.Delete(ctx, cronJob)
 	if apierrors.IsNotFound(err) {
-		debug(logger, "CronJob is already deleted", "cronJob", cronJob.Name)
+		logging.Debug(ctx, "CronJob is already deleted", "cronJob", cronJob.Name)
 		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("failed to delete CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
 	}
 
-	logger.Info("requested CronJob deletion", "cronJob", cronJob.Name)
+	logging.Info(ctx, "requested CronJob deletion", "cronJob", cronJob.Name)
 	return nil
 }

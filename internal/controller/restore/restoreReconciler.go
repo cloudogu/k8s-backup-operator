@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
@@ -72,17 +73,16 @@ type restoreReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
 	metrics.UpdateRestoreReconcileTotalMetric()
 
 	restore := &k8sv1.Restore{}
 	err := r.k8sClient.Get(ctx, client.ObjectKey{Namespace: r.namespace, Name: req.Name}, restore)
 	if err != nil {
-		logger.Info(fmt.Sprintf("failed to get restore resource %s/%s: %s", r.namespace, req.Name, err))
+		logging.Debug(ctx, fmt.Sprintf("failed to get restore resource %s/%s: %s", r.namespace, req.Name, err))
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	logger.Info(fmt.Sprintf("found restore resource %s", req.NamespacedName))
+	logging.Debug(ctx, fmt.Sprintf("found restore resource %s", req.NamespacedName))
 
 	// Init Metric timelines for conditions
 	// - no increment, just create if not exists
@@ -164,6 +164,7 @@ func (r *restoreReconciler) ensureConditionsInitialized(ctx context.Context, res
 	}
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore conditions were initialized")
 	return initialized, retryAfter(r.requeueDelay)
 }
 
@@ -192,6 +193,7 @@ func (r *restoreReconciler) ensureMetadata(ctx context.Context, restore *k8sv1.R
 
 	if written {
 		// retry after defaultDelay is a fallback since the metadata write triggers an instant requeue anyway
+		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore metadata was updated")
 		return restore, retryAfter(r.requeueDelay)
 	}
 
@@ -285,6 +287,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	}
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore preparation was persisted")
 	return updated, retryAfter(r.requeueDelay)
 }
 
@@ -352,6 +355,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 	}
 
 	// The child's own events drive the next reconciliation; the delay is only the fallback.
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider restore was created")
 	return restore, retryAfter(r.requeueDelay)
 }
 
@@ -370,6 +374,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 	if child == nil {
 		// The child vanished between the stages. There is nothing to observe, and the next
 		// reconciliation lets the provider restore stage create it again.
+		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider restore child disappeared and must be recreated")
 		return restore, retryAfter(r.requeueDelay)
 	}
 
@@ -398,9 +403,11 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 
 	if status == metav1.ConditionTrue {
 		// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
+		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the successful provider restore state was persisted")
 		return updated, retryAfter(r.requeueDelay)
 	}
 
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider restore has not completed yet")
 	return updated, retryAfter(providerObservationRecoveryDelay)
 }
 
@@ -470,6 +477,7 @@ func (r *restoreReconciler) ensureBackupsSynchronized(ctx context.Context, resto
 	}
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the backup synchronization was persisted")
 	return updated, retryAfter(r.requeueDelay)
 }
 
@@ -492,6 +500,7 @@ func (r *restoreReconciler) ensureDeletingStatus(ctx context.Context, restore *k
 		))
 	}
 
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the deleting status was persisted")
 	return updated, retryAfter(r.requeueDelay)
 }
 
@@ -542,6 +551,7 @@ func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, re
 
 	// if the child is still deleting, we have to wait (requeue)
 	if child.DeletionTimestamp != nil && !child.DeletionTimestamp.IsZero() {
+		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider restore deletion is still in progress")
 		return restore, retryAfter(r.requeueDelay)
 	}
 
@@ -556,6 +566,7 @@ func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, re
 
 	// Delete only acknowledges acceptance of the deletion request. Only a subsequent
 	// Get can determine whether the child has actually been removed.
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider restore deletion was requested")
 	return restore, retryAfter(r.requeueDelay)
 
 }
@@ -634,8 +645,6 @@ func (r *restoreReconciler) performOperation(
 	eventReason string,
 	operationFn func(context.Context, *k8sv1.Restore) error,
 ) stageOutcome {
-	logger := log.FromContext(ctx)
-
 	operationError := operationFn(ctx, restore)
 	eventType := corev1.EventTypeNormal
 	message := fmt.Sprintf("%s successful", eventReason)
@@ -643,7 +652,7 @@ func (r *restoreReconciler) performOperation(
 		eventType = corev1.EventTypeWarning
 		printError := strings.ReplaceAll(operationError.Error(), "\n", "")
 		message = fmt.Sprintf("%s failed. Reason: %s", eventReason, printError)
-		logger.Error(operationError, message)
+		logging.Error(ctx, operationError, message)
 	}
 
 	r.recorder.Event(restore, eventType, eventReason, message)

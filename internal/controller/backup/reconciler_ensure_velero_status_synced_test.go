@@ -7,7 +7,6 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -22,7 +21,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		reconciler := NewReconciler(newFakeClientBuilder(t).WithObjects(backup).Build(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 		require.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -42,7 +41,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 		require.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -63,7 +62,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 		require.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -81,7 +80,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 		require.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -102,7 +101,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 		require.ErrorContains(t, err, "get velero backup to sync status")
 		assert.Equal(t, Abort, nextAction)
@@ -112,7 +111,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		counter := &callCounter{}
 		reconciler := NewReconciler(newFakeClientBuilderWithCounter(t, counter).WithObjects(backup).Build(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 		require.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -127,7 +126,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).WithStatusSubresource(backup).Build()
 			reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-			nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+			nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 			require.NoError(t, err)
 			assert.Equal(t, Abort, nextAction)
@@ -143,7 +142,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).WithStatusSubresource(backup).Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 		require.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -158,7 +157,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).WithStatusSubresource(backup).Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 		require.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -171,7 +170,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		backup.Spec.SyncedFromProvider = true
 		reconciler := NewReconciler(newFakeClientBuilder(t).WithObjects(backup).Build(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 		require.ErrorContains(t, err, "get velero backup to sync status")
 		assert.Equal(t, Abort, nextAction)
@@ -185,7 +184,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).WithObjects(backup, veleroBackup).WithStatusSubresource(backup).Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
 		require.ErrorContains(t, err, "patch backup status synchronized from Velero")
 		assert.Equal(t, Abort, nextAction)

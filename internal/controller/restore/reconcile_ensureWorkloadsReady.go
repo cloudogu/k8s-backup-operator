@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -27,6 +28,7 @@ func (r *restoreReconciler) ensureWorkloadsReady(
 		if condition != nil &&
 			condition.Status == metav1.ConditionUnknown &&
 			condition.Reason == ReasonWaitingForWorkloads {
+			logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workloads have not reached their target state yet")
 			return restore, retryAfter(defaultRequeueDelay)
 		}
 
@@ -44,6 +46,7 @@ func (r *restoreReconciler) ensureWorkloadsReady(
 			))
 		}
 
+		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workload readiness wait was persisted")
 		return updated, retryAfter(defaultRequeueDelay)
 	}
 
@@ -69,5 +72,6 @@ func (r *restoreReconciler) ensureWorkloadsReady(
 		))
 	}
 
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workload readiness was persisted")
 	return updated, retryAfter(defaultRequeueDelay)
 }

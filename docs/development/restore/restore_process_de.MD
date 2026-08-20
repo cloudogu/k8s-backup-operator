@@ -21,6 +21,8 @@ flowchart TD
 
 Der Controller beobachtet sowohl Parent-`Restore`-Ressourcen als auch owned Velero-`Restore`-Children. Es gibt bewusst weder einen controllerweiten Event-Filter noch eine `GenerationChangedPredicate`: Provider-Phasenwechsel sowie Status-, Finalizer- und Löschereignisse des Parents müssen einen Reconcile auslösen können.
 
+Das Logging verwendet den vom `controller-runtime` im `context.Context` bereitgestellten `logr.Logger`. Restore-Stages und aufgerufene Manager reichen deshalb den vorhandenen Context weiter und greifen über `internal/logging` auf den Logger zu; ein zusätzlicher Logger-Parameter oder eine erneute Initialisierung pro Methode ist nicht erforderlich. Ein neuer `context.Background()` innerhalb des Workflows würde neben Abbruch und Deadline auch den Request-Logger verlieren und ist deshalb zu vermeiden.
+
 ### Stage-Ergebnisse
 
 Eine Stage liefert genau eines der folgenden Ergebnisse:
@@ -28,11 +30,11 @@ Eine Stage liefert genau eines der folgenden Ergebnisse:
 | Ergebnis | Bedeutung |
 |---|---|
 | `next()` | Die Stage ist bereits konvergiert; die nächste Stage darf im selben Reconcile laufen. |
-| `retryAfter(d)` | Der Reconcile endet kontrolliert und wird nach der von der Stage angegebenen Dauer `d` erneut ausgeführt. Ist `d` nicht positiv, verwendet `runStages` das über `requeueTimeSeconds` konfigurierte Requeue-Intervall. Einige Stages geben ausdrücklich den internen Festwert von 5 Sekunden an. |
-| `retryOnError(err)` | Der Reconcile endet mit Fehler; `controller-runtime` übernimmt exponentielles Backoff. |
+| `retryAfter(d)` | Der Reconcile endet kontrolliert und wird nach der von der Stage angegebenen Dauer `d` erneut ausgeführt. Unmittelbar davor protokolliert die entscheidende Stage den englischen fachlichen Grund auf Debug-Level. Ist `d` nicht positiv, verwendet `runStages` das über `requeueTimeSeconds` konfigurierte Requeue-Intervall. Einige Stages geben ausdrücklich den internen Festwert von 5 Sekunden an. |
+| `retryOnError(err)` | Unmittelbar davor protokolliert die entscheidende Stage den konkreten Fehler auf Error-Level und beendet den Reconcile mit diesem Fehler; `controller-runtime` übernimmt exponentielles Backoff. |
 | `abort()` | Der Reconcile endet ohne explizites Requeue, beispielsweise bei einem terminalen Ergebnis. |
 
-Eine schreibende Stage beendet normalerweise den aktuellen Reconcile. Dadurch laufen nicht mehrere externe Mutationen auf Basis eines möglicherweise veralteten Restore-Objekts. Watch-Events sind der primäre Trigger; die Zeitangaben dienen zusätzlich als Fallback für verlorene Events. Für normale kontrollierte Retries verwenden viele Stages das über `requeueTimeSeconds` konfigurierte Intervall, einige Stages dagegen ausdrücklich den festen internen Wert von 5 Sekunden. Während der Provider arbeitet, ist der Fallback fest auf fünf Minuten gesetzt. Bei `retryOnError(err)` gilt keine dieser Zeiten; hier bestimmt das exponentielle Backoff von `controller-runtime` den nächsten Versuch.
+Eine schreibende Stage beendet normalerweise den aktuellen Reconcile. Dadurch laufen nicht mehrere externe Mutationen auf Basis eines möglicherweise veralteten Restore-Objekts. Watch-Events sind der primäre Trigger; die Zeitangaben dienen zusätzlich als Fallback für verlorene Events. Für normale kontrollierte Retries verwenden viele Stages das über `requeueTimeSeconds` konfigurierte Intervall, einige Stages dagegen ausdrücklich den festen internen Wert von 5 Sekunden. Während der Provider arbeitet, ist der Fallback fest auf fünf Minuten gesetzt. Bei `retryOnError(err)` gilt keine dieser Zeiten; hier bestimmt das exponentielle Backoff von `controller-runtime` den nächsten Versuch. Das Logging bleibt bewusst dezentral unmittelbar vor dem jeweiligen Outcome; `runStages` protokolliert Retries nicht erneut.
 
 ## Gesamtablauf eines erfolgreichen Restores
 

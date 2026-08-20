@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -28,7 +27,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 
 		require.True(t, backup.DeletionTimestamp.IsZero())
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -60,7 +59,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -102,7 +101,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -149,7 +148,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -173,7 +172,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "get error")
@@ -197,7 +196,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "get error")
@@ -221,7 +220,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "create error")
@@ -243,7 +242,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "patch status error")

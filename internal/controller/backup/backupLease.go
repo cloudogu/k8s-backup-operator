@@ -6,14 +6,13 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const backupLeaseHolderKind = "Backup"
 
-func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup, _ logr.Logger) (action, error) {
+func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
 	result, err := manager.Acquire(ctx, backup, backupLeaseHolderKind)
 	return backupLeaseAction(backup, result, err)
@@ -35,7 +34,7 @@ func backupLeaseAction(backup *backupv1.Backup, result leases.Result, err error)
 	}
 }
 
-func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup, _ logr.Logger) (action, error) {
+func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	resolver := backupHolderResolver{client: c.client}
 	if !resolver.IsTerminal(backup) && backup.DeletionTimestamp.IsZero() {
 		return Next, nil

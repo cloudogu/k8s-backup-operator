@@ -6,6 +6,7 @@ import (
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,6 +34,7 @@ func (r *restoreReconciler) ensureActiveRestoreLease(ctx context.Context, restor
 	switch result.State {
 	case leases.StateChanged:
 		// A Lease write or an optimistic-lock conflict must be observed in a new reconciliation.
+		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore lease changed and must be observed again")
 		return restore, retryAfter(defaultRequeueDelay)
 	case leases.StateInvalid:
 		return r.reportInvalidRestoreLease(ctx, restore)
@@ -58,6 +60,7 @@ func (r *restoreReconciler) continueWithAcquiredLease(ctx context.Context, resto
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to report lease acquisition for restore %s: %w", restore.Name, err))
 	}
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the acquired restore lease was persisted")
 	return updated, retryAfter(defaultRequeueDelay)
 }
 
@@ -73,6 +76,7 @@ func (r *restoreReconciler) reportWaitingForLease(ctx context.Context, restore *
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to report that restore %s is waiting for the active operation: %w", restore.Name, err))
 	}
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "another operation still holds the restore lease")
 	return updated, retryAfter(defaultRequeueDelay)
 }
 

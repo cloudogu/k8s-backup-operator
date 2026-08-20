@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -31,8 +31,7 @@ func NewScaleManager(k8sClient k8sClient, namespace string) *DefaultManager {
 // labeled with the scaledown scope label, stores their current replica count in a label,
 // and scales them to zero.
 func (m *DefaultManager) ScaleDown(ctx context.Context) error {
-	logger := log.FromContext(ctx)
-	logger.Info("scaling down workloads labeled for restore scaledown...")
+	logging.Debug(ctx, "scaling down workloads labeled for restore scaledown...")
 
 	listOpts := []client.ListOption{
 		client.InNamespace(m.namespace),
@@ -55,7 +54,7 @@ func (m *DefaultManager) ScaleDown(ctx context.Context) error {
 		return fmt.Errorf("failed to scale down ReplicationControllers: %w", err)
 	}
 
-	logger.Info("workload scaledown complete...")
+	logging.Debug(ctx, "workload scaledown complete...")
 
 	return nil
 }
@@ -64,8 +63,7 @@ func (m *DefaultManager) ScaleDown(ctx context.Context) error {
 // labeled with the scaledown scope label and restores the stored replica count.
 // The replicas label is retained so later recovery stages can identify and observe the workloads.
 func (m *DefaultManager) ScaleUp(ctx context.Context) error {
-	logger := log.FromContext(ctx)
-	logger.Info("scaling up workloads after restore...")
+	logging.Debug(ctx, "scaling up workloads after restore...")
 
 	listOpts := []client.ListOption{
 		client.InNamespace(m.namespace),
@@ -88,7 +86,7 @@ func (m *DefaultManager) ScaleUp(ctx context.Context) error {
 		return fmt.Errorf("failed to scale up ReplicationControllers: %w", err)
 	}
 
-	logger.Info("workload scaleup complete...")
+	logging.Debug(ctx, "workload scaleup complete...")
 
 	return nil
 }
@@ -112,14 +110,13 @@ func (m *DefaultManager) scaleDownStatefulSets(ctx context.Context, listOpts []c
 }
 
 func (m *DefaultManager) scaleDownReplicaSets(ctx context.Context, listOpts []client.ListOption) error {
-	logger := log.FromContext(ctx)
 
 	list := &appsv1.ReplicaSetList{}
 	return forEachWorkload(ctx, m.k8sClient, list, listOpts, "failed to list replicasets for scaledown", func() []appsv1.ReplicaSet {
 		return list.Items
 	}, func(rs *appsv1.ReplicaSet) error {
 		if len(rs.OwnerReferences) > 0 {
-			logger.Info("skipping replicaset with owner references for scaledown", "name", rs.Name)
+			logging.Debug(ctx, "skipping replicaset with owner references for scaledown", "name", rs.Name)
 			return nil
 		}
 		return m.scaleDownWorkload(ctx, rs, &rs.Spec.Replicas, "replicaset")
