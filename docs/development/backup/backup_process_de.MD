@@ -277,10 +277,10 @@ Condition-Änderungen werden zentral über den `conditionsUpdater` mit einem Sta
 | `Deleting=True` | `deleting` |
 | noch keine Condition | bisheriger Wert, bei einem neuen Backup also leer |
 
-`Deleting=True` hat Vorrang vor terminalen Erfolgs- oder Fehlerconditions.
+`Deleting=True` hat Vorrang vor terminalen Erfolgs- oder Fehlerconditions. 
 
-`meta.SetStatusCondition` erhält bei unverändertem Status die vorhandene Transition-Zeit.
-Status und Conditions werden nur bei tatsächlicher Abweichung aktualisiert.
+`meta.SetStatusCondition` erhält bei unverändertem Status die vorhandene Transition-Zeit. 
+Status und Conditions werden nur bei tatsächlicher Abweichung aktualisiert. 
 
 ## Acceptance-Tests
 

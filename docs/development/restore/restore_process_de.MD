@@ -1,7 +1,7 @@
 # Restore-Prozess
 
-Diese Dokumentation beschreibt den Restore-Workflow des `k8s-backup-operator`.
-Ein Reconcile führt nicht den gesamten Restore synchron / blockierend aus.
+Diese Dokumentation beschreibt den Restore-Workflow des `k8s-backup-operator`. 
+Ein Reconcile führt nicht den gesamten Restore synchron / blockierend aus. 
 Stattdessen wird die CR bis zur nächsten Stage bearbeitet, die die Ressource verändert, der Operator warten muss oder ein Fehler gemeldet wird.
 
 ## Grundmodell des Reconcilers
