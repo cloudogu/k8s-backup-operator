@@ -219,9 +219,6 @@ func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restor
 		return r.failOnProviderChildConflict(ctx, restore, conflictErr)
 	}
 
-	// Our child already exists, so the preparation is done. Continue with next stage.
-	log.FromContext(ctx).Info(fmt.Sprintf("provider restore of restore %s/%s already exists: skip preparation", r.namespace, restore.Name))
-
 	return restore, next()
 }
 
