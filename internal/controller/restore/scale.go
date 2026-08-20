@@ -294,10 +294,9 @@ func (m *DefaultManager) deploymentsReady(ctx context.Context, listOpts []client
 			generation: deployment.Generation, observedGeneration: deployment.Status.ObservedGeneration,
 			replicas: deployment.Status.Replicas, readyReplicas: deployment.Status.ReadyReplicas,
 			availableReplicas: deployment.Status.AvailableReplicas,
-			additionalChecks: func(target int32) bool {
-				return deployment.Status.UpdatedReplicas == target && deployment.Status.UnavailableReplicas == 0
-			},
 		}
+	}, func(deployment *appsv1.Deployment, target int32) bool {
+		return deployment.Status.UpdatedReplicas == target && deployment.Status.UnavailableReplicas == 0
 	})
 }
 
@@ -311,9 +310,9 @@ func (m *DefaultManager) statefulSetsReady(ctx context.Context, listOpts []clien
 			resourceKind: "statefulset", resourceName: statefulSet.Name,
 			generation: statefulSet.Generation, observedGeneration: statefulSet.Status.ObservedGeneration,
 			replicas: statefulSet.Status.Replicas, readyReplicas: statefulSet.Status.ReadyReplicas,
-			availableReplicas: statefulSet.Status.AvailableReplicas, additionalChecks: noAdditionalReadinessChecks,
+			availableReplicas: statefulSet.Status.AvailableReplicas,
 		}
-	})
+	}, nil)
 }
 
 func (m *DefaultManager) replicaSetsReady(ctx context.Context, listOpts []client.ListOption) (bool, error) {
@@ -326,9 +325,9 @@ func (m *DefaultManager) replicaSetsReady(ctx context.Context, listOpts []client
 			resourceKind: "replicaset", resourceName: replicaSet.Name,
 			generation: replicaSet.Generation, observedGeneration: replicaSet.Status.ObservedGeneration,
 			replicas: replicaSet.Status.Replicas, readyReplicas: replicaSet.Status.ReadyReplicas,
-			availableReplicas: replicaSet.Status.AvailableReplicas, additionalChecks: noAdditionalReadinessChecks,
+			availableReplicas: replicaSet.Status.AvailableReplicas,
 		}
-	})
+	}, nil)
 }
 
 func (m *DefaultManager) replicationControllersReady(ctx context.Context, listOpts []client.ListOption) (bool, error) {
@@ -341,9 +340,9 @@ func (m *DefaultManager) replicationControllersReady(ctx context.Context, listOp
 			resourceKind: "replicationcontroller", resourceName: replicationController.Name,
 			generation: replicationController.Generation, observedGeneration: replicationController.Status.ObservedGeneration,
 			replicas: replicationController.Status.Replicas, readyReplicas: replicationController.Status.ReadyReplicas,
-			availableReplicas: replicationController.Status.AvailableReplicas, additionalChecks: noAdditionalReadinessChecks,
+			availableReplicas: replicationController.Status.AvailableReplicas,
 		}
-	})
+	}, nil)
 }
 
 type workloadReadiness struct {
@@ -356,7 +355,6 @@ type workloadReadiness struct {
 	replicas           int32
 	readyReplicas      int32
 	availableReplicas  int32
-	additionalChecks   func(target int32) bool
 }
 
 func workloadsReady[T any](
@@ -367,6 +365,7 @@ func workloadsReady[T any](
 	listError string,
 	items func() []T,
 	readiness func(*T) workloadReadiness,
+	workloadSpecificCheck func(*T, int32) bool,
 ) (bool, error) {
 	allReady := true
 	err := forEachWorkload(ctx, k8sClient, list, listOpts, listError, items, func(workload *T) error {
@@ -375,16 +374,16 @@ func workloadsReady[T any](
 		if err != nil {
 			return err
 		}
-		allReady = allReady && state.desiredReplicas != nil && *state.desiredReplicas == target &&
+		ready := state.desiredReplicas != nil && *state.desiredReplicas == target &&
 			state.observedGeneration >= state.generation && state.replicas == target &&
-			state.readyReplicas == target && state.availableReplicas == target && state.additionalChecks(target)
+			state.readyReplicas == target && state.availableReplicas == target
+		if workloadSpecificCheck != nil && !workloadSpecificCheck(workload, target) {
+			ready = false
+		}
+		allReady = allReady && ready
 		return nil
 	})
 	return allReady, err
-}
-
-func noAdditionalReadinessChecks(int32) bool {
-	return true
 }
 
 func targetReplicasForReadiness(
