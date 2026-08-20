@@ -18,6 +18,7 @@ import (
 	. "github.com/onsi/gomega"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -56,6 +57,7 @@ var _ = BeforeSuite(func() {
 	utilruntime.Must(velerov1.AddToScheme(k8sClient.Scheme()))
 	utilruntime.Must(backupv1.AddToScheme(k8sClient.Scheme()))
 	utilruntime.Must(batchv1.AddToScheme(k8sClient.Scheme()))
+	utilruntime.Must(coordinationv1.AddToScheme(k8sClient.Scheme()))
 })
 
 // expectSingleKubeConfigFile fails the suite when K8S_TEST_CLUSTER_KUBECONFIG

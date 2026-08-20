@@ -32,11 +32,6 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	expectReadinessCheck(t, nil)
-	var activationErr error = nil
-	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().
-		Activate(testCtx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false).
-		Return(activationErr)
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
@@ -44,7 +39,6 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
-		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
 	}
@@ -65,10 +59,13 @@ func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testi
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process").Return()
 
+	maintenanceMock := newMockMaintenanceModeSwitch(t)
+	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+
 	// The cleanup, scale and maintenance mocks carry no expectations, so any preparation step would fail.
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), newMockScaleManager(t), requeueAfterTest)
-		reconciler.maintenanceModeSwitch = newMockMaintenanceModeSwitch(t)
+		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
 	}
@@ -109,10 +106,6 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	expectReadinessCheck(t, nil)
-	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().
-		Activate(testCtx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false).
-		Return(assert.AnError)
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
@@ -120,8 +113,6 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
-		reconciler.maintenanceModeSwitch = maintenanceMock
-
 		return reconciler.Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
@@ -138,18 +129,11 @@ func TestAFailedScaleDownReportsPreparedFalseAndRetriesWithoutCleaningUp(t *test
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	expectReadinessCheck(t, nil)
-	var activationErr error = nil
-	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().
-		Activate(testCtx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false).
-		Return(activationErr)
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(assert.AnError).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, newMockCleanupManager(t), scaleMock, requeueAfterTest)
-		reconciler.maintenanceModeSwitch = maintenanceMock
-
 		return reconciler.Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
@@ -170,11 +154,6 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	expectReadinessCheck(t, nil)
-	var activationErr error = nil
-	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().
-		Activate(testCtx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false).
-		Return(activationErr)
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
@@ -182,8 +161,6 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
-		reconciler.maintenanceModeSwitch = maintenanceMock
-
 		return reconciler.Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
@@ -200,11 +177,6 @@ func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	expectReadinessCheck(t, nil)
-	var activationErr error = nil
-	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().
-		Activate(testCtx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false).
-		Return(activationErr)
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
@@ -212,8 +184,6 @@ func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
-		reconciler.maintenanceModeSwitch = maintenanceMock
-
 		return reconciler.Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore)

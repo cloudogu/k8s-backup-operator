@@ -17,13 +17,18 @@ const (
 	// ReasonWaitingForActiveRestore marks a restore that must wait because another restore
 	// currently holds the namespace-wide restore arbitration.
 	ReasonWaitingForActiveRestore = "WaitingForActiveRestore"
-	// ReasonPreparing marks a running (destructive) preparation, i.e. maintenance mode,
-	// scale-down and cleanup.
+	// ReasonRestoreLeaseAcquired marks a restore that holds the namespace-wide restore lease and
+	// may continue with the destructive workflow.
+	ReasonRestoreLeaseAcquired = "RestoreLeaseAcquired"
+	// ReasonInvalidRestoreLease marks a restore blocked by a namespace-wide restore lease whose
+	// holder cannot be identified safely.
+	ReasonInvalidRestoreLease = "InvalidRestoreLease"
+	// ReasonPreparing marks a running destructive preparation, i.e. scale-down and cleanup.
 	ReasonPreparing = "Preparing"
 	// ReasonPreparationFailed marks a failed preparation.
 	ReasonPreparationFailed = "PreparationFailed"
-	// ReasonPreparationCompleted marks a finished preparation: maintenance mode is active, the
-	// workloads are scaled down and the resources to be restored are removed.
+	// ReasonPreparationCompleted marks a finished preparation: workloads are scaled down and the
+	// resources to be restored are removed.
 	ReasonPreparationCompleted = "PreparationCompleted"
 	// ReasonProviderRestorePending marks an owned provider restore that exists but has not started.
 	ReasonProviderRestorePending = "ProviderRestorePending"
@@ -64,6 +69,19 @@ const (
 	// derived from the deprecated scalar status of a Restore created by an older operator. The
 	// original cause of a legacy success or failure is not recoverable, so it is not claimed.
 	ReasonMigratedFromLegacyStatus = "MigratedFromLegacyStatus"
+	// ReasonScaleUpInitiated means that the desired replica counts have been
+	// restored, but the workloads have not necessarily become ready yet.
+	ReasonScaleUpInitiated = "ScaleUpInitiated"
+	// ReasonWaitingForWorkloads marks workloads that have not reached their target state yet.
+	ReasonWaitingForWorkloads = "WaitingForWorkloads"
+	// ReasonWorkloadsReady marks workloads that reached their target replica count and availability.
+	ReasonWorkloadsReady = "WorkloadsReady"
+	// ReasonScaleUpFinalized marks the removal of the temporary replica recovery labels.
+	ReasonScaleUpFinalized = "ScaleUpFinalized"
+	// ReasonMaintenanceModeActivated marks a failed best-effort activation attempt in an event.
+	ReasonMaintenanceModeActivated = "MaintenanceModeActivated"
+	// ReasonMaintenanceModeDeactivated marks the successfully removed maintenance notice.
+	ReasonMaintenanceModeDeactivated = "MaintenanceModeDeactivated"
 )
 
 // workflowConditionTypes are the conditions every running restore carries, in the order a reader of

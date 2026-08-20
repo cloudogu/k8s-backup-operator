@@ -58,7 +58,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
 
-	t.Run("If the velero backup storage is available set prepared to true and proceed to the next step", func(t *testing.T) {
+	t.Run("If the velero backup storage is available set prepared to true and proceed to the next stage", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		counter := &callCounter{}

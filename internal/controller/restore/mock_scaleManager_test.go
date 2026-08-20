@@ -21,6 +21,108 @@ func (_m *mockScaleManager) EXPECT() *mockScaleManager_Expecter {
 	return &mockScaleManager_Expecter{mock: &_m.Mock}
 }
 
+// AreWorkloadsReady provides a mock function with given fields: ctx
+func (_m *mockScaleManager) AreWorkloadsReady(ctx context.Context) (bool, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AreWorkloadsReady")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (bool, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) bool); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockScaleManager_AreWorkloadsReady_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AreWorkloadsReady'
+type mockScaleManager_AreWorkloadsReady_Call struct {
+	*mock.Call
+}
+
+// AreWorkloadsReady is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *mockScaleManager_Expecter) AreWorkloadsReady(ctx interface{}) *mockScaleManager_AreWorkloadsReady_Call {
+	return &mockScaleManager_AreWorkloadsReady_Call{Call: _e.mock.On("AreWorkloadsReady", ctx)}
+}
+
+func (_c *mockScaleManager_AreWorkloadsReady_Call) Run(run func(ctx context.Context)) *mockScaleManager_AreWorkloadsReady_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *mockScaleManager_AreWorkloadsReady_Call) Return(_a0 bool, _a1 error) *mockScaleManager_AreWorkloadsReady_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockScaleManager_AreWorkloadsReady_Call) RunAndReturn(run func(context.Context) (bool, error)) *mockScaleManager_AreWorkloadsReady_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FinalizeScaleUp provides a mock function with given fields: ctx
+func (_m *mockScaleManager) FinalizeScaleUp(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FinalizeScaleUp")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockScaleManager_FinalizeScaleUp_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FinalizeScaleUp'
+type mockScaleManager_FinalizeScaleUp_Call struct {
+	*mock.Call
+}
+
+// FinalizeScaleUp is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *mockScaleManager_Expecter) FinalizeScaleUp(ctx interface{}) *mockScaleManager_FinalizeScaleUp_Call {
+	return &mockScaleManager_FinalizeScaleUp_Call{Call: _e.mock.On("FinalizeScaleUp", ctx)}
+}
+
+func (_c *mockScaleManager_FinalizeScaleUp_Call) Run(run func(ctx context.Context)) *mockScaleManager_FinalizeScaleUp_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *mockScaleManager_FinalizeScaleUp_Call) Return(_a0 error) *mockScaleManager_FinalizeScaleUp_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockScaleManager_FinalizeScaleUp_Call) RunAndReturn(run func(context.Context) error) *mockScaleManager_FinalizeScaleUp_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ScaleDown provides a mock function with given fields: ctx
 func (_m *mockScaleManager) ScaleDown(ctx context.Context) error {
 	ret := _m.Called(ctx)
