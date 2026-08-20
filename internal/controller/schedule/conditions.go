@@ -6,9 +6,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type conditionManager struct{}
+type defaultConditionManager struct{}
 
-func (c conditionManager) MarkAccepted(schedule *v1.BackupSchedule) {
+func (c defaultConditionManager) markAccepted(schedule *v1.BackupSchedule) {
 	setCondition(schedule, metav1.Condition{
 		Type:    v1.ConditionAccepted,
 		Status:  metav1.ConditionTrue,
@@ -17,7 +17,7 @@ func (c conditionManager) MarkAccepted(schedule *v1.BackupSchedule) {
 	})
 }
 
-func (c conditionManager) MarkInvalid(schedule *v1.BackupSchedule, err error) {
+func (c defaultConditionManager) markInvalid(schedule *v1.BackupSchedule, err error) {
 	setCondition(schedule, metav1.Condition{
 		Type:    v1.ConditionAccepted,
 		Status:  metav1.ConditionFalse,
@@ -26,7 +26,7 @@ func (c conditionManager) MarkInvalid(schedule *v1.BackupSchedule, err error) {
 	})
 }
 
-func (c conditionManager) MarkAcceptanceNotEvaluated(schedule *v1.BackupSchedule, err error) {
+func (c defaultConditionManager) markAcceptanceNotEvaluated(schedule *v1.BackupSchedule, err error) {
 	setCondition(schedule, metav1.Condition{
 		Type:    v1.ConditionAccepted,
 		Status:  metav1.ConditionUnknown,
@@ -35,7 +35,7 @@ func (c conditionManager) MarkAcceptanceNotEvaluated(schedule *v1.BackupSchedule
 	})
 }
 
-func (c conditionManager) MarkReady(schedule *v1.BackupSchedule) {
+func (c defaultConditionManager) markReady(schedule *v1.BackupSchedule) {
 	setCondition(schedule, metav1.Condition{
 		Type:    v1.ConditionReady,
 		Status:  metav1.ConditionTrue,
@@ -44,7 +44,7 @@ func (c conditionManager) MarkReady(schedule *v1.BackupSchedule) {
 	})
 }
 
-func (c conditionManager) MarkNotReady(schedule *v1.BackupSchedule, reason, message string) {
+func (c defaultConditionManager) markNotReady(schedule *v1.BackupSchedule, reason, message string) {
 	setCondition(schedule, metav1.Condition{
 		Type:    v1.ConditionReady,
 		Status:  metav1.ConditionFalse,

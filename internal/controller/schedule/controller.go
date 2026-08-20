@@ -19,12 +19,12 @@ type Controller struct {
 func NewController(client client.Client, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *Controller {
 	return &Controller{
 		client:     client,
-		reconciler: NewReconciler(client, operatorImage, imagePullSecrets),
+		reconciler: newReconciler(client, operatorImage, imagePullSecrets),
 	}
 }
 
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return c.reconciler.Reconcile(ctx, req)
+	return c.reconciler.reconcile(ctx, req)
 }
 
 // SetupWithManager sets up the controller with the Manager and registers the watcher

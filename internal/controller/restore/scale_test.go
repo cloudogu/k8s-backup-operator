@@ -1318,6 +1318,28 @@ func TestAreWorkloadsReadyReturnsFalseForEverySupportedUnreadyWorkloadKind(t *te
 	}
 }
 
+func TestAreWorkloadsReadyAppliesDeploymentSpecificReadinessChecks(t *testing.T) {
+	for name, changeStatus := range map[string]func(*appsv1.DeploymentStatus){
+		"not all replicas are updated": func(status *appsv1.DeploymentStatus) {
+			status.UpdatedReplicas--
+		},
+		"replicas are unavailable": func(status *appsv1.DeploymentStatus) {
+			status.UnavailableReplicas = 1
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			deployment := readyWorkloads()[0].(*appsv1.Deployment)
+			changeStatus(&deployment.Status)
+			manager := NewScaleManager(newTestClient(t, interceptor.Funcs{}, deployment), testNamespace)
+
+			ready, err := manager.AreWorkloadsReady(testCtx)
+
+			require.NoError(t, err)
+			assert.False(t, ready)
+		})
+	}
+}
+
 func TestAreWorkloadsReadyTreatsAnEmptyRecoverySetAsReady(t *testing.T) {
 	manager := NewScaleManager(newTestClient(t, interceptor.Funcs{}), testNamespace)
 

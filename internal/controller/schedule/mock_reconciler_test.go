@@ -22,12 +22,12 @@ func (_m *mockReconciler) EXPECT() *mockReconciler_Expecter {
 	return &mockReconciler_Expecter{mock: &_m.Mock}
 }
 
-// Reconcile provides a mock function with given fields: ctx, req
-func (_m *mockReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+// reconcile provides a mock function with given fields: ctx, req
+func (_m *mockReconciler) reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Reconcile")
+		panic("no return value specified for reconcile")
 	}
 
 	var r0 reconcile.Result
@@ -50,31 +50,31 @@ func (_m *mockReconciler) Reconcile(ctx context.Context, req reconcile.Request) 
 	return r0, r1
 }
 
-// mockReconciler_Reconcile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Reconcile'
-type mockReconciler_Reconcile_Call struct {
+// mockReconciler_reconcile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'reconcile'
+type mockReconciler_reconcile_Call struct {
 	*mock.Call
 }
 
-// Reconcile is a helper method to define mock.On call
+// reconcile is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req reconcile.Request
-func (_e *mockReconciler_Expecter) Reconcile(ctx interface{}, req interface{}) *mockReconciler_Reconcile_Call {
-	return &mockReconciler_Reconcile_Call{Call: _e.mock.On("Reconcile", ctx, req)}
+func (_e *mockReconciler_Expecter) reconcile(ctx interface{}, req interface{}) *mockReconciler_reconcile_Call {
+	return &mockReconciler_reconcile_Call{Call: _e.mock.On("reconcile", ctx, req)}
 }
 
-func (_c *mockReconciler_Reconcile_Call) Run(run func(ctx context.Context, req reconcile.Request)) *mockReconciler_Reconcile_Call {
+func (_c *mockReconciler_reconcile_Call) Run(run func(ctx context.Context, req reconcile.Request)) *mockReconciler_reconcile_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(reconcile.Request))
 	})
 	return _c
 }
 
-func (_c *mockReconciler_Reconcile_Call) Return(_a0 reconcile.Result, _a1 error) *mockReconciler_Reconcile_Call {
+func (_c *mockReconciler_reconcile_Call) Return(_a0 reconcile.Result, _a1 error) *mockReconciler_reconcile_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockReconciler_Reconcile_Call) RunAndReturn(run func(context.Context, reconcile.Request) (reconcile.Result, error)) *mockReconciler_Reconcile_Call {
+func (_c *mockReconciler_reconcile_Call) RunAndReturn(run func(context.Context, reconcile.Request) (reconcile.Result, error)) *mockReconciler_reconcile_Call {
 	_c.Call.Return(run)
 	return _c
 }
