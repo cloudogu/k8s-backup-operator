@@ -6,6 +6,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -15,10 +16,10 @@ const backupLeaseHolderKind = "Backup"
 func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
 	result, err := manager.Acquire(ctx, backup, backupLeaseHolderKind)
-	return backupLeaseAction(backup, result, err)
+	return backupLeaseAction(ctx, backup, result, err)
 }
 
-func backupLeaseAction(backup *backupv1.Backup, result leases.Result, err error) (action, error) {
+func backupLeaseAction(ctx context.Context, backup *backupv1.Backup, result leases.Result, err error) (action, error) {
 	if err != nil {
 		return Abort, fmt.Errorf("acquire backup lease for backup %s: %w", backup.Name, err)
 	}
@@ -26,6 +27,7 @@ func backupLeaseAction(backup *backupv1.Backup, result leases.Result, err error)
 	case leases.StateAcquired:
 		return Next, nil
 	case leases.StateChanged, leases.StateWaiting:
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the backup lease is waiting for a state change")
 		return Retry, nil
 	case leases.StateInvalid:
 		return Abort, fmt.Errorf("backup %s is blocked by invalid lease %s/%s without a resolvable holder", backup.Name, backup.Namespace, leases.DefaultName)

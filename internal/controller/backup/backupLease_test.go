@@ -93,7 +93,7 @@ func TestBackupLease(t *testing.T) {
 	t.Run("rejects an unknown acquisition state", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 
-		nextAction, err := backupLeaseAction(backup, leases.Result{State: leases.State(99)}, nil)
+		nextAction, err := backupLeaseAction(ctx, backup, leases.Result{State: leases.State(99)}, nil)
 
 		assert.Equal(t, Abort, nextAction)
 		require.ErrorContains(t, err, "unknown backup lease acquisition state 99")

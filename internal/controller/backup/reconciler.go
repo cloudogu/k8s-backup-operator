@@ -141,6 +141,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch conditions to mark backup as deleting: %w", patchErr)
 		}
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup deletion is still in progress")
 		return Retry, nil
 	}
 
@@ -292,6 +293,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch conditions to mark preparation as failed: %w", patchErr)
 		}
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup storage location was not found")
 		return Retry, nil
 	}
 
@@ -313,6 +315,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch conditions to mark preparation as failed: %w", patchErr)
 		}
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup storage location is not available")
 		return Retry, nil
 	}
 
@@ -371,6 +374,7 @@ func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, back
 	if patchErr != nil {
 		return Abort, fmt.Errorf("patch status to mark the complete condition as failed: %w", patchErr)
 	}
+	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the maintenance mode was activated")
 	return Retry, nil
 }
 
@@ -404,6 +408,7 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup was created")
 		return Retry, nil
 	}
 
@@ -430,6 +435,7 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup is still in progress")
 		return Retry, nil
 	}
 
@@ -493,6 +499,7 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 		if maintenanceErr != nil {
 			return Abort, fmt.Errorf("deactivate maintenance mode: %w", maintenanceErr)
 		}
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the maintenance mode was deactivated")
 		return Retry, nil
 	}
 
@@ -562,6 +569,9 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 	}
 
 	logging.Debug(ctx, fmt.Sprintf("synchronized backup status from Velero- Phase: %s", veleroBackup.Status.Phase))
+	if nextAction == Retry {
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the synchronized provider backup is still in progress")
+	}
 	return nextAction, nil
 }
 
