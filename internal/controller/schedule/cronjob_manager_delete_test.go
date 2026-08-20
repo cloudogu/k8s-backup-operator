@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
@@ -25,7 +26,7 @@ func TestCronJobManagerDelete(t *testing.T) {
 	manager := defaultCronJobManager{Client: fakeClient, recorder: recorder, scheme: scheme}
 
 	require.NoError(t, manager.delete(context.Background(), schedule))
-	requireRecordedEvent(t, recorder, schedule, corev1.EventTypeNormal, cronJobDeletionRequestedEventReason, `Requested deletion of CronJob "backup-schedule-daily".`)
+	requireRecordedEvent(t, recorder, schedule, corev1.EventTypeNormal, backupv1.CronJobDeletionRequestedEventReason, `Requested deletion of CronJob "backup-schedule-daily".`)
 	// twice to check for idempotence
 	require.NoError(t, manager.delete(context.Background(), schedule))
 	requireNoRecordedEvent(t, recorder)
@@ -55,5 +56,5 @@ func TestCronJobManagerDeleteReturnsError(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, assert.AnError)
 	assert.ErrorContains(t, err, "failed to delete CronJob")
-	requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, cronJobDeletionFailedEventReason, `Failed to delete CronJob "backup-schedule-daily"`, assert.AnError.Error())
+	requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, backupv1.CronJobDeletionFailedEventReason, `Failed to delete CronJob "backup-schedule-daily"`, assert.AnError.Error())
 }

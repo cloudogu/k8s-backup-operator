@@ -15,16 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const (
-	cronJobCreatedEventReason               = "CronJobCreated"
-	cronJobUpdatedEventReason               = "CronJobUpdated"
-	cronJobSynchronizationFailedEventReason = "CronJobSynchronizationFailed"
-	invalidScheduleEventReason              = "InvalidSchedule"
-	cronJobDeletionRequestedEventReason     = "CronJobDeletionRequested"
-	cronJobDeletionFailedEventReason        = "CronJobDeletionFailed"
-	finalizerRemovalFailedEventReason       = "FinalizerRemovalFailed"
-)
-
 type defaultReconciler struct {
 	client   client.Client
 	recorder eventRecorder
@@ -109,7 +99,7 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 
 	// only need to remove finalizers, not labels
 	if err := r.metadata.remove(ctx, schedule); err != nil {
-		r.recorder.Eventf(schedule, corev1.EventTypeWarning, finalizerRemovalFailedEventReason,
+		r.recorder.Eventf(schedule, corev1.EventTypeWarning, backupv1.FinalizerRemovalFailedEventReason,
 			"Failed to remove finalizer %q from BackupSchedule: %v", backupv1.BackupScheduleFinalizer, err,
 		)
 		return err
@@ -134,7 +124,7 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 		r.conditions.markInvalid(schedule, err)
 		r.conditions.markNotReady(schedule, backupv1.ReasonInvalidSpec, "BackupSchedule spec is invalid: "+err.Error())
 		r.recorder.Eventf(
-			schedule, corev1.EventTypeWarning, invalidScheduleEventReason,
+			schedule, corev1.EventTypeWarning, backupv1.InvalidScheduleEventReason,
 			"BackupSchedule has an invalid schedule: %v", err,
 		)
 		logger.Error(err, "BackupSchedule spec is invalid, skipping CronJob synchronization")
