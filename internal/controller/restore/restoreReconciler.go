@@ -258,6 +258,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		return restore, retryOnError(err)
 	}
 	if prepared {
+		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed")
 		return restore, next()
 	}
 
@@ -319,6 +320,8 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 		preparationErr = errors.Join(preparationErr, fmt.Errorf("failed to report the failed preparation of restore %s: %w", restore.Name, err))
 	}
 
+	r.recorder.Event(restore, corev1.EventTypeWarning, ReasonPreparationFailed, "The preparation of the ecosystem failed")
+
 	return updated, retryOnError(preparationErr)
 }
 
@@ -328,6 +331,7 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	// A provider restore already succeeded -> skip
 	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful) {
+		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonProviderRestoreCompleted, "Provider restore completed")
 		return restore, next()
 	}
 
@@ -339,7 +343,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 		return restore, next()
 	}
 
-	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process")
+	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process")
 
 	if _, err := velero.EnsureRestore(ctx, r.k8sClient, restore); err != nil {
 		// A conflict is not transient: another restore's child occupies the expected name, and no
@@ -349,7 +353,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 			return r.failOnProviderChildConflict(ctx, restore, conflictErr)
 		}
 
-		r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, err.Error())
+		r.recorder.Event(restore, corev1.EventTypeWarning, ReasonProviderRestoreFailed, err.Error())
 
 		return restore, retryOnError(fmt.Errorf("failed to start the provider restore of restore %s: %w", restore.Name, err))
 	}

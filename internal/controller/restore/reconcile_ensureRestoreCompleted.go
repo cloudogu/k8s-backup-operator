@@ -41,7 +41,7 @@ func (r *restoreReconciler) ensureRestoreCompleted(
 		return restore, retryOnError(fmt.Errorf("failed to persist the completed restore %s: %w", restore.Name, err))
 	}
 
-	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Restore successful")
+	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonRestoreCompleted, "Restore successful")
 
 	return updated, abort()
 }

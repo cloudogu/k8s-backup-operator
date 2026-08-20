@@ -20,14 +20,16 @@ func (r *restoreReconciler) ensureMaintenanceModeActivated(
 	if err != nil {
 		logger := log.FromContext(ctx)
 		logger.Error(err, "The maintenance mode status could not be determined.. Continuing anyways...")
-		r.recorder.Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Could not get maintenance mode status; continuing restore.")
+		r.recorder.Eventf(restore, corev1.EventTypeWarning, ReasonMaintenanceModeActivated, "Could not get maintenance mode status; continuing restore.")
 	}
 	if !isActive {
 		err = r.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
 		if err != nil {
 			logger := log.FromContext(ctx)
 			logger.Error(err, "The Maintenance mode could not be activated. Continuing anyways...")
-			r.recorder.Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Could not activate maintenance mode; continuing restore.")
+			r.recorder.Eventf(restore, corev1.EventTypeWarning, ReasonMaintenanceModeActivated, "Could not activate maintenance mode; continuing restore.")
+		} else {
+			r.recorder.Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated")
 		}
 	}
 
