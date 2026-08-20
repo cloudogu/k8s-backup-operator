@@ -285,7 +285,8 @@ func (m *DefaultManager) AreWorkloadsReady(ctx context.Context) (bool, error) {
 
 func (m *DefaultManager) deploymentsReady(ctx context.Context, listOpts []client.ListOption) (bool, error) {
 	list := &appsv1.DeploymentList{}
-	return workloadsReady(ctx, m.k8sClient, list, listOpts, "failed to list deployments for readiness check", func() []appsv1.Deployment {
+
+	ready, err := workloadsReady(ctx, m.k8sClient, list, listOpts, "failed to list deployments for readiness check", func() []appsv1.Deployment {
 		return list.Items
 	}, func(deployment *appsv1.Deployment) workloadReadiness {
 		return workloadReadiness{
@@ -295,9 +296,20 @@ func (m *DefaultManager) deploymentsReady(ctx context.Context, listOpts []client
 			replicas: deployment.Status.Replicas, readyReplicas: deployment.Status.ReadyReplicas,
 			availableReplicas: deployment.Status.AvailableReplicas,
 		}
-	}, func(deployment *appsv1.Deployment, target int32) bool {
-		return deployment.Status.UpdatedReplicas == target && deployment.Status.UnavailableReplicas == 0
 	})
+	if err != nil || !ready {
+		return false, err
+	}
+
+	// At this point we know that status.replicas is equal to the target for every deployment,
+	// so status.replicas is the rollout target here.
+	for _, deployment := range list.Items {
+		if deployment.Status.UpdatedReplicas != deployment.Status.Replicas || deployment.Status.UnavailableReplicas != 0 {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 func (m *DefaultManager) statefulSetsReady(ctx context.Context, listOpts []client.ListOption) (bool, error) {
@@ -312,7 +324,7 @@ func (m *DefaultManager) statefulSetsReady(ctx context.Context, listOpts []clien
 			replicas: statefulSet.Status.Replicas, readyReplicas: statefulSet.Status.ReadyReplicas,
 			availableReplicas: statefulSet.Status.AvailableReplicas,
 		}
-	}, nil)
+	})
 }
 
 func (m *DefaultManager) replicaSetsReady(ctx context.Context, listOpts []client.ListOption) (bool, error) {
@@ -327,7 +339,7 @@ func (m *DefaultManager) replicaSetsReady(ctx context.Context, listOpts []client
 			replicas: replicaSet.Status.Replicas, readyReplicas: replicaSet.Status.ReadyReplicas,
 			availableReplicas: replicaSet.Status.AvailableReplicas,
 		}
-	}, nil)
+	})
 }
 
 func (m *DefaultManager) replicationControllersReady(ctx context.Context, listOpts []client.ListOption) (bool, error) {
@@ -342,7 +354,7 @@ func (m *DefaultManager) replicationControllersReady(ctx context.Context, listOp
 			replicas: replicationController.Status.Replicas, readyReplicas: replicationController.Status.ReadyReplicas,
 			availableReplicas: replicationController.Status.AvailableReplicas,
 		}
-	}, nil)
+	})
 }
 
 type workloadReadiness struct {
@@ -365,7 +377,6 @@ func workloadsReady[T any](
 	listError string,
 	items func() []T,
 	readiness func(*T) workloadReadiness,
-	workloadSpecificCheck func(*T, int32) bool,
 ) (bool, error) {
 	allReady := true
 	err := forEachWorkload(ctx, k8sClient, list, listOpts, listError, items, func(workload *T) error {
@@ -374,13 +385,9 @@ func workloadsReady[T any](
 		if err != nil {
 			return err
 		}
-		ready := state.desiredReplicas != nil && *state.desiredReplicas == target &&
+		allReady = allReady && state.desiredReplicas != nil && *state.desiredReplicas == target &&
 			state.observedGeneration >= state.generation && state.replicas == target &&
 			state.readyReplicas == target && state.availableReplicas == target
-		if workloadSpecificCheck != nil && !workloadSpecificCheck(workload, target) {
-			ready = false
-		}
-		allReady = allReady && ready
 		return nil
 	})
 	return allReady, err
