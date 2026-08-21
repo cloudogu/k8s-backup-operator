@@ -219,3 +219,18 @@ func legacyStatusFor(restore *k8sv1.Restore) string {
 		return k8sv1.RestoreStatusInProgress // NOSONAR -- legacy restore status compatibility
 	}
 }
+
+// restoreOutcome derives how a terminal restore ended from its effective Successful condition.
+func restoreOutcome(restore *k8sv1.Restore) string {
+	condition := effectiveSuccessfulCondition(restore)
+	switch {
+	case condition == nil:
+		return "unknown"
+	case condition.Status == metav1.ConditionTrue:
+		return "succeeded"
+	case condition.Status == metav1.ConditionFalse:
+		return "failed"
+	default:
+		return "unknown"
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
@@ -73,12 +74,20 @@ func (r *restoreReconciler) reportWaitingForLease(ctx context.Context, restore *
 	if holderName != "" {
 		message = fmt.Sprintf("Operation %q currently holds the namespace-wide backup/restore lease.", holderName)
 	}
-	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
+	waiting := metav1.Condition{
 		Type: k8sv1.ConditionSuccessful, Status: metav1.ConditionUnknown,
 		Reason: ReasonWaitingForActiveRestore, Message: message,
-	})
+	}
+	// The holder is part of the message, so a wait for a new holder is reported again while a
+	// repeated wait for the same one is not.
+	report := conditions.WillChange(restore.Status.Conditions, waiting)
+
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, waiting)
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to report that restore %s is waiting for the active operation: %w", restore.Name, err))
+	}
+	if report {
+		logging.Info(ctx, "waiting for the restore lease", "holder", holderName)
 	}
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "another operation still holds the restore lease")
 	return updated, retryAfter(defaultRequeueDelay)

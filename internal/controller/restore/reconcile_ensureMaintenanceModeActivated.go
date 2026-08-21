@@ -4,9 +4,9 @@ import (
 	"context"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ensureMaintenanceModeActivated tries to activate the maintenance notice before starting the restore
@@ -18,16 +18,16 @@ func (r *restoreReconciler) ensureMaintenanceModeActivated(
 
 	_, isActive, err := r.maintenanceModeSwitch.GetStatus(ctx)
 	if err != nil {
-		logger := log.FromContext(ctx)
-		logger.Error(err, "The maintenance mode status could not be determined.. Continuing anyways...")
+		logging.Error(ctx, err, "The maintenance mode status could not be determined.. Continuing anyways...")
 		r.recorder.Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Could not get maintenance mode status; continuing restore.")
 	}
 	if !isActive {
 		err = r.maintenanceModeSwitch.Activate(ctx, repository.MaintenanceModeDescription{Title: maintenanceModeTitle, Text: maintenanceModeText}, false)
 		if err != nil {
-			logger := log.FromContext(ctx)
-			logger.Error(err, "The Maintenance mode could not be activated. Continuing anyways...")
+			logging.Error(ctx, err, "The Maintenance mode could not be activated. Continuing anyways...")
 			r.recorder.Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Could not activate maintenance mode; continuing restore.")
+		} else {
+			logging.Info(ctx, "activated maintenance mode")
 		}
 	}
 

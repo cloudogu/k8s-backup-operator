@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var doguDeleteWaitTime = defaultWaitTime
@@ -32,7 +32,7 @@ func newDoguManager(doguClient doguClient) *defaultDoguManager {
 // cleanupDogus deletes all dogus that need to be deleted before restoring the backup.
 // It adds those deletions to the wait group.
 func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGroup) error {
-	log.FromContext(ctx).Info("starting cleanup of dogus before restore...")
+	logging.Info(ctx, "starting cleanup of dogus before restore...")
 
 	doguList, err := c.doguClient.List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -55,18 +55,18 @@ func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGrou
 
 func (c *defaultDoguManager) waitForDoguDeletion(ctx context.Context, dogu *doguv2.Dogu) {
 	for {
-		log.FromContext(ctx).Info("waiting for dogu to be deleted", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
+		logging.Debug(ctx, "waiting for dogu to be deleted", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
 		_, err := c.doguClient.Get(ctx, dogu.GetName(), metav1.GetOptions{})
 
 		if ctx.Err() != nil {
-			log.FromContext(context.WithoutCancel(ctx)).Info("context was cancelled or deadline exceeded, stop waiting for dogu deletion",
+			logging.Info(context.WithoutCancel(ctx), "context was cancelled or deadline exceeded, stop waiting for dogu deletion",
 				"ns", dogu.GetNamespace(), "Name", dogu.GetName())
 			break
 		} else if exists := !k8sErr.IsNotFound(err); exists {
 			// wait for 3 seconds and try again
 			time.Sleep(doguDeleteWaitTime)
 		} else {
-			log.FromContext(ctx).Info("dogu was deleted successfully", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
+			logging.Info(ctx, "dogu was deleted successfully", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
 			break
 		}
 	}
