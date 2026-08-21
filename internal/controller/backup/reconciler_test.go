@@ -3,8 +3,12 @@ package backup
 import (
 	"context"
 	"reflect"
+	"testing"
+	"time"
 
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	operatortime "github.com/cloudogu/k8s-backup-operator/pkg/time"
+	"github.com/stretchr/testify/assert"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,6 +82,54 @@ func (c *callCounter) createCall(ctx context.Context, client client.WithWatch, o
 		c.veleroBackupCreateCount++
 	}
 	return client.Create(ctx, obj, opts...)
+}
+
+func TestBackupRunOutcome(t *testing.T) {
+	succeeded := metav1.Condition{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionTrue}
+	failed := metav1.Condition{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionFalse}
+	running := metav1.Condition{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionUnknown}
+	canceled := metav1.Condition{Type: backupv1.ConditionCanceled, Status: metav1.ConditionTrue}
+
+	for expected, conditions := range map[string][]metav1.Condition{
+		"succeeded": {succeeded},
+		"failed":    {failed},
+		"canceled":  {running, canceled},
+		"unknown":   {running},
+	} {
+		backup := newBackupForTest("ns", "backup")
+		backup.Status.Conditions = conditions
+		assert.Equal(t, expected, backupRunOutcome(backup))
+	}
+
+	t.Run("prefers a cancellation over the provider outcome", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		backup.Status.Conditions = []metav1.Condition{failed, canceled}
+		assert.Equal(t, "canceled", backupRunOutcome(backup))
+	})
+
+	t.Run("reports an unknown outcome without conditions", func(t *testing.T) {
+		assert.Equal(t, "unknown", backupRunOutcome(newBackupForTest("ns", "backup")))
+	})
+}
+
+func TestBackupRunDuration(t *testing.T) {
+	start := time.Date(2026, 8, 21, 5, 3, 0, 0, time.UTC)
+
+	t.Run("reports the time between start and completion", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		backup.Status.StartTimestamp = metav1.NewTime(start)
+		backup.Status.CompletionTimestamp = metav1.NewTime(start.Add(3 * time.Minute))
+
+		assert.Equal(t, "3m0s", backupRunDuration(backup))
+	})
+
+	t.Run("reports an unknown duration while a timestamp is missing", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		assert.Equal(t, "unknown", backupRunDuration(backup))
+
+		backup.Status.StartTimestamp = metav1.NewTime(start)
+		assert.Equal(t, "unknown", backupRunDuration(backup))
+	})
 }
 
 func newRealClock() Clock {

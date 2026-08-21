@@ -32,15 +32,19 @@ func (r *restoreReconciler) ensureActiveRestoreLease(ctx context.Context, restor
 	}
 
 	switch result.State {
-	case leases.StateChanged:
-		// A Lease write or an optimistic-lock conflict must be observed in a new reconciliation.
-		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore lease changed and must be observed again")
+	case leases.StateAcquired:
+		logging.Info(ctx, "acquired the restore lease", "lease", restoreLeaseName)
+		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the acquired restore lease must be observed again")
+		return restore, retryAfter(defaultRequeueDelay)
+	case leases.StateConflict:
+		// An optimistic-lock conflict must be observed in a new reconciliation.
+		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore lease was modified concurrently")
 		return restore, retryAfter(defaultRequeueDelay)
 	case leases.StateInvalid:
 		return r.reportInvalidRestoreLease(ctx, restore)
 	case leases.StateWaiting:
 		return r.reportWaitingForLease(ctx, restore, result.HolderName)
-	case leases.StateAcquired:
+	case leases.StateHeld:
 		return r.continueWithAcquiredLease(ctx, restore)
 	default:
 		return restore, retryOnError(fmt.Errorf("unknown restore lease acquisition state %d", result.State))
