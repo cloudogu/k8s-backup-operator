@@ -10,6 +10,7 @@ import (
 
 	"github.com/cloudogu/ces-commons-lib/errors"
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
@@ -123,6 +124,9 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			if updateErr != nil {
 				return Abort, fmt.Errorf("update backup after removing finalizer: %w", updateErr)
 			}
+			// Removing the finalizer releases the backup for deletion, so this is the last point at
+			// which the deletion can be reported.
+			logging.Info(ctx, "deleted the backup")
 			return Abort, nil
 		}
 
@@ -130,16 +134,29 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 		if createErr != nil {
 			return Abort, createErr
 		}
+		waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionDeleting, c.clock.Now())
+		deleting := metav1.Condition{
+			Type:    backupv1.ConditionDeleting,
+			Status:  metav1.ConditionTrue,
+			Reason:  reasonBackupDeleting,
+			Message: fmt.Sprintf("Backup is deleting (phase: %s, running for %s)", deleteReq.Status.Phase, conditions.FormatWaitDuration(waited)),
+		}
+		reportDeleting := conditions.WillChange(backup.Status.Conditions, deleting)
+
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-				Type:    backupv1.ConditionDeleting,
-				Status:  metav1.ConditionTrue,
-				Reason:  reasonBackupDeleting,
-				Message: fmt.Sprintf("Backup is deleting (phase: %s)", deleteReq.Status.Phase),
-			})
+			meta.SetStatusCondition(&status.Conditions, deleting)
 		})
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch conditions to mark backup as deleting: %w", patchErr)
+		}
+		if reportDeleting {
+			// The delete request carries the provider errors of a deletion that cannot finish. They
+			// are reported here because they are otherwise only visible on the delete request itself.
+			logging.Info(ctx, "waiting for the velero backup to be deleted",
+				"phase", deleteReq.Status.Phase,
+				"running for", conditions.FormatWaitDuration(waited),
+				"providerErrors", deleteReq.Status.Errors,
+			)
 		}
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup deletion is still in progress")
 		return Retry, nil
@@ -289,7 +306,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 			Reason:  reasonProviderBackupStorageLocationNotFound,
 			Message: "The provider backup storage location not found.",
 		}
-		reportNotFound := conditionWillChange(backup.Status.Conditions, notFound)
+		reportNotFound := conditions.WillChange(backup.Status.Conditions, notFound)
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, notFound)
@@ -317,7 +334,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 			Reason:  reasonProviderBackupStorageLocationNotAvailable,
 			Message: fmt.Sprintf("velero backup storage location 'name=%s' is not available.", c.backupStorageName),
 		}
-		reportNotAvailable := conditionWillChange(backup.Status.Conditions, notAvailable)
+		reportNotAvailable := conditions.WillChange(backup.Status.Conditions, notAvailable)
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, notAvailable)
@@ -341,7 +358,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		Reason:  reasonProviderBackupStorageLocationAvailable,
 		Message: fmt.Sprintf("velero backup storage location 'name=%s' is available.", c.backupStorageName),
 	}
-	reportPrepared := conditionWillChange(backup.Status.Conditions, prepared)
+	reportPrepared := conditions.WillChange(backup.Status.Conditions, prepared)
 
 	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, prepared)
@@ -451,14 +468,14 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 
 		// The elapsed time is part of the message, so the message changes once per minute and the
 		// guard below turns into a heartbeat for a wait that spans many reconciliations.
-		waited := elapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionSucceeded, c.clock.Now())
+		waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionSucceeded, c.clock.Now())
 		inProgress := metav1.Condition{
 			Type:    backupv1.ConditionSucceeded,
 			Status:  metav1.ConditionUnknown,
 			Reason:  reasonProviderBackupInProgress,
-			Message: fmt.Sprintf("Provider backup is in progress (running for %s).", formatWaitDuration(waited)),
+			Message: fmt.Sprintf("Provider backup is in progress (running for %s).", conditions.FormatWaitDuration(waited)),
 		}
-		reportProgress := conditionWillChange(backup.Status.Conditions, inProgress)
+		reportProgress := conditions.WillChange(backup.Status.Conditions, inProgress)
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, inProgress)
@@ -469,7 +486,7 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 		if reportProgress {
 			logging.Info(ctx, "waiting for the velero backup to complete",
 				"phase", providerBackup.Status.Phase,
-				"running for", formatWaitDuration(waited),
+				"running for", conditions.FormatWaitDuration(waited),
 			)
 		}
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup is still in progress")
@@ -600,7 +617,7 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		report = "waiting for the synchronized velero backup to complete"
 	}
 
-	reportSync := conditionWillChange(backup.Status.Conditions, succeeded)
+	reportSync := conditions.WillChange(backup.Status.Conditions, succeeded)
 
 	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, prepared)
@@ -648,6 +665,7 @@ func (c *defaultReconciler) createVeleroDeleteBackupRequestIfNotExists(
 		if createErr != nil {
 			return nil, fmt.Errorf("create velero delete backup request: %w", createErr)
 		}
+		logging.Info(ctx, "created the velero delete backup request")
 		return newDeleteBackupRequest, nil
 	}
 

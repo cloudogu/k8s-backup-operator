@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/stretchr/testify/assert"
@@ -249,6 +250,45 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 		assert.Equal(t, Abort, nextAction)
 	})
 
+}
+
+func TestReconcilerReportsDeletionProgress(t *testing.T) {
+	t.Run("renders the delete request phase and the elapsed deletion time into the condition", func(t *testing.T) {
+		deletionStart := time.Date(2026, 8, 21, 5, 3, 0, 0, time.UTC)
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		// The deletion already started, so the wait is measured from that transition.
+		backup.Status.Conditions = []metav1.Condition{{
+			Type:               backupv1.ConditionDeleting,
+			Status:             metav1.ConditionTrue,
+			Reason:             reasonBackupDeleting,
+			Message:            "Backup is deleting (phase: New, running for less than 1m)",
+			LastTransitionTime: metav1.NewTime(deletionStart),
+		}}
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
+		deleteRequest := &velerov1.DeleteBackupRequest{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "backup"},
+			Status: velerov1.DeleteBackupRequestStatus{
+				Phase:  velerov1.DeleteBackupRequestPhaseInProgress,
+				Errors: []string{"provider error"},
+			},
+		}
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup, veleroBackup, deleteRequest).
+			WithStatusSubresource(backup).
+			Build()
+		clock := NewMockClock(t)
+		clock.EXPECT().Now().Return(deletionStart.Add(2 * time.Minute)).Once()
+		reconciler := NewReconciler(fakeClient, nil, clock, "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		require.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+
+		deletingCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
+		require.NotNil(t, deletingCondition)
+		assert.Equal(t, "Backup is deleting (phase: InProgress, running for 2m)", deletingCondition.Message)
+	})
 }
 
 func newDeletedBackupForReconcilerTest(namespace string, name string) *backupv1.Backup {
