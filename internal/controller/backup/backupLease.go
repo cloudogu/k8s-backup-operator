@@ -7,6 +7,7 @@ import (
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -16,22 +17,25 @@ const backupLeaseHolderKind = "Backup"
 func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
 	result, err := manager.Acquire(ctx, backup, backupLeaseHolderKind)
-	return backupLeaseAction(ctx, backup, result, err)
+	return c.backupLeaseAction(ctx, backup, result, err)
 }
 
-func backupLeaseAction(ctx context.Context, backup *backupv1.Backup, result leases.Result, err error) (action, error) {
+func (c *defaultReconciler) backupLeaseAction(ctx context.Context, backup *backupv1.Backup, result leases.Result, err error) (action, error) {
 	if err != nil {
 		return Abort, fmt.Errorf("acquire backup lease for backup %s: %w", backup.Name, err)
 	}
 	switch result.State {
 	case leases.StateAcquired:
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupStarted, "The backup has started")
 		return Next, nil
 	case leases.StateChanged, leases.StateWaiting:
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the backup lease is waiting for a state change")
 		return Retry, nil
 	case leases.StateInvalid:
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Acquiring the backup lease failed")
 		return Abort, fmt.Errorf("backup %s is blocked by invalid lease %s/%s without a resolvable holder", backup.Name, backup.Namespace, leases.DefaultName)
 	default:
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Acquiring the backup lease failed with unknown state")
 		return Abort, fmt.Errorf("unknown backup lease acquisition state %d", result.State)
 	}
 }
@@ -44,6 +48,7 @@ func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backu
 
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, resolver)
 	if _, err := manager.Release(ctx, backup, backupLeaseHolderKind); err != nil {
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Releasing the backup lease failed")
 		return Abort, fmt.Errorf("release backup lease for backup %s: %w", backup.Name, err)
 	}
 	return Next, nil
