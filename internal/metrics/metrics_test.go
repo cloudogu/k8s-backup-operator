@@ -198,7 +198,6 @@ func TestInitRestoreConditionTransitionMetrics(t *testing.T) {
 		v1.ConditionPrepared,
 		v1.ConditionProviderRestoreSuccessful,
 		v1.ConditionWorkloadsRecovered,
-		v1.ConditionBackupsSynchronized,
 	}
 	conditionStatuses := []metav1.ConditionStatus{
 		metav1.ConditionUnknown,

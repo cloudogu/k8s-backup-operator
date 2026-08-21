@@ -22,9 +22,9 @@ const (
 	testBackup     = "test-backup"
 )
 
-// recoverableRestore is a Restore whose provider restore succeeded and whose backups are synchronized.
+// recoverableRestore is a Restore whose provider restore succeeded, so workload recovery can start.
 func recoverableRestore() *k8sv1.Restore {
-	return withBackupsSynchronized(withProviderRestoreSuccess(startableRestore()))
+	return withProviderRestoreSuccess(startableRestore())
 }
 
 func newParentRestore() *k8sv1.Restore {
@@ -77,19 +77,6 @@ func withProviderRestoreSuccess(restore *k8sv1.Restore) *k8sv1.Restore {
 	return restore
 }
 
-// withBackupsSynchronized adds the BackupsSynchronized milestone the synchronization stage writes, so
-// that a test starting behind that stage does not have to reconcile it first.
-func withBackupsSynchronized(restore *k8sv1.Restore) *k8sv1.Restore {
-	applyConditions(restore, []metav1.Condition{{
-		Type:    k8sv1.ConditionBackupsSynchronized,
-		Status:  metav1.ConditionTrue,
-		Reason:  ReasonBackupSynchronizationCompleted,
-		Message: "The backup resources were synchronized with the provider.",
-	}})
-
-	return restore
-}
-
 // installProvider makes restoreprovider.Get return the given provider instead of a real one.
 func installProvider(t *testing.T, providerMock *mockRestoreProvider) {
 	t.Helper()
@@ -105,15 +92,6 @@ func installProvider(t *testing.T, providerMock *mockRestoreProvider) {
 func expectReadinessCheck(t *testing.T, checkReadyErr error) {
 	providerMock := newMockRestoreProvider(t)
 	providerMock.EXPECT().CheckReady(testCtx).Return(checkReadyErr)
-
-	installProvider(t, providerMock)
-}
-
-// expectBackupSynchronization installs a ready provider whose backup synchronization returns syncErr.
-func expectBackupSynchronization(t *testing.T, syncErr error) {
-	providerMock := newMockRestoreProvider(t)
-	providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-	providerMock.EXPECT().SyncBackups(testCtx).Return(syncErr)
 
 	installProvider(t, providerMock)
 }
