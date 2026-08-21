@@ -7,6 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
 func TestMaintenanceModeActivationSkipsAnAlreadyActiveMode(t *testing.T) {
@@ -109,4 +112,53 @@ func TestMaintenanceModeActivationFailureIsReportedButDoesNotStopTheRestore(t *t
 	require.Same(t, restore, actual)
 	assert.Equal(t, actionNext, outcome.action)
 	assert.NoError(t, outcome.err)
+}
+
+func TestMaintenanceModeActivationSkipsAfterTheWorkflowDeactivatedIt(t *testing.T) {
+	recovered := map[string]metav1.Condition{
+		ReasonMaintenanceModeDeactivated: {Status: metav1.ConditionUnknown, Reason: ReasonMaintenanceModeDeactivated},
+		ReasonWorkloadRecoveryCompleted:  {Status: metav1.ConditionTrue, Reason: ReasonWorkloadRecoveryCompleted},
+	}
+
+	for name, recovery := range recovered {
+		t.Run(name, func(t *testing.T) {
+			restore := newParentRestore()
+			restore.Status.Conditions = []metav1.Condition{{
+				Type:               k8sv1.ConditionWorkloadsRecovered,
+				Status:             recovery.Status,
+				Reason:             recovery.Reason,
+				LastTransitionTime: metav1.Now(),
+			}}
+			// A mock without expectations fails the test as soon as the switch is touched at all.
+			sut := &restoreReconciler{maintenanceModeSwitch: newMockMaintenanceModeSwitch(t)}
+
+			actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
+
+			require.Same(t, restore, actual)
+			assert.Equal(t, actionNext, outcome.action)
+		})
+	}
+}
+
+// Every state before the deliberate deactivation keeps re-asserting the maintenance mode.
+func TestMaintenanceModeActivationStillActivatesWhileTheRestoreIsRunning(t *testing.T) {
+	restore := newParentRestore()
+	restore.Status.Conditions = []metav1.Condition{{
+		Type:               k8sv1.ConditionWorkloadsRecovered,
+		Status:             metav1.ConditionUnknown,
+		Reason:             ReasonWaitingForWorkloads,
+		LastTransitionTime: metav1.Now(),
+	}}
+	maintenanceMock := newMockMaintenanceModeSwitch(t)
+	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
+	maintenanceMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{
+		Title: maintenanceModeTitle,
+		Text:  maintenanceModeText,
+	}, false).Return(nil).Once()
+
+	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock}
+	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
+
+	require.Same(t, restore, actual)
+	assert.Equal(t, actionNext, outcome.action)
 }

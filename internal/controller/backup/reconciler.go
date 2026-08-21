@@ -187,7 +187,7 @@ func (c *defaultReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, 
 	}
 
 	logging.Debug(ctx, "ensureCompletedBackupIsIgnored: backup completed -> ABORT")
-	logging.Info(ctx, "backup already completed, ignoring it", "outcome", backupRunOutcome(backup))
+	logging.Debug(ctx, "backup already completed, skipping the backup workflow", "outcome", backupRunOutcome(backup))
 	return Abort, nil
 }
 
