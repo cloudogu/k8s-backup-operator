@@ -89,10 +89,10 @@ func DeleteVeleroDeleteBackupRequestIfExists(ctx context.Context, k8sClient clie
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("get velero delete backup request while provider backup is running: %w", err)
+		return fmt.Errorf("error getting velero delete backup request: %w", err)
 	}
 
-	log.FromContext(ctx).Info("provider backup is running: delete existing velero delete backup request")
+	log.FromContext(ctx).Info("delete existing velero delete backup request")
 	if err = k8sClient.Delete(ctx, deleteBackupRequest); err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("delete velero delete backup request while provider backup is running: %w", err)
 	}
