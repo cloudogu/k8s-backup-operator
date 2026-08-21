@@ -10,7 +10,7 @@ import (
 
 	"github.com/cloudogu/ces-commons-lib/errors"
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
+	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	"github.com/go-logr/logr"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -54,9 +54,6 @@ const (
 	backupConfigMapName     = "k8s-backup-operator-backup-config"
 	backupRetryTimeLimitKey = "retryTimeLimit"
 )
-
-// defaultBackupTTL is ten years, basically infinity in backup standards
-const defaultBackupTTL = 87660 * time.Hour
 
 var defaultLabels = map[string]string{
 	"app":                      "ces",
@@ -129,7 +126,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 		}
 
 		if isProviderBackupInProgress(veleroBackup) {
-			if cleanupErr := c.deleteVeleroDeleteBackupRequestIfExists(ctx, backup, logger); cleanupErr != nil {
+			if cleanupErr := veleroprovider.DeleteVeleroDeleteBackupRequestIfExists(ctx, c.client, backup); cleanupErr != nil {
 				return Abort, cleanupErr
 			}
 
@@ -148,7 +145,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			return Retry, nil
 		}
 
-		deleteReq, createErr := c.createVeleroDeleteBackupRequestIfNotExists(ctx, backup, logger)
+		deleteReq, createErr := veleroprovider.CreateVeleroDeleteBackupRequestIfNotExists(ctx, c.client, backup)
 		if createErr != nil {
 			return Abort, createErr
 		}
@@ -181,28 +178,6 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 	}
 
 	return Next, nil
-}
-
-func (c *defaultReconciler) deleteVeleroDeleteBackupRequestIfExists(
-	ctx context.Context,
-	backup *backupv1.Backup,
-	logger logr.Logger,
-) error {
-	deleteBackupRequest := &velerov1.DeleteBackupRequest{}
-	err := c.client.Get(ctx, backup.GetNamespacedName(), deleteBackupRequest)
-	if apierrors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("get velero delete backup request while provider backup is running: %w", err)
-	}
-
-	debug(logger, "ensureProviderBackupDeleted: provider backup is running -> delete existing delete backup request")
-	if err = c.client.Delete(ctx, deleteBackupRequest); err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("delete velero delete backup request while provider backup is running: %w", err)
-	}
-
-	return nil
 }
 
 func (c *defaultReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
@@ -427,7 +402,7 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 	if veleroBackup == nil {
 		debug(logger, "ensureProviderBackupCreated: provider backup not found -> Succeeded = Unknown, RETRY")
 
-		veleroBackupCr := c.createVeleroBackupResource(backup)
+		veleroBackupCr := veleroprovider.CreateVeleroBackupResource(backup, c.backupStorageName, defaultLabels)
 		createErr := c.client.Create(ctx, veleroBackupCr)
 		if createErr != nil {
 			return Abort, fmt.Errorf("create velero backup resource: %w", createErr)
@@ -608,76 +583,6 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 
 	debug(logger, fmt.Sprintf("synchronized backup status from Velero- Phase: %s", veleroBackup.Status.Phase))
 	return nextAction, nil
-}
-
-func (c *defaultReconciler) createVeleroDeleteBackupRequestIfNotExists(
-	ctx context.Context,
-	backup *backupv1.Backup,
-	logger logr.Logger,
-) (*velerov1.DeleteBackupRequest, error) {
-	var deleteBackupRequest = &velerov1.DeleteBackupRequest{}
-	err := c.client.Get(ctx, backup.GetNamespacedName(), deleteBackupRequest)
-	if apierrors.IsNotFound(err) {
-		debug(logger, "ensureProviderBackupDeleted: delete backup request not found -> create one")
-
-		var newDeleteBackupRequest = &velerov1.DeleteBackupRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: backup.Namespace,
-				Name:      backup.Name,
-			},
-			Spec: velerov1.DeleteBackupRequestSpec{
-				BackupName: backup.Name,
-			},
-		}
-		createErr := c.client.Create(ctx, newDeleteBackupRequest)
-		if createErr != nil {
-			return nil, fmt.Errorf("create velero delete backup request: %w", createErr)
-		}
-		return newDeleteBackupRequest, nil
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("get velero delete backup request: %w", err)
-	}
-
-	debug(logger, "ensureProviderBackupDeleted: delete backup request already exists")
-	return deleteBackupRequest, nil
-}
-
-func (c *defaultReconciler) createVeleroBackupResource(backup *backupv1.Backup) *velerov1.Backup {
-	selectors := []*metav1.LabelSelector{
-		{MatchLabels: map[string]string{"k8s.cloudogu.com/type": "global-config"}},
-		{MatchExpressions: []metav1.LabelSelectorRequirement{
-			{Key: "dogu.name", Operator: metav1.LabelSelectorOpExists},
-		}},
-		// everything besides dogu-specific config that should be included in the backup, e.g., PVCs of components etc.
-		{MatchExpressions: []metav1.LabelSelectorRequirement{
-			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
-		}},
-	}
-	volumeFsBackup := false
-	return &velerov1.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        backup.Name,
-			Namespace:   backup.Namespace,
-			Labels:      defaultLabels,
-			Annotations: annotations.GetBackupAnnotations(backup.ObjectMeta),
-		},
-		Spec: velerov1.BackupSpec{
-			IncludedNamespaces: []string{backup.Namespace},
-			IncludedResources: []string{
-				"configmaps",
-				"secrets",
-				"persistentvolumeclaims",
-				"persistentvolumes",
-				"dogus.k8s.cloudogu.com",
-			},
-			OrLabelSelectors:         selectors,
-			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
-			StorageLocation:          c.backupStorageName,
-			DefaultVolumesToFsBackup: &volumeFsBackup,
-		},
-	}
 }
 
 func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
