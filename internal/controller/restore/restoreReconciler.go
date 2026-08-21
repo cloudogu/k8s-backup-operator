@@ -526,6 +526,7 @@ func (r *restoreReconciler) ensureDeletingStatus(ctx context.Context, restore *k
 		))
 	}
 
+	logging.Info(ctx, "deleting the restore")
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the deleting status was persisted")
 	return updated, retryAfter(r.requeueDelay)
 }
@@ -563,7 +564,7 @@ func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, re
 			child.Name,
 		)
 
-		log.FromContext(ctx).Info(message)
+		logging.Info(ctx, message)
 		r.recorder.Event(
 			restore,
 			corev1.EventTypeWarning,
@@ -590,6 +591,7 @@ func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, re
 		))
 	}
 
+	logging.Info(ctx, "requested the deletion of the velero restore", "veleroRestore", child.Name)
 	// Delete only acknowledges acceptance of the deletion request. Only a subsequent
 	// Get can determine whether the child has actually been removed.
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider restore deletion was requested")
@@ -640,7 +642,9 @@ func (r *restoreReconciler) ensureDeletionFinalized(ctx context.Context, restore
 	)
 
 	// Removing the finalizer completes the workflow. If no other finalizers
-	// remain, Kubernetes deletes the Restore afterwards.
+	// remain, Kubernetes deletes the Restore afterwards. This is therefore the last point at which
+	// the deletion can be reported.
+	logging.Info(ctx, "deleted the restore")
 	return restore, abort()
 }
 
