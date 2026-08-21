@@ -52,8 +52,7 @@ flowchart TD
     G --> H{Provider beendet?}
     H -- nein --> H
     H -- fehlgeschlagen --> X[Successful=False terminal]
-    H -- erfolgreich --> I[Backup-Ressourcen synchronisieren]
-    I --> J[Scale-up initiieren]
+    H -- erfolgreich --> J[Scale-up initiieren]
     J --> K{Alle Workloads ready?}
     K -- nein --> K
     K -- ja --> L[Scale-up finalisieren]
@@ -72,22 +71,20 @@ In Methodennamen lautet die Folge:
 7. `ensureMaintenanceModeActivated`
 8. `ensureProviderRestore`
 9. `ensureProviderCompletion`
-10. `ensureBackupsSynchronized`
-11. `ensureScaleUpInitiated`
-12. `ensureWorkloadsReady`
-13. `ensureScaleUpFinalized`
-14. `ensureMaintenanceModeDeactivated`
-15. `ensureRestoreCompleted`
+10. `ensureScaleUpInitiated`
+11. `ensureWorkloadsReady`
+12. `ensureScaleUpFinalized`
+13. `ensureMaintenanceModeDeactivated`
+14. `ensureRestoreCompleted`
 
 ## Conditions und Übergänge
 
-Jeder neue, laufende Restore erhält zunächst diese fünf Conditions mit `Status=Unknown`, `Reason=Pending`:
+Jeder neue, laufende Restore erhält zunächst diese vier Conditions mit `Status=Unknown`, `Reason=Pending`:
 
 - `Successful`
 - `Prepared`
 - `ProviderRestoreSuccessful`
 - `WorkloadsRecovered`
-- `BackupsSynchronized`
 
 Eine vorhandene Condition wird bei der Initialisierung nicht auf `Unknown` zurückgesetzt. Das ist wichtig, wenn ein Status-Write erfolgreich war, der Prozess aber unmittelbar danach abstürzt.
 
@@ -152,24 +149,14 @@ Vor der destruktiven Vorbereitung wird geprüft, ob der Provider verfügbar ist.
 | `False` | `ProviderRestoreFailed` | Provider meldet einen terminalen Fehler, einschließlich Validation- und Partial-Failures. |
 | `False` | `ProviderRestoreConflict` | Gleichnamiger Child ist nicht sicher adoptierbar. |
 
-Bei Pending, Running oder unbekanntem Zustand wartet der Controller auf Child-Events; ein Fallback-Requeue erfolgt nach fünf Minuten. Nur `True/ProviderRestoreCompleted` lässt den Workflow zur Backup-Synchronisierung und Workload-Recovery weiterlaufen.
+Bei Pending, Running oder unbekanntem Zustand wartet der Controller auf Child-Events; ein Fallback-Requeue erfolgt nach fünf Minuten. Nur `True/ProviderRestoreCompleted` lässt den Workflow zur Workload-Recovery weiterlaufen.
 
 Bei einem Provider-Fehler werden außerdem gesetzt:
 
 - `WorkloadsRecovered=False/RecoveryNotAttemptedAfterProviderFailure`
-- `BackupsSynchronized=False/SynchronizationNotAttemptedAfterProviderFailure`
 - `Successful=False/ProviderRestoreFailed`
 
 Die Workloads bleiben in diesem Fehlerpfad absichtlich herunterskaliert. Der Wartungsmodus wird best-effort deaktiviert. Weil `Successful=False` terminal ist, kann das Lease anschließend von einem anderen Restore übernommen werden. Entwickler müssen dieses bewusst andere Sicherheitsmodell des Fehlerpfads bei Änderungen berücksichtigen.
-
-### `BackupsSynchronized`
-
-| Status | Reason | Bedeutung |
-|---|---|---|
-| `Unknown` | `Pending` | Synchronisierung noch nicht versucht. |
-| `False` | `BackupSynchronizationFailed` | Provider-Katalog und Backup-CRs konnten nicht synchronisiert werden; Retry mit Backoff. |
-| `True` | `BackupSynchronizationCompleted` | Backup-Ressourcen entsprechen wieder dem Provider-Katalog. |
-| `False` | `SynchronizationNotAttemptedAfterProviderFailure` | Wegen terminalem Provider-Fehler bewusst übersprungen. |
 
 ### `WorkloadsRecovered`
 

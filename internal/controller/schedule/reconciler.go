@@ -15,7 +15,8 @@ import (
 )
 
 type defaultReconciler struct {
-	client client.Client
+	client   client.Client
+	recorder eventRecorder
 
 	metadata   metadataManager
 	cronJobs   cronJobManager
@@ -24,14 +25,16 @@ type defaultReconciler struct {
 }
 
 // newReconciler creates a new BackupSchedule reconciler instance.
-func newReconciler(client client.Client, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *defaultReconciler {
+func newReconciler(client client.Client, recorder eventRecorder, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *defaultReconciler {
 	return &defaultReconciler{
 		client:     client,
+		recorder:   recorder,
 		metadata:   defaultMetadataManager{client: client},
 		conditions: defaultConditionManager{},
 		validator:  defaultValidator{},
 		cronJobs: defaultCronJobManager{
 			Client:           client,
+			recorder:         recorder,
 			scheme:           client.Scheme(),
 			operatorImage:    operatorImage,
 			pullPolicy:       config.GetStagePullPolicy(),
@@ -40,6 +43,8 @@ func newReconciler(client client.Client, operatorImage string, imagePullSecrets 
 	}
 }
 
+// reconcile brings the requested BackupSchedule and its CronJob closer to their desired state as
+// part of the reconcile loop
 func (r *defaultReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	logging.Debug(ctx, "starting BackupSchedule reconciliation")
@@ -83,6 +88,8 @@ func (r *defaultReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 
 }
 
+// reconcileDelete deletes the BackupSchedule by first deleting the managed CronJob before removing the BackupSchedule finalizer
+// which will allow Kubernetes to delete the BackupSchedule
 func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 	if err := r.cronJobs.delete(ctx, schedule); err != nil {
 		return err
@@ -90,12 +97,17 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 
 	// only need to remove finalizers, not labels
 	if err := r.metadata.remove(ctx, schedule); err != nil {
+		r.recorder.Eventf(schedule, corev1.EventTypeWarning, backupv1.FinalizerRemovalFailedEventReason,
+			"Failed to remove finalizer %q from BackupSchedule: %v", backupv1.BackupScheduleFinalizer, err,
+		)
 		return err
 	}
 
 	return nil
 }
 
+// reconcileNormal ensures metadata like labels and finalizers, validates that the schedule, is a valid cronjob schedule
+// and synchronizes the managed CronJob to the BackupSchedule resource.
 func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 
 	logging.Debug(ctx, "BackupSchedule reconciliation for backupschedule")
@@ -108,7 +120,11 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 	if err := r.validator.validate(schedule); err != nil {
 		r.conditions.markInvalid(schedule, err)
 		r.conditions.markNotReady(schedule, backupv1.ReasonInvalidSpec, "BackupSchedule spec is invalid: "+err.Error())
-		logging.Info(ctx, "BackupSchedule spec is invalid, skipping CronJob synchronization", "error", err)
+		r.recorder.Eventf(
+			schedule, corev1.EventTypeWarning, backupv1.InvalidScheduleEventReason,
+			"BackupSchedule has an invalid schedule: %v", err,
+		)
+		logging.Error(ctx, err, "BackupSchedule spec is invalid, skipping CronJob synchronization")
 
 		// invalid spec should not be reconciled again before it is edited
 		return nil
@@ -127,6 +143,7 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 	return nil
 }
 
+// patchStatus persists the BackupSchedule status when it differs from the original status.
 func (r *defaultReconciler) patchStatus(ctx context.Context, before, after *backupv1.BackupSchedule) error {
 
 	if equality.Semantic.DeepEqual(before.Status, after.Status) {
@@ -141,6 +158,7 @@ func (r *defaultReconciler) patchStatus(ctx context.Context, before, after *back
 	return nil
 }
 
+// getBackupSchedule retrieves a BackupSchedule specified by name.
 func (r *defaultReconciler) getBackupSchedule(ctx context.Context, name types.NamespacedName) (*backupv1.BackupSchedule, error) {
 	schedule := &backupv1.BackupSchedule{}
 

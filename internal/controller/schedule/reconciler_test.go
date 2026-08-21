@@ -8,6 +8,7 @@ import (
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,6 +70,7 @@ func (m *fakeMetaData) remove(ctx context.Context, s *backupv1.BackupSchedule) e
 func newTestReconciler(client client.Client, validator validator, cronJobs cronJobManager, metaData metadataManager) *defaultReconciler {
 	return &defaultReconciler{
 		client:     client,
+		recorder:   newFakeEventRecorder(),
 		validator:  validator,
 		cronJobs:   cronJobs,
 		conditions: defaultConditionManager{},
@@ -154,6 +156,7 @@ func Test_reconcileNormal(t *testing.T) {
 			testValidator := &fakeValidator{err: tt.validatorErr}
 			testCronJobs := &fakeCronJobManager{ensureErr: tt.cronJobErr}
 			testMetaData := &fakeMetaData{ensureErr: tt.metadataErr}
+			recorder := newFakeEventRecorder()
 			schedule := &backupv1.BackupSchedule{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test",
@@ -162,6 +165,7 @@ func Test_reconcileNormal(t *testing.T) {
 				},
 			}
 			reconciler := newTestReconciler(nil, testValidator, testCronJobs, testMetaData)
+			reconciler.recorder = recorder
 
 			err := reconciler.reconcileNormal(testCtx, schedule)
 
@@ -190,6 +194,12 @@ func Test_reconcileNormal(t *testing.T) {
 			assert.Equal(t, tt.expectedReady, ready.Status)
 			assert.Equal(t, tt.expectedReadyReason, ready.Reason)
 			assert.Len(t, schedule.Status.Conditions, 2)
+
+			if tt.validatorErr != nil {
+				requireRecordedEvent(t, recorder, schedule, corev1.EventTypeWarning, backupv1.InvalidScheduleEventReason, "BackupSchedule has an invalid schedule: invalid")
+			} else {
+				requireNoRecordedEvent(t, recorder)
+			}
 		})
 	}
 }
@@ -229,8 +239,10 @@ func Test_reconcileDelete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			testCronJobs := &fakeCronJobManager{deleteErr: tt.cronJobErr}
 			testMetadata := &fakeMetaData{removeErr: tt.metadataErr}
+			recorder := newFakeEventRecorder()
 			schedule := &backupv1.BackupSchedule{}
 			reconciler := newTestReconciler(nil, nil, testCronJobs, testMetadata)
+			reconciler.recorder = recorder
 
 			err := reconciler.reconcileDelete(testCtx, schedule)
 
@@ -242,6 +254,11 @@ func Test_reconcileDelete(t *testing.T) {
 
 			assert.Equal(t, tt.expectDeleteCalled, testCronJobs.deleteCalled)
 			assert.Equal(t, tt.expectMetadataRemove, testMetadata.removeCalled)
+			if tt.metadataErr != nil {
+				requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, backupv1.FinalizerRemovalFailedEventReason, "Failed to remove finalizer", backupv1.BackupScheduleFinalizer, tt.metadataErr.Error())
+			} else {
+				requireNoRecordedEvent(t, recorder)
+			}
 
 		})
 	}

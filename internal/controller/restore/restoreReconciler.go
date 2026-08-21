@@ -123,7 +123,6 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.ensureMaintenanceModeActivated,
 			r.ensureProviderRestore,
 			r.ensureProviderCompletion,
-			r.ensureBackupsSynchronized,
 			r.ensureScaleUpInitiated,
 			r.ensureWorkloadsReady,
 			r.ensureScaleUpFinalized,
@@ -458,12 +457,6 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 			Message: "The workloads were deliberately left scaled down because the provider restore failed.",
 		},
 		metav1.Condition{
-			Type:    k8sv1.ConditionBackupsSynchronized,
-			Status:  metav1.ConditionFalse,
-			Reason:  ReasonSynchronizationNotAttemptedAfterProviderFailure,
-			Message: "The backups were deliberately not synchronized because the provider restore failed.",
-		},
-		metav1.Condition{
 			Type:    k8sv1.ConditionSuccessful,
 			Status:  metav1.ConditionFalse,
 			Reason:  reason,
@@ -475,35 +468,6 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 	}
 
 	return updated, abort()
-}
-
-// ensureBackupsSynchronized synchronizes the Backup resources with the ones the provider knows about
-func (r *restoreReconciler) ensureBackupsSynchronized(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
-	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionBackupsSynchronized) {
-		return restore, next()
-	}
-
-	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
-	if err != nil {
-		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
-	}
-
-	if err := provider.SyncBackups(ctx); err != nil {
-		return r.reportUnreachedMilestone(ctx, restore, k8sv1.ConditionBackupsSynchronized, ReasonBackupSynchronizationFailed,
-			fmt.Errorf("failed to sync backups with provider: %w", err))
-	}
-
-	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
-		reachedMilestone(k8sv1.ConditionBackupsSynchronized, ReasonBackupSynchronizationCompleted,
-			"The backup resources were synchronized with the provider."))
-	if err != nil {
-		return restore, retryOnError(fmt.Errorf("failed to persist the backup synchronization of restore %s: %w", restore.Name, err))
-	}
-
-	logging.Info(ctx, "synchronized the backup resources with the provider")
-	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
-	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the backup synchronization was persisted")
-	return updated, retryAfter(r.requeueDelay)
 }
 
 // ensureDeletingStatus persists the deprecated scalar deleting status for consumers that have not

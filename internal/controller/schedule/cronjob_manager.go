@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -24,13 +24,14 @@ var defaultLabels = map[string]string{
 
 type defaultCronJobManager struct {
 	client.Client
+	recorder         eventRecorder
 	scheme           *runtime.Scheme
 	operatorImage    string
 	pullPolicy       corev1.PullPolicy
 	imagePullSecrets []corev1.LocalObjectReference
 }
 
-func (c defaultCronJobManager) ensure(ctx context.Context, schedule *v1.BackupSchedule) error {
+func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -63,19 +64,36 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *v1.BackupSc
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
+		c.recorder.Eventf(
+			schedule, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason,
+			"Failed to synchronize CronJob %q: %v", cronJob.Name, err,
+		)
+		return fmt.Errorf("failed to synchronize CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
 	}
 
-	if operation == controllerutil.OperationResultNone {
+	switch operation {
+	case controllerutil.OperationResultCreated:
+		c.recorder.Eventf(
+			schedule, corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason,
+			"Created CronJob %q.", cronJob.Name,
+		)
+	case controllerutil.OperationResultUpdated:
+		c.recorder.Eventf(
+			schedule, corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason,
+			"Updated CronJob %q.", cronJob.Name,
+		)
+	case controllerutil.OperationResultNone:
 		logging.Debug(ctx, "CronJob is up to date", "cronJob", cronJob.Name)
-	} else {
+	}
+
+	if operation != controllerutil.OperationResultNone {
 		logging.Info(ctx, "synchronized CronJob", "cronJob", cronJob.Name, "operation", operation)
 	}
 
 	return nil
 }
 
-func (c defaultCronJobManager) delete(ctx context.Context, schedule *v1.BackupSchedule) error {
+func (c defaultCronJobManager) delete(ctx context.Context, schedule *backupv1.BackupSchedule) error {
 
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -90,9 +108,16 @@ func (c defaultCronJobManager) delete(ctx context.Context, schedule *v1.BackupSc
 		return nil
 	}
 	if err != nil {
+		c.recorder.Eventf(schedule, corev1.EventTypeWarning, backupv1.CronJobDeletionFailedEventReason,
+			"Failed to delete CronJob %q: %v", cronJob.Name, err,
+		)
 		return fmt.Errorf("failed to delete CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
 	}
 
+	c.recorder.Eventf(
+		schedule, corev1.EventTypeNormal, backupv1.CronJobDeletionRequestedEventReason,
+		"Requested deletion of CronJob %q.", cronJob.Name,
+	)
 	logging.Info(ctx, "requested CronJob deletion", "cronJob", cronJob.Name)
 	return nil
 }
