@@ -24,7 +24,7 @@ func TestBackupLease(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		backup.UID = types.UID("backup-uid")
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup).Build()
-		reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 		require.NoError(t, err)
@@ -50,7 +50,7 @@ func TestBackupLease(t *testing.T) {
 		}}
 		lease := leases.NewLease("ns", leases.DefaultName, restoreHolder, "Restore")
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup, lease).Build()
-		reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 		require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestBackupLease(t *testing.T) {
 		backup.UID = types.UID("backup-uid")
 		lease := &coordinationv1.Lease{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: leases.DefaultName}}
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup, lease).Build()
-		reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 
@@ -82,7 +82,7 @@ func TestBackupLease(t *testing.T) {
 				return errors.New("get failed")
 			},
 		}).Build()
-		reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 
@@ -92,8 +92,9 @@ func TestBackupLease(t *testing.T) {
 
 	t.Run("rejects an unknown acquisition state", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
+		reconciler := NewReconciler(nil, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := backupLeaseAction(ctx, backup, leases.Result{State: leases.State(99)}, nil)
+		nextAction, err := reconciler.backupLeaseAction(ctx, backup, leases.Result{State: leases.State(99)}, nil)
 
 		assert.Equal(t, Abort, nextAction)
 		require.ErrorContains(t, err, "unknown backup lease acquisition state 99")
@@ -105,7 +106,7 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 
 	t.Run("keeps the lease while the backup is running", func(t *testing.T) {
 		backup := newBackupWithSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionUnknown)
-		reconciler := NewReconciler(nil, nil, newRealClock(), "default")
+		reconciler := NewReconciler(nil, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup)
 
@@ -127,7 +128,7 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 			tt.backup.UID = types.UID("backup-uid")
 			lease := leases.NewLease("ns", leases.DefaultName, tt.backup, backupLeaseHolderKind)
 			k8sClient := newFakeClientBuilder(t).WithObjects(lease).Build()
-			reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
+			reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 			nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, tt.backup)
 
@@ -145,7 +146,7 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 				return errors.New("get failed")
 			},
 		}).Build()
-		reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup)
 
