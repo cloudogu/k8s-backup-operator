@@ -80,7 +80,7 @@ func TestConditionInitializationDoesNotResetAResolvedCondition(t *testing.T) {
 	require.NotNil(t, prepared)
 	assert.Equal(t, metav1.ConditionTrue, prepared.Status, "the reached milestone must survive the initialization")
 	assertUnknownWorkflowConditions(t, stored, k8sv1.ConditionSuccessful, k8sv1.ConditionProviderRestoreSuccessful,
-		k8sv1.ConditionWorkloadsRecovered, k8sv1.ConditionBackupsSynchronized)
+		k8sv1.ConditionWorkloadsRecovered)
 }
 
 func TestARestoreInterruptedAtAnUnknownOutcomeContinues(t *testing.T) {

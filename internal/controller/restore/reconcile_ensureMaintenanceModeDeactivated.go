@@ -50,6 +50,8 @@ func (r *restoreReconciler) ensureMaintenanceModeDeactivated(
 			err,
 		))
 	}
+
+	logging.Info(ctx, "deactivated maintenance mode")
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the maintenance mode deactivation was persisted")
 	return updated, retryAfter(defaultRequeueDelay)
 }

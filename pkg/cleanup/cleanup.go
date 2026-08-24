@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 )
 
 const defaultWaitTime = time.Second * 3
@@ -39,7 +39,7 @@ func NewManager(doguClient doguClient, dynamicClient dynamicClient, namespace st
 // It waits for the deletion of the resources to complete.
 // If the deletion fails, the cleanup will fail.
 func (c *DefaultCleanupManager) Cleanup(ctx context.Context) error {
-	log.FromContext(ctx).Info("starting cleanup before restore...")
+	logging.Info(ctx, "starting cleanup before restore...")
 
 	// Create a timeout context for the entire cleanup
 	ctx, cancel := context.WithTimeout(ctx, cleanupTimeout)
@@ -66,7 +66,7 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context) error {
 
 	select {
 	case <-allDeletesDone:
-		log.FromContext(ctx).Info("... cleanup finished. All resources were deleted successfully.")
+		logging.Info(ctx, "... cleanup finished. All resources were deleted successfully.")
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("cleanup timed out: %w", ctx.Err())

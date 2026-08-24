@@ -272,3 +272,37 @@ func TestObserveProviderRestoreStateNeverReportsAnUnknownStateAsAnOutcome(t *tes
 		assert.Equal(t, metav1.ConditionUnknown, status, "state %q must not be reported as an outcome", state)
 	}
 }
+
+func TestRestoreOutcome(t *testing.T) {
+	tests := map[string]struct {
+		restore  *backupv1.Restore
+		expected string
+	}{
+		"a completed restore succeeded": {
+			restore:  restoreWith("", successful(metav1.ConditionTrue, ReasonRestoreCompleted)),
+			expected: "succeeded",
+		},
+		"a terminally failed restore failed": {
+			restore:  restoreWith("", successful(metav1.ConditionFalse, ReasonProviderRestoreFailed)),
+			expected: "failed",
+		},
+		"a running restore has no outcome yet": {
+			restore:  restoreWith("", successful(metav1.ConditionUnknown, ReasonPreparing)),
+			expected: "unknown",
+		},
+		"a restore without conditions has no outcome": {
+			restore:  restoreWith(""),
+			expected: "unknown",
+		},
+		"the legacy status decides while the condition is absent": {
+			restore:  restoreWith(backupv1.RestoreStatusCompleted),
+			expected: "succeeded",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.expected, restoreOutcome(test.restore))
+		})
+	}
+}

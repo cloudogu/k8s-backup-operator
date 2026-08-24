@@ -42,6 +42,7 @@ func (r *restoreReconciler) ensureRestoreCompleted(
 	}
 
 	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonRestoreCompleted, "Restore successful")
+	logging.Info(ctx, "restore completed successfully")
 
 	return updated, abort()
 }

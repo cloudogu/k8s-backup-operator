@@ -294,7 +294,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("error setting up backup controller with manager: %w", err)
 	}
 
-	err = configureBackupScheduleReconciler(ctx, k8sManager, k8sClient, operatorConfig)
+	err = configureBackupScheduleReconciler(ctx, k8sManager, k8sClient, recorder, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("error setting up backup schedule controller with manager: %w", err)
 	}
@@ -355,8 +355,7 @@ func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.W
 	return nil
 }
 
-func configureBackupScheduleReconciler(ctx context.Context, k8sManager controllerManager, k8sClient client.WithWatch, operatorConfig *config.OperatorConfig) error {
-
+func configureBackupScheduleReconciler(ctx context.Context, k8sManager controllerManager, k8sClient client.WithWatch, recorder eventRecorder, operatorConfig *config.OperatorConfig) error {
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create k8s clientset: %w", err)
@@ -368,7 +367,7 @@ func configureBackupScheduleReconciler(ctx context.Context, k8sManager controlle
 		return fmt.Errorf("failed to get operator image: %w", err)
 	}
 
-	if err = schedulecontroller.NewController(k8sClient, operatorImage, operatorConfig.ImagePullSecrets).SetupWithManager(k8sManager); err != nil {
+	if err = schedulecontroller.NewController(k8sClient, recorder, operatorImage, operatorConfig.ImagePullSecrets).SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create backupSchedule controller: %w", err)
 	}
 	return nil

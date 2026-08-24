@@ -9,6 +9,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -25,11 +26,19 @@ func (c *defaultReconciler) backupLeaseAction(ctx context.Context, backup *backu
 		return Abort, fmt.Errorf("acquire backup lease for backup %s: %w", backup.Name, err)
 	}
 	switch result.State {
-	case leases.StateAcquired:
-		c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupStarted, "The backup has started")
+	case leases.StateHeld:
+		logging.Debug(ctx, "ensureActiveBackupLease: backup lease is held -> NEXT")
 		return Next, nil
-	case leases.StateChanged, leases.StateWaiting:
-		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the backup lease is waiting for a state change")
+	case leases.StateAcquired:
+		logging.Info(ctx, "acquired the backup lease", "lease", leases.DefaultName)
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the acquired backup lease must be observed again")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupStarted, "The backup has started")
+		return Retry, nil
+	case leases.StateConflict:
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the backup lease was modified concurrently")
+		return Retry, nil
+	case leases.StateWaiting:
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "another operation still holds the backup lease", "holder", result.HolderName)
 		return Retry, nil
 	case leases.StateInvalid:
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Acquiring the backup lease failed")
@@ -47,11 +56,52 @@ func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backu
 	}
 
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, resolver)
-	if _, err := manager.Release(ctx, backup, backupLeaseHolderKind); err != nil {
-		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Releasing the backup lease failed")
+	released, err := manager.Release(ctx, backup, backupLeaseHolderKind)
+	if err != nil {
+	    c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Releasing the backup lease failed")
 		return Abort, fmt.Errorf("release backup lease for backup %s: %w", backup.Name, err)
 	}
+	if !released {
+		logging.Debug(ctx, "ensureBackupLeaseReleased: backup does not hold the lease -> NEXT")
+		return Next, nil
+	}
+
+	logging.Info(ctx, "released the backup lease", "lease", leases.DefaultName)
+	// Releasing the lease is the last action of a backup run, so this is the single point at which
+	// the run can be reported as finished exactly once. A backup that is being deleted has no run
+	// outcome to report.
+	if backup.DeletionTimestamp.IsZero() {
+		logging.Info(ctx, "backup finished", "outcome", backupRunOutcome(backup), "duration", backupRunDuration(backup))
+	}
 	return Next, nil
+}
+
+// backupRunOutcome derives how a finished backup run ended from its conditions.
+func backupRunOutcome(backup *backupv1.Backup) string {
+	if meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled) {
+		return "canceled"
+	}
+	succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+	switch {
+	case succeeded == nil:
+		return "unknown"
+	case succeeded.Status == metav1.ConditionTrue:
+		return "succeeded"
+	case succeeded.Status == metav1.ConditionFalse:
+		return "failed"
+	default:
+		return "unknown"
+	}
+}
+
+// backupRunDuration reports how long the backup ran, or "unknown" while a timestamp is missing.
+func backupRunDuration(backup *backupv1.Backup) string {
+	start := backup.Status.StartTimestamp
+	completion := backup.Status.CompletionTimestamp
+	if start.IsZero() || completion.IsZero() {
+		return "unknown"
+	}
+	return completion.Sub(start.Time).String()
 }
 
 type backupHolderResolver struct {

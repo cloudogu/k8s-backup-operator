@@ -46,6 +46,7 @@ func (r *restoreReconciler) ensureWorkloadsReady(
 			))
 		}
 
+		logging.Info(ctx, "waiting for the workloads to become ready")
 		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workload readiness wait was persisted")
 		return updated, retryAfter(defaultRequeueDelay)
 	}
@@ -72,6 +73,7 @@ func (r *restoreReconciler) ensureWorkloadsReady(
 		))
 	}
 
+	logging.Info(ctx, "the workloads are ready")
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workload readiness was persisted")
 	return updated, retryAfter(defaultRequeueDelay)
 }

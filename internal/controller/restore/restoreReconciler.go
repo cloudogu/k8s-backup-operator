@@ -19,9 +19,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 )
 
 type operation string
@@ -101,6 +101,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.ensureDeletionFinalized,
 		)
 	case operationIgnore:
+		logging.Debug(ctx, "restore already completed, skipping the restore workflow", "outcome", restoreOutcome(restore))
 		return runStages(
 			ctx,
 			restore,
@@ -122,7 +123,6 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.ensureMaintenanceModeActivated,
 			r.ensureProviderRestore,
 			r.ensureProviderCompletion,
-			r.ensureBackupsSynchronized,
 			r.ensureScaleUpInitiated,
 			r.ensureWorkloadsReady,
 			r.ensureScaleUpFinalized,
@@ -163,6 +163,7 @@ func (r *restoreReconciler) ensureConditionsInitialized(ctx context.Context, res
 		return restore, retryOnError(fmt.Errorf("failed to initialize the conditions of restore %s: %w", restore.Name, err))
 	}
 
+	logging.Info(ctx, "initialized the restore conditions")
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore conditions were initialized")
 	return initialized, retryAfter(r.requeueDelay)
@@ -173,10 +174,15 @@ func (r *restoreReconciler) ensureConditionsInitialized(ctx context.Context, res
 // its outcome no longer matters and writing conditions would only fight the deletion.
 func (r *restoreReconciler) ensureLegacyConditionsMigrated(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	updater := newConditionUpdater(r.k8sClient)
+	hadCondition := findSuccessfulCondition(restore) != nil
 
 	migrated, err := updater.setConditionsFromLegacyStatus(ctx, restore)
 	if err != nil {
 		return restore, retryOnError(err)
+	}
+
+	if !hadCondition && findSuccessfulCondition(migrated) != nil {
+		logging.Info(ctx, "migrated the legacy restore status to conditions")
 	}
 
 	return migrated, next()
@@ -192,6 +198,7 @@ func (r *restoreReconciler) ensureMetadata(ctx context.Context, restore *k8sv1.R
 	}
 
 	if written {
+		logging.Info(ctx, "persisted restore labels and finalizer")
 		// retry after defaultDelay is a fallback since the metadata write triggers an instant requeue anyway
 		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore metadata was updated")
 		return restore, retryAfter(r.requeueDelay)
@@ -218,9 +225,6 @@ func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restor
 	if conflictErr := velero.CheckRestoreForConflicts(restore, child); conflictErr != nil {
 		return r.failOnProviderChildConflict(ctx, restore, conflictErr)
 	}
-
-	// Our child already exists, so the preparation is done. Continue with next stage.
-	log.FromContext(ctx).Info(fmt.Sprintf("provider restore of restore %s/%s already exists: skip preparation", r.namespace, restore.Name))
 
 	return restore, next()
 }
@@ -272,6 +276,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	if err := r.scaleManager.ScaleDown(ctx); err != nil {
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to scale down workloads before restore: %w", err))
 	}
+	logging.Info(ctx, "scaled down the workloads")
 
 	if err := r.cleanup.Cleanup(ctx); err != nil {
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to cleanup before restore: %w", err))
@@ -358,6 +363,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 		return restore, retryOnError(fmt.Errorf("failed to start the provider restore of restore %s: %w", restore.Name, err))
 	}
 
+	logging.Info(ctx, "created the velero restore", "backup", restore.Spec.BackupName)
 	// The child's own events drive the next reconciliation; the delay is only the fallback.
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider restore was created")
 	return restore, retryAfter(r.requeueDelay)
@@ -393,16 +399,31 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 		r.recorder.Eventf(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Successfully completed the provider restore [%s]", child.Name)
 	}
 
-	// The write is no-op aware, so an unchanged state costs nothing; a changed one makes the phase the
-	// restore is actually in visible in its status.
-	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
+	observation := metav1.Condition{
 		Type:    k8sv1.ConditionProviderRestoreSuccessful,
 		Status:  status,
 		Reason:  reason,
 		Message: message,
-	})
+	}
+	// The reason and the message carry the observed phase, so a repeated observation of the same
+	// phase is not reported again. The child's events drive the next look, so the report follows the
+	// provider rather than a timer.
+	report := conditions.WillChange(restore.Status.Conditions, observation)
+	waited := conditions.ElapsedInCurrentStatus(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful, time.Now())
+
+	// The write is no-op aware, so an unchanged state costs nothing; a changed one makes the phase the
+	// restore is actually in visible in its status.
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, observation)
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to persist the provider restore state of restore %s: %w", restore.Name, err))
+	}
+
+	if report {
+		if status == metav1.ConditionTrue {
+			logging.Info(ctx, "the velero restore succeeded", "phase", child.Status.Phase, "running for", conditions.FormatWaitDuration(waited))
+		} else {
+			logging.Info(ctx, "waiting for the velero restore to complete", "phase", child.Status.Phase, "running for", conditions.FormatWaitDuration(waited))
+		}
 	}
 
 	if status == metav1.ConditionTrue {
@@ -419,9 +440,11 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *k8sv1.Restore, child *velerov1.Restore, reason string) (*k8sv1.Restore, stageOutcome) {
 	message := fmt.Sprintf("The provider restore %q failed terminally in the phase %q.", child.Name, child.Status.Phase)
 	r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, message)
+	// Velero failing the restore is an outcome of this stage rather than an operator error.
+	logging.Info(ctx, "the velero restore failed", "phase", child.Status.Phase)
 
 	if err := r.maintenanceModeSwitch.Deactivate(ctx, false); err != nil {
-		log.FromContext(ctx).Error(err, "The maintenance mode could not be deactivated after a failed provider restore. Continuing anyways...")
+		logging.Error(ctx, err, "The maintenance mode could not be deactivated after a failed provider restore. Continuing anyways...")
 	}
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
@@ -438,12 +461,6 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 			Message: "The workloads were deliberately left scaled down because the provider restore failed.",
 		},
 		metav1.Condition{
-			Type:    k8sv1.ConditionBackupsSynchronized,
-			Status:  metav1.ConditionFalse,
-			Reason:  ReasonSynchronizationNotAttemptedAfterProviderFailure,
-			Message: "The backups were deliberately not synchronized because the provider restore failed.",
-		},
-		metav1.Condition{
 			Type:    k8sv1.ConditionSuccessful,
 			Status:  metav1.ConditionFalse,
 			Reason:  reason,
@@ -455,34 +472,6 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 	}
 
 	return updated, abort()
-}
-
-// ensureBackupsSynchronized synchronizes the Backup resources with the ones the provider knows about
-func (r *restoreReconciler) ensureBackupsSynchronized(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
-	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionBackupsSynchronized) {
-		return restore, next()
-	}
-
-	provider, err := restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
-	if err != nil {
-		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
-	}
-
-	if err := provider.SyncBackups(ctx); err != nil {
-		return r.reportUnreachedMilestone(ctx, restore, k8sv1.ConditionBackupsSynchronized, ReasonBackupSynchronizationFailed,
-			fmt.Errorf("failed to sync backups with provider: %w", err))
-	}
-
-	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
-		reachedMilestone(k8sv1.ConditionBackupsSynchronized, ReasonBackupSynchronizationCompleted,
-			"The backup resources were synchronized with the provider."))
-	if err != nil {
-		return restore, retryOnError(fmt.Errorf("failed to persist the backup synchronization of restore %s: %w", restore.Name, err))
-	}
-
-	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
-	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the backup synchronization was persisted")
-	return updated, retryAfter(r.requeueDelay)
 }
 
 // ensureDeletingStatus persists the deprecated scalar deleting status for consumers that have not
@@ -504,6 +493,7 @@ func (r *restoreReconciler) ensureDeletingStatus(ctx context.Context, restore *k
 		))
 	}
 
+	logging.Info(ctx, "deleting the restore")
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the deleting status was persisted")
 	return updated, retryAfter(r.requeueDelay)
 }
@@ -541,7 +531,7 @@ func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, re
 			child.Name,
 		)
 
-		log.FromContext(ctx).Info(message)
+		logging.Info(ctx, message)
 		r.recorder.Event(
 			restore,
 			corev1.EventTypeWarning,
@@ -568,6 +558,7 @@ func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, re
 		))
 	}
 
+	logging.Info(ctx, "requested the deletion of the velero restore", "veleroRestore", child.Name)
 	// Delete only acknowledges acceptance of the deletion request. Only a subsequent
 	// Get can determine whether the child has actually been removed.
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider restore deletion was requested")
@@ -618,7 +609,9 @@ func (r *restoreReconciler) ensureDeletionFinalized(ctx context.Context, restore
 	)
 
 	// Removing the finalizer completes the workflow. If no other finalizers
-	// remain, Kubernetes deletes the Restore afterwards.
+	// remain, Kubernetes deletes the Restore afterwards. This is therefore the last point at which
+	// the deletion can be reported.
+	logging.Info(ctx, "deleted the restore")
 	return restore, abort()
 }
 

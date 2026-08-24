@@ -26,6 +26,7 @@ type operatorImageGetter struct {
 	namespace       string
 }
 
+// NewOperatorImageGetter creates an image getter that reads from the operator's additional-images ConfigMap.
 func NewOperatorImageGetter(client kubernetes.Interface, namespace string) OperatorImageGetter {
 	return &operatorImageGetter{configmapClient: client, namespace: namespace}
 }
@@ -55,6 +56,7 @@ func (oig *operatorImageGetter) ImageForKey(ctx context.Context, key string) (st
 	return imageTag, nil
 }
 
+// verifyImageTag checks whether imageTag is a valid container image reference.
 func verifyImageTag(imageTag string) error {
 	matched, err := imageTagValidationRegexp.MatchString(imageTag)
 	if err != nil {
