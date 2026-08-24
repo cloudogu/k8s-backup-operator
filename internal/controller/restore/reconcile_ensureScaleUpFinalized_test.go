@@ -58,6 +58,12 @@ func TestFailedScaleUpFinalizationReportsRecoveryFalseAndRetries(t *testing.T) {
 	recorderMock.EXPECT().Event(
 		matchesRestoreNamed(testRestore),
 		corev1.EventTypeWarning,
+		ReasonWorkloadRecoveryFailed,
+		"failed to finalize workload scale-up after restore",
+	).Return()
+	recorderMock.EXPECT().Event(
+		matchesRestoreNamed(testRestore),
+		corev1.EventTypeWarning,
 		k8sv1.ErrorOnCreateEventReason,
 		"failed to finalize workload scale-up after restore: assert.AnError general error for testing",
 	).Return()

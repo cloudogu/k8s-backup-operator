@@ -10,9 +10,9 @@ import (
 
 	"github.com/cloudogu/ces-commons-lib/errors"
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/conditions"
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
-	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
+	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,6 +40,7 @@ const (
 	reasonProviderBackupFailed                      = "ProviderBackupFailed"
 	reasonProviderBackupDeletionFailed              = "ProviderBackupDeletionFailed"
 	reasonProviderBackupDeletion                    = "ProviderBackupDeletion"
+	reasonWaitingForProviderBackupCompletion        = "WaitingForProviderBackupCompletion"
 	reasonProviderBackupSucceeded                   = "ProviderBackupSucceeded"
 	reasonBackupStarted                             = "BackupStarted"
 	reasonBackupDeleting                            = "BackupDeleting"
@@ -692,7 +693,7 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 	return nextAction, nil
 }
 
-func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup has not started -> Canceled = True, ABORT")
 
 	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {

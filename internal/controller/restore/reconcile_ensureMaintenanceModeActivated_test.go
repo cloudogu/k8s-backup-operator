@@ -26,6 +26,8 @@ func TestMaintenanceModeActivationSkipsAnAlreadyActiveMode(t *testing.T) {
 
 func TestMaintenanceModeActivationActivatesAnInactiveMode(t *testing.T) {
 	restore := newParentRestore()
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
 	maintenanceMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{
@@ -33,7 +35,7 @@ func TestMaintenanceModeActivationActivatesAnInactiveMode(t *testing.T) {
 		Text:  maintenanceModeText,
 	}, false).Return(nil).Once()
 
-	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock}
+	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
 	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
 
 	require.Same(t, restore, actual)
@@ -58,6 +60,7 @@ func TestMaintenanceModeActivationStillActivatesWhenStatusCheckFailsAndReportsIn
 		ReasonMaintenanceModeActivated,
 		"Could not get maintenance mode status; continuing restore.",
 	).Once()
+	recorderMock.EXPECT().Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
 
 	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
 	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
@@ -143,6 +146,8 @@ func TestMaintenanceModeActivationSkipsAfterTheWorkflowDeactivatedIt(t *testing.
 // Every state before the deliberate deactivation keeps re-asserting the maintenance mode.
 func TestMaintenanceModeActivationStillActivatesWhileTheRestoreIsRunning(t *testing.T) {
 	restore := newParentRestore()
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
 	restore.Status.Conditions = []metav1.Condition{{
 		Type:               k8sv1.ConditionWorkloadsRecovered,
 		Status:             metav1.ConditionUnknown,
@@ -156,7 +161,7 @@ func TestMaintenanceModeActivationStillActivatesWhileTheRestoreIsRunning(t *test
 		Text:  maintenanceModeText,
 	}, false).Return(nil).Once()
 
-	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock}
+	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
 	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
 
 	require.Same(t, restore, actual)

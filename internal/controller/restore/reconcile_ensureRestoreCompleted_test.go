@@ -19,7 +19,7 @@ func TestRestoreCompletionPersistsTerminalConditionsWithoutExternalRecoveryActio
 
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Event(
-		matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Restore successful",
+		matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonRestoreCompleted, "Restore successful",
 	).Return()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)

@@ -3,6 +3,7 @@ package restore
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -34,12 +35,14 @@ func TestMaintenanceModeDeactivationPersistsItsProgressAndRequeues(t *testing.T)
 
 func TestMaintenanceModeDeactivationIsEnsuredAgainBeforeProceeding(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonMaintenanceModeDeactivated)
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, ReasonMaintenanceModeDeactivated, "Maintenance mode deactivated").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
-		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, nil, requeueAfterTest,
+		newTestClientWithParent(t, writes.interceptor(), restore), recorderMock, testNamespace, nil, nil, requeueAfterTest,
 	)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
@@ -52,12 +55,14 @@ func TestMaintenanceModeDeactivationIsEnsuredAgainBeforeProceeding(t *testing.T)
 
 func TestFailedMaintenanceModeDeactivationUsesBackoffWithoutChangingProgress(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonScaleUpFinalized)
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, "Failed to deactivate maintenance mode after restore").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(assert.AnError).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
-	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest)
+	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, nil, requeueAfterTest)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
 	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(testCtx, restore)
@@ -72,12 +77,14 @@ func TestFailedMaintenanceModeDeactivationUsesBackoffWithoutChangingProgress(t *
 
 func TestUnpersistableMaintenanceModeDeactivationIsRetried(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonScaleUpFinalized)
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, "Failed to persist maintenance mode deactivation for restore").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore),
-		nil, testNamespace, nil, nil, requeueAfterTest,
+		recorderMock, testNamespace, nil, nil, requeueAfterTest,
 	)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 

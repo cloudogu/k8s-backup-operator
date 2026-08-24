@@ -182,9 +182,9 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 					return client.Delete(ctx, obj, opts...)
 				},
 			}).Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
 		require.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -316,7 +316,7 @@ func TestReconcilerReportsDeletionProgress(t *testing.T) {
 			Build()
 		clock := NewMockClock(t)
 		clock.EXPECT().Now().Return(deletionStart.Add(2 * time.Minute)).Once()
-		reconciler := NewReconciler(fakeClient, nil, clock, "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clock, "default")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
