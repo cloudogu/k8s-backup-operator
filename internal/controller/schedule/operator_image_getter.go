@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/dlclark/regexp2"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 )
 
@@ -34,8 +33,7 @@ func NewOperatorImageGetter(client kubernetes.Interface, namespace string) Opera
 
 // ImageForKey returns a container image reference as found in OperatorAdditionalImagesConfigmapName.
 func (oig *operatorImageGetter) ImageForKey(ctx context.Context, key string) (string, error) {
-	logger := log.FromContext(ctx)
-	logger.Info("reading backup operator image to use from ConfigMap", "configMap", config.OperatorAdditionalImagesConfigmapName, "key", key)
+	logging.Info(ctx, "reading backup operator image to use from ConfigMap", "configMap", config.OperatorAdditionalImagesConfigmapName, "key", key)
 
 	configMap, err := oig.configmapClient.CoreV1().
 		ConfigMaps(oig.namespace).
@@ -54,7 +52,7 @@ func (oig *operatorImageGetter) ImageForKey(ctx context.Context, key string) (st
 		return "", fmt.Errorf("configmap '%s' contains an invalid image tag: %w", config.OperatorAdditionalImagesConfigmapName, err)
 	}
 
-	logger.Info("read backup operator image to use from ConfigMap", "configMap", config.OperatorAdditionalImagesConfigmapName, "key", key, "image", imageTag)
+	logging.Info(ctx, "read backup operator image to use from ConfigMap", "configMap", config.OperatorAdditionalImagesConfigmapName, "key", key, "image", imageTag)
 	return imageTag, nil
 }
 

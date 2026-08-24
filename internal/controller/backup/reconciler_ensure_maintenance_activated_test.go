@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,7 +20,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 			Return(true, nil)
 		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -36,7 +35,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 			Return(false, nil)
 		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -51,7 +50,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 			Return(false, nil)
 		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -74,7 +73,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 			Return(nil)
 		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -97,7 +96,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 			Return(false, assert.AnError)
 		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -115,7 +114,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 			Return(assert.AnError)
 		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)

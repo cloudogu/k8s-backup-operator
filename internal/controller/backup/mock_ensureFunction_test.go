@@ -6,7 +6,6 @@ import (
 	context "context"
 
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	logr "github.com/go-logr/logr"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -23,9 +22,9 @@ func (_m *mockEnsureFunction) EXPECT() *mockEnsureFunction_Expecter {
 	return &mockEnsureFunction_Expecter{mock: &_m.Mock}
 }
 
-// Execute provides a mock function with given fields: ctx, backup, logger
-func (_m *mockEnsureFunction) Execute(ctx context.Context, backup *v1.Backup, logger logr.Logger) (action, error) {
-	ret := _m.Called(ctx, backup, logger)
+// Execute provides a mock function with given fields: ctx, backup
+func (_m *mockEnsureFunction) Execute(ctx context.Context, backup *v1.Backup) (action, error) {
+	ret := _m.Called(ctx, backup)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Execute")
@@ -33,17 +32,17 @@ func (_m *mockEnsureFunction) Execute(ctx context.Context, backup *v1.Backup, lo
 
 	var r0 action
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, logr.Logger) (action, error)); ok {
-		return rf(ctx, backup, logger)
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (action, error)); ok {
+		return rf(ctx, backup)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, logr.Logger) action); ok {
-		r0 = rf(ctx, backup, logger)
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) action); ok {
+		r0 = rf(ctx, backup)
 	} else {
 		r0 = ret.Get(0).(action)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup, logr.Logger) error); ok {
-		r1 = rf(ctx, backup, logger)
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
+		r1 = rf(ctx, backup)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -59,14 +58,13 @@ type mockEnsureFunction_Execute_Call struct {
 // Execute is a helper method to define mock.On call
 //   - ctx context.Context
 //   - backup *v1.Backup
-//   - logger logr.Logger
-func (_e *mockEnsureFunction_Expecter) Execute(ctx interface{}, backup interface{}, logger interface{}) *mockEnsureFunction_Execute_Call {
-	return &mockEnsureFunction_Execute_Call{Call: _e.mock.On("Execute", ctx, backup, logger)}
+func (_e *mockEnsureFunction_Expecter) Execute(ctx interface{}, backup interface{}) *mockEnsureFunction_Execute_Call {
+	return &mockEnsureFunction_Execute_Call{Call: _e.mock.On("Execute", ctx, backup)}
 }
 
-func (_c *mockEnsureFunction_Execute_Call) Run(run func(ctx context.Context, backup *v1.Backup, logger logr.Logger)) *mockEnsureFunction_Execute_Call {
+func (_c *mockEnsureFunction_Execute_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockEnsureFunction_Execute_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup), args[2].(logr.Logger))
+		run(args[0].(context.Context), args[1].(*v1.Backup))
 	})
 	return _c
 }
@@ -76,7 +74,7 @@ func (_c *mockEnsureFunction_Execute_Call) Return(_a0 action, _a1 error) *mockEn
 	return _c
 }
 
-func (_c *mockEnsureFunction_Execute_Call) RunAndReturn(run func(context.Context, *v1.Backup, logr.Logger) (action, error)) *mockEnsureFunction_Execute_Call {
+func (_c *mockEnsureFunction_Execute_Call) RunAndReturn(run func(context.Context, *v1.Backup) (action, error)) *mockEnsureFunction_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }

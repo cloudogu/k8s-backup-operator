@@ -6,27 +6,37 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
-	"github.com/go-logr/logr"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const backupLeaseHolderKind = "Backup"
 
-func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup, _ logr.Logger) (action, error) {
+func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
 	result, err := manager.Acquire(ctx, backup, backupLeaseHolderKind)
-	return backupLeaseAction(backup, result, err)
+	return backupLeaseAction(ctx, backup, result, err)
 }
 
-func backupLeaseAction(backup *backupv1.Backup, result leases.Result, err error) (action, error) {
+func backupLeaseAction(ctx context.Context, backup *backupv1.Backup, result leases.Result, err error) (action, error) {
 	if err != nil {
 		return Abort, fmt.Errorf("acquire backup lease for backup %s: %w", backup.Name, err)
 	}
 	switch result.State {
-	case leases.StateAcquired:
+	case leases.StateHeld:
+		logging.Debug(ctx, "ensureActiveBackupLease: backup lease is held -> NEXT")
 		return Next, nil
-	case leases.StateChanged, leases.StateWaiting:
+	case leases.StateAcquired:
+		logging.Info(ctx, "acquired the backup lease", "lease", leases.DefaultName)
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the acquired backup lease must be observed again")
+		return Retry, nil
+	case leases.StateConflict:
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the backup lease was modified concurrently")
+		return Retry, nil
+	case leases.StateWaiting:
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "another operation still holds the backup lease", "holder", result.HolderName)
 		return Retry, nil
 	case leases.StateInvalid:
 		return Abort, fmt.Errorf("backup %s is blocked by invalid lease %s/%s without a resolvable holder", backup.Name, backup.Namespace, leases.DefaultName)
@@ -35,17 +45,58 @@ func backupLeaseAction(backup *backupv1.Backup, result leases.Result, err error)
 	}
 }
 
-func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup, _ logr.Logger) (action, error) {
+func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	resolver := backupHolderResolver{client: c.client}
 	if !resolver.IsTerminal(backup) && backup.DeletionTimestamp.IsZero() {
 		return Next, nil
 	}
 
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, resolver)
-	if _, err := manager.Release(ctx, backup, backupLeaseHolderKind); err != nil {
+	released, err := manager.Release(ctx, backup, backupLeaseHolderKind)
+	if err != nil {
 		return Abort, fmt.Errorf("release backup lease for backup %s: %w", backup.Name, err)
 	}
+	if !released {
+		logging.Debug(ctx, "ensureBackupLeaseReleased: backup does not hold the lease -> NEXT")
+		return Next, nil
+	}
+
+	logging.Info(ctx, "released the backup lease", "lease", leases.DefaultName)
+	// Releasing the lease is the last action of a backup run, so this is the single point at which
+	// the run can be reported as finished exactly once. A backup that is being deleted has no run
+	// outcome to report.
+	if backup.DeletionTimestamp.IsZero() {
+		logging.Info(ctx, "backup finished", "outcome", backupRunOutcome(backup), "duration", backupRunDuration(backup))
+	}
 	return Next, nil
+}
+
+// backupRunOutcome derives how a finished backup run ended from its conditions.
+func backupRunOutcome(backup *backupv1.Backup) string {
+	if meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled) {
+		return "canceled"
+	}
+	succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+	switch {
+	case succeeded == nil:
+		return "unknown"
+	case succeeded.Status == metav1.ConditionTrue:
+		return "succeeded"
+	case succeeded.Status == metav1.ConditionFalse:
+		return "failed"
+	default:
+		return "unknown"
+	}
+}
+
+// backupRunDuration reports how long the backup ran, or "unknown" while a timestamp is missing.
+func backupRunDuration(backup *backupv1.Backup) string {
+	start := backup.Status.StartTimestamp
+	completion := backup.Status.CompletionTimestamp
+	if start.IsZero() || completion.IsZero() {
+		return "unknown"
+	}
+	return completion.Sub(start.Time).String()
 }
 
 type backupHolderResolver struct {

@@ -4,9 +4,9 @@ import (
 	"context"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -23,7 +23,6 @@ type defaultMetadataManager struct {
 
 // ensure adds the required BackupSchedule finalizer and labels, patching only when metadata changes.
 func (m defaultMetadataManager) ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	logger := log.FromContext(ctx)
 
 	before := schedule.DeepCopy()
 	changed := false
@@ -46,13 +45,12 @@ func (m defaultMetadataManager) ensure(ctx context.Context, schedule *backupv1.B
 		return err
 	}
 
-	logger.Info("updated BackupSchedule metadata")
+	logging.Info(ctx, "updated BackupSchedule metadata")
 	return nil
 }
 
 // remove deletes the BackupSchedule finalizer when present without changing other metadata.
 func (m defaultMetadataManager) remove(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	logger := log.FromContext(ctx)
 
 	if !controllerutil.ContainsFinalizer(schedule, backupv1.BackupScheduleFinalizer) {
 		return nil
@@ -65,7 +63,7 @@ func (m defaultMetadataManager) remove(ctx context.Context, schedule *backupv1.B
 		return err
 	}
 
-	logger.Info("removed BackupSchedule finalizer")
+	logging.Info(ctx, "removed BackupSchedule finalizer")
 	return nil
 }
 

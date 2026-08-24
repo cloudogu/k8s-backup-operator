@@ -4,15 +4,14 @@ import (
 	"context"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type defaultReconciler struct {
@@ -47,13 +46,12 @@ func newReconciler(client client.Client, recorder eventRecorder, operatorImage s
 // reconcile brings the requested BackupSchedule and its CronJob closer to their desired state as
 // part of the reconcile loop
 func (r *defaultReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
 
-	debug(logger, "starting BackupSchedule reconciliation")
+	logging.Debug(ctx, "starting BackupSchedule reconciliation")
 	schedule, err := r.getBackupSchedule(ctx, req.NamespacedName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Info("BackupSchedule for reconcile no longer exists")
+			logging.Info(ctx, "BackupSchedule for reconcile no longer exists")
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -61,7 +59,7 @@ func (r *defaultReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 	original := schedule.DeepCopy()
 
 	if !schedule.DeletionTimestamp.IsZero() {
-		logger.Info("reconciling BackupSchedule: deletion")
+		logging.Info(ctx, "reconciling BackupSchedule: deletion")
 
 		// set the deletion state before doing anything else
 		// Removing the finalizer may delete the resource immediately
@@ -85,7 +83,7 @@ func (r *defaultReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, reconcileErr
 	}
 
-	debug(logger, "BackupSchedule reconciliation completed")
+	logging.Debug(ctx, "BackupSchedule reconciliation completed")
 	return ctrl.Result{}, nil
 
 }
@@ -111,9 +109,8 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 // reconcileNormal ensures metadata like labels and finalizers, validates that the schedule, is a valid cronjob schedule
 // and synchronizes the managed CronJob to the BackupSchedule resource.
 func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-	logger := log.FromContext(ctx)
 
-	debug(logger, "BackupSchedule reconciliation for backupschedule")
+	logging.Debug(ctx, "BackupSchedule reconciliation for backupschedule")
 	if err := r.metadata.ensure(ctx, schedule); err != nil {
 		r.conditions.markAcceptanceNotEvaluated(schedule, err)
 		r.conditions.markNotReady(schedule, backupv1.ReasonNotEvaluated, "Required metadata could not be persisted: "+err.Error())
@@ -127,7 +124,7 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 			schedule, corev1.EventTypeWarning, backupv1.InvalidScheduleEventReason,
 			"BackupSchedule has an invalid schedule: %v", err,
 		)
-		logger.Error(err, "BackupSchedule spec is invalid, skipping CronJob synchronization")
+		logging.Error(ctx, err, "BackupSchedule spec is invalid, skipping CronJob synchronization")
 
 		// invalid spec should not be reconciled again before it is edited
 		return nil
@@ -148,7 +145,6 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 
 // patchStatus persists the BackupSchedule status when it differs from the original status.
 func (r *defaultReconciler) patchStatus(ctx context.Context, before, after *backupv1.BackupSchedule) error {
-	logger := log.FromContext(ctx)
 
 	if equality.Semantic.DeepEqual(before.Status, after.Status) {
 		return nil
@@ -158,7 +154,7 @@ func (r *defaultReconciler) patchStatus(ctx context.Context, before, after *back
 		return err
 	}
 
-	debug(logger, "patched BackupSchedule status")
+	logging.Debug(ctx, "patched BackupSchedule status")
 	return nil
 }
 
@@ -171,9 +167,4 @@ func (r *defaultReconciler) getBackupSchedule(ctx context.Context, name types.Na
 	}
 
 	return schedule, nil
-}
-
-// debug logs a message at debug verbosity.
-func debug(logger logr.Logger, message string, keysAndValues ...any) {
-	logger.V(1).Info(message, keysAndValues...)
 }

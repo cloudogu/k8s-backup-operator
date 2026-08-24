@@ -21,6 +21,8 @@ flowchart TD
 
 Der Controller beobachtet sowohl Parent-`Restore`-Ressourcen als auch owned Velero-`Restore`-Children. Es gibt bewusst weder einen controllerweiten Event-Filter noch eine `GenerationChangedPredicate`: Provider-Phasenwechsel sowie Status-, Finalizer- und Löschereignisse des Parents müssen einen Reconcile auslösen können.
 
+Das Logging verwendet den vom `controller-runtime` im `context.Context` bereitgestellten `logr.Logger`. Restore-Stages und aufgerufene Manager reichen deshalb den vorhandenen Context weiter und greifen über `internal/logging` auf den Logger zu; ein zusätzlicher Logger-Parameter oder eine erneute Initialisierung pro Methode ist nicht erforderlich. Ein neuer `context.Background()` innerhalb des Workflows würde neben Abbruch und Deadline auch den Request-Logger verlieren und ist deshalb zu vermeiden.
+
 ### Stage-Ergebnisse
 
 Eine Stage liefert genau eines der folgenden Ergebnisse:

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -29,7 +28,7 @@ func TestReconcilerEnsureCompletedBackupIsIgnored(t *testing.T) {
 
 			reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock(), "default")
 
-			nextAction, err := reconciler.ensureCompletedBackupIsIgnored(context.Background(), backup, logr.Discard())
+			nextAction, err := reconciler.ensureCompletedBackupIsIgnored(context.Background(), backup)
 
 			assert.NoError(t, err)
 			assert.Equal(t, test.action, nextAction)
@@ -44,7 +43,7 @@ func TestReconcilerEnsureCompletedBackupIsIgnored(t *testing.T) {
 
 		reconciler := NewReconciler(fakeClient, maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureCompletedBackupIsIgnored(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureCompletedBackupIsIgnored(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)

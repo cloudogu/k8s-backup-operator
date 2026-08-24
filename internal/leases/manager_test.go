@@ -31,11 +31,12 @@ func TestManagerAcquire(t *testing.T) {
 
 		result, err := manager.Acquire(ctx, holder, testKind)
 		require.NoError(t, err)
-		assert.Equal(t, StateChanged, result.State)
+		assert.Equal(t, StateAcquired, result.State)
+		assert.Equal(t, holder.Name, result.HolderName)
 
 		result, err = manager.Acquire(ctx, holder, testKind)
 		require.NoError(t, err)
-		assert.Equal(t, StateAcquired, result.State)
+		assert.Equal(t, StateHeld, result.State)
 		assert.Equal(t, holder.Name, result.HolderName)
 	})
 
@@ -97,7 +98,8 @@ func TestManagerAcquire(t *testing.T) {
 
 		result, err := manager.Acquire(ctx, contender, testKind)
 		require.NoError(t, err)
-		assert.Equal(t, StateChanged, result.State)
+		assert.Equal(t, StateAcquired, result.State)
+		assert.Equal(t, contender.Name, result.HolderName)
 
 		stored := &coordinationv1.Lease{}
 		require.NoError(t, k8sClient.Get(ctx, client.ObjectKeyFromObject(lease), stored))

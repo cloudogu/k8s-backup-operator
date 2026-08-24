@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -54,5 +55,7 @@ func (r *restoreReconciler) ensureScaleUpInitiated(
 
 	// The status write ends this reconciliation. The following reconciliation verifies ScaleUp
 	// idempotently before the workflow proceeds to workload observation.
+	logging.Info(ctx, "scaling up the workloads")
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the initiated workload scale-up was persisted")
 	return updated, retryAfter(defaultRequeueDelay)
 }

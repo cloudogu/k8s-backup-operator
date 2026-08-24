@@ -6,11 +6,9 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
-	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -24,21 +22,21 @@ const (
 )
 
 type reconciler interface {
-	ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
-	ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+	ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (action, error)
 }
 
-type ensureFunction func(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error)
+type ensureFunction func(ctx context.Context, backup *backupv1.Backup) (action, error)
 
 func NewController(client client.Client, reconciler reconciler, requeueAfter time.Duration) *Controller {
 	return &Controller{
@@ -55,7 +53,6 @@ type Controller struct {
 }
 
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
 	metrics.UpdateBackupReconcileTotalMetric()
 
 	var backup = backupv1.Backup{}
@@ -83,7 +80,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	for _, ensure := range ensureFunctions {
-		nextAction, err := ensure(ctx, &backup, logger)
+		nextAction, err := ensure(ctx, &backup)
 		switch nextAction {
 		case Retry:
 			return ctrl.Result{RequeueAfter: c.requeueAfter}, err

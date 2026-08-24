@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
@@ -123,7 +123,6 @@ func CheckRestoreForConflicts(parent *k8sv1.Restore, child *velerov1.Restore) er
 // after a crash between child creation and parent status persistence safe. An existing child that is
 // not usable yields a *ConflictError and is neither deleted, mutated nor claimed.
 func EnsureRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.Restore) (*velerov1.Restore, error) {
-	logger := log.FromContext(ctx)
 
 	existing, err := GetRestore(ctx, k8sClient, parent)
 	if err != nil {
@@ -135,7 +134,7 @@ func EnsureRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.R
 			return nil, conflictErr
 		}
 
-		logger.Info(fmt.Sprintf("velero restore [%s] already exists and is ours: reuse it", existing.Name))
+		logging.Info(ctx, fmt.Sprintf("velero restore [%s] already exists and is ours: reuse it", existing.Name))
 
 		return existing, nil
 	}
@@ -153,12 +152,11 @@ func EnsureRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.R
 // The UID precondition prevents a namesake that replaced the classified child from being deleted.
 // An already absent child is not an error.
 func DeleteRestore(ctx context.Context, k8sClient client.Client, child *velerov1.Restore) error {
-	logger := log.FromContext(ctx)
 
 	uid := child.UID
 	err := k8sClient.Delete(ctx, child, client.Preconditions{UID: &uid})
 	if apierrors.IsNotFound(err) {
-		logger.Info(fmt.Sprintf("velero restore [%s] is already gone: ignore", child.Name))
+		logging.Info(ctx, fmt.Sprintf("velero restore [%s] is already gone: ignore", child.Name))
 
 		return nil
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -45,5 +46,7 @@ func (r *restoreReconciler) ensureMaintenanceModeDeactivated(
 		))
 	}
 
+	logging.Info(ctx, "deactivated maintenance mode")
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the maintenance mode deactivation was persisted")
 	return updated, retryAfter(defaultRequeueDelay)
 }

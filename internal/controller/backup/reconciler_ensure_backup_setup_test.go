@@ -9,7 +9,6 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	apiMeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +25,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		expectedLabels := map[string]string{}
 		maps.Copy(expectedLabels, defaultLabels)
@@ -48,7 +47,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		expectedLabels := map[string]string{}
 		maps.Copy(expectedLabels, backup.Labels)
@@ -67,7 +66,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -87,7 +86,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -112,7 +111,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -140,7 +139,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -169,7 +168,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -195,7 +194,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -225,7 +224,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)

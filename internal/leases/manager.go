@@ -21,10 +21,16 @@ const (
 type State int
 
 const (
-	StateAcquired State = iota
+	// StateHeld reports that the lease is already held by the given holder.
+	StateHeld State = iota
+	// StateWaiting reports that another, still active holder owns the lease.
 	StateWaiting
+	// StateInvalid reports that the lease cannot be interpreted and needs manual intervention.
 	StateInvalid
-	StateChanged
+	// StateConflict reports that the lease was modified concurrently and must be observed again.
+	StateConflict
+	// StateAcquired reports that this call created or took over the lease.
+	StateAcquired
 )
 
 type Result struct {
@@ -68,17 +74,20 @@ func (m *Manager) Acquire(ctx context.Context, holder client.Object, kind string
 	err := m.client.Get(ctx, key, lease)
 	if apierrors.IsNotFound(err) {
 		lease = NewLease(m.namespace, m.name, holder, kind)
-		if createErr := m.client.Create(ctx, lease); createErr != nil && !apierrors.IsAlreadyExists(createErr) {
+		if createErr := m.client.Create(ctx, lease); createErr != nil {
+			if apierrors.IsAlreadyExists(createErr) {
+				return Result{State: StateConflict}, nil
+			}
 			return Result{}, fmt.Errorf("failed to create lease %s/%s: %w", key.Namespace, key.Name, createErr)
 		}
-		return Result{State: StateChanged}, nil
+		return Result{State: StateAcquired, HolderName: holder.GetName()}, nil
 	}
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to get lease %s/%s: %w", key.Namespace, key.Name, err)
 	}
 
 	if IsHolder(lease, holder, kind) {
-		return Result{State: StateAcquired, HolderName: holder.GetName()}, nil
+		return Result{State: StateHeld, HolderName: holder.GetName()}, nil
 	}
 
 	leaseKind := lease.Annotations[HolderKindAnnotation]
@@ -102,11 +111,11 @@ func (m *Manager) Acquire(ctx context.Context, holder client.Object, kind string
 	Claim(lease, holder, kind)
 	if updateErr := m.client.Update(ctx, lease); updateErr != nil {
 		if apierrors.IsConflict(updateErr) {
-			return Result{State: StateChanged}, nil
+			return Result{State: StateConflict}, nil
 		}
 		return Result{}, fmt.Errorf("failed to take over stale lease %s/%s: %w", key.Namespace, key.Name, updateErr)
 	}
-	return Result{State: StateChanged}, nil
+	return Result{State: StateAcquired, HolderName: holder.GetName()}, nil
 }
 
 func (m *Manager) Release(ctx context.Context, holder client.Object, kind string) (bool, error) {

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -34,7 +33,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(time.Duration(timeLimitInMinutes)*time.Minute - time.Millisecond))
 		reconciler := NewReconciler(fakeClient, nil, clockMock, "default")
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -66,7 +65,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 
 		require.True(t, backup.Status.StartTimestamp.IsZero())
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -98,7 +97,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
 		reconciler := NewReconciler(fakeClient, nil, clockMock, "default")
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -131,7 +130,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
 		reconciler := NewReconciler(fakeClient, nil, clockMock, "default")
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -164,7 +163,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
 		reconciler := NewReconciler(fakeClient, nil, clockMock, "default")
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)

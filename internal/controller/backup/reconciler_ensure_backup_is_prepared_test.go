@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -22,7 +21,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -45,7 +44,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
@@ -68,7 +67,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -92,7 +91,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -110,7 +109,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -128,7 +127,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)
@@ -145,7 +144,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)

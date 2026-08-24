@@ -7,7 +7,6 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -27,7 +26,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 
 		require.True(t, backup.Status.StartTimestamp.IsZero())
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		assert.NotNil(t, completedCondition)
@@ -56,7 +55,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		assert.NotNil(t, completedCondition)
@@ -87,7 +86,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -107,7 +106,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "get error")
@@ -125,7 +124,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "patch error")
@@ -143,7 +142,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup, logr.Discard())
+		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "create error")

@@ -44,10 +44,10 @@ func TestControllerReconcile(t *testing.T) {
 		allowLeaseStages(reconcilerMock)
 		controller := NewController(fakeClient, reconcilerMock, requeueAfterTest)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureVeleroStatusSynced(context.Background(), mock.Anything, mock.Anything).
+			ensureVeleroStatusSynced(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -64,10 +64,10 @@ func TestControllerReconcile(t *testing.T) {
 		allowLeaseStages(reconcilerMock)
 		controller := NewController(fakeClient, reconcilerMock, requeueAfterTest)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureVeleroStatusSynced(context.Background(), mock.Anything, mock.Anything).
+			ensureVeleroStatusSynced(context.Background(), mock.Anything).
 			Return(Retry, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -79,7 +79,7 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check backup deletion and retry", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Retry, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -91,11 +91,11 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check backup deletion and proceed to the next step", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -107,7 +107,7 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check backup deletion and abort", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -119,7 +119,7 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check backup completion and abort", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -131,17 +131,17 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check backup completion and proceed to the next step", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -153,16 +153,16 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check backup cancellation and abort", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -174,20 +174,20 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check backup cancellation and proceed to the next step", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -199,19 +199,19 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check if the velero backup storage is available and retry", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Retry, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -223,19 +223,19 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check if the velero backup storage is available and abort", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Abort, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -247,23 +247,23 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check if the velero backup storage is available and proceed to the next step", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -275,22 +275,22 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check if the maintenance mode is active and retry", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Retry, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -302,22 +302,22 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check if the maintenance mode is active and abort", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Abort, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -329,26 +329,26 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check if the maintenance mode is active and proceed to the next step", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCreated(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCreated(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -360,25 +360,25 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check velero backup resource and retry", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCreated(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCreated(context.Background(), mock.Anything).
 			Return(Retry, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -390,25 +390,25 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check velero backup resource and abort", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCreated(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCreated(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -420,29 +420,29 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check velero backup resource and proceed to the next step", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCreated(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCreated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCompleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCompleted(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -454,28 +454,28 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check velero backup completion and retry", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCreated(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCreated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCompleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCompleted(context.Background(), mock.Anything).
 			Return(Retry, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -487,28 +487,28 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check velero backup completion and abort", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCreated(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCreated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCompleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCompleted(context.Background(), mock.Anything).
 			Return(Abort, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -520,32 +520,32 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check velero backup completion and proceed to the next step", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCreated(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCreated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCompleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCompleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		// The next step was called.
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Abort, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -557,31 +557,31 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check maintenance mode active after backup and retry", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil).Once()
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCreated(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCreated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCompleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCompleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Retry, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -593,31 +593,31 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check maintenance mode active after backup and abort", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil).Once()
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCreated(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCreated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCompleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCompleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Abort, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -629,28 +629,28 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("check maintenance mode active after backup and proceed to the next step", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsPrepared(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsPrepared(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceActivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceActivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCreated(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCreated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupCompleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupCompleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -666,19 +666,19 @@ func TestControllerReconcile(t *testing.T) {
 		allowLeaseStages(reconcilerMock)
 		controller := NewController(fakeClient, reconcilerMock, requeueAfterTest)
 		reconcilerMock.EXPECT().
-			ensureVeleroStatusSynced(context.Background(), mock.Anything, mock.Anything).
+			ensureVeleroStatusSynced(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupSetup(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupSetup(context.Background(), mock.Anything).
 			Return(Retry, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -690,16 +690,16 @@ func TestControllerReconcile(t *testing.T) {
 	t.Run("retry when checking whether the backup is canceled", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
-			ensureProviderBackupDeleted(context.Background(), mock.Anything, mock.Anything).
+			ensureProviderBackupDeleted(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureMaintenanceDeactivated(context.Background(), mock.Anything, mock.Anything).
+			ensureMaintenanceDeactivated(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything, mock.Anything).
+			ensureCompletedBackupIsIgnored(context.Background(), mock.Anything).
 			Return(Next, nil)
 		reconcilerMock.EXPECT().
-			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything, mock.Anything).
+			ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), mock.Anything).
 			Return(Retry, assert.AnError)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -750,8 +750,8 @@ func newReconcilerRequest(namespace string, name string) ctrl.Request {
 }
 
 func allowLeaseStages(reconcilerMock *mockReconciler) {
-	reconcilerMock.EXPECT().ensureBackupLeaseReleased(mock.Anything, mock.Anything, mock.Anything).Return(Next, nil).Maybe()
-	reconcilerMock.EXPECT().ensureActiveBackupLease(mock.Anything, mock.Anything, mock.Anything).Return(Next, nil).Maybe()
+	reconcilerMock.EXPECT().ensureBackupLeaseReleased(mock.Anything, mock.Anything).Return(Next, nil).Maybe()
+	reconcilerMock.EXPECT().ensureActiveBackupLease(mock.Anything, mock.Anything).Return(Next, nil).Maybe()
 }
 
 func newTestFixtureForControllerTest(t *testing.T) (*mockReconciler, *Controller) {
@@ -763,10 +763,10 @@ func newTestFixtureForControllerTest(t *testing.T) (*mockReconciler, *Controller
 	reconcilerMock := newMockReconciler(t)
 	allowLeaseStages(reconcilerMock)
 	reconcilerMock.EXPECT().
-		ensureVeleroStatusSynced(context.Background(), mock.Anything, mock.Anything).
+		ensureVeleroStatusSynced(context.Background(), mock.Anything).
 		Return(Next, nil).Maybe()
 	reconcilerMock.EXPECT().
-		ensureBackupSetup(context.Background(), mock.Anything, mock.Anything).
+		ensureBackupSetup(context.Background(), mock.Anything).
 		Return(Next, nil).Maybe()
 	controller := NewController(fakeClient, reconcilerMock, time.Duration(5)*time.Second)
 	return reconcilerMock, controller

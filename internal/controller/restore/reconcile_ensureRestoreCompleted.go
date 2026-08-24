@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +27,7 @@ func (r *restoreReconciler) ensureRestoreCompleted(
 	if recovery == nil ||
 		recovery.Status != metav1.ConditionUnknown ||
 		recovery.Reason != ReasonMaintenanceModeDeactivated {
+		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workload recovery has not completed yet")
 		return restore, retryAfter(defaultRequeueDelay)
 	}
 
@@ -40,6 +42,7 @@ func (r *restoreReconciler) ensureRestoreCompleted(
 	}
 
 	r.recorder.Event(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Restore successful")
+	logging.Info(ctx, "restore completed successfully")
 
 	return updated, abort()
 }

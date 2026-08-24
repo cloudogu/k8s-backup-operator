@@ -7,7 +7,6 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -27,7 +26,7 @@ func TestBackupLease(t *testing.T) {
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup).Build()
 		reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup, logr.Discard())
+		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 		require.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
 
@@ -38,7 +37,7 @@ func TestBackupLease(t *testing.T) {
 		assert.Equal(t, backup.Name, lease.Annotations[leases.HolderNameAnnotation])
 		assert.Equal(t, backupLeaseHolderKind, lease.Annotations[leases.HolderKindAnnotation])
 
-		nextAction, err = reconciler.ensureActiveBackupLease(ctx, backup, logr.Discard())
+		nextAction, err = reconciler.ensureActiveBackupLease(ctx, backup)
 		require.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 	})
@@ -53,7 +52,7 @@ func TestBackupLease(t *testing.T) {
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup, lease).Build()
 		reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup, logr.Discard())
+		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 		require.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
 
@@ -70,7 +69,7 @@ func TestBackupLease(t *testing.T) {
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup, lease).Build()
 		reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup, logr.Discard())
+		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 
 		assert.Equal(t, Abort, nextAction)
 		require.ErrorContains(t, err, "blocked by invalid lease")
@@ -85,7 +84,7 @@ func TestBackupLease(t *testing.T) {
 		}).Build()
 		reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup, logr.Discard())
+		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 
 		assert.Equal(t, Abort, nextAction)
 		require.ErrorContains(t, err, "acquire backup lease")
@@ -94,7 +93,7 @@ func TestBackupLease(t *testing.T) {
 	t.Run("rejects an unknown acquisition state", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 
-		nextAction, err := backupLeaseAction(backup, leases.Result{State: leases.State(99)}, nil)
+		nextAction, err := backupLeaseAction(ctx, backup, leases.Result{State: leases.State(99)}, nil)
 
 		assert.Equal(t, Abort, nextAction)
 		require.ErrorContains(t, err, "unknown backup lease acquisition state 99")
@@ -108,7 +107,7 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 		backup := newBackupWithSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionUnknown)
 		reconciler := NewReconciler(nil, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup)
 
 		require.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -130,7 +129,7 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 			k8sClient := newFakeClientBuilder(t).WithObjects(lease).Build()
 			reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
 
-			nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, tt.backup, logr.Discard())
+			nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, tt.backup)
 
 			require.NoError(t, err)
 			assert.Equal(t, Next, nextAction)
@@ -148,7 +147,7 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 		}).Build()
 		reconciler := NewReconciler(k8sClient, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup, logr.Discard())
+		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup)
 
 		assert.Equal(t, Abort, nextAction)
 		require.ErrorContains(t, err, "release backup lease")
