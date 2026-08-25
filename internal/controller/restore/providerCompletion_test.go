@@ -69,7 +69,6 @@ func TestACompletedProviderRestoreResolvesItsMilestoneAndThenContinuesTheWorkflo
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Times(2)
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreCompleted, "Provider restore completed").Once()
 	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason,
 		"Successfully completed the provider restore [%s]", testRestore).Return()
@@ -108,7 +107,6 @@ func TestAFailedProviderRestoreIsTerminalWithoutRecoveringTheWorkloads(t *testin
 			restore := startableRestore()
 
 			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
 			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
 			maintenanceMock := newMockMaintenanceModeSwitch(t)
 			maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
@@ -143,7 +141,6 @@ func TestAFailedProviderRestoreIsReportedEvenWhenTheMaintenanceModeStaysOn(t *te
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
@@ -168,7 +165,6 @@ func TestAFailedProviderRestoreIsReportedEvenWhenTheMaintenanceModeStaysOn(t *te
 func TestAnUnpersistableProviderRestoreStateIsRetried(t *testing.T) {
 	restore := startableRestore()
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
 	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
@@ -188,7 +184,6 @@ func TestAnUnreportableProviderRestoreFailureIsRetried(t *testing.T) {
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)

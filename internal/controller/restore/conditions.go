@@ -23,6 +23,10 @@ const (
 	// ReasonInvalidRestoreLease marks a restore blocked by a namespace-wide restore lease whose
 	// holder cannot be identified safely.
 	ReasonInvalidRestoreLease = "InvalidRestoreLease"
+	// ReasonPreparationFailed marks a failed preparation.
+	ReasonCleanupCompleted = "CleanupCompleted"
+	// ReasonPreparationFailed marks a failed preparation.
+	ReasonCleanupFailed = "CleanupFailed"
 	// ReasonPreparing marks a running destructive preparation, i.e. scale-down and cleanup.
 	ReasonPreparing = "Preparing"
 	// ReasonPreparationFailed marks a failed preparation.

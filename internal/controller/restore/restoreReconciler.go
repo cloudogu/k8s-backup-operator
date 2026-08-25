@@ -262,7 +262,6 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		return restore, retryOnError(err)
 	}
 	if prepared {
-		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed")
 		return restore, next()
 	}
 
@@ -279,8 +278,11 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	logging.Info(ctx, "scaled down the workloads")
 
 	if err := r.cleanup.Cleanup(ctx); err != nil {
+		r.recorder.Event(restore, corev1.EventTypeWarning, ReasonCleanupFailed, "Cleanup before restore failed")
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to cleanup before restore: %w", err))
 	}
+
+	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonCleanupCompleted, "Cleanup before restore completed")
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
 		Type:    k8sv1.ConditionPrepared,
@@ -294,6 +296,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore preparation was persisted")
+	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed")
 	return updated, retryAfter(r.requeueDelay)
 }
 

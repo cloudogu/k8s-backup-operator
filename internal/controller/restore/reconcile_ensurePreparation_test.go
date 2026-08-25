@@ -30,6 +30,9 @@ func assertPreparedCondition(t *testing.T, testClient client.Client, status meta
 
 func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheRestore(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonCleanupCompleted, "Cleanup before restore completed").Once()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
 
 	expectReadinessCheck(t, nil)
 	scaleMock := newMockScaleManager(t)
@@ -38,7 +41,7 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
 
 		return reconciler.Reconcile
 	}
@@ -57,7 +60,6 @@ func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testi
 	restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
@@ -88,7 +90,6 @@ func TestPreparationIsSkippedForAnUnpreparedRestoreThatAlreadyHasAProviderChild(
 
 	writes := &clientWrites{}
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
 	reconciler := &restoreReconciler{
 		namespace: testNamespace,
 		recorder:  recorderMock,
@@ -108,6 +109,9 @@ func TestPreparationIsSkippedForAnUnpreparedRestoreThatAlreadyHasAProviderChild(
 
 func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonCleanupCompleted, "Cleanup before restore completed").Once()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
 
 	expectReadinessCheck(t, nil)
 	scaleMock := newMockScaleManager(t)
@@ -116,7 +120,7 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
 		return reconciler.Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
@@ -160,6 +164,7 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, ReasonPreparationFailed, "The preparation of the ecosystem failed -> retrying").Once()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, ReasonCleanupFailed, "Cleanup before restore failed").Once()
 
 	expectReadinessCheck(t, nil)
 	scaleMock := newMockScaleManager(t)
@@ -183,6 +188,8 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 
 func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonCleanupCompleted, "Cleanup before restore completed").Once()
 
 	expectReadinessCheck(t, nil)
 	scaleMock := newMockScaleManager(t)
@@ -191,7 +198,7 @@ func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, nil, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
 		return reconciler.Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore)

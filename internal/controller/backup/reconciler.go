@@ -167,7 +167,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			if patchErr != nil {
 				return Abort, fmt.Errorf("patch conditions while waiting for provider backup completion: %w", patchErr)
 			}
-
+			c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupDeletion, "Waiting for the provider backup to complete")
 			return Retry, nil
 		}
 
