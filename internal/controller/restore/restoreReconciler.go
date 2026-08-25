@@ -88,6 +88,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// - no increment, just create if not exists
 	metrics.InitRestoreConditionTransitionMetrics(restore.Namespace, restore.Name, restore.Spec.BackupName)
 	metrics.InitRestoreStatusMetrics(restore.Namespace, restore.Name, restore.Spec.BackupName)
+	metrics.InitInvalidLeaseTotalMetric(restore.Namespace, restore.Name)
 
 	switch requiredOperation(restore) {
 	case operationDelete:
