@@ -50,6 +50,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		assert.True(t, backup.Status.CompletionTimestamp.Equal(&completion))
 		assertCondition(t, backup, backupv1.ConditionPrepared, metav1.ConditionTrue, reasonVeleroStatusSynced)
 		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionTrue, reasonVeleroStatusSynced)
+		assertCondition(t, backup, backupv1.ConditionProviderSucceeded, metav1.ConditionTrue, reasonVeleroStatusSynced)
 	})
 
 	t.Run("running Velero backup is synchronized and retried", func(t *testing.T) {
@@ -68,6 +69,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		assert.Equal(t, Retry, nextAction)
 		assert.Equal(t, backupv1.BackupStatusInProgress, backup.Status.Status)
 		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionUnknown, reasonVeleroBackupRunning)
+		assertCondition(t, backup, backupv1.ConditionProviderSucceeded, metav1.ConditionUnknown, reasonVeleroBackupRunning)
 	})
 
 	t.Run("failed Velero backup is synchronized and aborted", func(t *testing.T) {
@@ -86,6 +88,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		assert.Equal(t, Abort, nextAction)
 		assert.Equal(t, backupv1.BackupStatusFailed, backup.Status.Status)
 		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionFalse, reasonVeleroBackupFailed)
+		assertCondition(t, backup, backupv1.ConditionProviderSucceeded, metav1.ConditionFalse, reasonVeleroBackupFailed)
 	})
 
 	t.Run("reading the Velero backup fails", func(t *testing.T) {
@@ -132,6 +135,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			assert.Equal(t, Abort, nextAction)
 			assert.Equal(t, backupv1.BackupStatusFailed, backup.Status.Status)
 			assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionFalse, reasonVeleroBackupFailed)
+			assertCondition(t, backup, backupv1.ConditionProviderSucceeded, metav1.ConditionFalse, reasonVeleroBackupFailed)
 		})
 	}
 
@@ -148,6 +152,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		assert.Equal(t, Retry, nextAction)
 		assert.Equal(t, backupv1.BackupStatusInProgress, backup.Status.Status)
 		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionUnknown, reasonVeleroBackupRunning)
+		assertCondition(t, backup, backupv1.ConditionProviderSucceeded, metav1.ConditionUnknown, reasonVeleroBackupRunning)
 	})
 
 	t.Run("missing timestamps remain empty", func(t *testing.T) {

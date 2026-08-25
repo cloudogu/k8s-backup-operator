@@ -370,19 +370,6 @@ func expectRestoreRead(t *testing.T, clientMock *mockK8sClient, restore *backupv
 		Return(nil)
 }
 
-func expectRestoreList(t *testing.T, clientMock *mockK8sClient, restores ...*backupv1.Restore) {
-	t.Helper()
-	clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).
-		Run(func(_ context.Context, list client.ObjectList, _ ...client.ListOption) {
-			actual, ok := list.(*backupv1.RestoreList)
-			require.True(t, ok)
-			for _, restore := range restores {
-				actual.Items = append(actual.Items, *restore.DeepCopy())
-			}
-		}).
-		Return(nil)
-}
-
 func restoreWithIdentity(name string, uid types.UID) *backupv1.Restore {
 	restore := newParentRestore()
 	restore.Name = name

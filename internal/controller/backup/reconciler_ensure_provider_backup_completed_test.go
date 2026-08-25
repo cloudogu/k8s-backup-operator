@@ -30,7 +30,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
 
-		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionProviderSucceeded)
 		assert.NotNil(t, succeededCondition)
 		assert.Equal(t, metav1.ConditionUnknown, succeededCondition.Status)
 		assert.Equal(t, reasonProviderBackupInProgress, succeededCondition.Reason)
@@ -55,7 +55,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 
-		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionProviderSucceeded)
 		assert.NotNil(t, succeededCondition)
 		assert.Equal(t, metav1.ConditionFalse, succeededCondition.Status)
 		assert.Equal(t, reasonProviderBackupFailed, succeededCondition.Reason)
@@ -88,7 +88,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 
-		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionProviderSucceeded)
 		assert.NotNil(t, succeededCondition)
 		assert.Equal(t, metav1.ConditionFalse, succeededCondition.Status)
 		assert.Equal(t, reasonProviderBackupFailed, succeededCondition.Reason)
@@ -119,7 +119,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 
-		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionProviderSucceeded)
 		assert.NotNil(t, succeededCondition)
 		assert.Equal(t, metav1.ConditionTrue, succeededCondition.Status)
 		assert.Equal(t, reasonProviderBackupSucceeded, succeededCondition.Reason)
@@ -146,7 +146,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 
-		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionProviderSucceeded)
 		assert.NotNil(t, succeededCondition)
 		assert.Equal(t, metav1.ConditionTrue, succeededCondition.Status)
 		assert.Equal(t, reasonProviderBackupSucceeded, succeededCondition.Reason)

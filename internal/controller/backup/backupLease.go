@@ -50,15 +50,16 @@ func (c *defaultReconciler) backupLeaseAction(ctx context.Context, backup *backu
 }
 
 func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	resolver := backupHolderResolver{client: c.client}
-	if !resolver.IsTerminal(backup) && backup.DeletionTimestamp.IsZero() {
-		return Next, nil
+	// Safety-net, should normally not happen. Retry until provider is finished
+	if !isPostProcessing(backup) && backup.DeletionTimestamp.IsZero() {
+		logging.Debug(ctx, "ensureBackupLeaseReleased: the backup run is not finished -> RETRY")
+		return Retry, nil
 	}
 
-	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, resolver)
+	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
 	released, err := manager.Release(ctx, backup, backupLeaseHolderKind)
 	if err != nil {
-	    c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Releasing the backup lease failed")
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Releasing the backup lease failed")
 		return Abort, fmt.Errorf("release backup lease for backup %s: %w", backup.Name, err)
 	}
 	if !released {
@@ -67,12 +68,6 @@ func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backu
 	}
 
 	logging.Info(ctx, "released the backup lease", "lease", leases.DefaultName)
-	// Releasing the lease is the last action of a backup run, so this is the single point at which
-	// the run can be reported as finished exactly once. A backup that is being deleted has no run
-	// outcome to report.
-	if backup.DeletionTimestamp.IsZero() {
-		logging.Info(ctx, "backup finished", "outcome", backupRunOutcome(backup), "duration", backupRunDuration(backup))
-	}
 	return Next, nil
 }
 
@@ -118,6 +113,8 @@ func (r backupHolderResolver) Get(ctx context.Context, namespace, name string) (
 	return holder, nil
 }
 
+// IsTerminal deliberately keys on the terminal Succeeded condition rather than on isPostProcessing:
+// a backup that is still post-processing must release its lease on its own.
 func (backupHolderResolver) IsTerminal(holder client.Object) bool {
 	backup, ok := holder.(*backupv1.Backup)
 	if !ok {

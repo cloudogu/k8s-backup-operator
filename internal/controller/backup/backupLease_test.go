@@ -104,22 +104,22 @@ func TestBackupLease(t *testing.T) {
 func TestEnsureBackupLeaseReleased(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("keeps the lease while the backup is running", func(t *testing.T) {
-		backup := newBackupWithSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionUnknown)
+	t.Run("keeps the lease and requeues while the backup is running", func(t *testing.T) {
+		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionUnknown)
 		reconciler := NewReconciler(nil, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup)
 
 		require.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.Equal(t, Retry, nextAction)
 	})
 
 	tests := []struct {
 		name   string
 		backup *backupv1.Backup
 	}{
-		{name: "successful backup", backup: newBackupWithSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)},
-		{name: "failed backup", backup: newBackupWithSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionFalse)},
+		{name: "successful backup", backup: newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)},
+		{name: "failed backup", backup: newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionFalse)},
 		{name: "canceled backup", backup: backupWithCondition(metav1.Condition{Type: backupv1.ConditionCanceled, Status: metav1.ConditionTrue})},
 		{name: "deleting backup", backup: deletingBackupForLeaseTest()},
 	}
@@ -140,7 +140,7 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 	}
 
 	t.Run("reports an error while releasing the lease", func(t *testing.T) {
-		backup := newBackupWithSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
+		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
 		k8sClient := newFakeClientBuilder(t).WithInterceptorFuncs(interceptor.Funcs{
 			Get: func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
 				return errors.New("get failed")

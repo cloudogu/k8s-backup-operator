@@ -45,6 +45,7 @@ const (
 	reasonBackupStarted                             = "BackupStarted"
 	reasonBackupDeleting                            = "BackupDeleting"
 	reasonBackupSucceeded                           = "BackupSucceeded"
+	reasonBackupCanceled                            = "BackupCanceled"
 	reasonBackupDeletingFailed                      = "BackupDeletingFaild"
 	reasonBackupNotDeleting                         = "BackupNotDeleting"
 	reasonTimeWindowNotExpired                      = "TimeWindowNotExpired"
@@ -219,17 +220,6 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 	}
 	c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupNotDeleting, "Backup is not deleting")
 	return Next, nil
-}
-
-func (c *defaultReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
-	if succeededCondition == nil || succeededCondition.Status == metav1.ConditionUnknown {
-		logging.Debug(ctx, "ensureCompletedBackupIsIgnored: backup not completed -> NEXT")
-		return Next, nil
-	}
-
-	logging.Debug(ctx, "ensureCompletedBackupIsIgnored: backup completed -> ABORT")
-	return Abort, nil
 }
 
 func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error) {
@@ -429,16 +419,6 @@ func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, back
 		return Next, nil
 	}
 
-	succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
-	if succeededCondition != nil && succeededCondition.Status == metav1.ConditionTrue {
-		logging.Debug(ctx, "ensureMaintenanceActivated: maintenance mode is not active and backup succeeded -> ABORT")
-		return Abort, nil
-	}
-	if succeededCondition != nil && succeededCondition.Status == metav1.ConditionFalse {
-		logging.Debug(ctx, "ensureMaintenanceActivated: maintenance mode is not active and backup failed -> ABORT")
-		return Abort, nil
-	}
-
 	logging.Debug(ctx, "ensureMaintenanceActivated: maintenance mode is not active -> activate it; RETRY")
 
 	maintenanceErr := c.maintenanceGateway.activateMaintenanceMode(ctx, maintenanceModeTitle, maintenanceModeText)
@@ -514,9 +494,9 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 
 		// The elapsed time is part of the message, so the message changes once per minute and the
 		// guard below turns into a heartbeat for a wait that spans many reconciliations.
-		waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionSucceeded, c.clock.Now())
+		waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionProviderSucceeded, c.clock.Now())
 		inProgress := metav1.Condition{
-			Type:    backupv1.ConditionSucceeded,
+			Type:    backupv1.ConditionProviderSucceeded,
 			Status:  metav1.ConditionUnknown,
 			Reason:  reasonProviderBackupInProgress,
 			Message: fmt.Sprintf("Provider backup is in progress (running for %s).", conditions.FormatWaitDuration(waited)),
@@ -543,7 +523,7 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 		logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup has failed -> ABORT")
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-				Type:    backupv1.ConditionSucceeded,
+				Type:    backupv1.ConditionProviderSucceeded,
 				Status:  metav1.ConditionFalse,
 				Reason:  reasonProviderBackupFailed,
 				Message: "Provider backup has failed.",
@@ -565,7 +545,7 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 		logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup has succeeded -> NEXT")
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-				Type:    backupv1.ConditionSucceeded,
+				Type:    backupv1.ConditionProviderSucceeded,
 				Status:  metav1.ConditionTrue,
 				Reason:  reasonProviderBackupSucceeded,
 				Message: "Provider backup has succeeded.",
@@ -578,7 +558,6 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 		logging.Info(ctx, "the velero backup succeeded", "phase", providerBackup.Status.Phase)
-		c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupSucceeded, "Backup completed")
 		return Next, nil
 	}
 
@@ -586,6 +565,12 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 }
 
 func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (action, error) {
+	// Safety-net, should normally not happen. Retry until provider is finished
+	if !isPostProcessing(backup) {
+		logging.Debug(ctx, "ensureMaintenanceDeactivated: the backup run is not finished -> RETRY")
+		return Retry, nil
+	}
+
 	maintenanceModeIsActive, err := c.maintenanceGateway.isMaintenanceModeActive(ctx)
 	if err != nil {
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesStatusFailed, "Failed to get maintenance mode status")
@@ -593,27 +578,58 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 	}
 
 	if !maintenanceModeIsActive {
-		logging.Debug(ctx, "ensureMaintenanceDeactivated: is not active -> Next")
+		logging.Debug(ctx, "ensureMaintenanceDeactivated: is not active -> NEXT")
 		return Next, nil
 	}
 
-	succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
-	if hasBackupSucceededOrFailed(succeededCondition) {
-		logging.Debug(ctx, "ensureMaintenanceDeactivated: is active and backup succeeded or failed -> deactivate it,  Retry")
+	logging.Debug(ctx, "ensureMaintenanceDeactivated: is active and the backup run is finished -> deactivate it, NEXT")
 
-		maintenanceErr := c.maintenanceGateway.deactivateMaintenanceMode(ctx)
-		if maintenanceErr != nil {
-			c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesDeactivationFailed, "Failed to deactivate maintenance mode")
-			return Abort, fmt.Errorf("deactivate maintenance mode: %w", maintenanceErr)
-		}
-		logging.Info(ctx, "deactivated maintenance mode")
-		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the maintenance mode was deactivated")
+	maintenanceErr := c.maintenanceGateway.deactivateMaintenanceMode(ctx)
+	if maintenanceErr != nil {
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesDeactivationFailed, "Failed to deactivate maintenance mode")
+		return Abort, fmt.Errorf("deactivate maintenance mode: %w", maintenanceErr)
+	}
+	logging.Info(ctx, "deactivated maintenance mode")
+	c.recorder.Event(backup, corev1.EventTypeNormal, reasonMaintenanceModesDeactivation, "Maintenance mode deactivated")
+	return Next, nil
+}
+
+// ensureBackupRunCompleted writes the terminal Succeeded condition and closes the run.
+func (c *defaultReconciler) ensureBackupRunCompleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
+	// Safety-net, should normally not happen. Retry until provider is finished
+	if !isPostProcessing(backup) {
+		logging.Debug(ctx, "ensureBackupRunCompleted: the backup run is not finished -> RETRY")
 		return Retry, nil
 	}
 
-	logging.Debug(ctx, "ensureMaintenanceDeactivated: is active and backup in progress -> Next")
-	c.recorder.Event(backup, corev1.EventTypeNormal, reasonMaintenanceModesDeactivation, "Maintenance mode deactivated")
-	return Next, nil
+	// A run without a provider result got here through the cancellation, so the provider result is
+	// the outcome whenever there is one.
+	succeeded := metav1.Condition{
+		Type:    backupv1.ConditionSucceeded,
+		Status:  metav1.ConditionFalse,
+		Reason:  reasonBackupCanceled,
+		Message: "The backup was canceled.",
+	}
+	providerSucceeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionProviderSucceeded)
+	if hasBackupSucceededOrFailed(providerSucceeded) {
+		succeeded.Status = providerSucceeded.Status
+		succeeded.Reason = providerSucceeded.Reason
+		succeeded.Message = providerSucceeded.Message
+	}
+
+	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, succeeded)
+	})
+	if patchErr != nil {
+		return Abort, fmt.Errorf("patch status to complete the backup run: %w", patchErr)
+	}
+
+	if succeeded.Status == metav1.ConditionTrue {
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupSucceeded, "Backup completed")
+	}
+	logging.Info(ctx, "backup finished", "outcome", backupRunOutcome(backup), "duration", backupRunDuration(backup))
+	logging.Debug(ctx, "ensureBackupRunCompleted: the backup run is complete -> ABORT")
+	return Abort, nil
 }
 
 func (c *defaultReconciler) patchStatus(ctx context.Context, backup *backupv1.Backup, updateFn statusUpdate) error {
@@ -667,10 +683,15 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		report = "waiting for the synchronized velero backup to complete"
 	}
 
+	// Set providerSucceeded and Succeeded together to keep the guards working correctly
+	providerSucceeded := succeeded
+	providerSucceeded.Type = backupv1.ConditionProviderSucceeded
+
 	reportSync := conditions.WillChange(backup.Status.Conditions, succeeded)
 
 	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, prepared)
+		meta.SetStatusCondition(&status.Conditions, providerSucceeded)
 		meta.SetStatusCondition(&status.Conditions, succeeded)
 
 		if veleroBackup.Status.StartTimestamp != nil {
@@ -817,6 +838,16 @@ func hasProviderBackupFailed(backup *velerov1.Backup) bool {
 
 func hasProviderBackupSucceeded(backup *velerov1.Backup) bool {
 	return backup.Status.Phase == velerov1.BackupPhaseCompleted
+}
+
+// isPostProcessing reports that the backup has no work left to do and only owes its post-processing:
+// switching the maintenance mode off, releasing the lease and writing the terminal condition.
+func isPostProcessing(backup *backupv1.Backup) bool {
+	providerSucceeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionProviderSucceeded)
+	if hasBackupSucceededOrFailed(providerSucceeded) {
+		return true
+	}
+	return meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled)
 }
 
 func hasBackupSucceededOrFailed(condition *metav1.Condition) bool {

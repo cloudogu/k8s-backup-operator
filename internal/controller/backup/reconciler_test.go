@@ -140,3 +140,48 @@ func TestBackupRunDuration(t *testing.T) {
 func newRealClock() Clock {
 	return &operatortime.Clock{}
 }
+
+func newBackupWithSucceededStatusForReconcilerTest(namespace string, name string, conditionStatus metav1.ConditionStatus) *backupv1.Backup {
+	return &backupv1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: backupv1.BackupSpec{
+			Provider: "velero",
+		},
+		Status: backupv1.BackupStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   backupv1.ConditionSucceeded,
+					Status: conditionStatus,
+					Reason: "aReason",
+				},
+			},
+		},
+	}
+}
+
+func newBackupWithNoConditionsForReconcilerTest(namespace string, name string) *backupv1.Backup {
+	return &backupv1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: backupv1.BackupSpec{
+			Provider: "velero",
+		},
+	}
+}
+
+func newBackupWithProviderSucceededStatusForReconcilerTest(namespace string, name string, conditionStatus metav1.ConditionStatus) *backupv1.Backup {
+	backup := newBackupWithNoConditionsForReconcilerTest(namespace, name)
+	backup.Status.Conditions = []metav1.Condition{
+		{
+			Type:   backupv1.ConditionProviderSucceeded,
+			Status: conditionStatus,
+			Reason: "aReason",
+		},
+	}
+	return backup
+}

@@ -71,6 +71,7 @@ func TestInitBackupConditionTransitionMetrics(t *testing.T) {
 		v1.ConditionDeleting,
 		v1.ConditionCanceled,
 		v1.ConditionSucceeded,
+		v1.ConditionProviderSucceeded,
 	}
 	conditionStatuses := []metav1.ConditionStatus{
 		metav1.ConditionUnknown,

@@ -6,6 +6,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
+	"k8s.io/apimachinery/pkg/api/meta"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -25,7 +26,6 @@ type reconciler interface {
 	ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureCompletedBackupIsIgnored(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (action, error)
@@ -34,6 +34,31 @@ type reconciler interface {
 	ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureBackupRunCompleted(ctx context.Context, backup *backupv1.Backup) (action, error)
+}
+
+type operation int
+
+const (
+	operationCreate operation = iota
+	operationFinalize
+	operationIgnore
+	operationDelete
+)
+
+// requiredOperation decides what this reconciliation has to do. This way we keep the heavy gating
+// out of most stages.
+func requiredOperation(backup *backupv1.Backup) operation {
+	if !backup.DeletionTimestamp.IsZero() {
+		return operationDelete
+	}
+	if hasBackupSucceededOrFailed(meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)) {
+		return operationIgnore
+	}
+	if isPostProcessing(backup) {
+		return operationFinalize
+	}
+	return operationCreate
 }
 
 type ensureFunction func(ctx context.Context, backup *backupv1.Backup) (action, error)
@@ -62,24 +87,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// Initialize all possible condition transition time series without incrementing them.
 	metrics.InitBackupConditionTransitionMetrics(backup.Namespace, backup.Name)
 
-	ensureFunctions := []ensureFunction{
-		c.reconciler.ensureBackupLeaseReleased, // cleanup leases of deleted/failed backups
-		c.reconciler.ensureProviderBackupDeleted,
-		c.reconciler.ensureVeleroStatusSynced,
-		c.reconciler.ensureMaintenanceDeactivated,
-		c.reconciler.ensureCompletedBackupIsIgnored,
-		c.reconciler.ensureBackupSetup,
-		c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired,
-		c.reconciler.ensureBackupIsPrepared,
-		c.reconciler.ensureActiveBackupLease,
-		c.reconciler.ensureMaintenanceActivated,
-		c.reconciler.ensureProviderBackupCreated,
-		c.reconciler.ensureProviderBackupCompleted,
-		c.reconciler.ensureMaintenanceDeactivated,
-		c.reconciler.ensureBackupLeaseReleased, // close current backup reconcile
-	}
-
-	for _, ensure := range ensureFunctions {
+	for _, ensure := range c.getStagesForOperation(requiredOperation(&backup)) {
 		nextAction, err := ensure(ctx, &backup)
 		switch nextAction {
 		case Retry:
@@ -90,6 +98,42 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (c *Controller) getStagesForOperation(op operation) []ensureFunction {
+	switch op {
+	case operationDelete:
+		return []ensureFunction{
+			c.reconciler.ensureBackupLeaseReleased,
+			c.reconciler.ensureProviderBackupDeleted,
+		}
+	case operationIgnore:
+		return []ensureFunction{
+			c.reconciler.ensureBackupLeaseReleased,
+		}
+	case operationFinalize:
+		return c.finalizeStages()
+	default: // operationCreate
+		return append([]ensureFunction{
+			c.reconciler.ensureVeleroStatusSynced,
+			c.reconciler.ensureBackupSetup,
+			c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired,
+			c.reconciler.ensureBackupIsPrepared,
+			c.reconciler.ensureActiveBackupLease,
+			c.reconciler.ensureMaintenanceActivated,
+			c.reconciler.ensureProviderBackupCreated,
+			c.reconciler.ensureProviderBackupCompleted,
+		}, c.finalizeStages()...)
+	}
+}
+
+// finalizeStages post-process a finished backup run
+func (c *Controller) finalizeStages() []ensureFunction {
+	return []ensureFunction{
+		c.reconciler.ensureMaintenanceDeactivated,
+		c.reconciler.ensureBackupLeaseReleased,
+		c.reconciler.ensureBackupRunCompleted,
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
