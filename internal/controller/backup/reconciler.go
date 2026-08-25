@@ -146,7 +146,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			// Removing the finalizer releases the backup for deletion, so this is the last point at
 			// which the deletion can be reported.
 			logging.Info(ctx, "deleted the backup")
-			// This is just for completion - the object will be gone afterward
+			// This is for the sake of completeness only - the object will be gone
 			c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupDeleting, "Removed finalizer - deletion completed")
 			return Abort, nil
 		}
@@ -201,6 +201,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			)
 		}
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup deletion is still in progress")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupDeletion, "The provider backup deletion is still in progress")
 		return Retry, nil
 	}
 
@@ -217,7 +218,6 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 	if patchErr != nil {
 		return Abort, fmt.Errorf("patch condition to mark backup as not deleting: %w", patchErr)
 	}
-	c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupNotDeleting, "Backup is not deleting")
 	return Next, nil
 }
 
@@ -578,7 +578,7 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 		logging.Info(ctx, "the velero backup succeeded", "phase", providerBackup.Status.Phase)
-		c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupSucceeded, "Backup completed")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupSucceeded, "Provider Backup completed")
 		return Next, nil
 	}
 
@@ -594,6 +594,7 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 
 	if !maintenanceModeIsActive {
 		logging.Debug(ctx, "ensureMaintenanceDeactivated: is not active -> Next")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonMaintenanceModesDeactivation, "Maintenance mode deactivated")
 		return Next, nil
 	}
 
@@ -612,7 +613,6 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 	}
 
 	logging.Debug(ctx, "ensureMaintenanceDeactivated: is active and backup in progress -> Next")
-	c.recorder.Event(backup, corev1.EventTypeNormal, reasonMaintenanceModesDeactivation, "Maintenance mode deactivated")
 	return Next, nil
 }
 
@@ -708,7 +708,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.
 		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window not expired'")
 	}
 	logging.Info(ctx, "canceled the backup", "reason", "the time window expired before the backup started")
-	c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupNotStarted, "The backup has not started when the time window expired")
+	c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupNotStarted, "The backup is being canceled - time window expired")
 	return Abort, nil
 }
 
@@ -739,7 +739,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'")
 		}
-		c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupInProgress, "The backup was running when the time window expired")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonTimeWindowExpiredBackupInProgress, "The backup was running when the time window expired -> Continue")
 		return Next, nil
 	}
 

@@ -58,7 +58,7 @@ func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backu
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, resolver)
 	released, err := manager.Release(ctx, backup, backupLeaseHolderKind)
 	if err != nil {
-	    c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Releasing the backup lease failed")
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Releasing the backup lease failed")
 		return Abort, fmt.Errorf("release backup lease for backup %s: %w", backup.Name, err)
 	}
 	if !released {
@@ -72,6 +72,7 @@ func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backu
 	// outcome to report.
 	if backup.DeletionTimestamp.IsZero() {
 		logging.Info(ctx, "backup finished", "outcome", backupRunOutcome(backup), "duration", backupRunDuration(backup))
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupSucceeded, "Backup completed - Lease released")
 	}
 	return Next, nil
 }

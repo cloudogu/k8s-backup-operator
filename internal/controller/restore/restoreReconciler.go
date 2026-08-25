@@ -325,7 +325,7 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 		preparationErr = errors.Join(preparationErr, fmt.Errorf("failed to report the failed preparation of restore %s: %w", restore.Name, err))
 	}
 
-	r.recorder.Event(restore, corev1.EventTypeWarning, ReasonPreparationFailed, "The preparation of the ecosystem failed")
+	r.recorder.Event(restore, corev1.EventTypeWarning, ReasonPreparationFailed, "The preparation of the ecosystem failed -> retrying")
 
 	return updated, retryOnError(preparationErr)
 }
