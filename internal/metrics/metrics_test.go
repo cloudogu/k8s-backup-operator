@@ -194,9 +194,9 @@ func TestInitRestoreConditionTransitionMetrics(t *testing.T) {
 	InitRestoreConditionTransitionMetrics(namespace, name, backupName)
 
 	conditionTypes := []string{
-		v1.ConditionSuccessful,
+		v1.ConditionSucceeded,
 		v1.ConditionPrepared,
-		v1.ConditionProviderRestoreSuccessful,
+		v1.ConditionProviderSucceeded,
 		v1.ConditionWorkloadsRecovered,
 	}
 	conditionStatuses := []metav1.ConditionStatus{

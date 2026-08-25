@@ -79,7 +79,7 @@ func TestConditionInitializationDoesNotResetAResolvedCondition(t *testing.T) {
 	prepared := meta.FindStatusCondition(stored.Status.Conditions, k8sv1.ConditionPrepared)
 	require.NotNil(t, prepared)
 	assert.Equal(t, metav1.ConditionTrue, prepared.Status, "the reached milestone must survive the initialization")
-	assertUnknownWorkflowConditions(t, stored, k8sv1.ConditionSuccessful, k8sv1.ConditionProviderRestoreSuccessful,
+	assertUnknownWorkflowConditions(t, stored, k8sv1.ConditionSucceeded, k8sv1.ConditionProviderSucceeded,
 		k8sv1.ConditionWorkloadsRecovered)
 }
 

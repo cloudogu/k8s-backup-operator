@@ -30,7 +30,7 @@ func TestRestoreCompletionPersistsTerminalConditionsWithoutExternalRecoveryActio
 	assert.Equal(t, abort(), outcome)
 	assert.Equal(t, 1, writes.total())
 	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionTrue, ReasonWorkloadRecoveryCompleted)
-	assertPersistedCondition(t, testClient, k8sv1.ConditionSuccessful, metav1.ConditionTrue, ReasonRestoreCompleted)
+	assertPersistedCondition(t, testClient, k8sv1.ConditionSucceeded, metav1.ConditionTrue, ReasonRestoreCompleted)
 	assert.Equal(t, k8sv1.RestoreStatusCompleted, updated.Status.Status)
 }
 
@@ -53,7 +53,7 @@ func TestRepeatedRestoreCompletionIsANoOp(t *testing.T) {
 	restore := completableRestore()
 	applyConditions(restore, []metav1.Condition{
 		reachedMilestone(k8sv1.ConditionWorkloadsRecovered, ReasonWorkloadRecoveryCompleted, "Recovered."),
-		reachedMilestone(k8sv1.ConditionSuccessful, ReasonRestoreCompleted, "Completed."),
+		reachedMilestone(k8sv1.ConditionSucceeded, ReasonRestoreCompleted, "Completed."),
 	})
 
 	writes := &clientWrites{}

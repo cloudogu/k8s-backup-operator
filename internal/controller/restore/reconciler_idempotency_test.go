@@ -28,7 +28,7 @@ func newReadyRestore() *backupv1.Restore {
 	restore.Status = backupv1.RestoreStatus{
 		Status: backupv1.RestoreStatusCompleted,
 		Conditions: []metav1.Condition{{
-			Type:               backupv1.ConditionSuccessful,
+			Type:               backupv1.ConditionSucceeded,
 			Status:             metav1.ConditionTrue,
 			Reason:             ReasonRestoreCompleted,
 			LastTransitionTime: metav1.Now(),
@@ -143,7 +143,7 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	running, runningErrs := fixture.reconcileTimes(testCtx, request, 1)
 	require.NoError(t, runningErrs[0])
 	require.Equal(t, ctrl.Result{RequeueAfter: providerObservationRecoveryDelay}, running[0])
-	assertPersistedCondition(t, fixture.client, backupv1.ConditionProviderRestoreSuccessful, metav1.ConditionUnknown, ReasonProviderRestoreRunning)
+	assertPersistedCondition(t, fixture.client, backupv1.ConditionProviderSucceeded, metav1.ConditionUnknown, ReasonProviderRestoreRunning)
 
 	// The operator restarts while the provider is still working, and the provider finishes meanwhile.
 	fixture.restart(factory)

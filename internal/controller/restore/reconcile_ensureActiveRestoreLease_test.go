@@ -106,7 +106,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 	t.Run("should report lease acquisition after waiting for another restore", func(t *testing.T) {
 		restore := newParentRestore()
 		applyConditions(restore, []metav1.Condition{{
-			Type: backupv1.ConditionSuccessful, Status: metav1.ConditionUnknown, Reason: ReasonWaitingForActiveRestore,
+			Type: backupv1.ConditionSucceeded, Status: metav1.ConditionUnknown, Reason: ReasonWaitingForActiveRestore,
 		}})
 		clientMock := newMockK8sClient(t)
 		expectLeaseRead(t, clientMock, newRestoreLease(restore))
@@ -129,7 +129,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 	t.Run("should return an error when reporting lease acquisition fails", func(t *testing.T) {
 		restore := newParentRestore()
 		applyConditions(restore, []metav1.Condition{{
-			Type: backupv1.ConditionSuccessful, Status: metav1.ConditionUnknown, Reason: ReasonWaitingForActiveRestore,
+			Type: backupv1.ConditionSucceeded, Status: metav1.ConditionUnknown, Reason: ReasonWaitingForActiveRestore,
 		}})
 		clientMock := newMockK8sClient(t)
 		expectLeaseRead(t, clientMock, newRestoreLease(restore))
@@ -150,7 +150,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 	t.Run("should clear an invalid lease condition after manual recovery", func(t *testing.T) {
 		restore := newParentRestore()
 		applyConditions(restore, []metav1.Condition{{
-			Type: backupv1.ConditionSuccessful, Status: metav1.ConditionUnknown, Reason: ReasonInvalidRestoreLease,
+			Type: backupv1.ConditionSucceeded, Status: metav1.ConditionUnknown, Reason: ReasonInvalidRestoreLease,
 		}})
 		clientMock := newMockK8sClient(t)
 		expectLeaseRead(t, clientMock, newRestoreLease(restore))
@@ -256,7 +256,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			prepareMock: func(t *testing.T, clientMock *mockK8sClient, holder *backupv1.Restore) {
 				terminal := holder.DeepCopy()
 				applyConditions(terminal, []metav1.Condition{{
-					Type: backupv1.ConditionSuccessful, Status: metav1.ConditionFalse,
+					Type: backupv1.ConditionSucceeded, Status: metav1.ConditionFalse,
 					Reason: ReasonProviderRestoreFailed,
 				}})
 				expectRestoreRead(t, clientMock, terminal)

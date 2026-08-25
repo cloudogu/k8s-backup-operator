@@ -56,7 +56,7 @@ func TestAnUndecidedProviderRestoreEndsTheReconciliationWithoutAnOutcome(t *test
 			require.NoError(t, errs[0])
 			assert.Equal(t, ctrl.Result{RequeueAfter: providerObservationRecoveryDelay}, results[0],
 				"the provider is observed through its child's events, not by waiting")
-			assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionUnknown, test.reason)
+			assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionUnknown, test.reason)
 
 			stored := &k8sv1.Restore{}
 			require.NoError(t, fixture.client.Get(testCtx, newRestoreRequest(testRestore).NamespacedName, stored))
@@ -94,7 +94,7 @@ func TestACompletedProviderRestoreResolvesItsMilestoneAndThenContinuesTheWorkflo
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[1], "the workflow continues once the milestone is stored")
 	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
 		"one milestone per reconciliation, and the child must never be written")
-	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionTrue, ReasonProviderRestoreCompleted)
+	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionTrue, ReasonProviderRestoreCompleted)
 	assertPersistedCondition(t, fixture.client, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonScaleUpInitiated)
 }
 
@@ -131,9 +131,9 @@ func TestAFailedProviderRestoreIsTerminalWithoutRecoveringTheWorkloads(t *testin
 			assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), deleteOf(newRestoreLease(restore))}, fixture.clientActions.snapshot(),
 				"the failure must be reported exactly once, in one write")
 
-			assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionFalse, ReasonProviderRestoreFailed)
+			assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionFalse, ReasonProviderRestoreFailed)
 			assertPersistedCondition(t, fixture.client, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionFalse, ReasonRecoveryNotAttemptedAfterProviderFailure)
-			assertPersistedCondition(t, fixture.client, k8sv1.ConditionSuccessful, metav1.ConditionFalse, ReasonProviderRestoreFailed)
+			assertPersistedCondition(t, fixture.client, k8sv1.ConditionSucceeded, metav1.ConditionFalse, ReasonProviderRestoreFailed)
 			assertPersistedCondition(t, fixture.client, k8sv1.ConditionPrepared, metav1.ConditionTrue, ReasonPreparationCompleted)
 		})
 	}
@@ -162,7 +162,7 @@ func TestAFailedProviderRestoreIsReportedEvenWhenTheMaintenanceModeStaysOn(t *te
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{}, results[0])
-	assertPersistedCondition(t, fixture.client, k8sv1.ConditionSuccessful, metav1.ConditionFalse, ReasonProviderRestoreFailed)
+	assertPersistedCondition(t, fixture.client, k8sv1.ConditionSucceeded, metav1.ConditionFalse, ReasonProviderRestoreFailed)
 }
 
 func TestAnUnpersistableProviderRestoreStateIsRetried(t *testing.T) {

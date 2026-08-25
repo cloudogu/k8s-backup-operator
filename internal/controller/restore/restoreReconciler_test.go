@@ -96,7 +96,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 				Name:      testRestore,
 				Namespace: testNamespace,
 			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusCompleted, Conditions: []metav1.Condition{{
-				Type:               v1.ConditionSuccessful,
+				Type:               v1.ConditionSucceeded,
 				Status:             metav1.ConditionTrue,
 				Reason:             ReasonRestoreCompleted,
 				LastTransitionTime: metav1.Now(),
@@ -170,7 +170,7 @@ func createScheme(t *testing.T) *runtime.Scheme {
 
 func Test_requiredOperation(t *testing.T) {
 	successful := func(status metav1.ConditionStatus) []metav1.Condition {
-		return []metav1.Condition{{Type: v1.ConditionSuccessful, Status: status, Reason: "TestReason", LastTransitionTime: metav1.Now()}}
+		return []metav1.Condition{{Type: v1.ConditionSucceeded, Status: status, Reason: "TestReason", LastTransitionTime: metav1.Now()}}
 	}
 
 	for _, testCase := range []struct {

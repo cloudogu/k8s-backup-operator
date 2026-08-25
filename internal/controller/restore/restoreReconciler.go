@@ -236,13 +236,13 @@ func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, res
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
 		metav1.Condition{
-			Type:    k8sv1.ConditionProviderRestoreSuccessful,
+			Type:    k8sv1.ConditionProviderSucceeded,
 			Status:  metav1.ConditionFalse,
 			Reason:  ReasonProviderRestoreConflict,
 			Message: conflictErr.Error(),
 		},
 		metav1.Condition{
-			Type:    k8sv1.ConditionSuccessful,
+			Type:    k8sv1.ConditionSucceeded,
 			Status:  metav1.ConditionFalse,
 			Reason:  ReasonProviderRestoreConflict,
 			Message: fmt.Sprintf("The restore was not started: %v", conflictErr),
@@ -335,7 +335,7 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 // instead of starting a second restore.
 func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	// A provider restore already succeeded -> skip
-	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful) {
+	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderSucceeded) {
 		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonProviderRestoreCompleted, "Provider restore completed")
 		return restore, next()
 	}
@@ -373,7 +373,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 // terminated yet, stop reconciliation and wait for next change on the child resource.
 // Only a provider success continues the workflow; a failure is terminal.
 func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
-	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful) {
+	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderSucceeded) {
 		return restore, next()
 	}
 
@@ -400,7 +400,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 	}
 
 	observation := metav1.Condition{
-		Type:    k8sv1.ConditionProviderRestoreSuccessful,
+		Type:    k8sv1.ConditionProviderSucceeded,
 		Status:  status,
 		Reason:  reason,
 		Message: message,
@@ -409,7 +409,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 	// phase is not reported again. The child's events drive the next look, so the report follows the
 	// provider rather than a timer.
 	report := conditions.WillChange(restore.Status.Conditions, observation)
-	waited := conditions.ElapsedInCurrentStatus(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful, time.Now())
+	waited := conditions.ElapsedInCurrentStatus(restore.Status.Conditions, k8sv1.ConditionProviderSucceeded, time.Now())
 
 	// The write is no-op aware, so an unchanged state costs nothing; a changed one makes the phase the
 	// restore is actually in visible in its status.
@@ -449,7 +449,7 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
 		metav1.Condition{
-			Type:    k8sv1.ConditionProviderRestoreSuccessful,
+			Type:    k8sv1.ConditionProviderSucceeded,
 			Status:  metav1.ConditionFalse,
 			Reason:  reason,
 			Message: message,
@@ -461,7 +461,7 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 			Message: "The workloads were deliberately left scaled down because the provider restore failed.",
 		},
 		metav1.Condition{
-			Type:    k8sv1.ConditionSuccessful,
+			Type:    k8sv1.ConditionSucceeded,
 			Status:  metav1.ConditionFalse,
 			Reason:  reason,
 			Message: message,

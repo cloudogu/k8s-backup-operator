@@ -19,7 +19,7 @@ func (r *restoreReconciler) ensureRestoreCompleted(
 	restore *k8sv1.Restore,
 ) (*k8sv1.Restore, stageOutcome) {
 	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionWorkloadsRecovered) &&
-		meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionSuccessful) {
+		meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionSucceeded) {
 		return restore, abort()
 	}
 
@@ -34,7 +34,7 @@ func (r *restoreReconciler) ensureRestoreCompleted(
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
 		reachedMilestone(k8sv1.ConditionWorkloadsRecovered, ReasonWorkloadRecoveryCompleted,
 			"The workloads reached their target state, their recovery labels were removed and the maintenance mode was switched off."),
-		reachedMilestone(k8sv1.ConditionSuccessful, ReasonRestoreCompleted,
+		reachedMilestone(k8sv1.ConditionSucceeded, ReasonRestoreCompleted,
 			"The restore workflow finished successfully."),
 	)
 	if err != nil {

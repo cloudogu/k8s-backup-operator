@@ -55,7 +55,7 @@ func TestProviderRestoreStageCreatesOwnedChildWithoutWaiting(t *testing.T) {
 	assert.True(t, velero.IsOwnedRestore(restore, child), "the created child must be owned by the restore")
 	assert.Equal(t, testBackup, child.Spec.BackupName)
 
-	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionUnknown, ReasonPending)
+	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionUnknown, ReasonPending)
 }
 
 func TestARepeatedReconciliationNeverStartsASecondProviderRestore(t *testing.T) {
@@ -92,7 +92,7 @@ func TestARepeatedReconciliationNeverStartsASecondProviderRestore(t *testing.T) 
 	// The second reconciliation observes the pending child once; the third one changes nothing.
 	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore)), statusUpdateOf(restore)},
 		fixture.clientActions.snapshot(), "the child must be created exactly once")
-	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionUnknown, ReasonProviderRestorePending)
+	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionUnknown, ReasonProviderRestorePending)
 }
 
 func TestAProviderRestoreThatCannotBeStartedIsReportedAndRetried(t *testing.T) {
@@ -146,7 +146,7 @@ func TestAConflictingChildFoundWhenStartingTheRestoreIsTerminal(t *testing.T) {
 	require.NotNil(t, condition)
 	assert.Equal(t, metav1.ConditionFalse, condition.Status)
 	assert.Equal(t, ReasonProviderRestoreConflict, condition.Reason)
-	assertPersistedCondition(t, reconciler.k8sClient, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionFalse, ReasonProviderRestoreConflict)
+	assertPersistedCondition(t, reconciler.k8sClient, k8sv1.ConditionProviderSucceeded, metav1.ConditionFalse, ReasonProviderRestoreConflict)
 }
 
 // appearingForeignChild hides the foreign child from the first read of the stage and reveals it to the
