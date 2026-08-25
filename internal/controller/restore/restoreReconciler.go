@@ -265,6 +265,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		return restore, next()
 	}
 
+	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparing, "Preparation in progress - scale down and cleanup")
 	// The provider is checked before anything is touched: the preparation is irreversible, so an
 	// unready provider must not cost the ecosystem its availability for a restore that cannot start.
 	_, err = restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
@@ -339,7 +340,6 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	// A provider restore already succeeded -> skip
 	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful) {
-		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonProviderRestoreCompleted, "Provider restore completed")
 		return restore, next()
 	}
 

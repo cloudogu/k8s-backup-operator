@@ -69,7 +69,6 @@ func TestACompletedProviderRestoreResolvesItsMilestoneAndThenContinuesTheWorkflo
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreCompleted, "Provider restore completed").Once()
 	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason,
 		"Successfully completed the provider restore [%s]", testRestore).Return()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)

@@ -23,9 +23,9 @@ const (
 	// ReasonInvalidRestoreLease marks a restore blocked by a namespace-wide restore lease whose
 	// holder cannot be identified safely.
 	ReasonInvalidRestoreLease = "InvalidRestoreLease"
-	// ReasonPreparationFailed marks a failed preparation.
+	// ReasonCleanupCompleted marks a completed cleanup.
 	ReasonCleanupCompleted = "CleanupCompleted"
-	// ReasonPreparationFailed marks a failed preparation.
+	// ReasonCleanupFailed marks a failed cleanup.
 	ReasonCleanupFailed = "CleanupFailed"
 	// ReasonPreparing marks a running destructive preparation, i.e. scale-down and cleanup.
 	ReasonPreparing = "Preparing"
@@ -62,6 +62,8 @@ const (
 	ReasonRecoveryNotAttemptedAfterProviderFailure = "RecoveryNotAttemptedAfterProviderFailure"
 	// ReasonRestoreCompleted marks the successfully finished restore workflow.
 	ReasonRestoreCompleted = "RestoreCompleted"
+	// reasonRestoreStarted marks a started restore workflow.
+	ReasonRestoreStarted = "RestoreStarted"
 	// ReasonMigratedFromLegacyStatus marks a condition that was not written by this workflow but
 	// derived from the deprecated scalar status of a Restore created by an older operator. The
 	// original cause of a legacy success or failure is not recoverable, so it is not claimed.
