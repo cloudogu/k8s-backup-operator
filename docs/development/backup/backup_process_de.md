@@ -103,8 +103,6 @@ stateDiagram-v2
     TimeWindowExpiredBackupSucceeded --> ProviderObservation: Canceled=False
 ```
 
-Existiert kein Blueprint, läuft der Workflow ohne Blueprint-Annotationen weiter. Andere Fehler beim Listen oder Serialisieren brechen den Reconcile mit Fehler ab. Vorhandene fremde Labels, Annotationen und Finalizer bleiben erhalten; verwaltete Werte werden bei Abweichung korrigiert.
-
 Fehlt die ConfigMap oder der Schlüssel, oder ist der Wert nicht numerisch, endet der Reconcile mit Fehler. `StartTimestamp` ist die Grenze zwischen „noch nicht gestartet“ und „bereits gestartet“.
 
 ### Vorbereitung

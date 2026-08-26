@@ -85,7 +85,10 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 	// Initialize all possible condition transition time series without incrementing them.
+	// - no increment, just create if not exists
 	metrics.InitBackupConditionTransitionMetrics(backup.Namespace, backup.Name)
+	metrics.InitBackupStatusMetrics(backup.Namespace, backup.Name)
+	metrics.InitInvalidLeaseTotalMetric(backup.Namespace, backup.Name)
 
 	for _, ensure := range c.getStagesForOperation(requiredOperation(&backup)) {
 		nextAction, err := ensure(ctx, &backup)

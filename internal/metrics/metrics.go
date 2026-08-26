@@ -206,6 +206,11 @@ func UpdateRestoreReconcileTotalMetric() {
 	RestoreReconcileTotal.Inc()
 }
 
+// InitInvalidLeaseTotalMetric initializes the invalid lease metric for a resource without incrementing it.
+func InitInvalidLeaseTotalMetric(namespace, name string) {
+	InvalidLeaseTotal.WithLabelValues(namespace, name).Add(0)
+}
+
 // UpdateInvalidLeaseTotalMetric increments the metric for the total number of failed acquire lease attempts
 func UpdateInvalidLeaseTotalMetric(namespace, name string) {
 	InvalidLeaseTotal.WithLabelValues(namespace, name).Inc()
