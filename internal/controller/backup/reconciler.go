@@ -148,7 +148,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			// Removing the finalizer releases the backup for deletion, so this is the last point at
 			// which the deletion can be reported.
 			logging.Info(ctx, "deleted the backup")
-			// This is just for completion - the object will be gone afterward
+			// This is for the sake of completeness only - the object will be gone
 			c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupDeleting, "Removed finalizer - deletion completed")
 			return Abort, nil
 		}
@@ -169,7 +169,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			if patchErr != nil {
 				return Abort, fmt.Errorf("patch conditions while waiting for provider backup completion: %w", patchErr)
 			}
-
+			c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupDeletion, "Waiting for the provider backup to complete")
 			return Retry, nil
 		}
 
@@ -203,6 +203,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			)
 		}
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup deletion is still in progress")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupDeletion, "The provider backup deletion is still in progress")
 		return Retry, nil
 	}
 
@@ -219,7 +220,6 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 	if patchErr != nil {
 		return Abort, fmt.Errorf("patch condition to mark backup as not deleting: %w", patchErr)
 	}
-	c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupNotDeleting, "Backup is not deleting")
 	return Next, nil
 }
 
@@ -476,6 +476,7 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupInProgress, "Provider backup started")
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup was created")
 		return Retry, nil
 	}
@@ -559,6 +560,7 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 		logging.Info(ctx, "the velero backup succeeded", "phase", providerBackup.Status.Phase)
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupSucceeded, "Provider Backup completed")
 		return Next, nil
 	}
 
@@ -744,7 +746,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.
 		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window not expired'")
 	}
 	logging.Info(ctx, "canceled the backup", "reason", "the time window expired before the backup started")
-	c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupNotStarted, "The backup has not started when the time window expired")
+	c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupNotStarted, "The backup is being canceled - time window expired")
 	// Canceled = True routes the next pass to operationFinalize, which writes the terminal Succeeded
 	// condition and closes the run -> Retry
 	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the canceled backup run must be finalized")
@@ -801,7 +803,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'")
 		}
-		c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupInProgress, "The backup was running when the time window expired")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonTimeWindowExpiredBackupInProgress, "The backup was running when the time window expired -> Continue")
 		return Next, nil
 	}
 

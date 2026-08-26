@@ -262,10 +262,10 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		return restore, retryOnError(err)
 	}
 	if prepared {
-		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed")
 		return restore, next()
 	}
 
+	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparing, "Preparation in progress - scale down and cleanup")
 	// The provider is checked before anything is touched: the preparation is irreversible, so an
 	// unready provider must not cost the ecosystem its availability for a restore that cannot start.
 	_, err = restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
@@ -279,8 +279,11 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	logging.Info(ctx, "scaled down the workloads")
 
 	if err := r.cleanup.Cleanup(ctx); err != nil {
+		r.recorder.Event(restore, corev1.EventTypeWarning, ReasonCleanupFailed, "Cleanup before restore failed")
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to cleanup before restore: %w", err))
 	}
+
+	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonCleanupCompleted, "Cleanup before restore completed")
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
 		Type:    k8sv1.ConditionPrepared,
@@ -294,6 +297,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore preparation was persisted")
+	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed")
 	return updated, retryAfter(r.requeueDelay)
 }
 
@@ -325,7 +329,7 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 		preparationErr = errors.Join(preparationErr, fmt.Errorf("failed to report the failed preparation of restore %s: %w", restore.Name, err))
 	}
 
-	r.recorder.Event(restore, corev1.EventTypeWarning, ReasonPreparationFailed, "The preparation of the ecosystem failed")
+	r.recorder.Event(restore, corev1.EventTypeWarning, ReasonPreparationFailed, "The preparation of the ecosystem failed -> retrying")
 
 	return updated, retryOnError(preparationErr)
 }
@@ -336,7 +340,6 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	// A provider restore already succeeded -> skip
 	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderSucceeded) {
-		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonProviderRestoreCompleted, "Provider restore completed")
 		return restore, next()
 	}
 

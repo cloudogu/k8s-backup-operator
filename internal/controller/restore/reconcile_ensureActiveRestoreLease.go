@@ -9,6 +9,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -36,6 +37,7 @@ func (r *restoreReconciler) ensureActiveRestoreLease(ctx context.Context, restor
 	case leases.StateAcquired:
 		logging.Info(ctx, "acquired the restore lease", "lease", restoreLeaseName)
 		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the acquired restore lease must be observed again")
+		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonRestoreStarted, "The restore has started")
 		return restore, retryAfter(defaultRequeueDelay)
 	case leases.StateConflict:
 		// An optimistic-lock conflict must be observed in a new reconciliation.
