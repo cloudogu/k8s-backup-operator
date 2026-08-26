@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
@@ -345,4 +346,83 @@ func TestRequiredOperationForSynchronizedBackup(t *testing.T) {
 			assert.Equal(t, test.expected, requiredOperation(backup))
 		})
 	}
+}
+
+// The maintenance gateway mock has no expectations, so any call to it fails the test.
+func TestControllerReconcileDoesNotStealTheMaintenanceMode(t *testing.T) {
+	ctx := context.Background()
+
+	// Backup A is running: it owns the lease and therefore the active maintenance mode.
+	newRunningBackupWithLease := func() (*backupv1.Backup, client.Object) {
+		runningBackup := newBackupForTest("ns", "running-backup")
+		return runningBackup, newHeldBackupLeaseForTest(runningBackup)
+	}
+
+	t.Run("a completed backup does not touch the maintenance mode of a running backup", func(t *testing.T) {
+		runningBackup, lease := newRunningBackupWithLease()
+		completedBackup := newBackupWithSucceededStatusForReconcilerTest("ns", "completed-backup", metav1.ConditionTrue)
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(runningBackup, completedBackup, lease).
+			WithStatusSubresource(completedBackup).
+			Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		controller := NewController(fakeClient, reconciler, requeueAfterTest)
+
+		_, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "completed-backup"))
+		require.NoError(t, err)
+
+		assertBackupLeaseStillHeldBy(t, fakeClient, runningBackup)
+	})
+
+	t.Run("a canceled backup that never started does not touch the maintenance mode of a running backup", func(t *testing.T) {
+		runningBackup, lease := newRunningBackupWithLease()
+		canceledBackup := withCondition(newBackupForTest("ns", "canceled-backup"), backupv1.ConditionCanceled, metav1.ConditionTrue)
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(runningBackup, canceledBackup, lease).
+			WithStatusSubresource(canceledBackup).
+			Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		controller := NewController(fakeClient, reconciler, requeueAfterTest)
+
+		_, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "canceled-backup"))
+		require.NoError(t, err)
+
+		assertBackupLeaseStillHeldBy(t, fakeClient, runningBackup)
+
+		// The finalization still has to close the canceled run, otherwise it stays in the finalize
+		// branch forever and re-enters this stage on every operator restart.
+		stored := &backupv1.Backup{}
+		require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(canceledBackup), stored))
+		succeeded := meta.FindStatusCondition(stored.Status.Conditions, backupv1.ConditionSucceeded)
+		require.NotNil(t, succeeded)
+		assert.Equal(t, metav1.ConditionFalse, succeeded.Status)
+		assert.Equal(t, reasonBackupCanceled, succeeded.Reason)
+	})
+
+	t.Run("the lease holder deactivates the maintenance mode it owns", func(t *testing.T) {
+		finishedBackup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "finished-backup", metav1.ConditionTrue)
+		lease := newHeldBackupLeaseForTest(finishedBackup)
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(finishedBackup, lease).
+			WithStatusSubresource(finishedBackup).
+			Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		maintenanceGatewayMock.EXPECT().isMaintenanceModeActive(ctx).Return(true, nil)
+		maintenanceGatewayMock.EXPECT().deactivateMaintenanceMode(ctx).Return(nil)
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		controller := NewController(fakeClient, reconciler, requeueAfterTest)
+
+		_, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "finished-backup"))
+		require.NoError(t, err)
+
+		assertBackupLeaseReleased(t, fakeClient, finishedBackup)
+
+		stored := &backupv1.Backup{}
+		require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(finishedBackup), stored))
+		succeeded := meta.FindStatusCondition(stored.Status.Conditions, backupv1.ConditionSucceeded)
+		require.NotNil(t, succeeded)
+		assert.Equal(t, metav1.ConditionTrue, succeeded.Status)
+	})
 }

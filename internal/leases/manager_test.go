@@ -129,6 +129,60 @@ func TestManagerRelease(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestManagerHolds(t *testing.T) {
+	ctx := context.Background()
+	holder := testHolder("restore-a", "restore-a-uid")
+	contender := testHolder("backup-a", "backup-a-uid")
+
+	t.Run("reports false without ever creating or taking a lease", func(t *testing.T) {
+		k8sClient := newLeaseTestClient(t, holder)
+		manager := NewManager(k8sClient, testNamespace, testLeaseName, configMapResolver{client: k8sClient})
+
+		holds, err := manager.Holds(ctx, holder, testKind)
+		require.NoError(t, err)
+		assert.False(t, holds)
+
+		stored := &coordinationv1.Lease{}
+		err = k8sClient.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: testLeaseName}, stored)
+		assert.Error(t, err, "Holds must not create the lease")
+	})
+
+	t.Run("distinguishes the holder from a contender and does not take over", func(t *testing.T) {
+		lease := NewLease(testNamespace, testLeaseName, holder, testKind)
+		k8sClient := newLeaseTestClient(t, holder, contender, lease)
+		manager := NewManager(k8sClient, testNamespace, testLeaseName, configMapResolver{client: k8sClient})
+
+		holds, err := manager.Holds(ctx, holder, testKind)
+		require.NoError(t, err)
+		assert.True(t, holds)
+
+		holds, err = manager.Holds(ctx, contender, testKind)
+		require.NoError(t, err)
+		assert.False(t, holds)
+
+		// A different kind with the same name and UID is not the holder either.
+		holds, err = manager.Holds(ctx, holder, "OtherKind")
+		require.NoError(t, err)
+		assert.False(t, holds)
+
+		stored := &coordinationv1.Lease{}
+		require.NoError(t, k8sClient.Get(ctx, client.ObjectKeyFromObject(lease), stored))
+		assert.True(t, IsHolder(stored, holder, testKind), "Holds must leave the lease with its owner")
+	})
+
+	t.Run("a stale lease of a terminal holder is still not held by a contender", func(t *testing.T) {
+		terminalHolder := testHolder("restore-a", "restore-a-uid")
+		terminalHolder.Annotations = map[string]string{"terminal": "true"}
+		lease := NewLease(testNamespace, testLeaseName, terminalHolder, testKind)
+		k8sClient := newLeaseTestClient(t, terminalHolder, contender, lease)
+		manager := NewManager(k8sClient, testNamespace, testLeaseName, configMapResolver{client: k8sClient})
+
+		holds, err := manager.Holds(ctx, contender, testKind)
+		require.NoError(t, err)
+		assert.False(t, holds)
+	})
+}
+
 type configMapResolver struct {
 	client client.Client
 }

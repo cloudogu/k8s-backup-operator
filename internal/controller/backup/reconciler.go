@@ -52,6 +52,7 @@ const (
 	reasonTimeWindowExpiredBackupNotStarted         = "TimeWindowExpiredBackupNotStarted"
 	reasonTimeWindowExpiredBackupInProgress         = "TimeWindowExpiredBackupInProgress"
 	reasonTimeWindowExpiredBackupFailed             = "TimeWindowExpiredBackupFailed"
+	reasonTimeWindowExpiredProviderBackupMissing    = "TimeWindowExpiredProviderBackupMissing"
 	reasonTimeWindowExpiredBackupSucceeded          = "TimeWindowExpiredBackupSucceeded"
 	reasonVeleroStatusSynced                        = "VeleroStatusSynced"
 	reasonVeleroBackupRunning                       = "VeleroBackupRunning"
@@ -571,6 +572,18 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 		return Retry, nil
 	}
 
+	// The maintenance mode is owned by the lease holder. Without this gate a backup that owns no
+	// lease - a cancelled backup that never started, or one whose run is already over - switches off
+	// the maintenance mode that a concurrently running backup depends on.
+	holdsLease, err := c.holdsBackupLease(ctx, backup)
+	if err != nil {
+		return Abort, err
+	}
+	if !holdsLease {
+		logging.Debug(ctx, "ensureMaintenanceDeactivated: the backup does not hold the backup lease -> NEXT")
+		return Next, nil
+	}
+
 	maintenanceModeIsActive, err := c.maintenanceGateway.isMaintenanceModeActive(ctx)
 	if err != nil {
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesStatusFailed, "Failed to get maintenance mode status")
@@ -715,7 +728,7 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 }
 
 func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup has not started -> Canceled = True, ABORT")
+	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup has not started -> Canceled = True, RETRY")
 
 	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
@@ -730,13 +743,39 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.
 	}
 	logging.Info(ctx, "canceled the backup", "reason", "the time window expired before the backup started")
 	c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupNotStarted, "The backup has not started when the time window expired")
-	return Abort, nil
+	// Canceled = True routes the next pass to operationFinalize, which writes the terminal Succeeded
+	// condition and closes the run -> Retry
+	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the canceled backup run must be finalized")
+	return Retry, nil
 }
 
 func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	veleroBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
 	if err != nil {
 		return Abort, fmt.Errorf("get velero backup: %w", err)
+	}
+
+	if veleroBackup == nil {
+		// getProviderBackup returns (nil, nil) on NotFound. The backup has a start timestamp, so the
+		// provider backup was deleted underneath us and this run can never complete.
+		logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, provider backup is gone -> Canceled = True, RETRY")
+
+		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
+				Type:    backupv1.ConditionCanceled,
+				Status:  metav1.ConditionTrue,
+				Reason:  reasonTimeWindowExpiredProviderBackupMissing,
+				Message: "The provider backup no longer existed when the time window expired.",
+			})
+		})
+		if patchErr != nil {
+			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and provider backup is missing'")
+		}
+
+		logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup no longer exists")
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredProviderBackupMissing, "The provider backup no longer existed when the time window expired")
+		// Retry for finalize
+		return Retry, nil
 	}
 
 	logging.Debug(ctx,
@@ -765,7 +804,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 	}
 
 	if hasProviderBackupFailed(veleroBackup) {
-		logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup failed -> Canceled = True, ABORT")
+		logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup failed -> Canceled = True, RETRY")
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
@@ -781,7 +820,11 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 
 		logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup had failed", "phase", veleroBackup.Status.Phase)
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupFailed, "The backup had failed when the time window expired")
-		return Abort, nil
+		// This backup may still hold the lease and the maintenance mode. Canceled = True routes the
+		// next pass to operationFinalize, which deactivates the maintenance mode, releases the lease
+		// and writes the terminal Succeeded condition. -> Retry
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the canceled backup run must be finalized")
+		return Retry, nil
 	}
 
 	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {

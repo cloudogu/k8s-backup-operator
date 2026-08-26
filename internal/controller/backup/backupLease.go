@@ -49,6 +49,16 @@ func (c *defaultReconciler) backupLeaseAction(ctx context.Context, backup *backu
 	}
 }
 
+// holdsBackupLease reports whether this backup currently owns the shared backup lease.
+func (c *defaultReconciler) holdsBackupLease(ctx context.Context, backup *backupv1.Backup) (bool, error) {
+	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
+	holds, err := manager.Holds(ctx, backup, backupLeaseHolderKind)
+	if err != nil {
+		return false, fmt.Errorf("check backup lease ownership for backup %s: %w", backup.Name, err)
+	}
+	return holds, nil
+}
+
 func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	// Safety-net, should normally not happen. Retry until provider is finished
 	if !isPostProcessing(backup) && backup.DeletionTimestamp.IsZero() {

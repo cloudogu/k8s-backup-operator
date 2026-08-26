@@ -22,9 +22,37 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		assert.Equal(t, Retry, nextAction)
 	})
 
-	t.Run("If maintenance mode is not active, proceed to the next step", func(t *testing.T) {
+	t.Run("If the backup does not hold the backup lease, proceed without touching the maintenance mode", func(t *testing.T) {
+		// The maintenance mode belongs to the lease holder. A backup that owns no lease must never
+		// switch off the maintenance mode of a concurrently running backup.
+		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
+		otherBackup := newBackupForTest("ns", "other-backup")
+		lease := newHeldBackupLeaseForTest(otherBackup)
+		fakeClient := newFakeClientBuilder(t).WithObjects(backup, otherBackup, lease).Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+	})
+
+	t.Run("If there is no backup lease at all, proceed without touching the maintenance mode", func(t *testing.T) {
 		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+	})
+
+	t.Run("If maintenance mode is not active, proceed to the next step", func(t *testing.T) {
+		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
+		fakeClient := newFakeClientBuilder(t).WithObjects(backup, newHeldBackupLeaseForTest(backup)).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
@@ -58,7 +86,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		// Deactivating hands over to the lease release and the terminal condition in the same pass,
 		// so this stage must not requeue.
 		t.Run("If maintenance mode is active and the "+test.name+", deactivate it and proceed", func(t *testing.T) {
-			fakeClient := newFakeClientBuilder(t).WithObjects(test.backup).Build()
+			fakeClient := newFakeClientBuilder(t).WithObjects(test.backup, newHeldBackupLeaseForTest(test.backup)).Build()
 			maintenanceGatewayMock := newMockMaintenanceGateway(t)
 			maintenanceGatewayMock.EXPECT().
 				isMaintenanceModeActive(context.Background()).
@@ -77,7 +105,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 
 	t.Run("If the maintenance mode state cannot be read, abort", func(t *testing.T) {
 		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
-		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
+		fakeClient := newFakeClientBuilder(t).WithObjects(backup, newHeldBackupLeaseForTest(backup)).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
@@ -92,7 +120,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 
 	t.Run("If the maintenance mode cannot be deactivated, abort", func(t *testing.T) {
 		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
-		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
+		fakeClient := newFakeClientBuilder(t).WithObjects(backup, newHeldBackupLeaseForTest(backup)).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
