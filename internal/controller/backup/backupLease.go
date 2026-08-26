@@ -7,6 +7,7 @@ import (
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
+	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +42,7 @@ func (c *defaultReconciler) backupLeaseAction(ctx context.Context, backup *backu
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "another operation still holds the backup lease", "holder", result.HolderName)
 		return Retry, nil
 	case leases.StateInvalid:
+		metrics.UpdateInvalidLeaseTotalMetric(backup.Namespace, backup.Name)
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Acquiring the backup lease failed")
 		return Abort, fmt.Errorf("backup %s is blocked by invalid lease %s/%s without a resolvable holder", backup.Name, backup.Namespace, leases.DefaultName)
 	default:
