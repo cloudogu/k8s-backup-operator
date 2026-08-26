@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	coordinationv1 "k8s.io/api/coordination/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -21,6 +22,10 @@ import (
 func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 	t.Run("should create a lease for a restore when none exists", func(t *testing.T) {
 		restore := newParentRestore()
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(
+			matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonRestoreStarted, "The restore has started",
+		).Return()
 		clientMock := newMockK8sClient(t)
 		clientMock.EXPECT().Get(testCtx, leaseKey(), mock.Anything).Return(leaseNotFound())
 		clientMock.EXPECT().Create(testCtx, mock.Anything).
@@ -36,7 +41,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 				assert.Equal(t, int32(1), ptr.Deref(lease.Spec.LeaseTransitions, 0))
 			}).
 			Return(nil)
-		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace, recorder: recorderMock}
 
 		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
 
@@ -268,6 +273,10 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			holder := restoreWithIdentity("previous-restore", types.UID("previous-uid"))
 			lease := newRestoreLease(holder)
 			lease.ResourceVersion = "7"
+			recorderMock := newMockEventRecorder(t)
+			recorderMock.EXPECT().Event(
+				matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonRestoreStarted, "The restore has started",
+			).Return()
 			clientMock := newMockK8sClient(t)
 			expectLeaseRead(t, clientMock, lease)
 			test.prepareMock(t, clientMock, holder)
@@ -281,7 +290,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 					assert.Equal(t, int32(2), ptr.Deref(updatedLease.Spec.LeaseTransitions, 0))
 				}).
 				Return(nil)
-			sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
+			sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace, recorder: recorderMock}
 
 			actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
 

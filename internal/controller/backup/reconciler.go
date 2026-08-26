@@ -495,6 +495,7 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupInProgress, "Provider backup started")
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup was created")
 		return Retry, nil
 	}
@@ -594,7 +595,6 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 
 	if !maintenanceModeIsActive {
 		logging.Debug(ctx, "ensureMaintenanceDeactivated: is not active -> Next")
-		c.recorder.Event(backup, corev1.EventTypeNormal, reasonMaintenanceModesDeactivation, "Maintenance mode deactivated")
 		return Next, nil
 	}
 
@@ -609,6 +609,7 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 		}
 		logging.Info(ctx, "deactivated maintenance mode")
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the maintenance mode was deactivated")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonMaintenanceModesDeactivation, "Maintenance mode deactivated")
 		return Retry, nil
 	}
 
