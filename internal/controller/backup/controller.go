@@ -103,7 +103,10 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 func (c *Controller) getStagesForOperation(op operation) []ensureFunction {
 	switch op {
 	case operationDelete:
+		// MaintenanceModeDeactivation needs lease, so comes first. Lease second, because
+		// after ensureProviderBackupDeleted there is no backup anymore to release the lease on.
 		return []ensureFunction{
+			c.reconciler.ensureMaintenanceDeactivated,
 			c.reconciler.ensureBackupLeaseReleased,
 			c.reconciler.ensureProviderBackupDeleted,
 		}

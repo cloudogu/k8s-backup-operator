@@ -45,6 +45,12 @@ func TestControllerReconcileStageOrder(t *testing.T) {
 		"ensureBackupRunCompleted",
 	}
 
+	deleteStages := []string{
+		"ensureMaintenanceDeactivated",
+		"ensureBackupLeaseReleased",
+		"ensureProviderBackupDeleted",
+	}
+
 	tests := []struct {
 		name     string
 		backup   *backupv1.Backup
@@ -88,13 +94,13 @@ func TestControllerReconcileStageOrder(t *testing.T) {
 		{
 			name:     "delete a backup",
 			backup:   withDeletionTimestamp(newBackupForTest("ns", "backup")),
-			expected: []string{"ensureBackupLeaseReleased", "ensureProviderBackupDeleted"},
+			expected: deleteStages,
 		},
 		{
 			// Deletion wins over every other state.
 			name:     "delete a backup that already completed",
 			backup:   withDeletionTimestamp(withCondition(newBackupForTest("ns", "backup"), backupv1.ConditionSucceeded, metav1.ConditionTrue)),
-			expected: []string{"ensureBackupLeaseReleased", "ensureProviderBackupDeleted"},
+			expected: deleteStages,
 		},
 	}
 
@@ -399,6 +405,56 @@ func TestControllerReconcileDoesNotStealTheMaintenanceMode(t *testing.T) {
 		require.NotNil(t, succeeded)
 		assert.Equal(t, metav1.ConditionFalse, succeeded.Status)
 		assert.Equal(t, reasonBackupCanceled, succeeded.Reason)
+	})
+
+	t.Run("deleting a backup deactivates the maintenance mode it holds before releasing its lease", func(t *testing.T) {
+		deletedBackup := withDeletionTimestamp(newBackupForTest("ns", "deleted-backup"))
+		lease := newHeldBackupLeaseForTest(deletedBackup)
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(deletedBackup, lease).
+			WithStatusSubresource(deletedBackup).
+			Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		maintenanceGatewayMock.EXPECT().isMaintenanceModeActive(ctx).Return(true, nil)
+		maintenanceGatewayMock.EXPECT().deactivateMaintenanceMode(ctx).RunAndReturn(func(ctx context.Context) error {
+			// The lease is what proves ownership of the maintenance mode, so it must still be held
+			// while the maintenance mode is switched off.
+			assertBackupLeaseStillHeldBy(t, fakeClient, deletedBackup)
+			return nil
+		})
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		controller := NewController(fakeClient, reconciler, requeueAfterTest)
+
+		_, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "deleted-backup"))
+		require.NoError(t, err)
+
+		assertBackupLeaseReleased(t, fakeClient, deletedBackup)
+
+		// No provider backup exists, so the deletion path removes the finalizer and the Backup is gone.
+		stored := &backupv1.Backup{}
+		err = fakeClient.Get(ctx, client.ObjectKeyFromObject(deletedBackup), stored)
+		assert.Error(t, err, "expected the backup to be gone after its finalizer was removed")
+	})
+
+	t.Run("deleting a backup that does not hold the lease leaves the maintenance mode untouched", func(t *testing.T) {
+		runningBackup, lease := newRunningBackupWithLease()
+		deletedBackup := withDeletionTimestamp(newBackupForTest("ns", "deleted-backup"))
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(runningBackup, deletedBackup, lease).
+			WithStatusSubresource(deletedBackup).
+			Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		controller := NewController(fakeClient, reconciler, requeueAfterTest)
+
+		_, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "deleted-backup"))
+		require.NoError(t, err)
+
+		assertBackupLeaseStillHeldBy(t, fakeClient, runningBackup)
+		// backup is gone
+		stored := &backupv1.Backup{}
+		err = fakeClient.Get(ctx, client.ObjectKeyFromObject(deletedBackup), stored)
+		assert.Error(t, err, "expected the backup to be gone after its finalizer was removed")
 	})
 
 	t.Run("the lease holder deactivates the maintenance mode it owns", func(t *testing.T) {

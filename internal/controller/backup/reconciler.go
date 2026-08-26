@@ -566,8 +566,10 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 }
 
 func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	// Safety-net, should normally not happen. Retry until provider is finished
-	if !isPostProcessing(backup) {
+	// Safety-net, should normally not happen. Retry until provider is finished. A backup that is
+	// being deleted is let through, mirroring ensureBackupLeaseReleased: its run is over either way
+	// and the deletion path is the last chance to give the maintenance mode back.
+	if !isPostProcessing(backup) && backup.DeletionTimestamp.IsZero() {
 		logging.Debug(ctx, "ensureMaintenanceDeactivated: the backup run is not finished -> RETRY")
 		return Retry, nil
 	}

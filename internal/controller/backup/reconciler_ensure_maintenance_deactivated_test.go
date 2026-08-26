@@ -22,6 +22,41 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		assert.Equal(t, Retry, nextAction)
 	})
 
+	t.Run("If the backup is being deleted while its run is unfinished, deactivate the maintenance mode it holds", func(t *testing.T) {
+		// A backup being deleted has no consistency left to protect and the deletion path is the last
+		// reconcile that can give the maintenance mode back.
+		backup := withDeletionTimestamp(newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionUnknown))
+		fakeClient := newFakeClientBuilder(t).WithObjects(backup, newHeldBackupLeaseForTest(backup)).Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		maintenanceGatewayMock.EXPECT().
+			isMaintenanceModeActive(context.Background()).
+			Return(true, nil)
+		maintenanceGatewayMock.EXPECT().
+			deactivateMaintenanceMode(context.Background()).
+			Return(nil)
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+	})
+
+	t.Run("If the backup is being deleted without holding the backup lease, leave the maintenance mode alone", func(t *testing.T) {
+		backup := withDeletionTimestamp(newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionUnknown))
+		otherBackup := newBackupForTest("ns", "other-backup")
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup, otherBackup, newHeldBackupLeaseForTest(otherBackup)).
+			Build()
+		maintenanceGatewayMock := newMockMaintenanceGateway(t)
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+	})
+
 	t.Run("If the backup does not hold the backup lease, proceed without touching the maintenance mode", func(t *testing.T) {
 		// The maintenance mode belongs to the lease holder. A backup that owns no lease must never
 		// switch off the maintenance mode of a concurrently running backup.
