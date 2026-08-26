@@ -148,6 +148,18 @@ func TestUpdateRestoreReconcileTotalMetric(t *testing.T) {
 	})
 }
 
+func TestInitInvalidLeaseTotalMetric(t *testing.T) {
+	namespace := "test-ns"
+	name := "test-restore-invalid-lease"
+	InvalidLeaseTotal.Reset()
+
+	InitInvalidLeaseTotalMetric(namespace, name)
+	InitInvalidLeaseTotalMetric(namespace, name)
+
+	assert.Equal(t, 1, testutil.CollectAndCount(InvalidLeaseTotal))
+	assert.Zero(t, testutil.ToFloat64(InvalidLeaseTotal.WithLabelValues(namespace, name)))
+}
+
 func TestInitRestoreStatusMetrics(t *testing.T) {
 	t.Run("should initialize restore status metrics correctly", func(t *testing.T) {
 		namespace := "test-ns"
