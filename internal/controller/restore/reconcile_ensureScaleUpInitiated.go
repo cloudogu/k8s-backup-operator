@@ -6,6 +6,7 @@ import (
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -19,6 +20,7 @@ func (r *restoreReconciler) ensureScaleUpInitiated(
 	restore *k8sv1.Restore,
 ) (*k8sv1.Restore, stageOutcome) {
 	if err := r.scaleManager.ScaleUp(ctx); err != nil {
+		r.recorder.Event(restore, corev1.EventTypeWarning, ReasonWorkloadRecoveryFailed, "failed to initiate workload scale-up after restore")
 		return r.reportUnreachedMilestone(
 			ctx,
 			restore,

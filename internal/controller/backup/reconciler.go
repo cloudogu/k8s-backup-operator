@@ -10,9 +10,9 @@ import (
 
 	"github.com/cloudogu/ces-commons-lib/errors"
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/conditions"
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
-	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
+	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -29,12 +30,22 @@ const (
 	reasonProviderBackupStorageLocationNotAvailable = "ProviderBackupStorageLocationNotAvailable"
 	reasonProviderBackupStorageLocationAvailable    = "ProviderBackupStorageLocationAvailable"
 	reasonMaintenanceModesIsNotActive               = "MaintenanceModesIsNotActive"
+	reasonMaintenanceModesStatusFailed              = "MaintenanceModesStatusFailed"
+	reasonMaintenanceModesActivation                = "MaintenanceModesActivation"
+	reasonMaintenanceModesDeactivation              = "MaintenanceModesDeactivation"
+	reasonMaintenanceModesActivationFailed          = "MaintenanceModesActivationFailed"
+	reasonMaintenanceModesDeactivationFailed        = "MaintenanceModesDeactivationFailed"
 	reasonProviderBackupResourceDoesNotExist        = "ProviderBackupResourceDoesNotExist"
 	reasonProviderBackupInProgress                  = "ProviderBackupInProgress"
 	reasonProviderBackupFailed                      = "ProviderBackupFailed"
-	reasonProviderBackupSucceeded                   = "ProviderBackupSucceeded"
-	reasonBackupDeleting                            = "BackupDeleting"
+	reasonProviderBackupDeletionFailed              = "ProviderBackupDeletionFailed"
+	reasonProviderBackupDeletion                    = "ProviderBackupDeletion"
 	reasonWaitingForProviderBackupCompletion        = "WaitingForProviderBackupCompletion"
+	reasonProviderBackupSucceeded                   = "ProviderBackupSucceeded"
+	reasonBackupStarted                             = "BackupStarted"
+	reasonBackupDeleting                            = "BackupDeleting"
+	reasonBackupSucceeded                           = "BackupSucceeded"
+	reasonBackupDeletingFailed                      = "BackupDeletingFaild"
 	reasonBackupNotDeleting                         = "BackupNotDeleting"
 	reasonTimeWindowNotExpired                      = "TimeWindowNotExpired"
 	reasonTimeWindowExpiredBackupNotStarted         = "TimeWindowExpiredBackupNotStarted"
@@ -44,6 +55,8 @@ const (
 	reasonVeleroStatusSynced                        = "VeleroStatusSynced"
 	reasonVeleroBackupRunning                       = "VeleroBackupRunning"
 	reasonVeleroBackupFailed                        = "VeleroBackupFailed"
+	reasonBackupLeaseAquired                        = "BackupLeaseAquired"
+	reasonBackupLeaseFailed                         = "BackupLeaseFailed"
 )
 
 const (
@@ -91,16 +104,22 @@ type Clock interface {
 	Now() time.Time
 }
 
+type eventRecorder interface {
+	record.EventRecorder
+}
+
 type defaultReconciler struct {
 	client             client.Client
+	recorder           eventRecorder
 	maintenanceGateway maintenanceGateway
 	clock              Clock
 	backupStorageName  string
 }
 
-func NewReconciler(client client.Client, maintenanceGateway maintenanceGateway, clock Clock, backupStorageName string) *defaultReconciler {
+func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGateway maintenanceGateway, clock Clock, backupStorageName string) *defaultReconciler {
 	return &defaultReconciler{
 		client:             client,
+		recorder:           recorder,
 		maintenanceGateway: maintenanceGateway,
 		clock:              clock,
 		backupStorageName:  backupStorageName,
@@ -112,6 +131,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 	if isBackupDeleting {
 		var veleroBackup, err = c.getProviderBackup(ctx, backup.GetNamespacedName())
 		if err != nil {
+			c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, "Failed to get provider backup")
 			return Abort, fmt.Errorf("get the velero backup resource to check if it exists: %w", err)
 		}
 		if veleroBackup == nil {
@@ -120,11 +140,14 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			controllerutil.RemoveFinalizer(backup, backupv1.BackupFinalizer)
 			updateErr := c.client.Update(ctx, backup)
 			if updateErr != nil {
+				c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupDeletingFailed, "Failed to remove backup finalizer")
 				return Abort, fmt.Errorf("update backup after removing finalizer: %w", updateErr)
 			}
 			// Removing the finalizer releases the backup for deletion, so this is the last point at
 			// which the deletion can be reported.
 			logging.Info(ctx, "deleted the backup")
+			// This is for the sake of completeness only - the object will be gone
+			c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupDeleting, "Removed finalizer - deletion completed")
 			return Abort, nil
 		}
 
@@ -144,12 +167,13 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			if patchErr != nil {
 				return Abort, fmt.Errorf("patch conditions while waiting for provider backup completion: %w", patchErr)
 			}
-
+			c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupDeletion, "Waiting for the provider backup to complete")
 			return Retry, nil
 		}
 
 		deleteReq, createErr := veleroprovider.CreateVeleroDeleteBackupRequestIfNotExists(ctx, c.client, backup)
 		if createErr != nil {
+			c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, "Failed to create provider delete request")
 			return Abort, createErr
 		}
 		waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionDeleting, c.clock.Now())
@@ -177,6 +201,7 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 			)
 		}
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup deletion is still in progress")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupDeletion, "The provider backup deletion is still in progress")
 		return Retry, nil
 	}
 
@@ -193,7 +218,6 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 	if patchErr != nil {
 		return Abort, fmt.Errorf("patch condition to mark backup as not deleting: %w", patchErr)
 	}
-
 	return Next, nil
 }
 
@@ -335,6 +359,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 			logging.Info(ctx, "waiting for the velero backup storage location to appear", "backupStorageLocation", c.backupStorageName)
 		}
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup storage location was not found")
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupStorageLocationNotFound, "The provider backup storage location not found")
 		return Retry, nil
 	}
 
@@ -366,6 +391,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 			)
 		}
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup storage location is not available")
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupStorageLocationNotAvailable, "The provider backup storage location is not available")
 		return Retry, nil
 	}
 
@@ -394,6 +420,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	isActive, err := c.maintenanceGateway.isMaintenanceModeActive(ctx)
 	if err != nil {
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesStatusFailed, "Failed to get maintenance mode status")
 		return Abort, fmt.Errorf("check if maintenance is active: %w", err)
 	}
 
@@ -416,6 +443,7 @@ func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, back
 
 	maintenanceErr := c.maintenanceGateway.activateMaintenanceMode(ctx, maintenanceModeTitle, maintenanceModeText)
 	if maintenanceErr != nil {
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesActivationFailed, "Maintenance mode activation has failed")
 		return Abort, fmt.Errorf("activate maintenance mode: %w", maintenanceErr)
 	}
 	logging.Info(ctx, "activated maintenance mode")
@@ -432,6 +460,7 @@ func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, back
 		return Abort, fmt.Errorf("patch status to mark the complete condition as failed: %w", patchErr)
 	}
 	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the maintenance mode was activated")
+	c.recorder.Event(backup, corev1.EventTypeNormal, reasonMaintenanceModesActivation, "Maintenance mode was activated")
 	return Retry, nil
 }
 
@@ -466,6 +495,7 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupInProgress, "Provider backup started")
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup was created")
 		return Retry, nil
 	}
@@ -549,6 +579,7 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 		logging.Info(ctx, "the velero backup succeeded", "phase", providerBackup.Status.Phase)
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupSucceeded, "Provider Backup completed")
 		return Next, nil
 	}
 
@@ -558,6 +589,7 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	maintenanceModeIsActive, err := c.maintenanceGateway.isMaintenanceModeActive(ctx)
 	if err != nil {
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesStatusFailed, "Failed to get maintenance mode status")
 		return Abort, fmt.Errorf("check maintenance mode: %w", err)
 	}
 
@@ -572,10 +604,12 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 
 		maintenanceErr := c.maintenanceGateway.deactivateMaintenanceMode(ctx)
 		if maintenanceErr != nil {
+			c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesDeactivationFailed, "Failed to deactivate maintenance mode")
 			return Abort, fmt.Errorf("deactivate maintenance mode: %w", maintenanceErr)
 		}
 		logging.Info(ctx, "deactivated maintenance mode")
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the maintenance mode was deactivated")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonMaintenanceModesDeactivation, "Maintenance mode deactivated")
 		return Retry, nil
 	}
 
@@ -660,7 +694,7 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 	return nextAction, nil
 }
 
-func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup, logger logr.Logger) (action, error) {
+func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup has not started -> Canceled = True, ABORT")
 
 	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
@@ -675,6 +709,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.
 		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window not expired'")
 	}
 	logging.Info(ctx, "canceled the backup", "reason", "the time window expired before the backup started")
+	c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupNotStarted, "The backup is being canceled - time window expired")
 	return Abort, nil
 }
 
@@ -705,6 +740,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'")
 		}
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonTimeWindowExpiredBackupInProgress, "The backup was running when the time window expired -> Continue")
 		return Next, nil
 	}
 
@@ -724,6 +760,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 		}
 
 		logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup had failed", "phase", veleroBackup.Status.Phase)
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupFailed, "The backup had failed when the time window expired")
 		return Abort, nil
 	}
 

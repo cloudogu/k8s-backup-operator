@@ -7,6 +7,7 @@ import (
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,10 +18,10 @@ const backupLeaseHolderKind = "Backup"
 func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
 	result, err := manager.Acquire(ctx, backup, backupLeaseHolderKind)
-	return backupLeaseAction(ctx, backup, result, err)
+	return c.backupLeaseAction(ctx, backup, result, err)
 }
 
-func backupLeaseAction(ctx context.Context, backup *backupv1.Backup, result leases.Result, err error) (action, error) {
+func (c *defaultReconciler) backupLeaseAction(ctx context.Context, backup *backupv1.Backup, result leases.Result, err error) (action, error) {
 	if err != nil {
 		return Abort, fmt.Errorf("acquire backup lease for backup %s: %w", backup.Name, err)
 	}
@@ -31,6 +32,7 @@ func backupLeaseAction(ctx context.Context, backup *backupv1.Backup, result leas
 	case leases.StateAcquired:
 		logging.Info(ctx, "acquired the backup lease", "lease", leases.DefaultName)
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the acquired backup lease must be observed again")
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupStarted, "The backup has started")
 		return Retry, nil
 	case leases.StateConflict:
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the backup lease was modified concurrently")
@@ -39,8 +41,10 @@ func backupLeaseAction(ctx context.Context, backup *backupv1.Backup, result leas
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "another operation still holds the backup lease", "holder", result.HolderName)
 		return Retry, nil
 	case leases.StateInvalid:
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Acquiring the backup lease failed")
 		return Abort, fmt.Errorf("backup %s is blocked by invalid lease %s/%s without a resolvable holder", backup.Name, backup.Namespace, leases.DefaultName)
 	default:
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Acquiring the backup lease failed with unknown state")
 		return Abort, fmt.Errorf("unknown backup lease acquisition state %d", result.State)
 	}
 }
@@ -54,6 +58,7 @@ func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backu
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, resolver)
 	released, err := manager.Release(ctx, backup, backupLeaseHolderKind)
 	if err != nil {
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Releasing the backup lease failed")
 		return Abort, fmt.Errorf("release backup lease for backup %s: %w", backup.Name, err)
 	}
 	if !released {
@@ -67,6 +72,7 @@ func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backu
 	// outcome to report.
 	if backup.DeletionTimestamp.IsZero() {
 		logging.Info(ctx, "backup finished", "outcome", backupRunOutcome(backup), "duration", backupRunDuration(backup))
+		c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupSucceeded, "Backup completed - Lease released")
 	}
 	return Next, nil
 }

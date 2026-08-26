@@ -33,6 +33,7 @@ func (r *restoreReconciler) ensureMaintenanceModeActivated(
 			r.recorder.Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Could not activate maintenance mode; continuing restore.")
 		} else {
 			logging.Info(ctx, "activated maintenance mode")
+			r.recorder.Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated")
 		}
 	}
 

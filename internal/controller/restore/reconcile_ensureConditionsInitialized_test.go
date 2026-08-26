@@ -87,7 +87,7 @@ func TestARestoreInterruptedAtAnUnknownOutcomeContinues(t *testing.T) {
 	restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process").Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)

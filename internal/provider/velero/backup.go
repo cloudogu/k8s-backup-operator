@@ -3,12 +3,12 @@ package velero
 import (
 	"time"
 
-	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
 	"context"
 	"fmt"
+
+	"github.com/cloudogu/k8s-backup-operator/internal/logging"
+	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -62,7 +62,7 @@ func CreateVeleroDeleteBackupRequestIfNotExists(ctx context.Context, k8sClient c
 	deleteBackupRequest := &velerov1.DeleteBackupRequest{}
 	err := k8sClient.Get(ctx, client.ObjectKeyFromObject(backup), deleteBackupRequest)
 	if apierrors.IsNotFound(err) {
-		log.FromContext(ctx).Info("velero delete backup request not found: create one")
+		logging.Info(ctx, "velero delete backup request not found: create one")
 		deleteBackupRequest = &velerov1.DeleteBackupRequest{
 			ObjectMeta: metav1.ObjectMeta{Namespace: backup.Namespace, Name: backup.Name},
 			Spec:       velerov1.DeleteBackupRequestSpec{BackupName: backup.Name},
@@ -76,7 +76,7 @@ func CreateVeleroDeleteBackupRequestIfNotExists(ctx context.Context, k8sClient c
 		return nil, fmt.Errorf("get velero delete backup request: %w", err)
 	}
 
-	log.FromContext(ctx).Info("velero delete backup request already exists")
+	logging.Info(ctx, "velero delete backup request already exists")
 	return deleteBackupRequest, nil
 }
 
@@ -92,7 +92,7 @@ func DeleteVeleroDeleteBackupRequestIfExists(ctx context.Context, k8sClient clie
 		return fmt.Errorf("error getting velero delete backup request: %w", err)
 	}
 
-	log.FromContext(ctx).Info("delete existing velero delete backup request")
+	logging.Info(ctx, "delete existing velero delete backup request")
 	if err = k8sClient.Delete(ctx, deleteBackupRequest); err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("delete velero delete backup request while provider backup is running: %w", err)
 	}

@@ -23,7 +23,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupCompleted(context.Background(), backup)
 
@@ -46,7 +46,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		require.True(t, backup.Status.CompletionTimestamp.IsZero())
 
@@ -79,7 +79,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		require.False(t, backup.Status.CompletionTimestamp.IsZero())
 
@@ -112,7 +112,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupCompleted(context.Background(), backup)
 
@@ -139,7 +139,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupCompleted(context.Background(), backup)
 
@@ -164,7 +164,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupCompleted(context.Background(), backup)
 
@@ -181,7 +181,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupCompleted(context.Background(), backup)
 
@@ -200,7 +200,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			WithObjects(backup, veleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureProviderBackupCompleted(context.Background(), backup)
 

@@ -12,8 +12,13 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func newTestEventRecorder() eventRecorder {
+	return record.NewFakeRecorder(100)
+}
 
 func newVeleroBackupForReconcilerTest(namespace string, name string, phase velerov1.BackupPhase) *velerov1.Backup {
 	return &velerov1.Backup{

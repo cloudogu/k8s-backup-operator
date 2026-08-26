@@ -6,6 +6,7 @@ import (
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -18,6 +19,7 @@ func (r *restoreReconciler) ensureMaintenanceModeDeactivated(
 	restore *k8sv1.Restore,
 ) (*k8sv1.Restore, stageOutcome) {
 	if err := r.maintenanceModeSwitch.Deactivate(ctx, false); err != nil {
+		r.recorder.Event(restore, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, "Failed to deactivate maintenance mode after restore")
 		return restore, retryOnError(fmt.Errorf(
 			"failed to deactivate maintenance mode after restore %s: %w",
 			restore.Name,
@@ -29,7 +31,9 @@ func (r *restoreReconciler) ensureMaintenanceModeDeactivated(
 	if condition != nil &&
 		condition.Status == metav1.ConditionUnknown &&
 		condition.Reason == ReasonMaintenanceModeDeactivated {
+		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonMaintenanceModeDeactivated, "Maintenance mode deactivated")
 		return restore, next()
+
 	}
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
@@ -39,6 +43,7 @@ func (r *restoreReconciler) ensureMaintenanceModeDeactivated(
 		Message: "The maintenance mode was deactivated after workload recovery.",
 	})
 	if err != nil {
+		r.recorder.Event(restore, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, "Failed to persist maintenance mode deactivation for restore")
 		return restore, retryOnError(fmt.Errorf(
 			"failed to persist maintenance mode deactivation for restore %s: %w",
 			restore.Name,

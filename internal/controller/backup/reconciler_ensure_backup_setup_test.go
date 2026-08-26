@@ -23,7 +23,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
 		var updateCalled = false
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
@@ -45,7 +45,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
 		var updateCalled = false
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
@@ -64,7 +64,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
 		var updateCalled = false
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
@@ -84,7 +84,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		}
 		var updateCalled = false
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
@@ -109,7 +109,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		)
 		var updateCalled = false
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
@@ -137,7 +137,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		)
 		var updateCalled = false
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
@@ -166,7 +166,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		backup.Finalizers = []string{backupv1.BackupFinalizer}
 		updateCalled := false
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
@@ -192,7 +192,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		backup.Finalizers = []string{backupv1.BackupFinalizer}
 		updateCalled := false
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 
@@ -222,7 +222,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
 

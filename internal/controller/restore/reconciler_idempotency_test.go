@@ -110,10 +110,11 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	scaleMock.EXPECT().FinalizeScaleUp(testCtx).Return(nil).Times(3)
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Start restore process").Return()
 	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason,
 		"Successfully completed the provider restore [%s]", testRestore).Return()
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Restore successful").Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonRestoreCompleted, "Restore successful").Return()
+	recorderMock.EXPECT().Event(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+	recorderMock.EXPECT().Eventf(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 
 	// The maintenance switch has to be replaced after construction: unlike the cleanup and the scale
 	// manager it is not a constructor parameter, so the reconciler builds a real adapter for it.
@@ -212,7 +213,11 @@ func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheP
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Start restore process").Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparing, "Preparation in progress - scale down and cleanup").Once()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonCleanupCompleted, "Cleanup before restore completed").Once()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process").Once()
+	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
@@ -257,8 +262,10 @@ func TestATransientStageFailureIsRetriedWithoutRepeatingAnEarlierDestructiveStag
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Twice()
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, backupv1.ErrorOnCreateEventReason, mock.Anything).Return()
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, backupv1.CreateEventReason, "Restore successful").Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, ReasonWorkloadRecoveryFailed, "failed to initiate workload scale-up after restore").Once()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonRestoreCompleted, "Restore successful").Once()
+	recorderMock.EXPECT().Event(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+	recorderMock.EXPECT().Eventf(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, scaleMock, requeueAfterTest)

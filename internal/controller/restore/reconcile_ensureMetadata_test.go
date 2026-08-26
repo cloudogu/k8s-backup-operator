@@ -3,7 +3,6 @@ package restore
 import (
 	"testing"
 
-	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +20,7 @@ func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing
 
 	// The manager is nil, so the workflow must start the provider restore and stop there.
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process").Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
@@ -49,7 +48,7 @@ func TestEnsureMetadataDoesNotWriteAgain(t *testing.T) {
 	restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason, "Start restore process").Return()
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)

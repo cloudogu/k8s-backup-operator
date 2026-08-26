@@ -289,7 +289,7 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("error setting up restore controller with manager: %w", err)
 	}
 
-	err = configureBackupReconcilers(k8sManager, operatorConfig)
+	err = configureBackupReconcilers(k8sManager, recorder, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("error setting up backup controller with manager: %w", err)
 	}
@@ -303,11 +303,11 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	return nil
 }
 
-func configureBackupReconcilers(k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
+func configureBackupReconcilers(k8sManager controllerManager, recorder eventRecorder, operatorConfig *config.OperatorConfig) error {
 	k8sClient := k8sManager.GetClient()
 	maintenanceModeAdapter := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, operatorConfig.Namespace)
 	maintenanceGateway := backup2.NewMaintenanceGateway(maintenanceModeAdapter)
-	backupReconciler := backup2.NewReconciler(k8sClient, maintenanceGateway, &operatortime.Clock{}, operatorConfig.BackupStorageName)
+	backupReconciler := backup2.NewReconciler(k8sClient, recorder, maintenanceGateway, &operatortime.Clock{}, operatorConfig.BackupStorageName)
 
 	requeueAfter := time.Duration(operatorConfig.RequeueTimeSeconds) * time.Second
 	backupController := backup2.NewController(k8sClient, backupReconciler, requeueAfter)

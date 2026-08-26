@@ -42,8 +42,12 @@ func TestAnUndecidedProviderRestoreEndsTheReconciliationWithoutAnOutcome(t *test
 		t.Run(test.name, func(t *testing.T) {
 			restore := startableRestore()
 
+			recorderMock := newMockEventRecorder(t)
+			recorderMock.EXPECT().Event(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+			recorderMock.EXPECT().Eventf(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+
 			factory := func(fakeClient client.WithWatch) reconcileFunction {
-				return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest).Reconcile
+				return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest).Reconcile
 			}
 			fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedChildInPhase(restore, test.phase))
 
@@ -159,9 +163,11 @@ func TestAFailedProviderRestoreIsReportedEvenWhenTheMaintenanceModeStaysOn(t *te
 
 func TestAnUnpersistableProviderRestoreStateIsRetried(t *testing.T) {
 	restore := startableRestore()
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest).Reconcile
+		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore,
 		ownedChildInPhase(restore, velerov1.RestorePhaseInProgress))
