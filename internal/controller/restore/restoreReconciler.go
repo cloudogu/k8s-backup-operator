@@ -119,8 +119,9 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.ensureMetadata,
 			r.ensureProviderChildState,
 			r.ensureActiveRestoreLease,
-			r.ensurePreparation,
+			r.ensureProviderReady,
 			r.ensureMaintenanceModeActivated,
+			r.ensurePreparation,
 			r.ensureProviderRestore,
 			r.ensureProviderCompletion,
 			r.ensureScaleUpInitiated,
@@ -255,6 +256,24 @@ func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, res
 	return updated, abort()
 }
 
+// ensureProviderReady checks the provider before maintenance mode affects ecosystem availability.
+// A restore that is already prepared does not need the provider readiness gate again.
+func (r *restoreReconciler) ensureProviderReady(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	prepared, err := r.isAlreadyPrepared(ctx, restore)
+	if err != nil {
+		return restore, retryOnError(err)
+	}
+	if prepared {
+		return restore, next()
+	}
+
+	_, err = restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
+	}
+	return restore, next()
+}
+
 // ensurePreparation runs the destructive preparation of the ecosystem: scale-down and cleanup.
 func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	prepared, err := r.isAlreadyPrepared(ctx, restore)
@@ -266,12 +285,6 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	}
 
 	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparing, "Preparation in progress - scale down and cleanup")
-	// The provider is checked before anything is touched: the preparation is irreversible, so an
-	// unready provider must not cost the ecosystem its availability for a restore that cannot start.
-	_, err = restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
-	if err != nil {
-		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
-	}
 
 	if err := r.scaleManager.ScaleDown(ctx); err != nil {
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to scale down workloads before restore: %w", err))

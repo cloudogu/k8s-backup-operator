@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"time"
@@ -759,25 +760,27 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 		return Abort, fmt.Errorf("get velero backup: %w", err)
 	}
 
-	if veleroBackup == nil {
+	// A not available Velero, but available CRD will lead to a CR without a status.
+	// If it has no Status after the timeout, it wasn't touched once -> CANCEL
+	if veleroBackup == nil || reflect.DeepEqual(veleroBackup.Status, velerov1.BackupStatus{}) {
 		// getProviderBackup returns (nil, nil) on NotFound. The backup has a start timestamp, so the
 		// provider backup was deleted underneath us and this run can never complete.
-		logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, provider backup is gone -> Canceled = True, RETRY")
+		logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, provider backup is gone or was not touched once -> Canceled = True, RETRY")
 
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 				Type:    backupv1.ConditionCanceled,
 				Status:  metav1.ConditionTrue,
 				Reason:  reasonTimeWindowExpiredProviderBackupMissing,
-				Message: "The provider backup no longer existed when the time window expired.",
+				Message: "The provider backup no longer existed or was not touched once when the time window expired.",
 			})
 		})
 		if patchErr != nil {
 			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and provider backup is missing'")
 		}
 
-		logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup no longer exists")
-		c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredProviderBackupMissing, "The provider backup no longer existed when the time window expired")
+		logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup no longer exists or was not touched once")
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredProviderBackupMissing, "Provider backup no longer existed or was not touched once when the time window expired")
 		// Retry for finalize
 		return Retry, nil
 	}
