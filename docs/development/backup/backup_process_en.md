@@ -103,8 +103,6 @@ stateDiagram-v2
     TimeWindowExpiredBackupSucceeded --> ProviderObservation: Canceled=False
 ```
 
-If no blueprint exists, the workflow continues without blueprint annotations. Other errors while listing or serializing abort the reconciliation with an error. Existing foreign labels, annotations, and finalizers are preserved; managed values are corrected when they differ.
-
 If the ConfigMap or key is missing, or if the value is not numeric, the reconciliation ends with an error. `StartTimestamp` separates “not started yet” from “already started.”
 
 ### Preparation
