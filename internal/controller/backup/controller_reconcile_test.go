@@ -69,12 +69,12 @@ func TestControllerReconcileStageOrder(t *testing.T) {
 		{
 			name:     "ignore a backup that already completed",
 			backup:   withCondition(newBackupForTest("ns", "backup"), backupv1.ConditionSucceeded, metav1.ConditionTrue),
-			expected: []string{"ensureBackupLeaseReleased"},
+			expected: nil,
 		},
 		{
 			name:     "ignore a backup that already failed",
 			backup:   withCondition(newBackupForTest("ns", "backup"), backupv1.ConditionSucceeded, metav1.ConditionFalse),
-			expected: []string{"ensureBackupLeaseReleased"},
+			expected: nil,
 		},
 		{
 			name:     "finalize a backup whose provider backup succeeded",
@@ -375,8 +375,9 @@ func TestControllerReconcileDoesNotStealTheMaintenanceMode(t *testing.T) {
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 		controller := NewController(fakeClient, reconciler, requeueAfterTest)
 
-		_, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "completed-backup"))
+		result, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "completed-backup"))
 		require.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, result)
 
 		assertBackupLeaseStillHeldBy(t, fakeClient, runningBackup)
 	})

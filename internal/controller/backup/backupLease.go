@@ -131,8 +131,5 @@ func (backupHolderResolver) IsTerminal(holder client.Object) bool {
 		return false
 	}
 	succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
-	if hasBackupSucceededOrFailed(succeeded) {
-		return true
-	}
-	return meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled)
+	return hasBackupSucceededOrFailed(succeeded)
 }

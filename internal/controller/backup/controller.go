@@ -105,15 +105,12 @@ func (c *Controller) getStagesForOperation(op operation) []ensureFunction {
 	case operationDelete:
 		// MaintenanceModeDeactivation needs lease, so comes first. Lease second, because
 		// after ensureProviderBackupDeleted there is no backup anymore to release the lease on.
-		return []ensureFunction{
-			c.reconciler.ensureMaintenanceDeactivated,
-			c.reconciler.ensureBackupLeaseReleased,
+		return append(c.cleanupStages(),
 			c.reconciler.ensureProviderBackupDeleted,
-		}
+		)
 	case operationIgnore:
-		return []ensureFunction{
-			c.reconciler.ensureBackupLeaseReleased,
-		}
+		// Succeeded is written only after cleanup, so terminal backups have no work left.
+		return nil
 	case operationFinalize:
 		return c.finalizeStages()
 	default: // operationCreate
@@ -132,10 +129,16 @@ func (c *Controller) getStagesForOperation(op operation) []ensureFunction {
 
 // finalizeStages post-process a finished backup run
 func (c *Controller) finalizeStages() []ensureFunction {
+	return append(c.cleanupStages(),
+		c.reconciler.ensureBackupRunCompleted,
+	)
+}
+
+// cleanupStages returns resources owned by an active backup run in release order.
+func (c *Controller) cleanupStages() []ensureFunction {
 	return []ensureFunction{
 		c.reconciler.ensureMaintenanceDeactivated,
 		c.reconciler.ensureBackupLeaseReleased,
-		c.reconciler.ensureBackupRunCompleted,
 	}
 }
 
