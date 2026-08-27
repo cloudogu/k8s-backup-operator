@@ -9,7 +9,6 @@ import (
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	backupconfig "github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
-	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -138,51 +137,6 @@ func Test_startOperator(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "unable to start manager")
 	})
-	t.Run("should fail to sync backups", func(t *testing.T) {
-		// given
-		t.Setenv("NAMESPACE", "ecosystem")
-		t.Setenv("STAGE", "development")
-		t.Setenv("BACKUP_RETRY_TIME_LIMIT", "10")
-
-		oldNewManagerFunc := ctrl.NewManager
-		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldNewVeleroProviderFunc := provider.NewVeleroProvider
-		defer func() {
-			ctrl.NewManager = oldNewManagerFunc
-			ctrl.GetConfigOrDie = oldGetConfigFunc
-			provider.NewVeleroProvider = oldNewVeleroProviderFunc
-		}()
-
-		restConfig := &rest.Config{}
-		recorderMock := newMockEventRecorder(t)
-		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
-		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
-
-		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
-			return ctrlManMock, nil
-		}
-		ctrl.GetConfigOrDie = func() *rest.Config {
-			return restConfig
-		}
-
-		providerMock := newMockBackupProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(assert.AnError)
-		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-
-		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
-
-		// when
-		err := startOperator(testCtx, flags, []string{})
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to sync backups with provider backups on startup")
-	})
 	t.Run("should fail to get operator image", func(t *testing.T) {
 		// given
 		t.Setenv("NAMESPACE", "ecosystem")
@@ -191,12 +145,10 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 		}()
 
@@ -219,13 +171,6 @@ func Test_startOperator(t *testing.T) {
 		}
 		ctrl.GetConfigOrDie = func() *rest.Config {
 			return restConfig
-		}
-
-		providerMock := newMockBackupProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
@@ -253,11 +198,9 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 		}()
 
 		restConfig := &rest.Config{}
@@ -273,13 +216,6 @@ func Test_startOperator(t *testing.T) {
 		}
 		ctrl.GetConfigOrDie = func() *rest.Config {
 			return restConfig
-		}
-
-		providerMock := newMockBackupProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
 		}
 
 		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
@@ -299,12 +235,10 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 		}()
 
@@ -332,13 +266,6 @@ func Test_startOperator(t *testing.T) {
 		}
 		ctrl.GetConfigOrDie = func() *rest.Config {
 			return restConfig
-		}
-
-		providerMock := newMockBackupProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
@@ -371,12 +298,10 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 		}()
 
@@ -407,13 +332,6 @@ func Test_startOperator(t *testing.T) {
 			return restConfig
 		}
 
-		providerMock := newMockBackupProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
@@ -439,13 +357,11 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldSignalHandlerFunc := ctrl.SetupSignalHandler
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			ctrl.SetupSignalHandler = oldSignalHandlerFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 		}()
@@ -481,13 +397,6 @@ func Test_startOperator(t *testing.T) {
 			return testCtx
 		}
 
-		providerMock := newMockBackupProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
-		}
-
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
@@ -512,13 +421,11 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldNewVeleroProviderFunc := provider.NewVeleroProvider
 		oldSignalHandlerFunc := ctrl.SetupSignalHandler
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			provider.NewVeleroProvider = oldNewVeleroProviderFunc
 			ctrl.SetupSignalHandler = oldSignalHandlerFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 		}()
@@ -553,13 +460,6 @@ func Test_startOperator(t *testing.T) {
 		}
 		ctrl.SetupSignalHandler = func() context.Context {
 			return testCtx
-		}
-
-		providerMock := newMockBackupProvider(t)
-		providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-		providerMock.EXPECT().SyncBackups(testCtx).Return(nil)
-		provider.NewVeleroProvider = func(k8sclient provider.K8sClient, recorder provider.EventRecorder, namespace string) provider.Provider {
-			return providerMock
 		}
 
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)

@@ -649,6 +649,63 @@ func (_c *mockReconciler_ensureProviderBackupDeleted_Call) RunAndReturn(run func
 	return _c
 }
 
+// ensureProviderBackupStillExists provides a mock function with given fields: ctx, backup
+func (_m *mockReconciler) ensureProviderBackupStillExists(ctx context.Context, backup *v1.Backup) (action, error) {
+	ret := _m.Called(ctx, backup)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ensureProviderBackupStillExists")
+	}
+
+	var r0 action
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (action, error)); ok {
+		return rf(ctx, backup)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) action); ok {
+		r0 = rf(ctx, backup)
+	} else {
+		r0 = ret.Get(0).(action)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
+		r1 = rf(ctx, backup)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockReconciler_ensureProviderBackupStillExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ensureProviderBackupStillExists'
+type mockReconciler_ensureProviderBackupStillExists_Call struct {
+	*mock.Call
+}
+
+// ensureProviderBackupStillExists is a helper method to define mock.On call
+//   - ctx context.Context
+//   - backup *v1.Backup
+func (_e *mockReconciler_Expecter) ensureProviderBackupStillExists(ctx interface{}, backup interface{}) *mockReconciler_ensureProviderBackupStillExists_Call {
+	return &mockReconciler_ensureProviderBackupStillExists_Call{Call: _e.mock.On("ensureProviderBackupStillExists", ctx, backup)}
+}
+
+func (_c *mockReconciler_ensureProviderBackupStillExists_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockReconciler_ensureProviderBackupStillExists_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.Backup))
+	})
+	return _c
+}
+
+func (_c *mockReconciler_ensureProviderBackupStillExists_Call) Return(_a0 action, _a1 error) *mockReconciler_ensureProviderBackupStillExists_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockReconciler_ensureProviderBackupStillExists_Call) RunAndReturn(run func(context.Context, *v1.Backup) (action, error)) *mockReconciler_ensureProviderBackupStillExists_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ensureVeleroStatusSynced provides a mock function with given fields: ctx, backup
 func (_m *mockReconciler) ensureVeleroStatusSynced(ctx context.Context, backup *v1.Backup) (action, error) {
 	ret := _m.Called(ctx, backup)

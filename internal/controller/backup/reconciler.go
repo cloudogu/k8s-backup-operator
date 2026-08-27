@@ -221,6 +221,39 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 	return Next, nil
 }
 
+// ensureProviderBackupStillExists deletes a terminal backup whose provider backup has disappeared.
+// A completed backup without providerBackup would cannot be restored.
+func (c *defaultReconciler) ensureProviderBackupStillExists(ctx context.Context, backup *backupv1.Backup) (action, error) {
+	// A backup that never started never had a provider backup. That is the case for a run that was canceled
+	// before it reached the provider. Backup can stay for failure history reasons.
+	if backup.Status.StartTimestamp.IsZero() {
+		logging.Debug(ctx, "ensureProviderBackupStillExists: the backup never started -> NEXT")
+		return Next, nil
+	}
+
+	providerBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
+	if err != nil {
+		return Abort, fmt.Errorf("get the velero backup resource to check if it still exists: %w", err)
+	}
+
+	if providerBackup != nil {
+		logging.Debug(ctx, "ensureProviderBackupStillExists: the provider backup still exists -> NEXT")
+		return Next, nil
+	}
+
+	logging.Debug(ctx, "ensureProviderBackupStillExists: the provider backup is gone -> delete the backup, ABORT")
+	logging.Info(ctx, "deleting the backup", "reason", "the velero backup it mirrors no longer exists")
+
+	deleteErr := c.client.Delete(ctx, backup)
+	if deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupDeletingFailed, "Failed to delete the backup of a missing provider backup")
+		return Abort, fmt.Errorf("delete backup whose provider backup no longer exists: %w", deleteErr)
+	}
+
+	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the deletion of the backup must be finalized")
+	return Retry, nil
+}
+
 func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	metadataChanged := mergeMissingOrChangedValues(&backup.Labels, defaultLabels)
 
