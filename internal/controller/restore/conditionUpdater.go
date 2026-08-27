@@ -85,12 +85,17 @@ func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Res
 		return restore, fmt.Errorf("failed to update status of restore %q: %w", restore.Name, err)
 	}
 
-	// Update metrics
+	updateRestoreMetrics(result, persistedTransitions, persistedLegacyStatus)
+
+	return result, nil
+}
+
+func updateRestoreMetrics(restore *k8sv1.Restore, persistedTransitions []conditionTransition, persistedLegacyStatus string) {
 	for _, transition := range persistedTransitions {
 		metrics.UpdateRestoreConditionTransitionMetric(
-			result.Namespace,
-			result.Name,
-			result.Spec.BackupName,
+			restore.Namespace,
+			restore.Name,
+			restore.Spec.BackupName,
 			transition.conditionType,
 			string(transition.from),
 			string(transition.to),
@@ -98,14 +103,12 @@ func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Res
 	}
 	if persistedLegacyStatus != "" {
 		metrics.UpdateRestoreStatusMetrics(
-			result.Namespace,
-			result.Name,
-			result.Spec.BackupName,
+			restore.Namespace,
+			restore.Name,
+			restore.Spec.BackupName,
 			persistedLegacyStatus,
 		)
 	}
-
-	return result, nil
 }
 
 // setConditionsFromLegacyStatus persists the Successful condition derived from the deprecated
