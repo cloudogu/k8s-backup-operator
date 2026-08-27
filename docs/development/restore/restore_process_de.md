@@ -13,7 +13,7 @@ flowchart TD
     A[Restore gelesen] --> B{deletionTimestamp gesetzt?}
     B -- ja --> D[Delete-Workflow]
     B -- nein --> C{Restore terminal?}
-    C -- Ja --> I[Ignore: nur Legacy-Migration]
+    C -- Ja --> I[Ignore: Legacy-Migration und Lease-Freigabe]
     C -- nein --> R[Create-/Restore-Workflow]
 ```
 
