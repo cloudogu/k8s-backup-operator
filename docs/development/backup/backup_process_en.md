@@ -111,7 +111,7 @@ If the ConfigMap or key is missing, or if the value is not numeric, the reconcil
 
 ### Shared backup/restore lease
 
-After successful preparation and before maintenance mode is activated, `ensureActiveBackupLease` acquires the namespace-wide Kubernetes `Lease` named `k8s-backup-operator-restore`. The restore controller uses the same lease. This prevents backup and restore from executing their critical sections concurrently in the same namespace.
+After successful preparation and before maintenance mode is activated, `ensureActiveBackupLease` acquires the namespace-wide Kubernetes `Lease` named `k8s-backup-operator-lease`. The restore controller uses the same lease. This prevents backup and restore from executing their critical sections concurrently in the same namespace.
 
 The holder is described by `spec.holderIdentity` (UID), `k8s.cloudogu.com/backup-operator-lease-holder-name` (name), and `k8s.cloudogu.com/lease-holder-kind` (`Backup` or `Restore`). All three fields are written together and must be present; incomplete leases are considered invalid and are not repaired heuristically. Each controller only registers the resolver for its own resource type. A foreign or unknown holder type is considered active and is not taken over, so the two workflows do not need to know about each other. A resource's own lease is accepted idempotently. The passage of time alone does not make a lease stale.
 
