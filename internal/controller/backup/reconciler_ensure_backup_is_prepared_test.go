@@ -5,10 +5,13 @@ import (
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
@@ -29,7 +32,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
-		assert.Equal(t, reasonProviderBackupStorageLocationNotFound, preparedCondition.Reason)
+		assert.Equal(t, veleroprovider.ReasonBackupStorageLocationNotFound, preparedCondition.Reason)
 
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
@@ -52,7 +55,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
-		assert.Equal(t, reasonProviderBackupStorageLocationNotAvailable, preparedCondition.Reason)
+		assert.Equal(t, veleroprovider.ReasonBackupStorageLocationNotAvailable, preparedCondition.Reason)
 
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
@@ -75,9 +78,30 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionTrue, preparedCondition.Status)
-		assert.Equal(t, reasonProviderBackupStorageLocationAvailable, preparedCondition.Reason)
+		assert.Equal(t, veleroprovider.ReasonBackupStorageLocationAvailable, preparedCondition.Reason)
 
 		assert.Equal(t, 1, counter.subResourcePatchCount)
+	})
+
+	t.Run("An unready provider is reported once, not on every retry", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
+			WithObjects(backup).
+			WithStatusSubresource(backup).
+			Build()
+		recorder := record.NewFakeRecorder(100)
+		reconciler := NewReconciler(fakeClient, recorder, nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		assert.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+		// second call to verify only one report
+		nextAction, err = reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		assert.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+
+		require.Len(t, recorder.Events, 1, "the unchanged provider state must be reported only once")
+		assert.Contains(t, <-recorder.Events, veleroprovider.ReasonBackupStorageLocationNotFound)
 	})
 
 	t.Run("If an error occurred while getting the backup storage location resource then abort", func(t *testing.T) {

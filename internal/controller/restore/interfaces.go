@@ -9,8 +9,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 
 type k8sClient interface {
@@ -54,12 +52,6 @@ type scaleManager interface {
 }
 
 // used for mocks
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type restoreProvider interface {
-	provider.Provider
-}
 
 //nolint:unused
 //goland:noinspection GoUnusedType

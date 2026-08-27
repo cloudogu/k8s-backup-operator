@@ -77,6 +77,8 @@ const (
 	ReasonWorkloadsReady = "WorkloadsReady"
 	// ReasonScaleUpFinalized marks the removal of the temporary replica recovery labels.
 	ReasonScaleUpFinalized = "ScaleUpFinalized"
+	// ReasonProviderReady marks a provider that became ready after it had kept the restore waiting.
+	ReasonProviderReady = "ProviderReady"
 	// ReasonMaintenanceModeActivated marks a failed best-effort activation attempt in an event.
 	ReasonMaintenanceModeActivated = "MaintenanceModeActivated"
 	// ReasonMaintenanceModeDeactivated marks the successfully removed maintenance notice.

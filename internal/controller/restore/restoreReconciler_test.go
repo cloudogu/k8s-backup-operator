@@ -33,7 +33,7 @@ const requeueAfterTest = time.Duration(5) * time.Second
 func TestNewRestoreReconciler(t *testing.T) {
 	t.Run("should create restore reconciler", func(t *testing.T) {
 		// when
-		actual := NewRestoreReconciler(nil, nil, "default", nil, nil, requeueAfterTest)
+		actual := NewRestoreReconciler(nil, nil, "default", nil, nil, requeueAfterTest, testBackupStorage)
 
 		// then
 		assert.NotNil(t, actual)

@@ -348,6 +348,7 @@ func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.W
 		cleanupManager,
 		scaleManager,
 		requeueAfter,
+		operatorConfig.BackupStorageName,
 	)
 	if err := restoreReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)

@@ -10,7 +10,6 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
-	restoreprovider "github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,6 +43,7 @@ func NewRestoreReconciler(
 	cleanup cleanupManager,
 	scaleManager scaleManager,
 	requeueDelay time.Duration,
+	backupStorageName string,
 ) *restoreReconciler {
 	return &restoreReconciler{
 		k8sClient:             k8sClient,
@@ -53,6 +53,7 @@ func NewRestoreReconciler(
 		scaleManager:          scaleManager,
 		maintenanceModeSwitch: repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace),
 		requeueDelay:          requeueDelay,
+		backupStorageName:     backupStorageName,
 	}
 }
 
@@ -65,6 +66,7 @@ type restoreReconciler struct {
 	scaleManager          scaleManager
 	maintenanceModeSwitch maintenanceModeSwitch
 	requeueDelay          time.Duration
+	backupStorageName     string
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -268,11 +270,62 @@ func (r *restoreReconciler) ensureProviderReady(ctx context.Context, restore *k8
 		return restore, next()
 	}
 
-	_, err = restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
+	readiness, err := velero.CheckReady(ctx, r.k8sClient, restore.Namespace, r.backupStorageName)
 	if err != nil {
-		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
+		return restore, retryOnError(fmt.Errorf("failed to check whether the provider of restore %s is ready: %w", restore.Name, err))
 	}
+
+	if !readiness.Ready {
+		return r.reportUnreadyProvider(ctx, restore, readiness)
+	}
+
+	// Only record if changed to ready to avoid spam
+	if wasWaitingForTheProvider(restore) {
+		logging.Info(ctx, "the provider became ready", "reason", readiness.Reason)
+		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonProviderReady, readiness.Message)
+	}
+
 	return restore, next()
+}
+
+// reportUnreadyProvider records the provider state as Prepared=False and lets the restore wait. The
+// event and the log line are guarded by the condition, to avoid spam
+func (r *restoreReconciler) reportUnreadyProvider(ctx context.Context, restore *k8sv1.Restore, readiness velero.Readiness) (*k8sv1.Restore, stageOutcome) {
+	notReady := metav1.Condition{
+		Type:    k8sv1.ConditionPrepared,
+		Status:  metav1.ConditionFalse,
+		Reason:  readiness.Reason,
+		Message: readiness.Message,
+	}
+	report := conditions.WillChange(restore.Status.Conditions, notReady)
+
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, notReady)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to report the unready provider of restore %s: %w", restore.Name, err))
+	}
+
+	if report {
+		logging.Info(ctx, "waiting for the provider to become ready",
+			"backupStorageLocation", r.backupStorageName,
+			"reason", readiness.Reason,
+			"message", readiness.Message,
+		)
+		r.recorder.Event(restore, corev1.EventTypeWarning, readiness.Reason, readiness.Message)
+	}
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider is not ready")
+
+	return updated, retryAfter(r.requeueDelay)
+}
+
+// wasWaitingForTheProvider reports whether a previous pass stopped this restore at the provider gate.
+func wasWaitingForTheProvider(restore *k8sv1.Restore) bool {
+	condition := meta.FindStatusCondition(restore.Status.Conditions, k8sv1.ConditionPrepared)
+	if condition == nil || condition.Status != metav1.ConditionFalse {
+		return false
+	}
+
+	return condition.Reason == velero.ReasonBackupStorageLocationNotFound ||
+		condition.Reason == velero.ReasonBackupStorageLocationNotAvailable
 }
 
 // ensurePreparation runs the destructive preparation of the ecosystem: scale-down and cleanup.

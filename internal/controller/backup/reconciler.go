@@ -27,39 +27,36 @@ import (
 )
 
 const (
-	reasonProviderBackupStorageLocationNotFound     = "ProviderBackupStorageLocationNotFound"
-	reasonProviderBackupStorageLocationNotAvailable = "ProviderBackupStorageLocationNotAvailable"
-	reasonProviderBackupStorageLocationAvailable    = "ProviderBackupStorageLocationAvailable"
-	reasonMaintenanceModesIsNotActive               = "MaintenanceModesIsNotActive"
-	reasonMaintenanceModesStatusFailed              = "MaintenanceModesStatusFailed"
-	reasonMaintenanceModesActivation                = "MaintenanceModesActivation"
-	reasonMaintenanceModesDeactivation              = "MaintenanceModesDeactivation"
-	reasonMaintenanceModesActivationFailed          = "MaintenanceModesActivationFailed"
-	reasonMaintenanceModesDeactivationFailed        = "MaintenanceModesDeactivationFailed"
-	reasonProviderBackupResourceDoesNotExist        = "ProviderBackupResourceDoesNotExist"
-	reasonProviderBackupInProgress                  = "ProviderBackupInProgress"
-	reasonProviderBackupFailed                      = "ProviderBackupFailed"
-	reasonProviderBackupDeletionFailed              = "ProviderBackupDeletionFailed"
-	reasonProviderBackupDeletion                    = "ProviderBackupDeletion"
-	reasonWaitingForProviderBackupCompletion        = "WaitingForProviderBackupCompletion"
-	reasonProviderBackupSucceeded                   = "ProviderBackupSucceeded"
-	reasonBackupStarted                             = "BackupStarted"
-	reasonBackupDeleting                            = "BackupDeleting"
-	reasonBackupSucceeded                           = "BackupSucceeded"
-	reasonBackupCanceled                            = "BackupCanceled"
-	reasonBackupDeletingFailed                      = "BackupDeletingFaild"
-	reasonBackupNotDeleting                         = "BackupNotDeleting"
-	reasonTimeWindowNotExpired                      = "TimeWindowNotExpired"
-	reasonTimeWindowExpiredBackupNotStarted         = "TimeWindowExpiredBackupNotStarted"
-	reasonTimeWindowExpiredBackupInProgress         = "TimeWindowExpiredBackupInProgress"
-	reasonTimeWindowExpiredBackupFailed             = "TimeWindowExpiredBackupFailed"
-	reasonTimeWindowExpiredProviderBackupMissing    = "TimeWindowExpiredProviderBackupMissing"
-	reasonTimeWindowExpiredBackupSucceeded          = "TimeWindowExpiredBackupSucceeded"
-	reasonVeleroStatusSynced                        = "VeleroStatusSynced"
-	reasonVeleroBackupRunning                       = "VeleroBackupRunning"
-	reasonVeleroBackupFailed                        = "VeleroBackupFailed"
-	reasonBackupLeaseAquired                        = "BackupLeaseAquired"
-	reasonBackupLeaseFailed                         = "BackupLeaseFailed"
+	reasonMaintenanceModesIsNotActive            = "MaintenanceModesIsNotActive"
+	reasonMaintenanceModesStatusFailed           = "MaintenanceModesStatusFailed"
+	reasonMaintenanceModesActivation             = "MaintenanceModesActivation"
+	reasonMaintenanceModesDeactivation           = "MaintenanceModesDeactivation"
+	reasonMaintenanceModesActivationFailed       = "MaintenanceModesActivationFailed"
+	reasonMaintenanceModesDeactivationFailed     = "MaintenanceModesDeactivationFailed"
+	reasonProviderBackupResourceDoesNotExist     = "ProviderBackupResourceDoesNotExist"
+	reasonProviderBackupInProgress               = "ProviderBackupInProgress"
+	reasonProviderBackupFailed                   = "ProviderBackupFailed"
+	reasonProviderBackupDeletionFailed           = "ProviderBackupDeletionFailed"
+	reasonProviderBackupDeletion                 = "ProviderBackupDeletion"
+	reasonWaitingForProviderBackupCompletion     = "WaitingForProviderBackupCompletion"
+	reasonProviderBackupSucceeded                = "ProviderBackupSucceeded"
+	reasonBackupStarted                          = "BackupStarted"
+	reasonBackupDeleting                         = "BackupDeleting"
+	reasonBackupSucceeded                        = "BackupSucceeded"
+	reasonBackupCanceled                         = "BackupCanceled"
+	reasonBackupDeletingFailed                   = "BackupDeletingFaild"
+	reasonBackupNotDeleting                      = "BackupNotDeleting"
+	reasonTimeWindowNotExpired                   = "TimeWindowNotExpired"
+	reasonTimeWindowExpiredBackupNotStarted      = "TimeWindowExpiredBackupNotStarted"
+	reasonTimeWindowExpiredBackupInProgress      = "TimeWindowExpiredBackupInProgress"
+	reasonTimeWindowExpiredBackupFailed          = "TimeWindowExpiredBackupFailed"
+	reasonTimeWindowExpiredProviderBackupMissing = "TimeWindowExpiredProviderBackupMissing"
+	reasonTimeWindowExpiredBackupSucceeded       = "TimeWindowExpiredBackupSucceeded"
+	reasonVeleroStatusSynced                     = "VeleroStatusSynced"
+	reasonVeleroBackupRunning                    = "VeleroBackupRunning"
+	reasonVeleroBackupFailed                     = "VeleroBackupFailed"
+	reasonBackupLeaseAquired                     = "BackupLeaseAquired"
+	reasonBackupLeaseFailed                      = "BackupLeaseFailed"
 )
 
 const (
@@ -320,78 +317,19 @@ func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx con
 }
 
 func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	veleroBackupStorageLocation := velerov1.BackupStorageLocation{}
-	err := c.client.Get(
-		ctx,
-		types.NamespacedName{Namespace: backup.Namespace, Name: c.backupStorageName},
-		&veleroBackupStorageLocation,
-	)
-
-	if apierrors.IsNotFound(err) {
-		logging.Debug(ctx, fmt.Sprintf(
-			"ensureBackupIsPrepared: backup storage location '%s' not found -> Prepared = False, RETRY",
-			c.backupStorageName,
-		))
-
-		notFound := metav1.Condition{
-			Type:    backupv1.ConditionPrepared,
-			Status:  metav1.ConditionFalse,
-			Reason:  reasonProviderBackupStorageLocationNotFound,
-			Message: "The provider backup storage location not found.",
-		}
-		reportNotFound := conditions.WillChange(backup.Status.Conditions, notFound)
-
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, notFound)
-		})
-		if patchErr != nil {
-			return Abort, fmt.Errorf("patch conditions to mark preparation as failed: %w", patchErr)
-		}
-		if reportNotFound {
-			logging.Info(ctx, "waiting for the velero backup storage location to appear", "backupStorageLocation", c.backupStorageName)
-		}
-		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup storage location was not found")
-		c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupStorageLocationNotFound, "The provider backup storage location not found")
-		return Retry, nil
-	}
-
+	readiness, err := veleroprovider.CheckReady(ctx, c.client, backup.Namespace, c.backupStorageName)
 	if err != nil {
-		return Abort, fmt.Errorf("get velero backup storage location 'name=%s': %w", c.backupStorageName, err)
-	}
-
-	if veleroBackupStorageLocation.Status.Phase != velerov1.BackupStorageLocationPhaseAvailable {
-		logging.Debug(ctx, "ensureBackupIsPrepared: backup storage location is not available -> Prepared = False, RETRY")
-
-		notAvailable := metav1.Condition{
-			Type:    backupv1.ConditionPrepared,
-			Status:  metav1.ConditionFalse,
-			Reason:  reasonProviderBackupStorageLocationNotAvailable,
-			Message: fmt.Sprintf("velero backup storage location 'name=%s' is not available.", c.backupStorageName),
-		}
-		reportNotAvailable := conditions.WillChange(backup.Status.Conditions, notAvailable)
-
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, notAvailable)
-		})
-		if patchErr != nil {
-			return Abort, fmt.Errorf("patch conditions to mark preparation as failed: %w", patchErr)
-		}
-		if reportNotAvailable {
-			logging.Info(ctx, "waiting for the velero backup storage location to become available",
-				"backupStorageLocation", c.backupStorageName,
-				"phase", veleroBackupStorageLocation.Status.Phase,
-			)
-		}
-		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup storage location is not available")
-		c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupStorageLocationNotAvailable, "The provider backup storage location is not available")
-		return Retry, nil
+		return Abort, err
 	}
 
 	prepared := metav1.Condition{
 		Type:    backupv1.ConditionPrepared,
 		Status:  metav1.ConditionTrue,
-		Reason:  reasonProviderBackupStorageLocationAvailable,
-		Message: fmt.Sprintf("velero backup storage location 'name=%s' is available.", c.backupStorageName),
+		Reason:  readiness.Reason,
+		Message: readiness.Message,
+	}
+	if !readiness.Ready {
+		prepared.Status = metav1.ConditionFalse
 	}
 	reportPrepared := conditions.WillChange(backup.Status.Conditions, prepared)
 
@@ -399,10 +337,25 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		meta.SetStatusCondition(&status.Conditions, prepared)
 	})
 	if patchErr != nil {
-		return Abort, fmt.Errorf("patch status to mark the preparation conditions as failed: %w", patchErr)
+		return Abort, fmt.Errorf("patch conditions to report the provider readiness: %w", patchErr)
 	}
 
-	logging.Debug(ctx, "ensureBackupIsPrepared: backup storage location is available -> Prepared = True, NEXT")
+	if !readiness.Ready {
+		logging.Debug(ctx, "ensureBackupIsPrepared: the provider is not ready -> Prepared = False, RETRY")
+		// only report when changed to avoid spam
+		if reportPrepared {
+			logging.Info(ctx, "waiting for the provider to become ready",
+				"backupStorageLocation", c.backupStorageName,
+				"reason", readiness.Reason,
+				"message", readiness.Message,
+			)
+			c.recorder.Event(backup, corev1.EventTypeWarning, readiness.Reason, readiness.Message)
+		}
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider is not ready")
+		return Retry, nil
+	}
+
+	logging.Debug(ctx, "ensureBackupIsPrepared: the provider is ready -> Prepared = True, NEXT")
 	if reportPrepared {
 		logging.Info(ctx, "backup prepared", "backupStorageLocation", c.backupStorageName)
 	}
