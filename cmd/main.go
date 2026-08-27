@@ -66,7 +66,6 @@ var (
 	newAdditionalImageGetter    = schedulecontroller.NewOperatorImageGetter
 	newGarbageCollectionManager = garbagecollection.NewManager
 	newScheduledBackupManager   = scheduledbackup.NewManager
-	newBackupTimeoutGetter      = config.NewGetter
 )
 
 func init() {

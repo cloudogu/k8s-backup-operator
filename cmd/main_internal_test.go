@@ -7,7 +7,6 @@ import (
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
-	backupconfig "github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -272,11 +271,6 @@ func Test_startOperator(t *testing.T) {
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
 			return additionalImageGetterMock
-		}
-
-		configGetterMock := newMockConfigGetter(t)
-		newBackupTimeoutGetter = func(_ backupconfig.ConfigMapInterface) backupconfig.Getter {
-			return configGetterMock
 		}
 
 		flags := flag.NewFlagSet("operator", flag.ContinueOnError)
