@@ -158,11 +158,11 @@ func determineLegacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Conditio
 	var status metav1.ConditionStatus
 	switch restore.Status.Status { // NOSONAR -- legacy restore status compatibility
 	case k8sv1.RestoreStatusCompleted: // NOSONAR -- legacy restore status compatibility
-		status = metav1.ConditionTrue
+		status = metav1.ConditionTrue // NOSONAR -- legacy restore status compatibility
 	case k8sv1.RestoreStatusFailed: // NOSONAR -- legacy restore status compatibility
-		status = metav1.ConditionFalse
+		status = metav1.ConditionFalse // NOSONAR -- legacy restore status compatibility
 	case k8sv1.RestoreStatusInProgress: // NOSONAR -- legacy restore status compatibility
-		status = metav1.ConditionUnknown
+		status = metav1.ConditionUnknown // NOSONAR -- legacy restore status compatibility
 	default:
 		return nil
 	}
@@ -202,7 +202,7 @@ func isTerminalLegacyStatus(status string) bool {
 func legacyStatusFor(restore *k8sv1.Restore) string {
 	if restore.DeletionTimestamp != nil && !restore.DeletionTimestamp.IsZero() {
 		return k8sv1.RestoreStatusDeleting // NOSONAR -- legacy restore status compatibility
-	}
+	} // NOSONAR -- legacy restore status compatibility
 
 	switch condition := findSuccessfulCondition(restore); {
 	case condition == nil && (len(restore.Status.Conditions) == 0 || isTerminalLegacyStatus(restore.Status.Status)):
