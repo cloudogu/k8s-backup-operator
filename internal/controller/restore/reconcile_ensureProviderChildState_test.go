@@ -62,7 +62,7 @@ func TestAnExistingOwnedProviderChildSkipsThePreparationAndIsObservedInstead(t *
 	}
 	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
 		"the observed state must be written once and the child must never be written")
-	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderRestoreSuccessful, metav1.ConditionUnknown, ReasonProviderRestoreRunning)
+	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionUnknown, ReasonProviderRestoreRunning)
 }
 
 func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T) {
@@ -93,7 +93,7 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 	assert.Equal(t, k8sv1.RestoreStatusFailed, stored.Status.Status)
 	assert.Equal(t, metav1.ConditionFalse, findSuccessfulCondition(stored).Status)
 	assert.Equal(t, ReasonProviderRestoreConflict, findSuccessfulCondition(stored).Reason)
-	providerCondition := meta.FindStatusCondition(stored.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful)
+	providerCondition := meta.FindStatusCondition(stored.Status.Conditions, k8sv1.ConditionProviderSucceeded)
 	require.NotNil(t, providerCondition)
 	assert.Equal(t, metav1.ConditionFalse, providerCondition.Status)
 	assert.Equal(t, ReasonProviderRestoreConflict, providerCondition.Reason)

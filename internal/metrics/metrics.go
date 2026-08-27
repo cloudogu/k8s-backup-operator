@@ -109,6 +109,7 @@ func InitBackupConditionTransitionMetrics(namespace, name string) {
 		v1.ConditionDeleting,
 		v1.ConditionCanceled,
 		v1.ConditionSucceeded,
+		v1.ConditionProviderSucceeded,
 	}
 	conditionStatuses := []metav1.ConditionStatus{
 		metav1.ConditionUnknown,
@@ -164,9 +165,9 @@ func InitRestoreStatusMetrics(namespace, name, backupName string) {
 // InitRestoreConditionTransitionMetrics initializes every possible status transition for all restore conditions.
 func InitRestoreConditionTransitionMetrics(namespace, name, backupName string) {
 	conditionTypes := []string{
-		v1.ConditionSuccessful,
+		v1.ConditionSucceeded,
 		v1.ConditionPrepared,
-		v1.ConditionProviderRestoreSuccessful,
+		v1.ConditionProviderSucceeded,
 		v1.ConditionWorkloadsRecovered,
 	}
 	conditionStatuses := []metav1.ConditionStatus{

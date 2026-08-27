@@ -120,8 +120,9 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.ensureMetadata,
 			r.ensureProviderChildState,
 			r.ensureActiveRestoreLease,
-			r.ensurePreparation,
+			r.ensureProviderReady,
 			r.ensureMaintenanceModeActivated,
+			r.ensurePreparation,
 			r.ensureProviderRestore,
 			r.ensureProviderCompletion,
 			r.ensureScaleUpInitiated,
@@ -237,13 +238,13 @@ func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, res
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
 		metav1.Condition{
-			Type:    k8sv1.ConditionProviderRestoreSuccessful,
+			Type:    k8sv1.ConditionProviderSucceeded,
 			Status:  metav1.ConditionFalse,
 			Reason:  ReasonProviderRestoreConflict,
 			Message: conflictErr.Error(),
 		},
 		metav1.Condition{
-			Type:    k8sv1.ConditionSuccessful,
+			Type:    k8sv1.ConditionSucceeded,
 			Status:  metav1.ConditionFalse,
 			Reason:  ReasonProviderRestoreConflict,
 			Message: fmt.Sprintf("The restore was not started: %v", conflictErr),
@@ -254,6 +255,24 @@ func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, res
 	}
 
 	return updated, abort()
+}
+
+// ensureProviderReady checks the provider before maintenance mode affects ecosystem availability.
+// A restore that is already prepared does not need the provider readiness gate again.
+func (r *restoreReconciler) ensureProviderReady(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
+	prepared, err := r.isAlreadyPrepared(ctx, restore)
+	if err != nil {
+		return restore, retryOnError(err)
+	}
+	if prepared {
+		return restore, next()
+	}
+
+	_, err = restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
+	}
+	return restore, next()
 }
 
 // ensurePreparation runs the destructive preparation of the ecosystem: scale-down and cleanup.
@@ -267,12 +286,6 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	}
 
 	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparing, "Preparation in progress - scale down and cleanup")
-	// The provider is checked before anything is touched: the preparation is irreversible, so an
-	// unready provider must not cost the ecosystem its availability for a restore that cannot start.
-	_, err = restoreprovider.Get(ctx, restore, restore.Spec.Provider, restore.Namespace, r.recorder, r.k8sClient)
-	if err != nil {
-		return restore, retryOnError(fmt.Errorf("failed to get restore provider [%s]: %w", restore.Spec.Provider, err))
-	}
 
 	if err := r.scaleManager.ScaleDown(ctx); err != nil {
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to scale down workloads before restore: %w", err))
@@ -340,7 +353,7 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 // instead of starting a second restore.
 func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	// A provider restore already succeeded -> skip
-	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful) {
+	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderSucceeded) {
 		return restore, next()
 	}
 
@@ -377,7 +390,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 // terminated yet, stop reconciliation and wait for next change on the child resource.
 // Only a provider success continues the workflow; a failure is terminal.
 func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
-	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful) {
+	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderSucceeded) {
 		return restore, next()
 	}
 
@@ -404,7 +417,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 	}
 
 	observation := metav1.Condition{
-		Type:    k8sv1.ConditionProviderRestoreSuccessful,
+		Type:    k8sv1.ConditionProviderSucceeded,
 		Status:  status,
 		Reason:  reason,
 		Message: message,
@@ -413,7 +426,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 	// phase is not reported again. The child's events drive the next look, so the report follows the
 	// provider rather than a timer.
 	report := conditions.WillChange(restore.Status.Conditions, observation)
-	waited := conditions.ElapsedInCurrentStatus(restore.Status.Conditions, k8sv1.ConditionProviderRestoreSuccessful, time.Now())
+	waited := conditions.ElapsedInCurrentStatus(restore.Status.Conditions, k8sv1.ConditionProviderSucceeded, time.Now())
 
 	// The write is no-op aware, so an unchanged state costs nothing; a changed one makes the phase the
 	// restore is actually in visible in its status.
@@ -453,7 +466,7 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
 		metav1.Condition{
-			Type:    k8sv1.ConditionProviderRestoreSuccessful,
+			Type:    k8sv1.ConditionProviderSucceeded,
 			Status:  metav1.ConditionFalse,
 			Reason:  reason,
 			Message: message,
@@ -465,7 +478,7 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 			Message: "The workloads were deliberately left scaled down because the provider restore failed.",
 		},
 		metav1.Condition{
-			Type:    k8sv1.ConditionSuccessful,
+			Type:    k8sv1.ConditionSucceeded,
 			Status:  metav1.ConditionFalse,
 			Reason:  reason,
 			Message: message,

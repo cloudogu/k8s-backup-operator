@@ -60,7 +60,7 @@ func (r *restoreReconciler) continueWithAcquiredLease(ctx context.Context, resto
 		return restore, next()
 	}
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
-		Type: k8sv1.ConditionSuccessful, Status: metav1.ConditionUnknown,
+		Type: k8sv1.ConditionSucceeded, Status: metav1.ConditionUnknown,
 		Reason:  ReasonRestoreLeaseAcquired,
 		Message: "The restore holds the namespace-wide restore lease and can continue.",
 	})
@@ -77,7 +77,7 @@ func (r *restoreReconciler) reportWaitingForLease(ctx context.Context, restore *
 		message = fmt.Sprintf("Operation %q currently holds the namespace-wide backup/restore lease.", holderName)
 	}
 	waiting := metav1.Condition{
-		Type: k8sv1.ConditionSuccessful, Status: metav1.ConditionUnknown,
+		Type: k8sv1.ConditionSucceeded, Status: metav1.ConditionUnknown,
 		Reason: ReasonWaitingForActiveRestore, Message: message,
 	}
 	// The holder is part of the message, so a wait for a new holder is reported again while a
@@ -101,7 +101,7 @@ func (r *restoreReconciler) reportInvalidRestoreLease(ctx context.Context, resto
 	metrics.UpdateInvalidLeaseTotalMetric(restore.Namespace, restore.Name)
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
-		Type: k8sv1.ConditionSuccessful, Status: metav1.ConditionUnknown,
+		Type: k8sv1.ConditionSucceeded, Status: metav1.ConditionUnknown,
 		Reason:  ReasonInvalidRestoreLease,
 		Message: fmt.Sprintf("%s. Delete the lease after verifying that no backup or restore is active.", leaseError.Error()),
 	})

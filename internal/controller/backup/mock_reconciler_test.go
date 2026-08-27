@@ -307,12 +307,12 @@ func (_c *mockReconciler_ensureBackupSetup_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// ensureCompletedBackupIsIgnored provides a mock function with given fields: ctx, backup
-func (_m *mockReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, backup *v1.Backup) (action, error) {
+// ensureBackupRunCompleted provides a mock function with given fields: ctx, backup
+func (_m *mockReconciler) ensureBackupRunCompleted(ctx context.Context, backup *v1.Backup) (action, error) {
 	ret := _m.Called(ctx, backup)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ensureCompletedBackupIsIgnored")
+		panic("no return value specified for ensureBackupRunCompleted")
 	}
 
 	var r0 action
@@ -335,31 +335,31 @@ func (_m *mockReconciler) ensureCompletedBackupIsIgnored(ctx context.Context, ba
 	return r0, r1
 }
 
-// mockReconciler_ensureCompletedBackupIsIgnored_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ensureCompletedBackupIsIgnored'
-type mockReconciler_ensureCompletedBackupIsIgnored_Call struct {
+// mockReconciler_ensureBackupRunCompleted_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ensureBackupRunCompleted'
+type mockReconciler_ensureBackupRunCompleted_Call struct {
 	*mock.Call
 }
 
-// ensureCompletedBackupIsIgnored is a helper method to define mock.On call
+// ensureBackupRunCompleted is a helper method to define mock.On call
 //   - ctx context.Context
 //   - backup *v1.Backup
-func (_e *mockReconciler_Expecter) ensureCompletedBackupIsIgnored(ctx interface{}, backup interface{}) *mockReconciler_ensureCompletedBackupIsIgnored_Call {
-	return &mockReconciler_ensureCompletedBackupIsIgnored_Call{Call: _e.mock.On("ensureCompletedBackupIsIgnored", ctx, backup)}
+func (_e *mockReconciler_Expecter) ensureBackupRunCompleted(ctx interface{}, backup interface{}) *mockReconciler_ensureBackupRunCompleted_Call {
+	return &mockReconciler_ensureBackupRunCompleted_Call{Call: _e.mock.On("ensureBackupRunCompleted", ctx, backup)}
 }
 
-func (_c *mockReconciler_ensureCompletedBackupIsIgnored_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockReconciler_ensureCompletedBackupIsIgnored_Call {
+func (_c *mockReconciler_ensureBackupRunCompleted_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockReconciler_ensureBackupRunCompleted_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(*v1.Backup))
 	})
 	return _c
 }
 
-func (_c *mockReconciler_ensureCompletedBackupIsIgnored_Call) Return(_a0 action, _a1 error) *mockReconciler_ensureCompletedBackupIsIgnored_Call {
+func (_c *mockReconciler_ensureBackupRunCompleted_Call) Return(_a0 action, _a1 error) *mockReconciler_ensureBackupRunCompleted_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockReconciler_ensureCompletedBackupIsIgnored_Call) RunAndReturn(run func(context.Context, *v1.Backup) (action, error)) *mockReconciler_ensureCompletedBackupIsIgnored_Call {
+func (_c *mockReconciler_ensureBackupRunCompleted_Call) RunAndReturn(run func(context.Context, *v1.Backup) (action, error)) *mockReconciler_ensureBackupRunCompleted_Call {
 	_c.Call.Return(run)
 	return _c
 }
