@@ -728,12 +728,6 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		return Abort, fmt.Errorf("get velero backup to sync status: %w", err)
 	}
 
-	prepared := metav1.Condition{
-		Type:    backupv1.ConditionPrepared,
-		Status:  metav1.ConditionTrue,
-		Reason:  reasonVeleroStatusSynced,
-		Message: "The backup already exists in Velero.",
-	}
 	succeeded := metav1.Condition{
 		Type:   backupv1.ConditionSucceeded,
 		Status: metav1.ConditionUnknown,
@@ -760,24 +754,9 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		report = "waiting for the synchronized velero backup to complete"
 	}
 
-	// Set providerSucceeded and Succeeded together to keep the guards working correctly
-	providerSucceeded := succeeded
-	providerSucceeded.Type = backupv1.ConditionProviderSucceeded
-
 	reportSync := conditions.WillChange(backup.Status.Conditions, succeeded)
 
-	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-		meta.SetStatusCondition(&status.Conditions, prepared)
-		meta.SetStatusCondition(&status.Conditions, providerSucceeded)
-		meta.SetStatusCondition(&status.Conditions, succeeded)
-
-		if veleroBackup.Status.StartTimestamp != nil {
-			status.StartTimestamp = *veleroBackup.Status.StartTimestamp
-		}
-		if veleroBackup.Status.CompletionTimestamp != nil {
-			status.CompletionTimestamp = *veleroBackup.Status.CompletionTimestamp
-		}
-	}); err != nil {
+	if err := c.patchBackupStatusFromVelero(ctx, backup, veleroBackup, succeeded); err != nil {
 		return Abort, fmt.Errorf("patch backup status synchronized from Velero: %w", err)
 	}
 
@@ -789,6 +768,37 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the synchronized provider backup is still in progress")
 	}
 	return nextAction, nil
+}
+
+func (c *defaultReconciler) patchBackupStatusFromVelero(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	veleroBackup *velerov1.Backup,
+	succeeded metav1.Condition,
+) error {
+	prepared := metav1.Condition{
+		Type:    backupv1.ConditionPrepared,
+		Status:  metav1.ConditionTrue,
+		Reason:  reasonVeleroStatusSynced,
+		Message: "The backup already exists in Velero.",
+	}
+
+	// Set providerSucceeded and Succeeded together to keep the guards working correctly
+	providerSucceeded := succeeded
+	providerSucceeded.Type = backupv1.ConditionProviderSucceeded
+
+	return c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, prepared)
+		meta.SetStatusCondition(&status.Conditions, providerSucceeded)
+		meta.SetStatusCondition(&status.Conditions, succeeded)
+
+		if veleroBackup.Status.StartTimestamp != nil {
+			status.StartTimestamp = *veleroBackup.Status.StartTimestamp
+		}
+		if veleroBackup.Status.CompletionTimestamp != nil {
+			status.CompletionTimestamp = *veleroBackup.Status.CompletionTimestamp
+		}
+	})
 }
 
 func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup) (action, error) {
