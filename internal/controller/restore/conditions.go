@@ -158,11 +158,11 @@ func determineLegacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Conditio
 	var status metav1.ConditionStatus
 	switch restore.Status.Status { //nolint:staticcheck // legacy restore status compatibility
 	case k8sv1.RestoreStatusCompleted: //nolint:staticcheck // legacy restore status compatibility
-		status = metav1.ConditionTrue //nolint:staticcheck // legacy restore status compatibility
+		status = metav1.ConditionTrue
 	case k8sv1.RestoreStatusFailed: //nolint:staticcheck // legacy restore status compatibility
-		status = metav1.ConditionFalse //nolint:staticcheck // legacy restore status compatibility
+		status = metav1.ConditionFalse
 	case k8sv1.RestoreStatusInProgress: //nolint:staticcheck // legacy restore status compatibility
-		status = metav1.ConditionUnknown //nolint:staticcheck // legacy restore status compatibility
+		status = metav1.ConditionUnknown
 	default:
 		return nil
 	}
