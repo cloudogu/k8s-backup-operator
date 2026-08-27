@@ -86,9 +86,9 @@ const (
 // workflowConditionTypes are the conditions every running restore carries, in the order a reader of
 // the status should see them.
 var workflowConditionTypes = []string{
-	k8sv1.ConditionSuccessful,
+	k8sv1.ConditionSucceeded,
 	k8sv1.ConditionPrepared,
-	k8sv1.ConditionProviderRestoreSuccessful,
+	k8sv1.ConditionProviderSucceeded,
 	k8sv1.ConditionWorkloadsRecovered,
 }
 
@@ -147,7 +147,7 @@ func observeProviderRestoreState(state velero.RestoreState) (metav1.ConditionSta
 
 // findSuccessfulCondition returns the Successful condition actually present in the status, or nil.
 func findSuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
-	return meta.FindStatusCondition(restore.Status.Conditions, k8sv1.ConditionSuccessful)
+	return meta.FindStatusCondition(restore.Status.Conditions, k8sv1.ConditionSucceeded)
 }
 
 // determineLegacySuccessfulCondition derives a Successful condition from the deprecated scalar status of a
@@ -168,7 +168,7 @@ func determineLegacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Conditio
 	}
 
 	return &metav1.Condition{
-		Type:    k8sv1.ConditionSuccessful,
+		Type:    k8sv1.ConditionSucceeded,
 		Status:  status,
 		Reason:  ReasonMigratedFromLegacyStatus,
 		Message: fmt.Sprintf("Derived from the deprecated status %q of a restore created before conditions existed.", restore.Status.Status),

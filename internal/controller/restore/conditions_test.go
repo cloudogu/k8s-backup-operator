@@ -20,7 +20,7 @@ func restoreWith(legacyStatus string, conditions ...metav1.Condition) *backupv1.
 }
 
 func successful(status metav1.ConditionStatus, reason string) metav1.Condition {
-	return metav1.Condition{Type: backupv1.ConditionSuccessful, Status: status, Reason: reason}
+	return metav1.Condition{Type: backupv1.ConditionSucceeded, Status: status, Reason: reason}
 }
 
 func TestLegacyStatusForNeverRegressesAnObservedRestoreToNew(t *testing.T) {
@@ -156,7 +156,7 @@ func TestLegacySuccessfulConditionInterpretsRestoresCreatedBeforeConditions(t *t
 			condition := determineLegacySuccessfulCondition(test.restore)
 
 			require.NotNil(t, condition)
-			assert.Equal(t, backupv1.ConditionSuccessful, condition.Type)
+			assert.Equal(t, backupv1.ConditionSucceeded, condition.Type)
 			assert.Equal(t, test.wantStatus, condition.Status)
 			assert.Equal(t, ReasonMigratedFromLegacyStatus, condition.Reason)
 			assert.NotEmpty(t, condition.Message)

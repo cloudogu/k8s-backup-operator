@@ -26,38 +26,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		assert.Equal(t, Next, nextAction)
 	})
 
-	t.Run("If maintenance mode is not active and backup succeeded, abort", func(t *testing.T) {
-		backup := newBackupWithSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
-		fakeClient := newFakeClientBuilder(t).Build()
-		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		maintenanceGatewayMock.EXPECT().
-			isMaintenanceModeActive(context.Background()).
-			Return(false, nil)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
-
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
-
-		assert.NoError(t, err)
-		assert.Equal(t, Abort, nextAction)
-	})
-
-	t.Run("If maintenance mode is not active and backup failed, abort", func(t *testing.T) {
-		backup := newBackupWithSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionFalse)
-		fakeClient := newFakeClientBuilder(t).Build()
-		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		maintenanceGatewayMock.EXPECT().
-			isMaintenanceModeActive(context.Background()).
-			Return(false, nil)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
-
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
-
-		assert.NoError(t, err)
-		assert.Equal(t, Abort, nextAction)
-	})
-
-	t.Run("If the maintenance mode is not active and the backup is not completed (failed or succeeded), "+
-		"activate it, set succeeded to unknown and retry", func(t *testing.T) {
+	t.Run("If the maintenance mode is not active, activate it, set succeeded to unknown and retry", func(t *testing.T) {
 		backup := newBackupWithSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionUnknown)
 		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).

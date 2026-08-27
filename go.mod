@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/cloudogu/ces-commons-lib v0.3.0
-	github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260825085712-aa3a37cf7ed6
+	github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260825095622-1ef5bbfff811
 	github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0
 	github.com/cloudogu/k8s-dogu-lib/v2 v2.12.0
 	github.com/cloudogu/k8s-registry-lib v1.0.0

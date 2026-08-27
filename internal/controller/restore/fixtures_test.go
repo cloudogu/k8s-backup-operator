@@ -68,7 +68,7 @@ func withPreparation(restore *k8sv1.Restore) *k8sv1.Restore {
 // writes, so that a test starting behind that stage does not have to run a provider restore first.
 func withProviderRestoreSuccess(restore *k8sv1.Restore) *k8sv1.Restore {
 	applyConditions(restore, []metav1.Condition{{
-		Type:    k8sv1.ConditionProviderRestoreSuccessful,
+		Type:    k8sv1.ConditionProviderSucceeded,
 		Status:  metav1.ConditionTrue,
 		Reason:  ReasonProviderRestoreCompleted,
 		Message: "The provider restored the backup.",

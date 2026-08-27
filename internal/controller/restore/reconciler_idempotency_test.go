@@ -28,7 +28,7 @@ func newReadyRestore() *backupv1.Restore {
 	restore.Status = backupv1.RestoreStatus{
 		Status: backupv1.RestoreStatusCompleted,
 		Conditions: []metav1.Condition{{
-			Type:               backupv1.ConditionSuccessful,
+			Type:               backupv1.ConditionSucceeded,
 			Status:             metav1.ConditionTrue,
 			Reason:             ReasonRestoreCompleted,
 			LastTransitionTime: metav1.Now(),
@@ -143,7 +143,7 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	running, runningErrs := fixture.reconcileTimes(testCtx, request, 1)
 	require.NoError(t, runningErrs[0])
 	require.Equal(t, ctrl.Result{RequeueAfter: providerObservationRecoveryDelay}, running[0])
-	assertPersistedCondition(t, fixture.client, backupv1.ConditionProviderRestoreSuccessful, metav1.ConditionUnknown, ReasonProviderRestoreRunning)
+	assertPersistedCondition(t, fixture.client, backupv1.ConditionProviderSucceeded, metav1.ConditionUnknown, ReasonProviderRestoreRunning)
 
 	// The operator restarts while the provider is still working, and the provider finishes meanwhile.
 	fixture.restart(factory)
@@ -205,8 +205,9 @@ func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheP
 	installProvider(t, providerMock)
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil)
+	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
 	maintenanceMock.EXPECT().Activate(testCtx, mock.Anything, false).Return(nil).Once()
+	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 	cleanupMock := newMockCleanupManager(t)
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
 	// No ScaleUp expectation: recovering the workloads before the provider ran would fail here.

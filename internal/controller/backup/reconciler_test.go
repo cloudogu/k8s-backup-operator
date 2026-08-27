@@ -7,11 +7,16 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/leases"
 	operatortime "github.com/cloudogu/k8s-backup-operator/pkg/time"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -139,4 +144,70 @@ func TestBackupRunDuration(t *testing.T) {
 
 func newRealClock() Clock {
 	return &operatortime.Clock{}
+}
+
+func newBackupWithSucceededStatusForReconcilerTest(namespace string, name string, conditionStatus metav1.ConditionStatus) *backupv1.Backup {
+	return &backupv1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: backupv1.BackupSpec{
+			Provider: "velero",
+		},
+		Status: backupv1.BackupStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   backupv1.ConditionSucceeded,
+					Status: conditionStatus,
+					Reason: "aReason",
+				},
+			},
+		},
+	}
+}
+
+func newBackupWithNoConditionsForReconcilerTest(namespace string, name string) *backupv1.Backup {
+	return &backupv1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: backupv1.BackupSpec{
+			Provider: "velero",
+		},
+	}
+}
+
+func newBackupWithProviderSucceededStatusForReconcilerTest(namespace string, name string, conditionStatus metav1.ConditionStatus) *backupv1.Backup {
+	backup := newBackupWithNoConditionsForReconcilerTest(namespace, name)
+	backup.Status.Conditions = []metav1.Condition{
+		{
+			Type:   backupv1.ConditionProviderSucceeded,
+			Status: conditionStatus,
+			Reason: "aReason",
+		},
+	}
+	return backup
+}
+
+// newHeldBackupLeaseForTest builds the shared lease claimed by the given backup, so that the backup
+// is its owner as far as leases.Manager.Holds is concerned.
+func newHeldBackupLeaseForTest(backup *backupv1.Backup) *coordinationv1.Lease {
+	backup.UID = types.UID(backup.Name + "-uid")
+	return leases.NewLease(backup.Namespace, leases.DefaultName, backup, backupLeaseHolderKind)
+}
+
+func assertBackupLeaseStillHeldBy(t *testing.T, k8sClient client.Client, backup *backupv1.Backup) {
+	t.Helper()
+	lease := &coordinationv1.Lease{}
+	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: leases.DefaultName}, lease))
+	assert.True(t, leases.IsHolder(lease, backup, backupLeaseHolderKind), "expected backup %s to still hold the lease", backup.Name)
+}
+
+func assertBackupLeaseReleased(t *testing.T, k8sClient client.Client, backup *backupv1.Backup) {
+	t.Helper()
+	lease := &coordinationv1.Lease{}
+	err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: leases.DefaultName}, lease)
+	assert.True(t, apierrors.IsNotFound(err), "expected the lease to be released, got %v", err)
 }

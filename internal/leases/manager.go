@@ -118,6 +118,20 @@ func (m *Manager) Acquire(ctx context.Context, holder client.Object, kind string
 	return Result{State: StateAcquired, HolderName: holder.GetName()}, nil
 }
 
+// Holds reports whether the given holder currently owns the lease. It is read-only on purpose:
+// Acquire cannot answer this question because it would take a free or stale lease as a side effect.
+func (m *Manager) Holds(ctx context.Context, holder client.Object, kind string) (bool, error) {
+	lease := &coordinationv1.Lease{}
+	key := client.ObjectKey{Namespace: m.namespace, Name: m.name}
+	if err := m.client.Get(ctx, key, lease); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get lease %s/%s: %w", key.Namespace, key.Name, err)
+	}
+	return IsHolder(lease, holder, kind), nil
+}
+
 func (m *Manager) Release(ctx context.Context, holder client.Object, kind string) (bool, error) {
 	lease := &coordinationv1.Lease{}
 	key := client.ObjectKey{Namespace: m.namespace, Name: m.name}
@@ -153,10 +167,10 @@ func Claim(lease *coordinationv1.Lease, holder client.Object, kind string) {
 	now := metav1.NowMicro()
 	lease.Annotations[HolderNameAnnotation] = holder.GetName()
 	lease.Annotations[HolderKindAnnotation] = kind
-	lease.Spec.HolderIdentity = ptr.To(string(holder.GetUID()))
+	lease.Spec.HolderIdentity = new(string(holder.GetUID()))
 	lease.Spec.AcquireTime = &now
 	lease.Spec.RenewTime = &now
-	lease.Spec.LeaseTransitions = ptr.To(ptr.Deref(lease.Spec.LeaseTransitions, 0) + 1)
+	lease.Spec.LeaseTransitions = new(ptr.Deref(lease.Spec.LeaseTransitions, 0) + 1)
 }
 
 func IsHolder(lease *coordinationv1.Lease, holder client.Object, kind string) bool {

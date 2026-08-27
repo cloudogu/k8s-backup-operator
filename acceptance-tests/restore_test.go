@@ -301,7 +301,7 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 
 				waiter := &backupv1.Restore{}
 				g.Expect(k8sClient.Get(ctx, observedWaiterKey, waiter)).Should(Succeed())
-				condition := meta.FindStatusCondition(waiter.Status.Conditions, backupv1.ConditionSuccessful)
+				condition := meta.FindStatusCondition(waiter.Status.Conditions, backupv1.ConditionSucceeded)
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Status).Should(Equal(metav1.ConditionUnknown))
 				g.Expect(condition.Reason).Should(Equal(reasonWaitingForActiveRestore))
