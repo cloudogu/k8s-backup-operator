@@ -101,7 +101,7 @@ Ein gültiges Operations-Lease enthält immer gemeinsam Holder-UID, Holder-Name 
 | `Unknown` | `Pending` | Workflow wurde erkannt, hat aber den nächsten Meilenstein noch nicht erreicht.                                                      |
 | `Unknown` | `WaitingForActiveRestore` | Ein anderer nicht-terminaler Restore oder Backup hält das Lease. Destruktive Stages werden nicht gestartet.                         |
 | `Unknown` | `RestoreLeaseAcquired` | Der wartende Restore besitzt das Lease nun selbst und darf fortfahren.                                                              |
-| `Unknown` | `InvalidRestoreLease` | Das Lease enthält weder eine sicher zuordenbare UID noch einen Namen. Manuelles Prüfen und gegebenenfalls Löschen ist erforderlich. |
+| `Unknown` | `InvalidRestoreLease` | Dem Lease fehlt die Holder-UID, der Holder-Name oder das Holder-Kind. Manuelles Prüfen und gegebenenfalls Löschen ist erforderlich. |
 | `True` | `RestoreCompleted` | Der vollständige Workflow einschließlich Readiness, Label-Cleanup und Maintenance-Deaktivierung ist abgeschlossen.                  |
 | `False` | `ProviderRestoreFailed` | Der Provider-Restore ist terminal fehlgeschlagen.                                                                                   |
 | `False` | `ProviderRestoreConflict` | Eine gleichnamige Provider-Ressource kann nicht sicher diesem Restore zugeordnet werden.                                            |

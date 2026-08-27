@@ -101,7 +101,7 @@ A valid operation lease always contains holder UID, holder name, and holder kind
 | `Unknown` | `Pending` | The workflow was observed but has not yet reached the next milestone. |
 | `Unknown` | `WaitingForActiveRestore` | Another non-terminal restore or backup holds the lease. Destructive stages are not started. |
 | `Unknown` | `RestoreLeaseAcquired` | The waiting restore now owns the lease and may continue. |
-| `Unknown` | `InvalidRestoreLease` | The lease contains neither a safely assignable UID nor a name. Manual inspection and possibly deletion are required. |
+| `Unknown` | `InvalidRestoreLease` | The lease is missing the holder UID, holder name, or holder kind. Manual inspection and possibly deletion are required. |
 | `True` | `RestoreCompleted` | The entire workflow, including readiness, label cleanup, and maintenance-mode deactivation, has completed. |
 | `False` | `ProviderRestoreFailed` | The provider restore failed terminally. |
 | `False` | `ProviderRestoreConflict` | A provider resource with the same name cannot safely be associated with this restore. |
