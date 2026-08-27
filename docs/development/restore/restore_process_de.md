@@ -46,9 +46,10 @@ flowchart TD
     B --> C[Metadaten und Finalizer sicherstellen]
     C --> D[Vorhandenen Provider-Child prüfen]
     D --> E[Restore-Lease sicherstellen]
-    E --> F[Scale-down und Cleanup]
-    F --> FM[Wartungsmodus best-effort aktivieren]
-    FM --> G[Provider-Restore anlegen]
+    E --> P[Provider-Verfügbarkeit prüfen]
+    P --> FM[Wartungsmodus best-effort aktivieren]
+    FM --> F[Scale-down und Cleanup]
+    F --> G[Provider-Restore anlegen]
     G --> H{Provider beendet?}
     H -- nein --> H
     H -- fehlgeschlagen --> X[Successful=False terminal]
@@ -67,15 +68,16 @@ In Methodennamen lautet die Folge:
 3. `ensureMetadata`
 4. `ensureProviderChildState`
 5. `ensureActiveRestoreLease`
-6. `ensurePreparation`
+6. `ensureProviderReady`
 7. `ensureMaintenanceModeActivated`
-8. `ensureProviderRestore`
-9. `ensureProviderCompletion`
-10. `ensureScaleUpInitiated`
-11. `ensureWorkloadsReady`
-12. `ensureScaleUpFinalized`
-13. `ensureMaintenanceModeDeactivated`
-14. `ensureRestoreCompleted`
+8. `ensurePreparation`
+9. `ensureProviderRestore`
+10. `ensureProviderCompletion`
+11. `ensureScaleUpInitiated`
+12. `ensureWorkloadsReady`
+13. `ensureScaleUpFinalized`
+14. `ensureMaintenanceModeDeactivated`
+15. `ensureRestoreCompleted`
 
 ## Conditions und Übergänge
 
@@ -133,9 +135,9 @@ Vor Lease und destruktiver Vorbereitung stellt `ensureMetadata` den Operator-Fin
 | `False` | `PreparationFailed` | Scale-down oder Cleanup schlug fehl; der Vorgang wird mit Backoff wiederholt. |
 | `True` | `PreparationCompleted` | Workloads wurden herunterskaliert und Restore-Ressourcen bereinigt. |
 
-Nach der Preparation aktiviert die eigene Stage `ensureMaintenanceModeActivated` den Wartungsmodus best-effort. Sie prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Die Stage persistiert keine Condition und darf im selben Reconcile direkt zum Provider-Restore weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein.
+Vor der Aktivierung des Wartungsmodus und der destruktiven Vorbereitung prüft `ensureProviderReady`, ob der Provider verfügbar ist. Ist der Restore laut `Prepared`-Condition oder anhand eines eindeutig zugehörigen Provider-Child bereits vorbereitet, wird diese Prüfung übersprungen. So wird ein wiederaufgenommener Restore nicht von einer erneuten Provider-Prüfung blockiert.
 
-Vor der destruktiven Vorbereitung wird geprüft, ob der Provider verfügbar ist. Existiert bereits ein eindeutig zugehöriger Provider-Child, gilt die Vorbereitung ebenfalls als bereits erfolgt. So wird das kritische Crash-Fenster zwischen Child-Erstellung und Parent-Status-Write nicht mit einem zweiten Cleanup beantwortet.
+Anschließend aktiviert `ensureMaintenanceModeActivated` den Wartungsmodus best-effort. Die Stage prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Sie persistiert keine Condition und darf im selben Reconcile direkt zur Preparation weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein. Existiert bereits ein eindeutig zugehöriger Provider-Child, gilt die Vorbereitung ebenfalls als erfolgt. So wird das kritische Crash-Fenster zwischen Child-Erstellung und Parent-Status-Write nicht mit einem zweiten Cleanup beantwortet.
 
 ### `ProviderRestoreSuccessful`
 

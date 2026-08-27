@@ -46,9 +46,10 @@ flowchart TD
     B --> C[Ensure metadata and finalizer]
     C --> D[Check existing provider child]
     D --> E[Ensure restore lease]
-    E --> F[Scale down and clean up]
-    F --> FM[Activate maintenance mode best-effort]
-    FM --> G[Create provider restore]
+    E --> P[Check provider availability]
+    P --> FM[Activate maintenance mode best-effort]
+    FM --> F[Scale down and clean up]
+    F --> G[Create provider restore]
     G --> H{Provider finished?}
     H -- no --> H
     H -- failed --> X[Successful=False terminal]
@@ -67,15 +68,16 @@ In terms of method names, the sequence is:
 3. `ensureMetadata`
 4. `ensureProviderChildState`
 5. `ensureActiveRestoreLease`
-6. `ensurePreparation`
+6. `ensureProviderReady`
 7. `ensureMaintenanceModeActivated`
-8. `ensureProviderRestore`
-9. `ensureProviderCompletion`
-10. `ensureScaleUpInitiated`
-11. `ensureWorkloadsReady`
-12. `ensureScaleUpFinalized`
-13. `ensureMaintenanceModeDeactivated`
-14. `ensureRestoreCompleted`
+8. `ensurePreparation`
+9. `ensureProviderRestore`
+10. `ensureProviderCompletion`
+11. `ensureScaleUpInitiated`
+12. `ensureWorkloadsReady`
+13. `ensureScaleUpFinalized`
+14. `ensureMaintenanceModeDeactivated`
+15. `ensureRestoreCompleted`
 
 ## Conditions and transitions
 
@@ -133,9 +135,9 @@ Before acquiring the lease and starting destructive preparation, `ensureMetadata
 | `False` | `PreparationFailed` | Scale-down or cleanup failed; the operation is retried with backoff. |
 | `True` | `PreparationCompleted` | Workloads were scaled down and restore resources were cleaned up. |
 
-After preparation, the dedicated `ensureMaintenanceModeActivated` stage activates maintenance mode on a best-effort basis. It first checks the actual state and activates maintenance mode only if it is still inactive. An error is logged and reported as an event but does not prevent the restore. The stage does not persist a condition and may proceed directly to the provider restore during the same reconciliation. Scale-down and cleanup, by contrast, must succeed.
+Before activating maintenance mode and starting destructive preparation, `ensureProviderReady` checks whether the provider is available. If the restore is already considered prepared based on its `Prepared` condition or an unambiguously associated provider child, this check is skipped. This prevents a resumed restore from being blocked by another provider readiness check.
 
-Before destructive preparation, the controller checks whether the provider is available. If an unambiguously associated provider child already exists, preparation is likewise considered complete. This prevents a second cleanup in the critical crash window between child creation and the parent status write.
+The dedicated `ensureMaintenanceModeActivated` stage then activates maintenance mode on a best-effort basis. It first checks the actual state and activates maintenance mode only if it is still inactive. An error is logged and reported as an event but does not prevent the restore. The stage does not persist a condition and may proceed directly to preparation during the same reconciliation. Scale-down and cleanup, by contrast, must succeed. If an unambiguously associated provider child already exists, preparation is likewise considered complete. This prevents a second cleanup in the critical crash window between child creation and the parent status write.
 
 ### `ProviderRestoreSuccessful`
 
