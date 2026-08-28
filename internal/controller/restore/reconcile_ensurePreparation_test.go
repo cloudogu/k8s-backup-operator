@@ -255,7 +255,7 @@ func TestAnUnreadyProviderPreventsMaintenanceAndPreparationWithoutTouchingTheEco
 
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning,
-		velero.ReasonBackupStorageLocationNotAvailable,
+		velero.ReasonVeleroBackupStorageLocationNotAvailable,
 		"The velero backup storage location 'name=test-backup-storage' is not available (phase: Unavailable).").Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
@@ -273,7 +273,7 @@ func TestAnUnreadyProviderPreventsMaintenanceAndPreparationWithoutTouchingTheEco
 	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0])
 	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
 		"an unready provider must only be reported, the ecosystem must stay untouched")
-	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, velero.ReasonBackupStorageLocationNotAvailable)
+	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, velero.ReasonVeleroBackupStorageLocationNotAvailable)
 }
 
 // The gate reports the provider once and then keeps quiet until the provider comes back.
@@ -282,7 +282,7 @@ func TestAnUnreadyProviderIsReportedOnceAndTheRecoveryIsReportedOnce(t *testing.
 
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning,
-		velero.ReasonBackupStorageLocationNotFound, mock.Anything).Once()
+		velero.ReasonVeleroBackupStorageLocationNotFound, mock.Anything).Once()
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal,
 		ReasonProviderReady, mock.Anything).Once()
 	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparing, mock.Anything).Once()
@@ -308,7 +308,7 @@ func TestAnUnreadyProviderIsReportedOnceAndTheRecoveryIsReportedOnce(t *testing.
 	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
-	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, velero.ReasonBackupStorageLocationNotFound)
+	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, velero.ReasonVeleroBackupStorageLocationNotFound)
 
 	fixture.simulateExternalWrite(t, func(testClient client.WithWatch) error {
 		return testClient.Create(testCtx, readyStorageLocation())

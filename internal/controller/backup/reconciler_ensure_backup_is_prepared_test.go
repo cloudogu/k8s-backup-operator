@@ -32,7 +32,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
-		assert.Equal(t, veleroprovider.ReasonBackupStorageLocationNotFound, preparedCondition.Reason)
+		assert.Equal(t, veleroprovider.ReasonVeleroBackupStorageLocationNotFound, preparedCondition.Reason)
 
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
@@ -55,7 +55,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
-		assert.Equal(t, veleroprovider.ReasonBackupStorageLocationNotAvailable, preparedCondition.Reason)
+		assert.Equal(t, veleroprovider.ReasonVeleroBackupStorageLocationNotAvailable, preparedCondition.Reason)
 
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
@@ -78,7 +78,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionTrue, preparedCondition.Status)
-		assert.Equal(t, veleroprovider.ReasonBackupStorageLocationAvailable, preparedCondition.Reason)
+		assert.Equal(t, veleroprovider.ReasonVeleroBackupStorageLocationAvailable, preparedCondition.Reason)
 
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
@@ -101,7 +101,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Equal(t, Retry, nextAction)
 
 		require.Len(t, recorder.Events, 1, "the unchanged provider state must be reported only once")
-		assert.Contains(t, <-recorder.Events, veleroprovider.ReasonBackupStorageLocationNotFound)
+		assert.Contains(t, <-recorder.Events, veleroprovider.ReasonVeleroBackupStorageLocationNotFound)
 	})
 
 	t.Run("If an error occurred while getting the backup storage location resource then abort", func(t *testing.T) {

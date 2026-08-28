@@ -11,13 +11,13 @@ import (
 )
 
 const (
-	// ReasonBackupStorageLocationAvailable reports a provider that can serve backup and restore requests.
-	ReasonBackupStorageLocationAvailable = "BackupStorageLocationAvailable"
-	// ReasonBackupStorageLocationNotFound reports a missing backup storage location, which usually
+	// ReasonVeleroBackupStorageLocationAvailable reports a provider that can serve backup and restore requests.
+	ReasonVeleroBackupStorageLocationAvailable = "VeleroBackupStorageLocationAvailable"
+	// ReasonVeleroBackupStorageLocationNotFound reports a missing backup storage location, which usually
 	// means that Velero is not installed or not configured yet.
-	ReasonBackupStorageLocationNotFound = "BackupStorageLocationNotFound"
-	// ReasonBackupStorageLocationNotAvailable reports a backup storage location that Velero cannot reach.
-	ReasonBackupStorageLocationNotAvailable = "BackupStorageLocationNotAvailable"
+	ReasonVeleroBackupStorageLocationNotFound = "VeleroBackupStorageLocationNotFound"
+	// ReasonVeleroBackupStorageLocationNotAvailable reports a backup storage location that Velero cannot reach.
+	ReasonVeleroBackupStorageLocationNotAvailable = "VeleroBackupStorageLocationNotAvailable"
 )
 
 // Readiness reports whether the provider can serve backup and restore requests. Reason and Message
@@ -36,7 +36,7 @@ func CheckReady(ctx context.Context, k8sClient client.Client, namespace string, 
 	err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: backupStorageName}, backupStorageLocation)
 	if apierrors.IsNotFound(err) {
 		return Readiness{
-			Reason:  ReasonBackupStorageLocationNotFound,
+			Reason:  ReasonVeleroBackupStorageLocationNotFound,
 			Message: fmt.Sprintf("The velero backup storage location 'name=%s' was not found.", backupStorageName),
 		}, nil
 	}
@@ -46,7 +46,7 @@ func CheckReady(ctx context.Context, k8sClient client.Client, namespace string, 
 
 	if backupStorageLocation.Status.Phase != velerov1.BackupStorageLocationPhaseAvailable {
 		return Readiness{
-			Reason: ReasonBackupStorageLocationNotAvailable,
+			Reason: ReasonVeleroBackupStorageLocationNotAvailable,
 			Message: fmt.Sprintf("The velero backup storage location 'name=%s' is not available (phase: %s).",
 				backupStorageName, backupStorageLocation.Status.Phase),
 		}, nil
@@ -54,7 +54,7 @@ func CheckReady(ctx context.Context, k8sClient client.Client, namespace string, 
 
 	return Readiness{
 		Ready:   true,
-		Reason:  ReasonBackupStorageLocationAvailable,
+		Reason:  ReasonVeleroBackupStorageLocationAvailable,
 		Message: fmt.Sprintf("The velero backup storage location 'name=%s' is available.", backupStorageName),
 	}, nil
 }

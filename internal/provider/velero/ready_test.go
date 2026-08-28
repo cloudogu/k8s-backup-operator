@@ -32,7 +32,7 @@ func TestCheckReadyReportsAnAvailableBackupStorageLocation(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, readiness.Ready)
-	assert.Equal(t, ReasonBackupStorageLocationAvailable, readiness.Reason)
+	assert.Equal(t, ReasonVeleroBackupStorageLocationAvailable, readiness.Reason)
 	assert.Contains(t, readiness.Message, testBackupStorage)
 }
 
@@ -43,7 +43,7 @@ func TestCheckReadyReportsAMissingBackupStorageLocationWithoutAnError(t *testing
 
 	require.NoError(t, err, "a provider that is not installed yet is not an error")
 	assert.False(t, readiness.Ready)
-	assert.Equal(t, ReasonBackupStorageLocationNotFound, readiness.Reason)
+	assert.Equal(t, ReasonVeleroBackupStorageLocationNotFound, readiness.Reason)
 	assert.Contains(t, readiness.Message, testBackupStorage)
 }
 
@@ -59,7 +59,7 @@ func TestCheckReadyReportsEveryPhaseButAvailableAsNotReady(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.False(t, readiness.Ready)
-			assert.Equal(t, ReasonBackupStorageLocationNotAvailable, readiness.Reason)
+			assert.Equal(t, ReasonVeleroBackupStorageLocationNotAvailable, readiness.Reason)
 			assert.Contains(t, readiness.Message, string(phase))
 		})
 	}

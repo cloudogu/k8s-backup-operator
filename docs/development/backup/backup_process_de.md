@@ -191,12 +191,12 @@ Lokale und aus dem Provider importierte Backups verwenden dieselben vier Conditi
 
 ### `Prepared`
 
-| Status | Reason | Bedeutung |
-|---|---|---|
-| `False` | `ProviderBackupStorageLocationNotFound` | BackupStorageLocation fehlt. |
-| `False` | `ProviderBackupStorageLocationNotAvailable` | Location existiert, ist aber nicht `Available`. |
-| `True` | `ProviderBackupStorageLocationAvailable` | Provider-Speicher ist verwendbar. |
-| `True` | `VeleroStatusSynced` | Importierter Backup existiert bereits bei Velero. |
+| Status | Reason                                   | Bedeutung |
+|---|------------------------------------------|---|
+| `False` | `VeleroBackupStorageLocationNotFound`     | BackupStorageLocation fehlt. |
+| `False` | `VeleroBackupStorageLocationNotAvailable` | Location existiert, ist aber nicht `Available`. |
+| `True` | `VeleroBackupStorageLocationAvailable`    | Provider-Speicher ist verwendbar. |
+| `True` | `VeleroStatusSynced`                     | Importierter Backup existiert bereits bei Velero. |
 
 ### `Succeeded`
 
