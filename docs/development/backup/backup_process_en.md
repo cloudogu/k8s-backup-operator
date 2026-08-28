@@ -21,7 +21,7 @@ The backup controller executes a fixed list of `ensure...` methods. Each stage r
 
 An error returned at the same time is passed to `controller-runtime` and triggers its backoff. The requeue interval comes from `operatorConfig.RequeueTimeSeconds`.
 
-Unlike the restore controller, the backup controller uses an event filter. Reconciliations are triggered when the `generation` changes and when the `deletionTimestamp` is set for the first time. Changes limited to the status of the backup CR do not trigger another event through this controller. Waiting for provider progress therefore uses `Retry` instead of watching owned children.
+Unlike the restore controller, the backup controller uses an event filter. Reconciliations are triggered when the `generation` changes and when the `deletionTimestamp` is set for the first time. Changes limited to the status of the backup CR do not trigger another event through this controller. Waiting for provider progress therefore uses `Retry` instead of watching owned children. Owning the children was never an option here: a Velero backup can already exist before its CES `Backup` CR does, so the CR cannot be its owner.
 
 ## Stage order
 

@@ -19,7 +19,7 @@ flowchart TD
 
 `Successful=True` und `Successful=False` sind terminal. `Successful=Unknown` ist ausdrücklich nicht terminal und bedeutet, dass der Workflow weiterarbeiten oder warten muss. Das veraltete skalare Feld `status.status` wird weiterhin für ältere Clients gespiegelt, die Steuerung erfolgt jedoch über Conditions.
 
-Der Controller beobachtet sowohl Parent-`Restore`-Ressourcen als auch owned Velero-`Restore`-Children. Es gibt bewusst weder einen controllerweiten Event-Filter noch eine `GenerationChangedPredicate`: Provider-Phasenwechsel sowie Status-, Finalizer- und Löschereignisse des Parents müssen einen Reconcile auslösen können.
+Der Controller beobachtet sowohl Parent-`Restore`-Ressourcen als auch owned Velero-`Restore`-Children. Es gibt bewusst weder einen controllerweiten Event-Filter noch eine `GenerationChangedPredicate`: Provider-Phasenwechsel sowie Status-, Finalizer- und Löschereignisse des Parents müssen einen Reconcile auslösen können. Das geht, weil ein Restore sein Child immer selbst erzeugt; der Backup-Controller kann das nicht und wartet deshalb per Requeue.
 
 Das Logging verwendet den vom `controller-runtime` im `context.Context` bereitgestellten `logr.Logger`. Restore-Stages und aufgerufene Manager reichen deshalb den vorhandenen Context weiter und greifen über `internal/logging` auf den Logger zu; ein zusätzlicher Logger-Parameter oder eine erneute Initialisierung pro Methode ist nicht erforderlich. Ein neuer `context.Background()` innerhalb des Workflows würde neben Abbruch und Deadline auch den Request-Logger verlieren und ist deshalb zu vermeiden.
 

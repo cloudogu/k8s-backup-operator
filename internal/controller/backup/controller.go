@@ -152,6 +152,10 @@ func (c *Controller) cleanupStages() []ensureFunction {
 }
 
 // SetupWithManager sets up the controller with the Manager.
+//
+// The event filter is deliberate: a Velero backup can already exist before
+// its Backup CR does, so the CR can never own it, and there are no owned children to watch. Provider
+// progress is therefore awaited by requeueing, not by events.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		WithEventFilter(predicate.Or(
