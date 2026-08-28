@@ -2,7 +2,7 @@ package retention
 
 import (
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	time2 "github.com/cloudogu/k8s-backup-operator/internal/time"
+	operatortime "github.com/cloudogu/k8s-backup-operator/internal/time"
 )
 
 // Strategy filters a set over all backups into sets of backups that should be removed by the RetentionManager
@@ -26,5 +26,5 @@ type Strategy interface {
 }
 
 type timeProvider interface {
-	time2.TimeProvider
+	operatortime.TimeProvider
 }

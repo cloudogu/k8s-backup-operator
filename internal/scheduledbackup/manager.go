@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
-	time2 "github.com/cloudogu/k8s-backup-operator/internal/time"
+	operatortime "github.com/cloudogu/k8s-backup-operator/internal/time"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -53,5 +53,5 @@ func (dm *DefaultManager) ScheduleBackup(ctx context.Context) error {
 }
 
 func NewManager(clientSet ecosystem.Interface, options Options) Manager {
-	return &DefaultManager{clientSet: clientSet, options: options, clock: &time2.Clock{}}
+	return &DefaultManager{clientSet: clientSet, options: options, clock: &operatortime.Clock{}}
 }

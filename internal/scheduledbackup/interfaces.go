@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
-	time2 "github.com/cloudogu/k8s-backup-operator/internal/time"
+	operatortime "github.com/cloudogu/k8s-backup-operator/internal/time"
 )
 
 type Manager interface {
@@ -16,7 +16,7 @@ type ecosystemClientSet interface {
 }
 
 type timeProvider interface {
-	time2.TimeProvider
+	operatortime.TimeProvider
 }
 
 //nolint:unused

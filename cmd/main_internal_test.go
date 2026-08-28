@@ -8,7 +8,7 @@ import (
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/internal/garbagecollection"
-	scheduledbackup2 "github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
+	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -558,7 +558,7 @@ func Test_startScheduledBackup(t *testing.T) {
 
 		scheduledBackupManagerMock := newMockScheduledBackupManager(t)
 		scheduledBackupManagerMock.EXPECT().ScheduleBackup(testCtx).Return(assert.AnError)
-		newScheduledBackupManager = func(clientSet ecosystem.Interface, options scheduledbackup2.Options) scheduledbackup2.Manager {
+		newScheduledBackupManager = func(clientSet ecosystem.Interface, options scheduledbackup.Options) scheduledbackup.Manager {
 			return scheduledBackupManagerMock
 		}
 
@@ -590,7 +590,7 @@ func Test_startScheduledBackup(t *testing.T) {
 
 		scheduledBackupManagerMock := newMockScheduledBackupManager(t)
 		scheduledBackupManagerMock.EXPECT().ScheduleBackup(testCtx).Return(nil)
-		newScheduledBackupManager = func(clientSet ecosystem.Interface, options scheduledbackup2.Options) scheduledbackup2.Manager {
+		newScheduledBackupManager = func(clientSet ecosystem.Interface, options scheduledbackup.Options) scheduledbackup.Manager {
 			return scheduledBackupManagerMock
 		}
 
