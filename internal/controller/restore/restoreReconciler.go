@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
@@ -648,34 +647,6 @@ func (r *restoreReconciler) reportUnreachedMilestone(ctx context.Context, restor
 	}
 
 	return updated, retryOnError(stageErr)
-}
-
-// performOperation executes the given operationFn, reports its outcome as an event and translates a
-// failure into a retry. The stage outcome is the only requeue authority; there is no separate
-// requeue orchestration writing the deprecated scalar status any more.
-func (r *restoreReconciler) performOperation(
-	ctx context.Context,
-	restore *k8sv1.Restore,
-	eventReason string,
-	operationFn func(context.Context, *k8sv1.Restore) error,
-) stageOutcome {
-	operationError := operationFn(ctx, restore)
-	eventType := corev1.EventTypeNormal
-	message := fmt.Sprintf("%s successful", eventReason)
-	if operationError != nil {
-		eventType = corev1.EventTypeWarning
-		printError := strings.ReplaceAll(operationError.Error(), "\n", "")
-		message = fmt.Sprintf("%s failed. Reason: %s", eventReason, printError)
-		logging.Error(ctx, operationError, message)
-	}
-
-	r.recorder.Event(restore, eventType, eventReason, message)
-
-	if operationError != nil {
-		return retryOnError(fmt.Errorf("%s of restore %s failed: %w", eventReason, restore.Name, operationError))
-	}
-
-	return abort()
 }
 
 // SetupWithManager sets up the controller with the Manager.
