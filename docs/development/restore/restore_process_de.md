@@ -46,8 +46,8 @@ flowchart TD
     B --> C[Metadaten und Finalizer sicherstellen]
     C --> D[Vorhandenen Provider-Child prüfen]
     D --> E[Restore-Lease sicherstellen]
-    E --> PR[Provider-Bereitschaft prüfen]
-    PR --> FM[Wartungsmodus best-effort aktivieren]
+    E --> P[Provider-Verfügbarkeit prüfen]
+    P --> FM[Wartungsmodus best-effort aktivieren]
     FM --> F[Scale-down und Cleanup]
     F --> G[Provider-Restore anlegen]
     G --> H{Provider beendet?}
@@ -101,7 +101,7 @@ Ein gültiges Operations-Lease enthält immer gemeinsam Holder-UID, Holder-Name 
 | `Unknown` | `Pending` | Workflow wurde erkannt, hat aber den nächsten Meilenstein noch nicht erreicht.                                                      |
 | `Unknown` | `WaitingForActiveRestore` | Ein anderer nicht-terminaler Restore oder Backup hält das Lease. Destruktive Stages werden nicht gestartet.                         |
 | `Unknown` | `RestoreLeaseAcquired` | Der wartende Restore besitzt das Lease nun selbst und darf fortfahren.                                                              |
-| `Unknown` | `InvalidRestoreLease` | Das Lease enthält weder eine sicher zuordenbare UID noch einen Namen. Manuelles Prüfen und gegebenenfalls Löschen ist erforderlich. |
+| `Unknown` | `InvalidRestoreLease` | Dem Lease fehlt die Holder-UID, der Holder-Name oder das Holder-Kind. Manuelles Prüfen und gegebenenfalls Löschen ist erforderlich. |
 | `True` | `RestoreCompleted` | Der vollständige Workflow einschließlich Readiness, Label-Cleanup und Maintenance-Deaktivierung ist abgeschlossen.                  |
 | `False` | `ProviderRestoreFailed` | Der Provider-Restore ist terminal fehlgeschlagen.                                                                                   |
 | `False` | `ProviderRestoreConflict` | Eine gleichnamige Provider-Ressource kann nicht sicher diesem Restore zugeordnet werden.                                            |
@@ -135,9 +135,9 @@ Vor Lease und destruktiver Vorbereitung stellt `ensureMetadata` den Operator-Fin
 | `False` | `PreparationFailed` | Scale-down oder Cleanup schlug fehl; der Vorgang wird mit Backoff wiederholt. |
 | `True` | `PreparationCompleted` | Workloads wurden herunterskaliert und Restore-Ressourcen bereinigt. |
 
-Nach der Provider-Prüfung und vor der destruktiven Preparation aktiviert die eigene Stage `ensureMaintenanceModeActivated` den Wartungsmodus best-effort. Sie prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Die Stage persistiert keine Condition und darf im selben Reconcile direkt zur Preparation weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein.
+Vor der Aktivierung des Wartungsmodus und der destruktiven Vorbereitung prüft `ensureProviderReady`, ob der Provider verfügbar ist. Ist der Restore laut `Prepared`-Condition oder anhand eines eindeutig zugehörigen Provider-Child bereits vorbereitet, wird diese Prüfung übersprungen. So wird ein wiederaufgenommener Restore nicht von einer erneuten Provider-Prüfung blockiert.
 
-Vor der destruktiven Vorbereitung wird geprüft, ob der Provider verfügbar ist. Existiert bereits ein eindeutig zugehöriger Provider-Child, gilt die Vorbereitung ebenfalls als bereits erfolgt. So wird das kritische Crash-Fenster zwischen Child-Erstellung und Parent-Status-Write nicht mit einem zweiten Cleanup beantwortet.
+Anschließend aktiviert `ensureMaintenanceModeActivated` den Wartungsmodus best-effort. Die Stage prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Sie persistiert keine Condition und darf im selben Reconcile direkt zur Preparation weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein. Existiert bereits ein eindeutig zugehöriger Provider-Child, gilt die Vorbereitung ebenfalls als erfolgt. So wird das kritische Crash-Fenster zwischen Child-Erstellung und Parent-Status-Write nicht mit einem zweiten Cleanup beantwortet.
 
 ### `ProviderRestoreSuccessful`
 

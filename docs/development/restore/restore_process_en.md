@@ -46,8 +46,8 @@ flowchart TD
     B --> C[Ensure metadata and finalizer]
     C --> D[Check existing provider child]
     D --> E[Ensure restore lease]
-    E --> PR[Check provider readiness]
-    PR --> FM[Activate maintenance mode best-effort]
+    E --> P[Check provider availability]
+    P --> FM[Activate maintenance mode best-effort]
     FM --> F[Scale down and clean up]
     F --> G[Create provider restore]
     G --> H{Provider finished?}
@@ -101,7 +101,7 @@ A valid operation lease always contains holder UID, holder name, and holder kind
 | `Unknown` | `Pending` | The workflow was observed but has not yet reached the next milestone. |
 | `Unknown` | `WaitingForActiveRestore` | Another non-terminal restore or backup holds the lease. Destructive stages are not started. |
 | `Unknown` | `RestoreLeaseAcquired` | The waiting restore now owns the lease and may continue. |
-| `Unknown` | `InvalidRestoreLease` | The lease contains neither a safely assignable UID nor a name. Manual inspection and possibly deletion are required. |
+| `Unknown` | `InvalidRestoreLease` | The lease is missing the holder UID, holder name, or holder kind. Manual inspection and possibly deletion are required. |
 | `True` | `RestoreCompleted` | The entire workflow, including readiness, label cleanup, and maintenance-mode deactivation, has completed. |
 | `False` | `ProviderRestoreFailed` | The provider restore failed terminally. |
 | `False` | `ProviderRestoreConflict` | A provider resource with the same name cannot safely be associated with this restore. |
@@ -135,9 +135,9 @@ Before acquiring the lease and starting destructive preparation, `ensureMetadata
 | `False` | `PreparationFailed` | Scale-down or cleanup failed; the operation is retried with backoff. |
 | `True` | `PreparationCompleted` | Workloads were scaled down and restore resources were cleaned up. |
 
-After the provider check and before destructive preparation, the dedicated `ensureMaintenanceModeActivated` stage activates maintenance mode on a best-effort basis. It first checks the actual state and activates maintenance mode only if it is still inactive. An error is logged and reported as an event but does not prevent the restore. The stage does not persist a condition and may proceed directly to preparation during the same reconciliation. Scale-down and cleanup, by contrast, must succeed.
+Before activating maintenance mode and starting destructive preparation, `ensureProviderReady` checks whether the provider is available. If the restore is already considered prepared based on its `Prepared` condition or an unambiguously associated provider child, this check is skipped. This prevents a resumed restore from being blocked by another provider readiness check.
 
-Before destructive preparation, the controller checks whether the provider is available. If an unambiguously associated provider child already exists, preparation is likewise considered complete. This prevents a second cleanup in the critical crash window between child creation and the parent status write.
+The dedicated `ensureMaintenanceModeActivated` stage then activates maintenance mode on a best-effort basis. It first checks the actual state and activates maintenance mode only if it is still inactive. An error is logged and reported as an event but does not prevent the restore. The stage does not persist a condition and may proceed directly to preparation during the same reconciliation. Scale-down and cleanup, by contrast, must succeed. If an unambiguously associated provider child already exists, preparation is likewise considered complete. This prevents a second cleanup in the critical crash window between child creation and the parent status write.
 
 ### `ProviderRestoreSuccessful`
 
