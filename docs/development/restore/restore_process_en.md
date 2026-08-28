@@ -17,7 +17,7 @@ flowchart TD
     C -- no --> R[Create/restore workflow]
 ```
 
-`Successful=True` and `Successful=False` are terminal. `Successful=Unknown` is explicitly non-terminal and means that the workflow must continue working or waiting. The deprecated scalar `status.status` field is still mirrored for older clients, but workflow control uses conditions.
+`Succeeded=True` and `Succeeded=False` are terminal. `Succeeded=Unknown` is explicitly non-terminal and means that the workflow must continue working or waiting. The deprecated scalar `status.status` field is still mirrored for older clients, but workflow control uses conditions.
 
 The controller watches both parent `Restore` resources and owned Velero `Restore` children. There is deliberately neither a controller-wide event filter nor a `GenerationChangedPredicate`: provider phase changes as well as status, finalizer, and deletion events on the parent must be able to trigger a reconciliation.
 
@@ -52,13 +52,13 @@ flowchart TD
     F --> G[Create provider restore]
     G --> H{Provider finished?}
     H -- no --> H
-    H -- failed --> X[Successful=False terminal]
+    H -- failed --> X[Succeeded=False terminal]
     H -- successful --> J[Initiate scale-up]
     J --> K{All workloads ready?}
     K -- no --> K
     K -- yes --> L[Finalize scale-up]
     L --> M[Deactivate maintenance mode]
-    M --> N[WorkloadsRecovered=True and Successful=True]
+    M --> N[WorkloadsRecovered=True and Succeeded=True]
 ```
 
 In terms of method names, the sequence is:
@@ -83,16 +83,16 @@ In terms of method names, the sequence is:
 
 Every new, running restore initially receives these four conditions with `Status=Unknown` and `Reason=Pending`:
 
-- `Successful`
+- `Succeeded`
 - `Prepared`
-- `ProviderRestoreSuccessful`
+- `ProviderSucceeded`
 - `WorkloadsRecovered`
 
 An existing condition is not reset to `Unknown` during initialization. This is important when a status write succeeds but the process crashes immediately afterward.
 
-### `Successful`
+### `Succeeded`
 
-`Successful` is the overarching completion condition and is relevant to lease handling.
+`Succeeded` is the overarching completion condition and is relevant to lease handling.
 
 A valid operation lease always contains holder UID, holder name, and holder kind together. If any of these fields is missing, the manager reports the lease as invalid; it is not reconstructed from other resources or repaired automatically.
 
@@ -107,7 +107,7 @@ A valid operation lease always contains holder UID, holder name, and holder kind
 | `False` | `ProviderRestoreConflict` | A provider resource with the same name cannot safely be associated with this restore. |
 | `True/False/Unknown` | `MigratedFromLegacyStatus` | Derived from the old scalar status of a restore created with an earlier operator version. |
 
-`Successful=True` is written only in `ensureRestoreCompleted`, together with `WorkloadsRecovered=True`.
+`Succeeded=True` is written only in `ensureRestoreCompleted`, together with `WorkloadsRecovered=True`.
 
 ### Legacy compatibility status
 
@@ -116,12 +116,12 @@ Every status write also synchronizes the deprecated `status.status` field. The m
 | State | `status.status` |
 |---|---|
 | `metadata.deletionTimestamp` set | `deleting` |
-| No `Successful` condition, workflow already observed | `inProgress` |
-| `Successful=Unknown` | `inProgress` |
-| `Successful=True` | `completed` |
-| `Successful=False` | `failed` |
+| No `Succeeded` condition, workflow already observed | `inProgress` |
+| `Succeeded=Unknown` | `inProgress` |
+| `Succeeded=True` | `completed` |
+| `Succeeded=False` | `failed` |
 
-Conversely, for older restores without a `Successful` condition, an existing `completed`, `failed`, or `inProgress` value is persisted once as `Successful=True`, `False`, or `Unknown`, respectively, with `Reason=MigratedFromLegacyStatus`. An existing condition always takes precedence over the legacy field. An unknown, new, or deleting legacy status is not interpreted as a result.
+Conversely, for older restores without a `Succeeded` condition, an existing `completed`, `failed`, or `inProgress` value is persisted once as `Succeeded=True`, `False`, or `Unknown`, respectively, with `Reason=MigratedFromLegacyStatus`. An existing condition always takes precedence over the legacy field. An unknown, new, or deleting legacy status is not interpreted as a result.
 
 ### Metadata before the workflow
 
@@ -139,7 +139,7 @@ Before activating maintenance mode and starting destructive preparation, `ensure
 
 The dedicated `ensureMaintenanceModeActivated` stage then activates maintenance mode on a best-effort basis. It first checks the actual state and activates maintenance mode only if it is still inactive. An error is logged and reported as an event but does not prevent the restore. The stage does not persist a condition and may proceed directly to preparation during the same reconciliation. Scale-down and cleanup, by contrast, must succeed. If an unambiguously associated provider child already exists, preparation is likewise considered complete. This prevents a second cleanup in the critical crash window between child creation and the parent status write.
 
-### `ProviderRestoreSuccessful`
+### `ProviderSucceeded`
 
 | Status | Reason | Meaning |
 |---|---|---|
@@ -156,9 +156,9 @@ For pending, running, or unknown states, the controller waits for child events; 
 The following conditions are also set after a provider failure:
 
 - `WorkloadsRecovered=False/RecoveryNotAttemptedAfterProviderFailure`
-- `Successful=False/ProviderRestoreFailed`
+- `Succeeded=False/ProviderRestoreFailed`
 
-The workloads deliberately remain scaled down on this error path. Maintenance mode is deactivated on a best-effort basis. Because `Successful=False` is terminal, another restore can subsequently take over the lease. Developers must account for this deliberately different safety model of the error path when making changes.
+The workloads deliberately remain scaled down on this error path. Maintenance mode is deactivated on a best-effort basis. Because `Succeeded=False` is terminal, another restore can subsequently take over the lease. Developers must account for this deliberately different safety model of the error path when making changes.
 
 ### `WorkloadsRecovered`
 
@@ -251,7 +251,7 @@ Test-owned hold finalizers make the otherwise brief intermediate states observab
 The spec creates two restore resources simultaneously and dynamically identifies the winner and the waiting restore. It verifies:
 
 1. Only the lease holder may start a provider restore.
-2. The waiting restore reports `Successful=Unknown/WaitingForActiveRestore` and does not have a provider child yet.
+2. The waiting restore reports `Succeeded=Unknown/WaitingForActiveRestore` and does not have a provider child yet.
 3. Only after the first restore is fully `completed` does `leaseTransitions` increase and the lease move to the waiting restore.
 4. The second restore then also starts and completes its provider restore.
 

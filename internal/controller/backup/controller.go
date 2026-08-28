@@ -25,6 +25,7 @@ const (
 type reconciler interface {
 	ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureOrphanedBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (action, error)
@@ -112,8 +113,11 @@ func (c *Controller) getStagesForOperation(op operation) []ensureFunction {
 			c.reconciler.ensureProviderBackupDeleted,
 		)
 	case operationIgnore:
-		// Succeeded is written only after cleanup, so terminal backups have no work left.
-		return nil
+		// Succeeded is written only after cleanup, so a terminal backup has no work left but to
+		// verify that the provider backup it mirrors is still there.
+		return []ensureFunction{
+			c.reconciler.ensureOrphanedBackupDeleted,
+		}
 	case operationFinalize:
 		return c.finalizeStages()
 	default: // operationCreate

@@ -111,7 +111,7 @@ func updateRestoreMetrics(restore *k8sv1.Restore, persistedTransitions []conditi
 	}
 }
 
-// setConditionsFromLegacyStatus persists the Successful condition derived from the deprecated
+// setConditionsFromLegacyStatus persists the Succeeded condition derived from the deprecated
 // scalar status of a Restore created by an older operator, so that the interpretation has to happen
 // only once.
 func (u *conditionUpdater) setConditionsFromLegacyStatus(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, error) {

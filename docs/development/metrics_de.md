@@ -21,8 +21,8 @@ Nach dem Lesen einer Ressource initialisiert jeder Reconcile alle sechs möglich
 
 | Ressource | Conditions | Zeitreihen pro Ressource |
 |---|---|---|
-| Backup | `Prepared`, `Deleting`, `Canceled`, `Succeeded` | 4 × 6 = 24 |
-| Restore | `Successful`, `Prepared`, `ProviderRestoreSuccessful`, `WorkloadsRecovered`, `BackupsSynchronized` | 5 × 6 = 30 |
+| Backup | `Prepared`, `Deleting`, `Canceled`, `Succeeded`, `ProviderSucceeded` | 5 × 6 = 30 |
+| Restore | `Succeeded`, `Prepared`, `ProviderSucceeded`, `WorkloadsRecovered` | 4 × 6 = 24 |
 
 Beispiel für erfolgreich erreichte Meilensteine:
 

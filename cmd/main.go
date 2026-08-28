@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -12,7 +11,6 @@ import (
 	restorecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/restore"
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
-	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	operatortime "github.com/cloudogu/k8s-backup-operator/pkg/time"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
@@ -68,7 +66,6 @@ var (
 	newAdditionalImageGetter    = schedulecontroller.NewOperatorImageGetter
 	newGarbageCollectionManager = garbagecollection.NewManager
 	newScheduledBackupManager   = scheduledbackup.NewManager
-	newBackupTimeoutGetter      = config.NewGetter
 )
 
 func init() {
@@ -279,11 +276,6 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 		return fmt.Errorf("unable to create k8s client: %w", err)
 	}
 
-	err = syncBackupsWithProviders(ctx, operatorConfig, recorder, k8sClient)
-	if err != nil {
-		return fmt.Errorf("failed to sync backups with provider backups on startup: %w", err)
-	}
-
 	err = configureRestoreReconciler(k8sManager, k8sClient, recorder, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("error setting up restore controller with manager: %w", err)
@@ -348,6 +340,7 @@ func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.W
 		cleanupManager,
 		scaleManager,
 		requeueAfter,
+		operatorConfig.BackupStorageName,
 	)
 	if err := restoreReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)
@@ -371,18 +364,6 @@ func configureBackupScheduleReconciler(ctx context.Context, k8sManager controlle
 		return fmt.Errorf("unable to create backupSchedule controller: %w", err)
 	}
 	return nil
-}
-
-func syncBackupsWithProviders(ctx context.Context, operatorConfig *config.OperatorConfig, recorder eventRecorder, k8sWatchclient provider.K8sClient) error {
-	var errs []error
-	allProviders := provider.GetAll(ctx, operatorConfig.Namespace, recorder, k8sWatchclient)
-	for _, prov := range allProviders {
-		err := prov.SyncBackups(ctx)
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.Join(errs...)
 }
 
 func addChecks(k8sManager controllerManager) error {

@@ -18,7 +18,6 @@ const (
 	namespaceEnvVar         = "NAMESPACE"
 	logLevelEnvVar          = "LOG_LEVEL"
 	imagePullSecretsEnvVar  = "IMAGE_PULL_SECRETS"
-	backupRetryTimeLimit    = "BACKUP_RETRY_TIME_LIMIT"
 	backupRequeueTimeEnvVar = "BACKUP_REQUEUE_TIME"
 	backupStorageNameEnvVar = "BACKUP_STORAGE_NAME"
 )

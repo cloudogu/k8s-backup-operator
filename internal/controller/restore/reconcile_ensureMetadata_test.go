@@ -26,7 +26,7 @@ func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
@@ -54,7 +54,7 @@ func TestEnsureMetadataDoesNotWriteAgain(t *testing.T) {
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
@@ -74,7 +74,7 @@ func TestEnsureMetadataRetriesAFailedWriteWithoutStartingTheRestore(t *testing.T
 	restore := withPreparation(withInitializedConditions(newParentRestore()))
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest).Reconcile
+		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage).Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, failingUpdate(assert.AnError), factory, restore)
 

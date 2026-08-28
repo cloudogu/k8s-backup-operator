@@ -18,6 +18,27 @@ import (
 )
 
 func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
+	t.Run("If the backup is not deleting, set condition and proceed to the next step", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		require.True(t, backup.DeletionTimestamp.IsZero())
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+
+		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
+		assert.NotNil(t, completedCondition)
+		assert.Equal(t, metav1.ConditionFalse, completedCondition.Status)
+		assert.Equal(t, reasonBackupNotDeleting, completedCondition.Reason)
+	})
+
 	t.Run("If the backup is deleted and the velero backup does not exist, remove the finalizer and abort", func(t *testing.T) {
 		backup := newDeletedBackupForReconcilerTest("ns", "backup")
 		var veleroBackupGetCallCount = 0

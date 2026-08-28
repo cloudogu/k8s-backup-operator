@@ -41,7 +41,7 @@ func newReadyRestore() *backupv1.Restore {
 // reconcilerWithoutExternals builds the reconciler under test without a manager or a recorder, so an
 // external action panics instead of being merely unexpected.
 func reconcilerWithoutExternals(fakeClient client.WithWatch) reconcileFunction {
-	return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest).Reconcile
+	return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage).Reconcile
 }
 
 func TestRepeatedReconciliationOfAReadyRestoreWithACompletedChildPerformsNoWritesOrExternalActions(t *testing.T) {
@@ -92,10 +92,6 @@ func advanceChildTo(t *testing.T, fixture *multiReconcileFixture, phase velerov1
 func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *testing.T) {
 	restore := newParentRestore()
 
-	providerMock := newMockRestoreProvider(t)
-	providerMock.EXPECT().CheckReady(testCtx).Return(nil)
-	installProvider(t, providerMock)
-
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
@@ -119,12 +115,12 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	// The maintenance switch has to be replaced after construction: unlike the cleanup and the scale
 	// manager it is not a constructor parameter, so the reconciler builds a real adapter for it.
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation())
 	request := newRestoreRequest(testRestore)
 
 	// One reconciliation per stage: conditions, metadata, preparation, start, and the first observation
@@ -200,10 +196,6 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheProviderRestore(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
-	providerMock := newMockRestoreProvider(t)
-	providerMock.EXPECT().CheckReady(testCtx).Return(nil).Once()
-	installProvider(t, providerMock)
-
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
 	maintenanceMock.EXPECT().Activate(testCtx, mock.Anything, false).Return(nil).Once()
@@ -221,12 +213,12 @@ func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheP
 	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation())
 	request := newRestoreRequest(testRestore)
 
 	repeated, repeatedErrs := fixture.reconcileTimes(testCtx, request, 1)
@@ -269,7 +261,7 @@ func TestATransientStageFailureIsRetriedWithoutRepeatingAnEarlierDestructiveStag
 	recorderMock.EXPECT().Eventf(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, scaleMock, requeueAfterTest)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile

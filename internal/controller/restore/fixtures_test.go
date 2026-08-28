@@ -8,18 +8,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 )
 
 const (
-	testRestoreUID = types.UID("11111111-1111-1111-1111-111111111111")
-	testBackup     = "test-backup"
+	testRestoreUID    = types.UID("11111111-1111-1111-1111-111111111111")
+	testBackup        = "test-backup"
+	testBackupStorage = "test-backup-storage"
 )
 
 // recoverableRestore is a Restore whose provider restore succeeded, so workload recovery can start.
@@ -77,23 +78,15 @@ func withProviderRestoreSuccess(restore *k8sv1.Restore) *k8sv1.Restore {
 	return restore
 }
 
-// installProvider makes restoreprovider.Get return the given provider instead of a real one.
-func installProvider(t *testing.T, providerMock *mockRestoreProvider) {
-	t.Helper()
-
-	oldNewVeleroProvider := provider.NewVeleroProvider
-	provider.NewVeleroProvider = func(_ provider.K8sClient, _ provider.EventRecorder, _ string) provider.Provider {
-		return providerMock
-	}
-	t.Cleanup(func() { provider.NewVeleroProvider = oldNewVeleroProvider })
+func readyStorageLocation() *velerov1.BackupStorageLocation {
+	return backupStorageLocation(velerov1.BackupStorageLocationPhaseAvailable)
 }
 
-// expectReadinessCheck installs a provider whose readiness check returns checkReadyErr
-func expectReadinessCheck(t *testing.T, checkReadyErr error) {
-	providerMock := newMockRestoreProvider(t)
-	providerMock.EXPECT().CheckReady(testCtx).Return(checkReadyErr)
-
-	installProvider(t, providerMock)
+func backupStorageLocation(phase velerov1.BackupStorageLocationPhase) *velerov1.BackupStorageLocation {
+	return &velerov1.BackupStorageLocation{
+		ObjectMeta: metav1.ObjectMeta{Name: testBackupStorage, Namespace: testNamespace},
+		Status:     velerov1.BackupStorageLocationStatus{Phase: phase},
+	}
 }
 
 func deletedRestore() *k8sv1.Restore {

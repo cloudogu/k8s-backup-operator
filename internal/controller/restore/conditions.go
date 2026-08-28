@@ -77,6 +77,8 @@ const (
 	ReasonWorkloadsReady = "WorkloadsReady"
 	// ReasonScaleUpFinalized marks the removal of the temporary replica recovery labels.
 	ReasonScaleUpFinalized = "ScaleUpFinalized"
+	// ReasonProviderReady marks a provider that became ready after it had kept the restore waiting.
+	ReasonProviderReady = "ProviderReady"
 	// ReasonMaintenanceModeActivated marks a failed best-effort activation attempt in an event.
 	ReasonMaintenanceModeActivated = "MaintenanceModeActivated"
 	// ReasonMaintenanceModeDeactivated marks the successfully removed maintenance notice.
@@ -125,7 +127,7 @@ func reachedMilestone(conditionType string, reason string, message string) metav
 }
 
 // observeProviderRestoreState maps the state of the owned provider restore to the status and reason
-// of the tri-state ProviderRestoreSuccessful condition.
+// of the tri-state ProviderSucceeded condition.
 //
 // Unknown means that the provider has not decided yet, so a state this operator does not know is
 // never reported as success or failure. Translating provider vocabulary into a state is the provider
@@ -145,12 +147,12 @@ func observeProviderRestoreState(state velero.RestoreState) (metav1.ConditionSta
 	}
 }
 
-// findSuccessfulCondition returns the Successful condition actually present in the status, or nil.
+// findSuccessfulCondition returns the Succeeded condition actually present in the status, or nil.
 func findSuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 	return meta.FindStatusCondition(restore.Status.Conditions, k8sv1.ConditionSucceeded)
 }
 
-// determineLegacySuccessfulCondition derives a Successful condition from the deprecated scalar status of a
+// determineLegacySuccessfulCondition derives a Succeeded condition from the deprecated scalar status of a
 // Restore that predates conditions. It returns nil when the scalar carries no interpretable
 // outcome, which is the case for a new restore and for a deleting one: deletion is communicated
 // by metadata.deletionTimestamp, not by status.
@@ -175,9 +177,9 @@ func determineLegacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Conditio
 	}
 }
 
-// effectiveSuccessfulCondition returns the Successful condition to base workflow decisions on.
+// effectiveSuccessfulCondition returns the Succeeded condition to base workflow decisions on.
 // A written condition always wins; the deprecated scalar status is consulted only for restores
-// that carry no Successful condition yet.
+// that carry no Succeeded condition yet.
 func effectiveSuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 	if condition := findSuccessfulCondition(restore); condition != nil {
 		return condition
@@ -198,7 +200,7 @@ func isTerminalLegacyStatus(status string) bool {
 	return status == k8sv1.RestoreStatusCompleted || status == k8sv1.RestoreStatusFailed //nolint:staticcheck // legacy restore status compatibility
 }
 
-// legacyStatusFor maps conditions to thr deprecated status field.
+// legacyStatusFor maps conditions to the deprecated status field.
 func legacyStatusFor(restore *k8sv1.Restore) string {
 	if restore.DeletionTimestamp != nil && !restore.DeletionTimestamp.IsZero() {
 		return k8sv1.RestoreStatusDeleting //nolint:staticcheck // legacy restore status compatibility
@@ -218,7 +220,7 @@ func legacyStatusFor(restore *k8sv1.Restore) string {
 	}
 }
 
-// restoreOutcome derives how a terminal restore ended from its effective Successful condition.
+// restoreOutcome derives how a terminal restore ended from its effective Succeeded condition.
 func restoreOutcome(restore *k8sv1.Restore) string {
 	condition := effectiveSuccessfulCondition(restore)
 	switch {

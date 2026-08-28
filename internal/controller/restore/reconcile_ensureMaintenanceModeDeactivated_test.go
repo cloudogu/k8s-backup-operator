@@ -19,7 +19,7 @@ func TestMaintenanceModeDeactivationPersistsItsProgressAndRequeues(t *testing.T)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
-	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest)
+	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
 	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(testCtx, restore)
@@ -42,7 +42,7 @@ func TestMaintenanceModeDeactivationIsEnsuredAgainBeforeProceeding(t *testing.T)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
-		newTestClientWithParent(t, writes.interceptor(), restore), recorderMock, testNamespace, nil, nil, requeueAfterTest,
+		newTestClientWithParent(t, writes.interceptor(), restore), recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage,
 	)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
@@ -62,7 +62,7 @@ func TestFailedMaintenanceModeDeactivationUsesBackoffWithoutChangingProgress(t *
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(assert.AnError).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
-	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, nil, requeueAfterTest)
+	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
 	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(testCtx, restore)
@@ -84,7 +84,7 @@ func TestUnpersistableMaintenanceModeDeactivationIsRetried(t *testing.T) {
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore),
-		recorderMock, testNamespace, nil, nil, requeueAfterTest,
+		recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage,
 	)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
