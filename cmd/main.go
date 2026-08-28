@@ -272,7 +272,7 @@ func parseManagerFlags(flags *flag.FlagSet, args []string, ctrlOpts ctrl.Options
 }
 
 func configureReconcilers(ctx context.Context, k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
-	var recorder eventRecorder = k8sManager.GetEventRecorder("k8s-backup-operator")
+	var recorder eventRecorder = k8sManager.GetEventRecorderFor("k8s-backup-operator")
 
 	k8sClient, err := client.NewWithWatch(k8sManager.GetConfig(), client.Options{Scheme: scheme})
 	if err != nil {
