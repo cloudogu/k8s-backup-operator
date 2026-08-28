@@ -27,6 +27,7 @@ type reconciler interface {
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureOrphanedBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureConditionsInitialized(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (action, error)
@@ -123,6 +124,7 @@ func (c *Controller) getStagesForOperation(op operation) []ensureFunction {
 	default: // operationCreate
 		return append([]ensureFunction{
 			c.reconciler.ensureVeleroStatusSynced,
+			c.reconciler.ensureConditionsInitialized,
 			c.reconciler.ensureBackupSetup,
 			c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired,
 			c.reconciler.ensureBackupIsPrepared,
