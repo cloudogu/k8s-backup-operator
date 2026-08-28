@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/config"
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
-	"github.com/cloudogu/k8s-backup-operator/pkg/config"
-	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
-	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
+	"github.com/cloudogu/k8s-backup-operator/internal/garbagecollection"
+	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
