@@ -7,7 +7,7 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/config"
+	"github.com/cloudogu/k8s-backup-operator/internal/config"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
