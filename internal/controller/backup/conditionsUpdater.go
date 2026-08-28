@@ -114,7 +114,7 @@ func legacyBackupStatusFor(backup *backupv1.Backup) string {
 		}
 	}
 	if len(backup.Status.Conditions) > 0 {
-		return backupv1.BackupStatusInProgress
-	} //nolint:staticcheck // legacy restore status compatibility
+		return backupv1.BackupStatusInProgress //nolint:staticcheck // legacy restore status compatibility
+	}
 	return backup.Status.Status
 }
