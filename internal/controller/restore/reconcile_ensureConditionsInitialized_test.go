@@ -1,6 +1,7 @@
 package restore
 
 import (
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"testing"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -24,7 +25,7 @@ func assertUnknownWorkflowConditions(t *testing.T, stored *k8sv1.Restore, condit
 		condition := meta.FindStatusCondition(stored.Status.Conditions, conditionType)
 		require.NotNil(t, condition, "condition %s was not initialized", conditionType)
 		assert.Equal(t, metav1.ConditionUnknown, condition.Status, "condition %s", conditionType)
-		assert.Equal(t, ReasonPending, condition.Reason, "condition %s", conditionType)
+		assert.Equal(t, conditions.ReasonPending, condition.Reason, "condition %s", conditionType)
 	}
 }
 

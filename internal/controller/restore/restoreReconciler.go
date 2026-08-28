@@ -157,7 +157,7 @@ func requiredOperation(restore *k8sv1.Restore) operation {
 // running restore shows the milestones it has not reached yet instead of hiding them. Only absent
 // conditions are written, so a milestone a later stage resolved is never reset to Unknown.
 func (r *restoreReconciler) ensureConditionsInitialized(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
-	missing := missingWorkflowConditions(restore)
+	missing := conditions.Missing(restore.Status.Conditions, initialWorkflowConditions)
 	if len(missing) == 0 {
 		return restore, next()
 	}

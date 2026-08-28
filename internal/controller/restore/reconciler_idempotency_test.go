@@ -1,6 +1,7 @@
 package restore
 
 import (
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -274,7 +275,7 @@ func TestATransientStageFailureIsRetriedWithoutRepeatingAnEarlierDestructiveStag
 	require.ErrorIs(t, failedErrs[0], assert.AnError)
 	require.Equal(t, ctrl.Result{}, failed[0], "the error carries the retry, so there must be no explicit requeue")
 	assertPersistedCondition(t, fixture.client, backupv1.ConditionWorkloadsRecovered, metav1.ConditionFalse, ReasonWorkloadRecoveryFailed)
-	assertSuccessfulCondition(t, fixture.client, restore.Name, metav1.ConditionUnknown, ReasonPending)
+	assertSuccessfulCondition(t, fixture.client, restore.Name, metav1.ConditionUnknown, conditions.ReasonPending)
 
 	recovered, recoveredErrs := fixture.reconcileTimes(testCtx, request, 5)
 	for index := range recovered {

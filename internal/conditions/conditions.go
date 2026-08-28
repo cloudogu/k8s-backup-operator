@@ -8,6 +8,26 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// ReasonPending marks a milestone that has been declared but not observed yet.
+	ReasonPending = "Pending"
+)
+
+// Missing returns the desired conditions the resource does not carry yet, so it sets only the missing ones.
+func Missing(existing []metav1.Condition, desired []metav1.Condition) []metav1.Condition {
+	var missing []metav1.Condition
+
+	for _, condition := range desired {
+		if meta.FindStatusCondition(existing, condition.Type) != nil {
+			continue
+		}
+
+		missing = append(missing, condition)
+	}
+
+	return missing
+}
+
 // WillChange reports whether persisting desired would change the stored condition's status,
 // reason or message. The reconciler replays every stage on each reconciliation, so this is the guard
 // that turns a per-reconciliation observation into one time actions, for example, a log line per reached state.

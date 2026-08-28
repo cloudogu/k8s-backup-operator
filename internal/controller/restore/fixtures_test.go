@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -35,6 +37,13 @@ func newParentRestore() *k8sv1.Restore {
 	}
 }
 
+var workflowConditionTypes = []string{
+	k8sv1.ConditionSucceeded,
+	k8sv1.ConditionPrepared,
+	k8sv1.ConditionProviderSucceeded,
+	k8sv1.ConditionWorkloadsRecovered,
+}
+
 // withMetadata adds the finalizer and the labels the metadata stage writes, so that a test
 // starting behind that stage does not have to reconcile it first.
 func withMetadata(restore *k8sv1.Restore) *k8sv1.Restore {
@@ -47,7 +56,7 @@ func withMetadata(restore *k8sv1.Restore) *k8sv1.Restore {
 // withInitializedConditions adds the Unknown workflow conditions the condition stage writes, so that
 // a test starting behind that stage does not have to reconcile it first.
 func withInitializedConditions(restore *k8sv1.Restore) *k8sv1.Restore {
-	applyConditions(restore, missingWorkflowConditions(restore))
+	applyConditions(restore, conditions.Missing(restore.Status.Conditions, initialWorkflowConditions))
 
 	return restore
 }
