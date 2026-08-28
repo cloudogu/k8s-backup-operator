@@ -27,9 +27,10 @@ ergänzt werden.
 
 ## Mailpit
 
-Zum Testen der E-Mails wird Mailpit verwendet. Dafür werden vier Ressourcen angelegt: ein Deployment, ein Service,
-ein Ingress und eine NetworkPolicy. Die dafür benötigte Datei [mailpit.yaml](k8s-resources/mailpit.yaml) befindet sich
-im Verzeichnis `k8s-resources`.
+Zum Testen der E-Mails wird Mailpit verwendet. Dafür müssen vier Ressourcen angelegt werden: ein Deployment, ein Service,
+ein Ingress und eine NetworkPolicy. Die Datei [mailpit.yaml](k8s-resources/mailpit.yaml) beinhaltet alles Notwendige und kann im Cluster
+angewendet werden. Sie befindet sich im Verzeichnis `k8s-resources`. Der Namespace muss dabei auf `ecosystem` gesetzt 
+sein.
 
 Danach die ConfigMap von Postfix editieren und den Wert `relayhost` auf
 
