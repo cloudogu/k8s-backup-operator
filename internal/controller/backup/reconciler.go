@@ -48,7 +48,6 @@ const (
 	reasonBackupSucceeded                           = "BackupSucceeded"
 	reasonBackupCanceled                            = "BackupCanceled"
 	reasonBackupDeletingFailed                      = "BackupDeletingFaild"
-	reasonBackupNotDeleting                         = "BackupNotDeleting"
 	reasonTimeWindowNotExpired                      = "TimeWindowNotExpired"
 	reasonTimeWindowExpiredBackupNotStarted         = "TimeWindowExpiredBackupNotStarted"
 	reasonTimeWindowExpiredBackupInProgress         = "TimeWindowExpiredBackupInProgress"
@@ -130,10 +129,6 @@ func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGate
 }
 
 func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	if backup.DeletionTimestamp.IsZero() {
-		return c.markBackupNotDeleting(ctx, backup)
-	}
-
 	veleroBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
 	if err != nil {
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, "Failed to get provider backup")
@@ -148,23 +143,6 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 	}
 
 	return c.requestProviderBackupDeletion(ctx, backup)
-}
-
-func (c *defaultReconciler) markBackupNotDeleting(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	logging.Debug(ctx, "ensureProviderBackupDeleted: backup is not deleted -> mark backup as not deleting, NEXT")
-
-	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-			Type:    backupv1.ConditionDeleting,
-			Status:  metav1.ConditionFalse,
-			Reason:  reasonBackupNotDeleting,
-			Message: "Backup is not deleting.",
-		})
-	})
-	if patchErr != nil {
-		return Abort, fmt.Errorf("patch condition to mark backup as not deleting: %w", patchErr)
-	}
-	return Next, nil
 }
 
 func (c *defaultReconciler) removeBackupFinalizer(ctx context.Context, backup *backupv1.Backup) (action, error) {
