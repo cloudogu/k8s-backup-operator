@@ -280,7 +280,7 @@ func (r *restoreReconciler) ensureProviderReady(ctx context.Context, restore *k8
 	}
 
 	// Only record if changed to ready to avoid spam
-	if wasWaitingForTheProvider(restore) {
+	if wasWaitingForProvider(restore) {
 		logging.Info(ctx, "the provider became ready", "reason", readiness.Reason)
 		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonProviderReady, readiness.Message)
 	}
@@ -317,8 +317,8 @@ func (r *restoreReconciler) reportUnreadyProvider(ctx context.Context, restore *
 	return updated, retryAfter(r.requeueDelay)
 }
 
-// wasWaitingForTheProvider reports whether a previous pass stopped this restore at the provider gate.
-func wasWaitingForTheProvider(restore *k8sv1.Restore) bool {
+// wasWaitingForProvider reports whether a previous pass stopped this restore at the provider gate.
+func wasWaitingForProvider(restore *k8sv1.Restore) bool {
 	condition := meta.FindStatusCondition(restore.Status.Conditions, k8sv1.ConditionPrepared)
 	if condition == nil || condition.Status != metav1.ConditionFalse {
 		return false

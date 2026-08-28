@@ -46,7 +46,7 @@ func TestControllerReconcileStageOrder(t *testing.T) {
 	}
 
 	ignoreStages := []string{
-		"ensureProviderBackupStillExists",
+		"ensureOrphanedBackupDeleted",
 	}
 
 	deleteStages := []string{
@@ -247,7 +247,7 @@ func recordStages(reconcilerMock *mockReconciler, executed *[]string) {
 	expecter := reconcilerMock.EXPECT()
 	expecter.ensureBackupLeaseReleased(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupLeaseReleased")).Maybe()
 	expecter.ensureProviderBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureProviderBackupDeleted")).Maybe()
-	expecter.ensureProviderBackupStillExists(mock.Anything, mock.Anything).RunAndReturn(record("ensureProviderBackupStillExists")).Maybe()
+	expecter.ensureOrphanedBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureOrphanedBackupDeleted")).Maybe()
 	expecter.ensureVeleroStatusSynced(mock.Anything, mock.Anything).RunAndReturn(record("ensureVeleroStatusSynced")).Maybe()
 	expecter.ensureBackupSetup(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupSetup")).Maybe()
 	expecter.ensureBackupIsCanceledAfterTimeWindowExpired(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupIsCanceledAfterTimeWindowExpired")).Maybe()
