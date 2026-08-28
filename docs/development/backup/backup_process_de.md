@@ -11,7 +11,7 @@ Der derzeit konkret implementierte Provider ist Velero. CES-Backup und Velero-Ba
 
 ## Controller-Steuerung
 
-Der Backup-Controller führt eine feste Liste von `ensure...`-Methoden aus. Jede Stage liefert eine Aktion:
+Der Backup-Controller wählt abhängig vom Zustand des Backup-CR eine operationsspezifische Liste von `ensure...`-Methoden aus. Jede Stage liefert eine Aktion:
 
 | Aktion | Bedeutung |
 |---|---|
@@ -25,23 +25,45 @@ Anders als der Restore-Controller verwendet der Backup-Controller einen Event-Fi
 
 ## Stage-Reihenfolge
 
-Die Methodenfolge lautet:
+Der `deletionTimestamp` hat Vorrang vor allen Conditions. Ohne Löschanforderung werden Backups mit terminalem `Succeeded` ignoriert; ein terminales Provider-Ergebnis oder `Canceled=True` führt in die Finalisierung. Alle übrigen Backups durchlaufen den Create-Workflow.
 
-1. `ensureBackupLeaseReleased` - Eigenes Lease bei terminalem oder gelöschtem Backup freigeben - Aufräumen bestehender Backup-Leases
-2. `ensureProviderBackupDeleted` - Provider-Backup-Löschung behandeln
-3. `ensureVeleroStatusSynced` - Von Velero importierten Status synchronisieren
-4. `ensureCompletedBackupIsIgnored` - Terminales lokales Backup ignorieren
-5. `ensureBackupSetup` - Labels, Blueprint-Annotationen und Finalizer sicherstellen
-6. `ensureBackupIsCanceledAfterTimeWindowExpired` - Zeitfenster prüfen
-7. `ensureBackupIsPrepared` - BackupStorageLocation prüfen
-8. `ensureActiveBackupLease` - Gemeinsames Backup-/Restore-Lease beanspruchen
-9. `ensureMaintenanceActivated` - Maintenance Mode aktivieren
-10. `ensureProviderBackupCreated` - Velero-Backup sicherstellen
-11. `ensureProviderBackupCompleted` - Velero-Phase beobachten
-12. `ensureMaintenanceDeactivated` - Maintenance Mode deaktivieren
-13. `ensureBackupLeaseReleased` - Eigenes Lease nach erfolgreichem Backup freigeben - Aufräumen des eigenen Backup-Lease
+### Create
 
-Die Lease-Freigabe steht am Anfang, damit terminale oder zu löschende Backups sie vor einem `Abort` oder `Retry` erreichen. Sie verändert den Wartungsmodus nicht; dafür bleibt ausschließlich `ensureMaintenanceDeactivated` zuständig.
+1. `ensureVeleroStatusSynced`
+2. `ensureBackupSetup`
+3. `ensureBackupIsCanceledAfterTimeWindowExpired`
+4. `ensureBackupIsPrepared`
+5. `ensureActiveBackupLease`
+6. `ensureMaintenanceActivated`
+7. `ensureProviderBackupCreated`
+8. `ensureProviderBackupCompleted`
+9. `ensureMaintenanceDeactivated`
+10. `ensureBackupLeaseReleased`
+11. `ensureBackupRunCompleted`
+
+Die letzten drei Stages bilden zugleich die Finalisierung. `ensureProviderBackupCompleted` schreibt zunächst nur das terminale Provider-Ergebnis. Erst nachdem der Wartungsmodus deaktiviert und das Lease freigegeben wurde, schreibt `ensureBackupRunCompleted` die terminale `Succeeded`-Condition.
+
+### Finalize
+
+1. `ensureMaintenanceDeactivated`
+2. `ensureBackupLeaseReleased`
+3. `ensureBackupRunCompleted`
+
+Diese verkürzte Pipeline wird für ein terminales `ProviderSucceeded` sowie für `Canceled=True` gewählt.
+
+### Ignore
+
+1. `ensureOrphanedBackupDeleted`
+
+Ein bereits terminales `Succeeded` startet den abgeschlossenen Workflow nicht erneut. Bei einem von Velero synchronisierten Backup prüft die Stage stattdessen, ob der Provider-Backup noch existiert, und löscht einen verwaisten CES-Backup-CR.
+
+### Delete
+
+1. `ensureMaintenanceDeactivated`
+2. `ensureBackupLeaseReleased`
+3. `ensureProviderBackupDeleted`
+
+Wartungsmodus und Lease werden vor der Provider-Löschung aufgeräumt. Beide Stages wirken nur auf Zustand, den dieses Backup tatsächlich besitzt; die Lease-Freigabe verwendet UID- und `resourceVersion`-Preconditions.
 
 ## Erfolgreicher lokaler Backup-Ablauf
 
@@ -64,11 +86,13 @@ sequenceDiagram
     loop bis Velero terminal ist
         B->>V: Backup-Phase lesen
         V-->>B: New/InProgress/Finalizing/WaitingForPluginOperations
-        B->>B: Succeeded=Unknown zeitgesteuerter Retry
+        B->>B: ProviderSucceeded=Unknown zeitgesteuerter Retry
     end
     V-->>B: Completed
-    B->>B: Succeeded=True und CompletionTimestamp setzen
+    B->>B: ProviderSucceeded=True und CompletionTimestamp setzen
     B->>M: Wartungsmodus deaktivieren
+    B->>B: Lease freigeben
+    B->>B: Succeeded=True setzen
 ```
 
 ### Setup und Metadaten
@@ -115,7 +139,7 @@ Nach erfolgreicher Vorbereitung und vor der Aktivierung des Wartungsmodus beansp
 
 Der Holder wird durch `spec.holderIdentity` (UID), `k8s.cloudogu.com/backup-operator-lease-holder-name` (Name) und `k8s.cloudogu.com/lease-holder-kind` (`Backup` oder `Restore`) beschrieben. Alle drei Felder werden gemeinsam geschrieben und müssen vorhanden sein; unvollständige Leases gelten als ungültig und werden nicht heuristisch repariert. Jeder Controller registriert nur den Resolver für seinen eigenen Ressourcentyp. Ein gesetzter fremder oder unbekannter Holder-Typ wird als aktiv behandelt und nicht übernommen; die beiden Workflows müssen sich daher nicht gegenseitig kennen. Ein eigenes Lease wird idempotent akzeptiert. Zeitablauf allein macht ein Lease nicht stale.
 
-`ensureBackupLeaseReleased` läuft am Anfang jedes Reconcile. Die Stage löscht ausschließlich das eigene Lease, wenn der Backup terminal (`Succeeded=True`, `Succeeded=False` oder `Canceled=True`) oder zum Löschen markiert ist. Für laufende Backups und fremde Holder ist sie ein No-op. UID- und `resourceVersion`-Preconditions verhindern, dass ein inzwischen neu vergebenes Lease gelöscht wird. Die Stage ändert bewusst nicht den Wartungsmodus; alle terminalen Backup-Pfade müssen dessen Deaktivierung selbst sicherstellen.
+`ensureBackupLeaseReleased` läuft in den Finalize- und Delete-Pipelines nach `ensureMaintenanceDeactivated`. Die Stage löscht ausschließlich das eigene Lease, wenn ein terminales Provider-Ergebnis beziehungsweise `Canceled=True` vorliegt oder das Backup zum Löschen markiert ist. Für fremde Holder ist sie ein No-op. UID- und `resourceVersion`-Preconditions verhindern, dass ein inzwischen neu vergebenes Lease gelöscht wird. Erst nach der Lease-Freigabe setzt `ensureBackupRunCompleted` die terminale `Succeeded`-Condition.
 
 ### Wartungsmodus
 
@@ -129,7 +153,7 @@ force: false
 
 Nach einem terminal erfolgreichen oder fehlgeschlagenen Provider-Backup wird ein noch aktiver Wartungsmodus deaktiviert. Aktivierung und Deaktivierung sind nicht best-effort; Fehler werden zurückgegeben.
 
-Die Reihenfolge ist relevant: `ensureCompletedBackupIsIgnored` liegt vor den Maintenance-Stages. Die normale terminale Provider-Auswertung setzt `Succeeded` und ruft die Deaktivierung noch im selben Reconcile auf. Schlägt genau diese Deaktivierung fehl, sieht der nächste Reconcile bereits eine terminale `Succeeded`-Condition und wird vorher abgebrochen. Änderungen an dieser Logik müssen diese Wiederanlaufkante ausdrücklich berücksichtigen.
+Die Reihenfolge ist relevant: Ein terminales Provider-Ergebnis führt in die Finalize-Pipeline. Dort wird zuerst der Wartungsmodus deaktiviert, dann das Lease freigegeben und erst zuletzt `Succeeded` geschrieben. Schlägt die Deaktivierung fehl, bleibt der Backup dadurch nicht fälschlich in der Ignore-Pipeline hängen, sondern versucht die Finalisierung beim nächsten Reconcile erneut.
 
 ### Erzeugtes Velero-Backup
 
@@ -161,16 +185,16 @@ Die Werte von `dogu.name` und `backup-scope` werden für die Auswahl nicht ausge
 
 | Kategorie | Velero-Phasen | Ergebnis |
 |---|---|---|
-| laufend | `New`, `InProgress`, `Finalizing`, `FinalizingPartiallyFailed`, `WaitingForPluginOperations`, `WaitingForPluginOperationsPartiallyFailed` | `Succeeded=Unknown/ProviderBackupInProgress`, Retry |
-| fehlgeschlagen | `FailedValidation`, `PartiallyFailed`, `Failed` | `Succeeded=False/ProviderBackupFailed` |
-| erfolgreich | `Completed` | `Succeeded=True/ProviderBackupSucceeded` |
+| laufend | `New`, `InProgress`, `Finalizing`, `FinalizingPartiallyFailed`, `WaitingForPluginOperations`, `WaitingForPluginOperationsPartiallyFailed` | `ProviderSucceeded=Unknown/ProviderBackupInProgress`, Retry |
+| fehlgeschlagen | `FailedValidation`, `PartiallyFailed`, `Failed` | `ProviderSucceeded=False/ProviderBackupFailed` |
+| erfolgreich | `Completed` | `ProviderSucceeded=True/ProviderBackupSucceeded` |
 | nicht erwartet | beispielsweise `Deleting` | Fehler; kein impliziter Erfolg |
 
 Beim Anlegen des Provider-Backups wird `StartTimestamp` nur gesetzt, wenn er noch leer ist. Beim terminalen Ergebnis wird `CompletionTimestamp` ebenfalls nur einmal gesetzt.
 
 ## Conditions
 
-Lokale und aus dem Provider importierte Backups verwenden dieselben vier Conditions:
+Lokale und aus dem Provider importierte Backups verwenden dieselben fünf Conditions:
 
 ### `Deleting`
 
@@ -198,20 +222,30 @@ Lokale und aus dem Provider importierte Backups verwenden dieselben vier Conditi
 | `True` | `VeleroBackupStorageLocationAvailable`    | Provider-Speicher ist verwendbar. |
 | `True` | `VeleroStatusSynced`                     | Importierter Backup existiert bereits bei Velero. |
 
+### `ProviderSucceeded`
+
+| Status | Reason | Bedeutung |
+|---|---|---|
+| `Unknown` | `ProviderBackupInProgress` | Provider arbeitet; die Create-Pipeline wird zeitgesteuert erneut ausgeführt. |
+| `Unknown` | `VeleroBackupRunning` | Ein importierter Velero-Backup ist noch nicht terminal. |
+| `False` | `ProviderBackupFailed` | Provider ist terminal fehlgeschlagen; die Finalize-Pipeline übernimmt. |
+| `False` | `VeleroBackupFailed` | Ein importierter Velero-Backup meldet eine bekannte Fehlerphase. |
+| `True` | `ProviderBackupSucceeded` | Provider ist erfolgreich abgeschlossen; die Finalize-Pipeline übernimmt. |
+| `True` | `VeleroStatusSynced` | Ein importierter Velero-Backup ist `Completed`. |
+
 ### `Succeeded`
 
 | Status | Reason | Bedeutung                                                                                                               |
 |---|---|-------------------------------------------------------------------------------------------------------------------------|
 | `Unknown` | `MaintenanceModesIsNotActive` | Das Aktivieren des Wartungsmodus wurde angestossen, der Modus ist aber aktuell noch nicht aktiv; Workflow läuft weiter. |
 | `Unknown` | `ProviderBackupResourceDoesNotExist` | Provider-Child wurde gerade erzeugt.                                                                                    |
-| `Unknown` | `ProviderBackupInProgress` | Provider arbeitet.                                                                                                      |
 | `Unknown` | `VeleroBackupRunning` | Ein importierter Velero-Backup ist noch nicht terminal; unbekannte Phasen gelten ebenfalls als laufend.                 |
 | `False` | `ProviderBackupFailed` | Provider ist terminal fehlgeschlagen.                                                                                   |
 | `False` | `VeleroBackupFailed` | Ein importierter Velero-Backup meldet eine bekannte Fehlerphase.                                                        |
 | `True` | `ProviderBackupSucceeded` | Provider ist erfolgreich abgeschlossen.                                                                                 |
 | `True` | `VeleroStatusSynced` | Ein importierter Velero-Backup ist `Completed`.                                                                         |
 
-`Succeeded=True` und `Succeeded=False` werden von `ensureCompletedBackupIsIgnored` als terminal behandelt. Der Name `MaintenanceModesIsNotActive` beschreibt historisch den Zustand vor der erfolgreichen Aktivierung.
+`Succeeded=True` und `Succeeded=False` führen in die Ignore-Pipeline. Der Name `MaintenanceModesIsNotActive` beschreibt historisch den Zustand vor der erfolgreichen Aktivierung.
 
 Für `spec.syncedFromProvider=true` schreibt `ensureVeleroStatusSynced` den beobachteten Zustand ebenfalls in `Succeeded`. `WaitingForPluginOperationsPartiallyFailed` und `FinalizingPartiallyFailed` bleiben dabei nicht-terminal, weil Velero noch Plugin- beziehungsweise Finalisierungsarbeiten ausführt; erst die spätere terminale Phase `PartiallyFailed` setzt `Succeeded=False`. Zusätzlich werden Velero-Zeitstempel gespiegelt. Das Legacy-Feld `status.status` wird wie bei lokalen Backups zentral vom `conditionsUpdater` aus den Conditions abgeleitet.
 
