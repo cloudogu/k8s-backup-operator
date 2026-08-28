@@ -16,7 +16,7 @@ func TestEnsureRestoreLeaseReleased(t *testing.T) {
 	t.Run("releases the lease held by the restore", func(t *testing.T) {
 		restore := newParentRestore()
 		testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
-		reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest)
+		reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage)
 
 		actual, outcome := reconciler.ensureRestoreLeaseReleased(testCtx, restore)
 
@@ -31,7 +31,7 @@ func TestEnsureRestoreLeaseReleased(t *testing.T) {
 		restore := newParentRestore()
 		other := restoreWithIdentity("other-restore", "other-uid")
 		testClient := newTestClient(t, interceptor.Funcs{}, restore, newRestoreLease(other))
-		reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest)
+		reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage)
 
 		_, outcome := reconciler.ensureRestoreLeaseReleased(testCtx, restore)
 
@@ -48,7 +48,7 @@ func TestEnsureRestoreLeaseReleased(t *testing.T) {
 				return assert.AnError
 			},
 		}, restore)
-		reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest)
+		reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage)
 
 		_, outcome := reconciler.ensureRestoreLeaseReleased(testCtx, restore)
 

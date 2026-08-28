@@ -18,13 +18,13 @@ Kind, Name und UID müssen zusammenpassen, damit sich eine Ressource als Holder 
 
 Ein fehlendes Lease wird für die aktuelle Ressource angelegt. Ist sie bereits der Holder, darf ihr Workflow fortfahren. Andernfalls wartet sie und versucht es in einem späteren Reconcile erneut.
 
-Jeder Controller registriert nur den Resolver für seinen eigenen Ressourcentyp. Ein Lease des jeweils anderen Typs wird daher als aktiv behandelt, bis der zuständige Controller es freigibt. Ein wartender Restore setzt `Successful=Unknown/WaitingForActiveRestore` und beginnt keine destruktive Stage; ein Backup liefert entsprechend `Retry`.
+Jeder Controller registriert nur den Resolver für seinen eigenen Ressourcentyp. Ein Lease des jeweils anderen Typs wird daher als aktiv behandelt, bis der zuständige Controller es freigibt. Ein wartender Restore setzt `Succeeded=Unknown/WaitingForActiveRestore` und beginnt keine destruktive Stage; ein Backup liefert entsprechend `Retry`.
 
 Ein Zeitablauf macht das Lease nicht ungültig und es wird während einer laufenden Operation nicht periodisch erneuert. `acquireTime`, `renewTime` und `leaseTransitions` werden nur beim Anlegen oder Übernehmen aktualisiert.
 
 ## Ungültige Leases und Übernahme
 
-UID, Name und Kind werden immer gemeinsam geschrieben. Fehlt eines dieser Felder, gilt das Lease als ungültig und wird weder aus anderen Ressourcen rekonstruiert noch automatisch repariert. Ein Restore dokumentiert das mit `Successful=Unknown/InvalidRestoreLease`; Fehler werden mit dem Backoff von `controller-runtime` erneut geprüft.
+UID, Name und Kind werden immer gemeinsam geschrieben. Fehlt eines dieser Felder, gilt das Lease als ungültig und wird weder aus anderen Ressourcen rekonstruiert noch automatisch repariert. Ein Restore dokumentiert das mit `Succeeded=Unknown/InvalidRestoreLease`; Fehler werden mit dem Backoff von `controller-runtime` erneut geprüft.
 
 Ein strukturell vollständiges Lease kann übernommen werden, wenn sein Holder nicht mehr existiert, seine UID nicht mehr zum benannten Objekt passt oder er terminal ist. Ein unbekannter oder vom Controller nicht auflösbarer Holder-Typ wird aus Sicherheitsgründen nicht übernommen.
 

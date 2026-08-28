@@ -6,7 +6,6 @@ import (
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
-	"github.com/cloudogu/k8s-backup-operator/pkg/provider"
 	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,12 +34,6 @@ type scheduledBackupManager interface {
 //goland:noinspection GoUnusedType
 type gcManager interface {
 	garbagecollection.Manager
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type backupProvider interface {
-	provider.Provider
 }
 
 //nolint:unused

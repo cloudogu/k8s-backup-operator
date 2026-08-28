@@ -11,7 +11,7 @@ Der derzeit konkret implementierte Provider ist Velero. CES-Backup und Velero-Ba
 
 ## Controller-Steuerung
 
-Der Backup-Controller führt eine feste Liste von `ensure...`-Methoden aus. Jede Stage liefert eine Aktion:
+Der Backup-Controller wählt abhängig vom Zustand des Backup-CR eine operationsspezifische Liste von `ensure...`-Methoden aus. Jede Stage liefert eine Aktion:
 
 | Aktion | Bedeutung |
 |---|---|
@@ -25,7 +25,7 @@ Anders als der Restore-Controller verwendet der Backup-Controller einen Event-Fi
 
 ## Stage-Reihenfolge
 
-Die Methodenfolge lautet:
+Der `deletionTimestamp` hat Vorrang vor allen Conditions. Ohne Löschanforderung werden Backups mit terminalem `Succeeded` in den Ignore-Pfad geleitet; ein terminales `ProviderSucceeded` oder `Canceled=True` führt in den Finalize-Pfad. Alle übrigen Backups durchlaufen den folgenden Create-Pfad:
 
 1. `ensureVeleroStatusSynced`
 2. `ensureBackupSetup`
@@ -39,7 +39,7 @@ Die Methodenfolge lautet:
 10. `ensureBackupLeaseReleased`
 11. `ensureBackupRunCompleted`
 
-Hat der Provider bereits ein terminales Ergebnis geliefert oder wurde das Backup abgebrochen, verwendet der Controller den Finalize-Pfad mit den letzten drei Stages. Bei einer Löschung laufen `ensureMaintenanceDeactivated`, `ensureBackupLeaseReleased` und `ensureProviderBackupDeleted`. Ein bereits terminales Backup mit `Succeeded=True` oder `Succeeded=False` verwendet den Ignore-Pfad und führt keine weitere Stage aus. `Succeeded` wird erst durch `ensureBackupRunCompleted` nach Maintenance-Deaktivierung und Lease-Freigabe gesetzt.
+Hat der Provider bereits ein terminales Ergebnis geliefert oder wurde das Backup abgebrochen, verwendet der Controller den Finalize-Pfad mit den letzten drei Stages. Bei einer Löschung laufen `ensureMaintenanceDeactivated`, `ensureBackupLeaseReleased` und `ensureProviderBackupDeleted`. Ein bereits terminales Backup mit `Succeeded=True` oder `Succeeded=False` verwendet den Ignore-Pfad mit `ensureOrphanedBackupDeleted`: Die Stage prüft, ob der Provider-Backup noch existiert, und entfernt gegebenenfalls einen verwaisten CES-Backup-CR. `Succeeded` wird erst durch `ensureBackupRunCompleted` nach Maintenance-Deaktivierung und Lease-Freigabe gesetzt.
 
 ## Erfolgreicher lokaler Backup-Ablauf
 
@@ -62,7 +62,7 @@ sequenceDiagram
     loop bis Velero terminal ist
         B->>V: Backup-Phase lesen
         V-->>B: New/InProgress/Finalizing/WaitingForPluginOperations
-        B->>B: Succeeded=Unknown zeitgesteuerter Retry
+        B->>B: ProviderSucceeded=Unknown zeitgesteuerter Retry
     end
     V-->>B: Completed
     B->>B: ProviderSucceeded=True und CompletionTimestamp setzen
@@ -161,16 +161,16 @@ Die Werte von `dogu.name` und `backup-scope` werden für die Auswahl nicht ausge
 
 | Kategorie | Velero-Phasen | Ergebnis |
 |---|---|---|
-| laufend | `New`, `InProgress`, `Finalizing`, `FinalizingPartiallyFailed`, `WaitingForPluginOperations`, `WaitingForPluginOperationsPartiallyFailed` | `Succeeded=Unknown/ProviderBackupInProgress`, Retry |
-| fehlgeschlagen | `FailedValidation`, `PartiallyFailed`, `Failed` | `Succeeded=False/ProviderBackupFailed` |
-| erfolgreich | `Completed` | `Succeeded=True/ProviderBackupSucceeded` |
+| laufend | `New`, `InProgress`, `Finalizing`, `FinalizingPartiallyFailed`, `WaitingForPluginOperations`, `WaitingForPluginOperationsPartiallyFailed` | `ProviderSucceeded=Unknown/ProviderBackupInProgress`, Retry |
+| fehlgeschlagen | `FailedValidation`, `PartiallyFailed`, `Failed` | `ProviderSucceeded=False/ProviderBackupFailed` |
+| erfolgreich | `Completed` | `ProviderSucceeded=True/ProviderBackupSucceeded` |
 | nicht erwartet | beispielsweise `Deleting` | Fehler; kein impliziter Erfolg |
 
 Beim Anlegen des Provider-Backups wird `StartTimestamp` nur gesetzt, wenn er noch leer ist. Beim terminalen Ergebnis wird `CompletionTimestamp` ebenfalls nur einmal gesetzt.
 
 ## Conditions
 
-Lokale und aus dem Provider importierte Backups verwenden dieselben vier Conditions:
+Lokale und aus dem Provider importierte Backups verwenden dieselben fünf Conditions:
 
 ### `Deleting`
 
@@ -198,13 +198,23 @@ Lokale und aus dem Provider importierte Backups verwenden dieselben vier Conditi
 | `True` | `ProviderBackupStorageLocationAvailable` | Provider-Speicher ist verwendbar. |
 | `True` | `VeleroStatusSynced` | Importierter Backup existiert bereits bei Velero. |
 
+### `ProviderSucceeded`
+
+| Status | Reason | Bedeutung |
+|---|---|---|
+| `Unknown` | `ProviderBackupInProgress` | Provider arbeitet; die Create-Pipeline wird zeitgesteuert erneut ausgeführt. |
+| `Unknown` | `VeleroBackupRunning` | Ein importierter Velero-Backup ist noch nicht terminal. |
+| `False` | `ProviderBackupFailed` | Provider ist terminal fehlgeschlagen; die Finalize-Pipeline übernimmt. |
+| `False` | `VeleroBackupFailed` | Ein importierter Velero-Backup meldet eine bekannte Fehlerphase. |
+| `True` | `ProviderBackupSucceeded` | Provider ist erfolgreich abgeschlossen; die Finalize-Pipeline übernimmt. |
+| `True` | `VeleroStatusSynced` | Ein importierter Velero-Backup ist `Completed`. |
+
 ### `Succeeded`
 
 | Status | Reason | Bedeutung                                                                                                               |
 |---|---|-------------------------------------------------------------------------------------------------------------------------|
 | `Unknown` | `MaintenanceModesIsNotActive` | Das Aktivieren des Wartungsmodus wurde angestossen, der Modus ist aber aktuell noch nicht aktiv; Workflow läuft weiter. |
 | `Unknown` | `ProviderBackupResourceDoesNotExist` | Provider-Child wurde gerade erzeugt.                                                                                    |
-| `Unknown` | `ProviderBackupInProgress` | Provider arbeitet.                                                                                                      |
 | `Unknown` | `VeleroBackupRunning` | Ein importierter Velero-Backup ist noch nicht terminal; unbekannte Phasen gelten ebenfalls als laufend.                 |
 | `False` | `ProviderBackupFailed` | Provider ist terminal fehlgeschlagen.                                                                                   |
 | `False` | `VeleroBackupFailed` | Ein importierter Velero-Backup meldet eine bekannte Fehlerphase.                                                        |

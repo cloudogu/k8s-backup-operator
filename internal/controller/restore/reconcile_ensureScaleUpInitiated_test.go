@@ -20,7 +20,7 @@ func TestScaleUpInitiationPersistsItsProgressAndRequeues(t *testing.T) {
 	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
-	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock, requeueAfterTest)
+	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage)
 
 	updated, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
 
@@ -51,7 +51,7 @@ func TestScaleUpInitiationIsEnsuredAgainBeforeProceeding(t *testing.T) {
 		testNamespace,
 		nil,
 		scaleMock,
-		requeueAfterTest,
+		requeueAfterTest, testBackupStorage,
 	)
 
 	updated, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
@@ -68,7 +68,7 @@ func TestScaleUpInitiationDoesNotResetFinalizedRecoveryProgress(t *testing.T) {
 	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
-		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest,
+		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage,
 	)
 
 	_, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
@@ -96,7 +96,7 @@ func TestFailedScaleUpInitiationReportsRecoveryFalseAndRetries(t *testing.T) {
 		"failed to initiate workload scale-up after restore: assert.AnError general error for testing",
 	).Return()
 	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
-	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, scaleMock, requeueAfterTest)
+	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage)
 
 	_, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
 
@@ -118,7 +118,7 @@ func TestUnpersistableScaleUpInitiationIsRetried(t *testing.T) {
 		testNamespace,
 		nil,
 		scaleMock,
-		requeueAfterTest,
+		requeueAfterTest, testBackupStorage,
 	)
 
 	_, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)

@@ -45,6 +45,10 @@ func TestControllerReconcileStageOrder(t *testing.T) {
 		"ensureBackupRunCompleted",
 	}
 
+	ignoreStages := []string{
+		"ensureOrphanedBackupDeleted",
+	}
+
 	deleteStages := []string{
 		"ensureMaintenanceDeactivated",
 		"ensureBackupLeaseReleased",
@@ -69,12 +73,12 @@ func TestControllerReconcileStageOrder(t *testing.T) {
 		{
 			name:     "ignore a backup that already completed",
 			backup:   withCondition(newBackupForTest("ns", "backup"), backupv1.ConditionSucceeded, metav1.ConditionTrue),
-			expected: nil,
+			expected: ignoreStages,
 		},
 		{
 			name:     "ignore a backup that already failed",
 			backup:   withCondition(newBackupForTest("ns", "backup"), backupv1.ConditionSucceeded, metav1.ConditionFalse),
-			expected: nil,
+			expected: ignoreStages,
 		},
 		{
 			name:     "finalize a backup whose provider backup succeeded",
@@ -243,6 +247,7 @@ func recordStages(reconcilerMock *mockReconciler, executed *[]string) {
 	expecter := reconcilerMock.EXPECT()
 	expecter.ensureBackupLeaseReleased(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupLeaseReleased")).Maybe()
 	expecter.ensureProviderBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureProviderBackupDeleted")).Maybe()
+	expecter.ensureOrphanedBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureOrphanedBackupDeleted")).Maybe()
 	expecter.ensureVeleroStatusSynced(mock.Anything, mock.Anything).RunAndReturn(record("ensureVeleroStatusSynced")).Maybe()
 	expecter.ensureBackupSetup(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupSetup")).Maybe()
 	expecter.ensureBackupIsCanceledAfterTimeWindowExpired(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupIsCanceledAfterTimeWindowExpired")).Maybe()

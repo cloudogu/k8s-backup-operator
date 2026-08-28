@@ -18,13 +18,13 @@ Kind, name, and UID must match for a resource to recognize itself as the holder 
 
 If the lease does not exist, it is created for the current resource. If the resource already holds the lease, its workflow may continue. Otherwise, it waits and retries during a later reconciliation.
 
-Each controller only registers the resolver for its own resource type. A lease held by the other type is therefore considered active until the responsible controller releases it. A waiting restore sets `Successful=Unknown/WaitingForActiveRestore` and does not start a destructive stage; a backup returns `Retry` accordingly.
+Each controller only registers the resolver for its own resource type. A lease held by the other type is therefore considered active until the responsible controller releases it. A waiting restore sets `Succeeded=Unknown/WaitingForActiveRestore` and does not start a destructive stage; a backup returns `Retry` accordingly.
 
 The lease does not become invalid over time and is not renewed periodically while an operation is running. `acquireTime`, `renewTime`, and `leaseTransitions` are updated only when the lease is created or taken over.
 
 ## Invalid leases and takeover
 
-UID, name, and kind are always written together. If any of these fields is missing, the lease is considered invalid and is neither reconstructed from other resources nor repaired automatically. A restore records this as `Successful=Unknown/InvalidRestoreLease`; errors are retried using the `controller-runtime` backoff.
+UID, name, and kind are always written together. If any of these fields is missing, the lease is considered invalid and is neither reconstructed from other resources nor repaired automatically. A restore records this as `Succeeded=Unknown/InvalidRestoreLease`; errors are retried using the `controller-runtime` backoff.
 
 A structurally complete lease can be taken over if its holder no longer exists, its UID no longer matches the named object, or the holder is in a terminal state. An unknown holder type, or one that the controller cannot resolve, is not taken over for safety reasons.
 
