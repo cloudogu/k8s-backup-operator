@@ -128,6 +128,155 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 	})
 }
 
+func TestCronJobManagerEnsureDoesNotUpdateForAPIServerDefaults(t *testing.T) {
+	scheme := newCronJobManagerTestScheme(t)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	recorder := newFakeEventRecorder()
+	manager := defaultCronJobManager{
+		Client:        fakeClient,
+		recorder:      recorder,
+		scheme:        scheme,
+		operatorImage: "example.com/backup-operator:1.2.3",
+		pullPolicy:    corev1.PullAlways,
+	}
+	schedule := newCronJobManagerTestSchedule()
+
+	require.NoError(t, manager.ensure(context.Background(), schedule))
+	requireRecordedEvent(t, recorder, schedule, corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason, `Created CronJob "backup-schedule-daily".`)
+
+	stored := &batchv1.CronJob{}
+	require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKey{
+		Name: schedule.CronJobName(), Namespace: schedule.Namespace,
+	}, stored))
+	setAPIServerPodDefaults(&stored.Spec.JobTemplate.Spec.Template)
+	require.NoError(t, fakeClient.Update(context.Background(), stored))
+
+	require.NoError(t, manager.ensure(context.Background(), schedule))
+	requireNoRecordedEvent(t, recorder)
+}
+
+func TestManagedTemplateEqual(t *testing.T) {
+	schedule := newCronJobManagerTestSchedule()
+	desired := schedule.CronJobPodTemplate("example.com/backup-operator:1.2.3", corev1.PullAlways)
+	desired.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: "registry-secret"}}
+
+	tests := []struct {
+		name     string
+		mutate   func(*corev1.PodTemplateSpec)
+		expected bool
+	}{
+		{
+			name:     "identical templates",
+			mutate:   func(*corev1.PodTemplateSpec) {},
+			expected: true,
+		},
+		{
+			name: "API server defaults are ignored",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				setAPIServerPodDefaults(actual)
+			},
+			expected: true,
+		},
+		{
+			name: "template name differs",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Name = "different"
+			},
+		},
+		{
+			name: "template namespace differs",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Namespace = "different"
+			},
+		},
+		{
+			name: "template labels differ",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Labels["app"] = "different"
+			},
+		},
+		{
+			name: "image pull secrets differ",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Spec.ImagePullSecrets[0].Name = "different"
+			},
+		},
+		{
+			name: "restart policy differs",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Spec.RestartPolicy = corev1.RestartPolicyNever
+			},
+		},
+		{
+			name: "service account differs",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Spec.ServiceAccountName = "different"
+			},
+		},
+		{
+			name: "container count differs",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Spec.Containers = append(actual.Spec.Containers, corev1.Container{Name: "sidecar"})
+			},
+		},
+		{
+			name: "container name differs",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Spec.Containers[0].Name = "different"
+			},
+		},
+		{
+			name: "container image differs",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Spec.Containers[0].Image = "different:latest"
+			},
+		},
+		{
+			name: "container pull policy differs",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Spec.Containers[0].ImagePullPolicy = corev1.PullNever
+			},
+		},
+		{
+			name: "container arguments differ",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Spec.Containers[0].Args = []string{"different"}
+			},
+		},
+		{
+			name: "container environment differs",
+			mutate: func(actual *corev1.PodTemplateSpec) {
+				actual.Spec.Containers[0].Env = []corev1.EnvVar{{Name: "DIFFERENT", Value: "true"}}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := desired.DeepCopy()
+			tt.mutate(actual)
+
+			assert.Equal(t, tt.expected, managedTemplateEqual(*actual, desired))
+		})
+	}
+}
+
+// this simulates the Kubernetes API setting certain defaults in the
+// pod template after it has been created. This must not lead to a
+// second reconcilation or we could get stuck in a loop
+func setAPIServerPodDefaults(template *corev1.PodTemplateSpec) {
+	terminationGracePeriodSeconds := int64(30)
+	enableServiceLinks := true
+	template.Spec.DNSPolicy = corev1.DNSClusterFirst
+	template.Spec.SchedulerName = corev1.DefaultSchedulerName
+	template.Spec.SecurityContext = &corev1.PodSecurityContext{}
+	template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriodSeconds
+	template.Spec.EnableServiceLinks = &enableServiceLinks
+	for i := range template.Spec.Containers {
+		template.Spec.Containers[i].TerminationMessagePath = corev1.TerminationMessagePathDefault
+		template.Spec.Containers[i].TerminationMessagePolicy = corev1.TerminationMessageReadFile
+	}
+}
 func newCronJobManagerTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 

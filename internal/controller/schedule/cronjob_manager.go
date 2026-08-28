@@ -8,6 +8,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,7 +60,9 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 		}
 
 		cronJob.Spec.Schedule = schedule.Spec.Schedule
-		cronJob.Spec.JobTemplate.Spec.Template = podTemplate
+		if !managedTemplateEqual(cronJob.Spec.JobTemplate.Spec.Template, podTemplate) {
+			cronJob.Spec.JobTemplate.Spec.Template = podTemplate
+		}
 
 		return nil
 	})
@@ -91,6 +94,55 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 	}
 
 	return nil
+}
+
+// managedTemplateEqual compares whether the CronJob has drifted by only comparing  fields populated by
+// BackupSchedule.CronJobPodTemplate and this controller. Otherwise, the Kubernetes API filling it
+// with default values would cause another call to the reconciler and the comparison result would be true
+// and cause another update
+func managedTemplateEqual(actual, desired corev1.PodTemplateSpec) bool {
+	return equality.Semantic.DeepEqual(managedTemplateOf(actual), managedTemplateOf(desired))
+}
+
+type managedPodTemplate struct {
+	Name             string
+	Namespace        string
+	Labels           map[string]string
+	ImagePullSecrets []corev1.LocalObjectReference
+	RestartPolicy    corev1.RestartPolicy
+	ServiceAccount   string
+	Containers       []managedContainer
+}
+
+type managedContainer struct {
+	Name       string
+	Image      string
+	PullPolicy corev1.PullPolicy
+	Args       []string
+	Env        []corev1.EnvVar
+}
+
+func managedTemplateOf(template corev1.PodTemplateSpec) managedPodTemplate {
+	managedContainers := make([]managedContainer, len(template.Spec.Containers))
+	for i, container := range template.Spec.Containers {
+		managedContainers[i] = managedContainer{
+			Name:       container.Name,
+			Image:      container.Image,
+			PullPolicy: container.ImagePullPolicy,
+			Args:       container.Args,
+			Env:        container.Env,
+		}
+	}
+
+	return managedPodTemplate{
+		Name:             template.Name,
+		Namespace:        template.Namespace,
+		Labels:           template.Labels,
+		ImagePullSecrets: template.Spec.ImagePullSecrets,
+		RestartPolicy:    template.Spec.RestartPolicy,
+		ServiceAccount:   template.Spec.ServiceAccountName,
+		Containers:       managedContainers,
+	}
 }
 
 func (c defaultCronJobManager) delete(ctx context.Context, schedule *backupv1.BackupSchedule) error {
