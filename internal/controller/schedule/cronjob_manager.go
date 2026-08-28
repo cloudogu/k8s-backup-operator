@@ -98,8 +98,8 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 
 // managedTemplateEqual compares whether the CronJob has drifted by only comparing  fields populated by
 // BackupSchedule.CronJobPodTemplate and this controller. Otherwise, the Kubernetes API filling it
-// with default values would cause another call to the reconciler and the comparison result would be true
-// and cause another update
+// with default values would cause another call to the reconciler, as CronJob is a watched resource,
+// and would cause another update since the CronJob now differs from the template.
 func managedTemplateEqual(actual, desired corev1.PodTemplateSpec) bool {
 	return equality.Semantic.DeepEqual(managedTemplateOf(actual), managedTemplateOf(desired))
 }
