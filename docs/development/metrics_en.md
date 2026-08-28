@@ -21,8 +21,8 @@ After reading a resource, each reconciliation initializes all six possible direc
 
 | Resource | Conditions | Time series per resource |
 |---|---|---|
-| Backup | `Prepared`, `Deleting`, `Canceled`, `Succeeded` | 4 × 6 = 24 |
-| Restore | `Successful`, `Prepared`, `ProviderRestoreSuccessful`, `WorkloadsRecovered`, `BackupsSynchronized` | 5 × 6 = 30 |
+| Backup | `Prepared`, `Deleting`, `Canceled`, `Succeeded`, `ProviderSucceeded` | 5 × 6 = 30 |
+| Restore | `Succeeded`, `Prepared`, `ProviderSucceeded`, `WorkloadsRecovered` | 4 × 6 = 24 |
 
 Example for successfully reached milestones:
 

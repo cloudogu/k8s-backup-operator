@@ -11,7 +11,7 @@ The provider currently implemented is Velero. CES backups and Velero backups use
 
 ## Controller flow
 
-The backup controller executes a fixed list of `ensure...` methods. Each stage returns an action:
+The backup controller selects an operation-specific list of `ensure...` methods based on the state of the backup CR. Each stage returns an action:
 
 | Action | Meaning |
 |---|---|
@@ -25,7 +25,7 @@ Unlike the restore controller, the backup controller uses an event filter. Recon
 
 ## Stage order
 
-The controller selects one of four operation paths based on the state of the backup CR. The create path is:
+The `deletionTimestamp` takes precedence over all conditions. Without a deletion request, backups with a terminal `Succeeded` condition enter the ignore path; a terminal `ProviderSucceeded` condition or `Canceled=True` enters the finalize path. All other backups run through this create path:
 
 1. `ensureVeleroStatusSynced`
 2. `ensureBackupSetup`
@@ -39,7 +39,7 @@ The controller selects one of four operation paths based on the state of the bac
 10. `ensureBackupLeaseReleased`
 11. `ensureBackupRunCompleted`
 
-Once the provider has produced a terminal result or the backup has been canceled, the controller uses the finalize path containing the last three stages. During deletion, `ensureMaintenanceDeactivated`, `ensureBackupLeaseReleased`, and `ensureProviderBackupDeleted` run. An already terminal backup with `Succeeded=True` or `Succeeded=False` uses the ignore path and runs no further stage. `Succeeded` is set by `ensureBackupRunCompleted` only after maintenance-mode deactivation and lease release.
+Once the provider has produced a terminal result or the backup has been canceled, the controller uses the finalize path containing the last three stages. During deletion, `ensureMaintenanceDeactivated`, `ensureBackupLeaseReleased`, and `ensureProviderBackupDeleted` run. An already terminal backup with `Succeeded=True` or `Succeeded=False` uses the ignore path with `ensureOrphanedBackupDeleted`: the stage checks whether the provider backup still exists and removes an orphaned CES backup CR if necessary. `Succeeded` is set by `ensureBackupRunCompleted` only after maintenance-mode deactivation and lease release.
 
 ## Successful local backup workflow
 
@@ -62,7 +62,7 @@ sequenceDiagram
     loop until Velero is terminal
         B->>V: Read backup phase
         V-->>B: New/InProgress/Finalizing/WaitingForPluginOperations
-        B->>B: Succeeded=Unknown, timed retry
+        B->>B: ProviderSucceeded=Unknown, timed retry
     end
     V-->>B: Completed
     B->>B: Set ProviderSucceeded=True and CompletionTimestamp
@@ -161,16 +161,16 @@ The values of `dogu.name` and `backup-scope` are not evaluated for selection. Ad
 
 | Category | Velero phases | Result |
 |---|---|---|
-| running | `New`, `InProgress`, `Finalizing`, `FinalizingPartiallyFailed`, `WaitingForPluginOperations`, `WaitingForPluginOperationsPartiallyFailed` | `Succeeded=Unknown/ProviderBackupInProgress`, retry |
-| failed | `FailedValidation`, `PartiallyFailed`, `Failed` | `Succeeded=False/ProviderBackupFailed` |
-| successful | `Completed` | `Succeeded=True/ProviderBackupSucceeded` |
+| running | `New`, `InProgress`, `Finalizing`, `FinalizingPartiallyFailed`, `WaitingForPluginOperations`, `WaitingForPluginOperationsPartiallyFailed` | `ProviderSucceeded=Unknown/ProviderBackupInProgress`, retry |
+| failed | `FailedValidation`, `PartiallyFailed`, `Failed` | `ProviderSucceeded=False/ProviderBackupFailed` |
+| successful | `Completed` | `ProviderSucceeded=True/ProviderBackupSucceeded` |
 | unexpected | for example `Deleting` | Error; no implicit success |
 
 When the provider backup is created, `StartTimestamp` is set only if it is still empty. For a terminal result, `CompletionTimestamp` is likewise set only once.
 
 ## Conditions
 
-Local backups and backups imported from the provider use the same four conditions:
+Local backups and backups imported from the provider use the same five conditions:
 
 ### `Deleting`
 
@@ -198,13 +198,23 @@ Local backups and backups imported from the provider use the same four condition
 | `True` | `ProviderBackupStorageLocationAvailable` | Provider storage is usable. |
 | `True` | `VeleroStatusSynced` | The imported backup already exists in Velero. |
 
+### `ProviderSucceeded`
+
+| Status | Reason | Meaning |
+|---|---|---|
+| `Unknown` | `ProviderBackupInProgress` | The provider is working; the create pipeline is retried on a timer. |
+| `Unknown` | `VeleroBackupRunning` | An imported Velero backup is not terminal yet. |
+| `False` | `ProviderBackupFailed` | The provider failed terminally; the finalize pipeline takes over. |
+| `False` | `VeleroBackupFailed` | An imported Velero backup reports a known failure phase. |
+| `True` | `ProviderBackupSucceeded` | The provider completed successfully; the finalize pipeline takes over. |
+| `True` | `VeleroStatusSynced` | An imported Velero backup is `Completed`. |
+
 ### `Succeeded`
 
 | Status | Reason | Meaning |
 |---|---|---|
 | `Unknown` | `MaintenanceModesIsNotActive` | Maintenance mode activation was initiated, but the mode is not active yet; the workflow continues. |
 | `Unknown` | `ProviderBackupResourceDoesNotExist` | The provider child was just created. |
-| `Unknown` | `ProviderBackupInProgress` | The provider is working. |
 | `Unknown` | `VeleroBackupRunning` | An imported Velero backup is not terminal yet; unknown phases are also considered running. |
 | `False` | `ProviderBackupFailed` | The provider failed terminally. |
 | `False` | `VeleroBackupFailed` | An imported Velero backup reports a known failure phase. |
