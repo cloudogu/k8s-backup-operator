@@ -496,7 +496,7 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 // compatibility write is no-op-aware and ends the reconciliation when it changes the Restore.
 func (r *restoreReconciler) ensureDeletingStatus(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	// Check legacy state first
-	if restore.Status.Status == k8sv1.RestoreStatusDeleting { // NOSONAR -- legacy restore status compatibility
+	if restore.Status.Status == k8sv1.RestoreStatusDeleting { //nolint:staticcheck // legacy restore status compatibility
 		return restore, next()
 	}
 
