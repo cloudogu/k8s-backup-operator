@@ -4,8 +4,8 @@ import (
 	"context"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/config"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
-	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

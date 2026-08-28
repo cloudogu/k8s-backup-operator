@@ -139,7 +139,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // requiredOperation decides what this reconciliation has to do. The decision is derived from the
-// deletion timestamp and from the effective Successful condition.
+// deletion timestamp and from the effective Succeeded condition.
 func requiredOperation(restore *k8sv1.Restore) operation {
 	if restore.DeletionTimestamp != nil && !restore.DeletionTimestamp.IsZero() {
 		return operationDelete
@@ -173,7 +173,7 @@ func (r *restoreReconciler) ensureConditionsInitialized(ctx context.Context, res
 	return initialized, retryAfter(r.requeueDelay)
 }
 
-// ensureLegacyConditionsMigrated persists the Successful condition derived from the
+// ensureLegacyConditionsMigrated persists the Succeeded condition derived from the
 // status phase of a Restore created before conditions existed. A Restore that is being deleted is left alone:
 // its outcome no longer matters and writing conditions would only fight the deletion.
 func (r *restoreReconciler) ensureLegacyConditionsMigrated(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {

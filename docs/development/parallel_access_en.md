@@ -18,15 +18,15 @@ Kind, name, and UID must match for a resource to recognize itself as the holder 
 
 If the lease does not exist, it is created for the current resource. If the resource already holds the lease, its workflow may continue. Otherwise, it waits and retries during a later reconciliation.
 
-Each controller only registers the resolver for its own resource type. A lease held by the other type is therefore considered active until the responsible controller releases it. A waiting restore sets `Successful=Unknown/WaitingForActiveRestore` and does not start a destructive stage; a backup returns `Retry` accordingly.
+Each controller only registers the resolver for its own resource type. A lease held by the other type is therefore considered active until the responsible controller releases it. A waiting restore sets `Succeeded=Unknown/WaitingForActiveRestore` and does not start a destructive stage; a backup returns `Retry` accordingly.
 
 The lease does not become invalid over time and is not renewed periodically while an operation is running. `acquireTime`, `renewTime`, and `leaseTransitions` are updated only when the lease is created or taken over.
 
-## Repair and takeover
+## Invalid leases and takeover
 
-For holders of its own resource type, the manager can repair a missing name or UID if the remaining value uniquely identifies the resource. A lease can be taken over if its holder no longer exists, its UID no longer matches the named object, or the holder is in a terminal state.
+UID, name, and kind are always written together. If any of these fields is missing, the lease is considered invalid and is neither reconstructed from other resources nor repaired automatically. A restore records this as `Succeeded=Unknown/InvalidRestoreLease`; errors are retried using the `controller-runtime` backoff.
 
-If both name and UID are missing, or if the holder cannot be identified unambiguously, the lease is considered invalid and is not taken over automatically. A restore records this as `Successful=Unknown/InvalidRestoreLease`; errors are retried using the `controller-runtime` backoff. An unknown holder type, or one that the controller cannot resolve, is likewise not taken over for safety reasons.
+A structurally complete lease can be taken over if its holder no longer exists, its UID no longer matches the named object, or the holder is in a terminal state. An unknown holder type, or one that the controller cannot resolve, is not taken over for safety reasons.
 
 Lease changes use the Kubernetes `resourceVersion` for optimistic concurrency control. After a conflict, the next reconciliation reads the current state again.
 

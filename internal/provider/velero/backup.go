@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/annotations"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
-	"github.com/cloudogu/k8s-backup-operator/pkg/annotations"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"

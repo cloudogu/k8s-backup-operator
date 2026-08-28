@@ -8,7 +8,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/leases"
-	operatortime "github.com/cloudogu/k8s-backup-operator/pkg/time"
+	operatortime "github.com/cloudogu/k8s-backup-operator/internal/time"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"

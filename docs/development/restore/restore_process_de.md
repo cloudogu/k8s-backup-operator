@@ -13,11 +13,11 @@ flowchart TD
     A[Restore gelesen] --> B{deletionTimestamp gesetzt?}
     B -- ja --> D[Delete-Workflow]
     B -- nein --> C{Restore terminal?}
-    C -- Ja --> I[Ignore: nur Legacy-Migration]
+    C -- Ja --> I[Ignore: Legacy-Migration und Lease-Freigabe]
     C -- nein --> R[Create-/Restore-Workflow]
 ```
 
-`Successful=True` und `Successful=False` sind terminal. `Successful=Unknown` ist ausdrücklich nicht terminal und bedeutet, dass der Workflow weiterarbeiten oder warten muss. Das veraltete skalare Feld `status.status` wird weiterhin für ältere Clients gespiegelt, die Steuerung erfolgt jedoch über Conditions.
+`Succeeded=True` und `Succeeded=False` sind terminal. `Succeeded=Unknown` ist ausdrücklich nicht terminal und bedeutet, dass der Workflow weiterarbeiten oder warten muss. Das veraltete skalare Feld `status.status` wird weiterhin für ältere Clients gespiegelt, die Steuerung erfolgt jedoch über Conditions.
 
 Der Controller beobachtet sowohl Parent-`Restore`-Ressourcen als auch owned Velero-`Restore`-Children. Es gibt bewusst weder einen controllerweiten Event-Filter noch eine `GenerationChangedPredicate`: Provider-Phasenwechsel sowie Status-, Finalizer- und Löschereignisse des Parents müssen einen Reconcile auslösen können. Das geht, weil ein Restore sein Child immer selbst erzeugt; der Backup-Controller kann das nicht und wartet deshalb per Requeue.
 
@@ -46,18 +46,19 @@ flowchart TD
     B --> C[Metadaten und Finalizer sicherstellen]
     C --> D[Vorhandenen Provider-Child prüfen]
     D --> E[Restore-Lease sicherstellen]
-    E --> F[Scale-down und Cleanup]
-    F --> FM[Wartungsmodus best-effort aktivieren]
-    FM --> G[Provider-Restore anlegen]
+    E --> P[Provider-Verfügbarkeit prüfen]
+    P --> FM[Wartungsmodus best-effort aktivieren]
+    FM --> F[Scale-down und Cleanup]
+    F --> G[Provider-Restore anlegen]
     G --> H{Provider beendet?}
     H -- nein --> H
-    H -- fehlgeschlagen --> X[Successful=False terminal]
+    H -- fehlgeschlagen --> X[Succeeded=False terminal]
     H -- erfolgreich --> J[Scale-up initiieren]
     J --> K{Alle Workloads ready?}
     K -- nein --> K
     K -- ja --> L[Scale-up finalisieren]
     L --> M[Wartungsmodus deaktivieren]
-    M --> N[WorkloadsRecovered=True und Successful=True]
+    M --> N[WorkloadsRecovered=True und Succeeded=True]
 ```
 
 In Methodennamen lautet die Folge:
@@ -67,30 +68,31 @@ In Methodennamen lautet die Folge:
 3. `ensureMetadata`
 4. `ensureProviderChildState`
 5. `ensureActiveRestoreLease`
-6. `ensurePreparation`
+6. `ensureProviderReady`
 7. `ensureMaintenanceModeActivated`
-8. `ensureProviderRestore`
-9. `ensureProviderCompletion`
-10. `ensureScaleUpInitiated`
-11. `ensureWorkloadsReady`
-12. `ensureScaleUpFinalized`
-13. `ensureMaintenanceModeDeactivated`
-14. `ensureRestoreCompleted`
+8. `ensurePreparation`
+9. `ensureProviderRestore`
+10. `ensureProviderCompletion`
+11. `ensureScaleUpInitiated`
+12. `ensureWorkloadsReady`
+13. `ensureScaleUpFinalized`
+14. `ensureMaintenanceModeDeactivated`
+15. `ensureRestoreCompleted`
 
 ## Conditions und Übergänge
 
 Jeder neue, laufende Restore erhält zunächst diese vier Conditions mit `Status=Unknown`, `Reason=Pending`:
 
-- `Successful`
+- `Succeeded`
 - `Prepared`
-- `ProviderRestoreSuccessful`
+- `ProviderSucceeded`
 - `WorkloadsRecovered`
 
 Eine vorhandene Condition wird bei der Initialisierung nicht auf `Unknown` zurückgesetzt. Das ist wichtig, wenn ein Status-Write erfolgreich war, der Prozess aber unmittelbar danach abstürzt.
 
-### `Successful`
+### `Succeeded`
 
-`Successful` ist die übergeordnete und lease-relevante Abschluss-Condition.
+`Succeeded` ist die übergeordnete und lease-relevante Abschluss-Condition.
 
 Ein gültiges Operations-Lease enthält immer gemeinsam Holder-UID, Holder-Name und Holder-Kind. Fehlt eines dieser Felder, meldet der Manager das Lease als ungültig; eine Rekonstruktion über andere Ressourcen oder eine automatische Reparatur findet nicht statt.
 
@@ -99,13 +101,13 @@ Ein gültiges Operations-Lease enthält immer gemeinsam Holder-UID, Holder-Name 
 | `Unknown` | `Pending` | Workflow wurde erkannt, hat aber den nächsten Meilenstein noch nicht erreicht.                                                      |
 | `Unknown` | `WaitingForActiveRestore` | Ein anderer nicht-terminaler Restore oder Backup hält das Lease. Destruktive Stages werden nicht gestartet.                         |
 | `Unknown` | `RestoreLeaseAcquired` | Der wartende Restore besitzt das Lease nun selbst und darf fortfahren.                                                              |
-| `Unknown` | `InvalidRestoreLease` | Das Lease enthält weder eine sicher zuordenbare UID noch einen Namen. Manuelles Prüfen und gegebenenfalls Löschen ist erforderlich. |
+| `Unknown` | `InvalidRestoreLease` | Dem Lease fehlt die Holder-UID, der Holder-Name oder das Holder-Kind. Manuelles Prüfen und gegebenenfalls Löschen ist erforderlich. |
 | `True` | `RestoreCompleted` | Der vollständige Workflow einschließlich Readiness, Label-Cleanup und Maintenance-Deaktivierung ist abgeschlossen.                  |
 | `False` | `ProviderRestoreFailed` | Der Provider-Restore ist terminal fehlgeschlagen.                                                                                   |
 | `False` | `ProviderRestoreConflict` | Eine gleichnamige Provider-Ressource kann nicht sicher diesem Restore zugeordnet werden.                                            |
 | `True/False/Unknown` | `MigratedFromLegacyStatus` | Aus dem alten skalaren Status eines mit einer älteren Operator-Version angelegten Restore abgeleitet.                               |
 
-`Successful=True` wird ausschließlich in `ensureRestoreCompleted` zusammen mit `WorkloadsRecovered=True` geschrieben.
+`Succeeded=True` wird ausschließlich in `ensureRestoreCompleted` zusammen mit `WorkloadsRecovered=True` geschrieben.
 
 ### Legacy-Kompatibilitätsstatus
 
@@ -114,12 +116,12 @@ Jeder Status-Write synchronisiert zusätzlich das veraltete Feld `status.status`
 | Zustand | `status.status` |
 |---|---|
 | `metadata.deletionTimestamp` gesetzt | `deleting` |
-| keine `Successful`-Condition, Workflow bereits beobachtet | `inProgress` |
-| `Successful=Unknown` | `inProgress` |
-| `Successful=True` | `completed` |
-| `Successful=False` | `failed` |
+| keine `Succeeded`-Condition, Workflow bereits beobachtet | `inProgress` |
+| `Succeeded=Unknown` | `inProgress` |
+| `Succeeded=True` | `completed` |
+| `Succeeded=False` | `failed` |
 
-Bei älteren Restores ohne `Successful`-Condition wird umgekehrt ein vorhandenes `completed`, `failed` oder `inProgress` einmalig als `Successful=True`, `False` beziehungsweise `Unknown` mit `Reason=MigratedFromLegacyStatus` persistiert. Eine bereits vorhandene Condition hat immer Vorrang vor dem Legacy-Feld. Ein unbekannter, neuer oder löschender Legacy-Status wird nicht als Ergebnis interpretiert.
+Bei älteren Restores ohne `Succeeded`-Condition wird umgekehrt ein vorhandenes `completed`, `failed` oder `inProgress` einmalig als `Succeeded=True`, `False` beziehungsweise `Unknown` mit `Reason=MigratedFromLegacyStatus` persistiert. Eine bereits vorhandene Condition hat immer Vorrang vor dem Legacy-Feld. Ein unbekannter, neuer oder löschender Legacy-Status wird nicht als Ergebnis interpretiert.
 
 ### Metadaten vor dem Workflow
 
@@ -133,11 +135,11 @@ Vor Lease und destruktiver Vorbereitung stellt `ensureMetadata` den Operator-Fin
 | `False` | `PreparationFailed` | Scale-down oder Cleanup schlug fehl; der Vorgang wird mit Backoff wiederholt. |
 | `True` | `PreparationCompleted` | Workloads wurden herunterskaliert und Restore-Ressourcen bereinigt. |
 
-Nach der Preparation aktiviert die eigene Stage `ensureMaintenanceModeActivated` den Wartungsmodus best-effort. Sie prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Die Stage persistiert keine Condition und darf im selben Reconcile direkt zum Provider-Restore weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein.
+Vor der Aktivierung des Wartungsmodus und der destruktiven Vorbereitung prüft `ensureProviderReady`, ob der Provider verfügbar ist. Ist der Restore laut `Prepared`-Condition oder anhand eines eindeutig zugehörigen Provider-Child bereits vorbereitet, wird diese Prüfung übersprungen. So wird ein wiederaufgenommener Restore nicht von einer erneuten Provider-Prüfung blockiert.
 
-Vor der destruktiven Vorbereitung wird geprüft, ob der Provider verfügbar ist. Existiert bereits ein eindeutig zugehöriger Provider-Child, gilt die Vorbereitung ebenfalls als bereits erfolgt. So wird das kritische Crash-Fenster zwischen Child-Erstellung und Parent-Status-Write nicht mit einem zweiten Cleanup beantwortet.
+Anschließend aktiviert `ensureMaintenanceModeActivated` den Wartungsmodus best-effort. Die Stage prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Sie persistiert keine Condition und darf im selben Reconcile direkt zur Preparation weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein. Existiert bereits ein eindeutig zugehöriger Provider-Child, gilt die Vorbereitung ebenfalls als erfolgt. So wird das kritische Crash-Fenster zwischen Child-Erstellung und Parent-Status-Write nicht mit einem zweiten Cleanup beantwortet.
 
-### `ProviderRestoreSuccessful`
+### `ProviderSucceeded`
 
 | Status | Reason | Bedeutung |
 |---|---|---|
@@ -154,9 +156,9 @@ Bei Pending, Running oder unbekanntem Zustand wartet der Controller auf Child-Ev
 Bei einem Provider-Fehler werden außerdem gesetzt:
 
 - `WorkloadsRecovered=False/RecoveryNotAttemptedAfterProviderFailure`
-- `Successful=False/ProviderRestoreFailed`
+- `Succeeded=False/ProviderRestoreFailed`
 
-Die Workloads bleiben in diesem Fehlerpfad absichtlich herunterskaliert. Der Wartungsmodus wird best-effort deaktiviert. Weil `Successful=False` terminal ist, kann das Lease anschließend von einem anderen Restore übernommen werden. Entwickler müssen dieses bewusst andere Sicherheitsmodell des Fehlerpfads bei Änderungen berücksichtigen.
+Die Workloads bleiben in diesem Fehlerpfad absichtlich herunterskaliert. Der Wartungsmodus wird best-effort deaktiviert. Weil `Succeeded=False` terminal ist, kann das Lease anschließend von einem anderen Restore übernommen werden. Entwickler müssen dieses bewusst andere Sicherheitsmodell des Fehlerpfads bei Änderungen berücksichtigen.
 
 ### `WorkloadsRecovered`
 
@@ -249,7 +251,7 @@ Testeigene Hold-Finalizer machen die sonst kurzen Zwischenzustände beobachtbar.
 Die Spec erstellt zwei Restore-Ressourcen gleichzeitig und ermittelt dynamisch Gewinner und Wartenden. Sie prüft:
 
 1. Genau der Lease-Holder darf einen Provider-Restore starten.
-2. Der Wartende zeigt `Successful=Unknown/WaitingForActiveRestore` und besitzt noch keinen Provider-Child.
+2. Der Wartende zeigt `Succeeded=Unknown/WaitingForActiveRestore` und besitzt noch keinen Provider-Child.
 3. Erst nachdem der erste Restore vollständig `completed` ist, steigt `leaseTransitions` und das Lease wechselt zum Wartenden.
 4. Danach startet und beendet auch der zweite Restore seinen Provider-Restore.
 

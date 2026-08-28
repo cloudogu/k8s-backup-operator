@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/dlclark/regexp2"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
-	"github.com/cloudogu/k8s-backup-operator/pkg/config"
 )
 
 // imageTagValidator defines a regexp string that validates a container reference. These include:

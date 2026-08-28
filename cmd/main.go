@@ -7,11 +7,15 @@ import (
 	"os"
 	"time"
 
-	backup2 "github.com/cloudogu/k8s-backup-operator/internal/controller/backup"
+	"github.com/cloudogu/k8s-backup-operator/internal/cleanup"
+	operatorconfig "github.com/cloudogu/k8s-backup-operator/internal/config"
+	backupcontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/backup"
 	restorecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/restore"
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
+	"github.com/cloudogu/k8s-backup-operator/internal/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/internal/metrics"
-	operatortime "github.com/cloudogu/k8s-backup-operator/pkg/time"
+	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
+	operatortime "github.com/cloudogu/k8s-backup-operator/internal/time"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
@@ -35,10 +39,6 @@ import (
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/pkg/cleanup"
-	"github.com/cloudogu/k8s-backup-operator/pkg/config"
-	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
-	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -80,7 +80,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	config.ConfigureLogger()
+	operatorconfig.ConfigureLogger()
 
 	metrics.RegisterMetrics()
 
@@ -124,7 +124,7 @@ func main() {
 
 func startScheduledBackup(ctx context.Context, cmd *flag.FlagSet, args []string) error {
 	restConfig := ctrl.GetConfigOrDie()
-	namespace, err := config.GetNamespace()
+	namespace, err := operatorconfig.GetNamespace()
 	if err != nil {
 		return fmt.Errorf("unable to get current namespace: %w", err)
 	}
@@ -158,7 +158,7 @@ func parseScheduledBackupOptions(flags *flag.FlagSet, args []string) scheduledba
 
 func startGarbageCollector(ctx context.Context, flags *flag.FlagSet, args []string) error {
 	restConfig := ctrl.GetConfigOrDie()
-	namespace, err := config.GetNamespace()
+	namespace, err := operatorconfig.GetNamespace()
 	if err != nil {
 		return fmt.Errorf("unable to get current namespace: %w", err)
 	}
@@ -189,7 +189,7 @@ func parseStrategyName(flags *flag.FlagSet, args []string) string {
 }
 
 func startOperator(ctx context.Context, flags *flag.FlagSet, args []string) error {
-	operatorConfig, err := config.NewOperatorConfig(Version)
+	operatorConfig, err := operatorconfig.NewOperatorConfig(Version)
 	if err != nil {
 		return fmt.Errorf("unable to create operator config: %w", err)
 	}
@@ -210,7 +210,7 @@ func startOperator(ctx context.Context, flags *flag.FlagSet, args []string) erro
 	return startK8sManager(ctx, k8sManager)
 }
 
-func configureManager(ctx context.Context, k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
+func configureManager(ctx context.Context, k8sManager controllerManager, operatorConfig *operatorconfig.OperatorConfig) error {
 	err := configureReconcilers(ctx, k8sManager, operatorConfig)
 	if err != nil {
 		return fmt.Errorf("unable to configure reconciler: %w", err)
@@ -224,7 +224,7 @@ func configureManager(ctx context.Context, k8sManager controllerManager, operato
 	return nil
 }
 
-func getK8sManagerOptions(flags *flag.FlagSet, args []string, operatorConfig *config.OperatorConfig) ctrl.Options {
+func getK8sManagerOptions(flags *flag.FlagSet, args []string, operatorConfig *operatorconfig.OperatorConfig) ctrl.Options {
 	controllerOpts := ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{
@@ -268,7 +268,7 @@ func parseManagerFlags(flags *flag.FlagSet, args []string, ctrlOpts ctrl.Options
 	return ctrlOpts
 }
 
-func configureReconcilers(ctx context.Context, k8sManager controllerManager, operatorConfig *config.OperatorConfig) error {
+func configureReconcilers(ctx context.Context, k8sManager controllerManager, operatorConfig *operatorconfig.OperatorConfig) error {
 	var recorder eventRecorder = k8sManager.GetEventRecorderFor("k8s-backup-operator")
 
 	k8sClient, err := client.NewWithWatch(k8sManager.GetConfig(), client.Options{Scheme: scheme})
@@ -295,21 +295,21 @@ func configureReconcilers(ctx context.Context, k8sManager controllerManager, ope
 	return nil
 }
 
-func configureBackupReconcilers(k8sManager controllerManager, recorder eventRecorder, operatorConfig *config.OperatorConfig) error {
+func configureBackupReconcilers(k8sManager controllerManager, recorder eventRecorder, operatorConfig *operatorconfig.OperatorConfig) error {
 	k8sClient := k8sManager.GetClient()
 	maintenanceModeAdapter := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, operatorConfig.Namespace)
-	maintenanceGateway := backup2.NewMaintenanceGateway(maintenanceModeAdapter)
-	backupReconciler := backup2.NewReconciler(k8sClient, recorder, maintenanceGateway, &operatortime.Clock{}, operatorConfig.BackupStorageName)
+	maintenanceGateway := backupcontroller.NewMaintenanceGateway(maintenanceModeAdapter)
+	backupReconciler := backupcontroller.NewReconciler(k8sClient, recorder, maintenanceGateway, &operatortime.Clock{}, operatorConfig.BackupStorageName)
 
 	requeueAfter := time.Duration(operatorConfig.RequeueTimeSeconds) * time.Second
-	backupController := backup2.NewController(k8sClient, backupReconciler, requeueAfter)
+	backupController := backupcontroller.NewController(k8sClient, backupReconciler, requeueAfter)
 	err := backupController.SetupWithManager(k8sManager)
 	if err != nil {
 		return fmt.Errorf("error setting up backup controller with manager: %w", err)
 	}
 
-	veleroBackupReconciler := backup2.NewVeleroBackupReconciler(k8sClient)
-	veleroBackupController := backup2.NewVeleroBackupController(k8sClient, veleroBackupReconciler)
+	veleroBackupReconciler := backupcontroller.NewVeleroBackupReconciler(k8sClient)
+	veleroBackupController := backupcontroller.NewVeleroBackupController(k8sClient, veleroBackupReconciler)
 	err = veleroBackupController.SetupWithManager(k8sManager)
 	if err != nil {
 		return fmt.Errorf("error setting up velero backup controller with manager: %w", err)
@@ -318,7 +318,7 @@ func configureBackupReconcilers(k8sManager controllerManager, recorder eventReco
 	return nil
 }
 
-func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.WithWatch, recorder eventRecorder, operatorConfig *config.OperatorConfig) error {
+func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.WithWatch, recorder eventRecorder, operatorConfig *operatorconfig.OperatorConfig) error {
 	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create dogu client: %w", err)
@@ -348,14 +348,14 @@ func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.W
 	return nil
 }
 
-func configureBackupScheduleReconciler(ctx context.Context, k8sManager controllerManager, k8sClient client.WithWatch, recorder eventRecorder, operatorConfig *config.OperatorConfig) error {
+func configureBackupScheduleReconciler(ctx context.Context, k8sManager controllerManager, k8sClient client.WithWatch, recorder eventRecorder, operatorConfig *operatorconfig.OperatorConfig) error {
 	k8sClientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create k8s clientset: %w", err)
 	}
 
 	imageGetter := newAdditionalImageGetter(k8sClientSet, operatorConfig.Namespace)
-	operatorImage, err := imageGetter.ImageForKey(ctx, config.OperatorImageConfigmapNameKey)
+	operatorImage, err := imageGetter.ImageForKey(ctx, operatorconfig.OperatorImageConfigmapNameKey)
 	if err != nil {
 		return fmt.Errorf("failed to get operator image: %w", err)
 	}

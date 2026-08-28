@@ -7,8 +7,8 @@ import (
 
 	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
-	"github.com/cloudogu/k8s-backup-operator/pkg/garbagecollection"
-	"github.com/cloudogu/k8s-backup-operator/pkg/scheduledbackup"
+	"github.com/cloudogu/k8s-backup-operator/internal/garbagecollection"
+	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
