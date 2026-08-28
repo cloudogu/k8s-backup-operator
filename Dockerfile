@@ -11,7 +11,10 @@ COPY go.sum go.sum
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
 
-# Copy the Go source (relies on .dockerignore to filter)
+# Copy the Go source. These are the only directories holding buildable Go code;
+# they are listed explicitly instead of `COPY . .` so that no unrelated files
+# (e.g. vendor/) end up in the build context. Add new top-level Go directories here.
+# .dockerignore additionally filters out *_test.go.
 COPY cmd/ cmd/
 COPY internal/ internal/
 
