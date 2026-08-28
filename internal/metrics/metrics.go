@@ -94,12 +94,12 @@ func UpdateBackupStatusMetrics(namespace, name, newStatus string) {
 // InitBackupStatusMetrics initializes the metrics for a backup resource
 func InitBackupStatusMetrics(namespace, name string) {
 	// all status values need to be initialized to 0 to monitor status increases
-	backupStatuses := []string{v1.BackupStatusInProgress, v1.BackupStatusCompleted, v1.BackupStatusFailed, v1.BackupStatusDeleting}
+	backupStatuses := []string{v1.BackupStatusInProgress, v1.BackupStatusCompleted, v1.BackupStatusFailed, v1.BackupStatusDeleting} //nolint:staticcheck // legacy restore status compatibility
 	for _, status := range backupStatuses {
 		BackupStatusTransitionsTotal.WithLabelValues(namespace, name, status).Add(0)
 	}
 
-	UpdateBackupStatusMetrics(namespace, name, v1.BackupStatusNew)
+	UpdateBackupStatusMetrics(namespace, name, v1.BackupStatusNew) //nolint:staticcheck // legacy restore status compatibility
 }
 
 // InitBackupConditionTransitionMetrics initializes every possible status transition for all backup conditions.
