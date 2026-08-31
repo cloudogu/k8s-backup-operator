@@ -30,6 +30,12 @@ type conditionTransition struct {
 	to            metav1.ConditionStatus
 }
 
+type conditionUpdateResult struct {
+	restore      *k8sv1.Restore
+	transitions  []conditionTransition
+	legacyStatus string
+}
+
 func newConditionUpdater(client restoreStatusClient) *conditionUpdater {
 	return &conditionUpdater{client: client}
 }
@@ -37,27 +43,24 @@ func newConditionUpdater(client restoreStatusClient) *conditionUpdater {
 // setConditions applies the given conditions to the Restore status, writes the deprecated
 // scalar status for consumers that have not migrated yet, and persists the result.
 func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Restore, conditions ...metav1.Condition) (*k8sv1.Restore, error) {
+	result, err := u.persistConditions(ctx, restore, conditions)
+	if err != nil {
+		return restore, fmt.Errorf("failed to update status of restore %q: %w", restore.Name, err)
+	}
 
+	recordConditionUpdateMetrics(result)
+	return result.restore, nil
+}
+
+func (u *conditionUpdater) persistConditions(
+	ctx context.Context,
+	restore *k8sv1.Restore,
+	conditions []metav1.Condition,
+) (conditionUpdateResult, error) {
 	current := restore
-	result := restore
-
-	var persistedTransitions []conditionTransition
-	var persistedLegacyStatus = ""
-
+	result := conditionUpdateResult{restore: restore}
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		persistedTransitions = nil
-
-		desired := current.DeepCopy()
-		transitions := applyConditions(desired, conditions)
-		legacyStatusChanged := current.Status.Status != desired.Status.Status
-
-		if apiequality.Semantic.DeepEqual(current.Status, desired.Status) {
-			result = current
-
-			return nil
-		}
-
-		updateErr := u.client.Status().Update(ctx, desired)
+		updated, updateErr := u.tryPersistConditions(ctx, current, conditions)
 		if apierrors.IsConflict(updateErr) {
 			refreshed := &k8sv1.Restore{}
 			if getErr := u.client.Get(ctx, client.ObjectKeyFromObject(restore), refreshed); getErr != nil {
@@ -70,42 +73,57 @@ func (u *conditionUpdater) setConditions(ctx context.Context, restore *k8sv1.Res
 		if updateErr != nil {
 			return updateErr
 		}
-
-		// only count transition of successful update
-		persistedTransitions = transitions
-		if legacyStatusChanged {
-			persistedLegacyStatus = desired.Status.Status
-		}
-		// The client updated desired in place, so it now carries the persisted resource version.
-		result = desired
-
+		result = updated
 		return nil
 	})
-	if err != nil {
-		return restore, fmt.Errorf("failed to update status of restore %q: %w", restore.Name, err)
+	return result, err
+}
+
+func (u *conditionUpdater) tryPersistConditions(
+	ctx context.Context,
+	current *k8sv1.Restore,
+	conditions []metav1.Condition,
+) (conditionUpdateResult, error) {
+	desired := current.DeepCopy()
+	transitions := applyConditions(desired, conditions)
+	legacyStatusChanged := current.Status.Status != desired.Status.Status
+
+	if apiequality.Semantic.DeepEqual(current.Status, desired.Status) {
+		return conditionUpdateResult{restore: current}, nil
+	}
+	if err := u.client.Status().Update(ctx, desired); err != nil {
+		return conditionUpdateResult{}, err
 	}
 
-	// Update metrics
-	for _, transition := range persistedTransitions {
+	result := conditionUpdateResult{
+		restore:     desired,
+		transitions: transitions,
+	}
+	if legacyStatusChanged {
+		result.legacyStatus = desired.Status.Status
+	}
+	return result, nil
+}
+
+func recordConditionUpdateMetrics(result conditionUpdateResult) {
+	for _, transition := range result.transitions {
 		metrics.UpdateRestoreConditionTransitionMetric(
-			result.Namespace,
-			result.Name,
-			result.Spec.BackupName,
+			result.restore.Namespace,
+			result.restore.Name,
+			result.restore.Spec.BackupName,
 			transition.conditionType,
 			string(transition.from),
 			string(transition.to),
 		)
 	}
-	if persistedLegacyStatus != "" {
+	if result.legacyStatus != "" {
 		metrics.UpdateRestoreStatusMetrics(
-			result.Namespace,
-			result.Name,
-			result.Spec.BackupName,
-			persistedLegacyStatus,
+			result.restore.Namespace,
+			result.restore.Name,
+			result.restore.Spec.BackupName,
+			result.legacyStatus,
 		)
 	}
-
-	return result, nil
 }
 
 // setConditionsFromLegacyStatus persists the Succeeded condition derived from the deprecated
