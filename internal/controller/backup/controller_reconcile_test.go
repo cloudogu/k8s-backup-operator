@@ -154,7 +154,7 @@ func TestControllerReconcile(t *testing.T) {
 		assert.Equal(t, ctrl.Result{}, result)
 	})
 
-	t.Run("retry while synchronizing the provider backup status", func(t *testing.T) {
+	t.Run("a failure while synchronizing the provider backup status reports the error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		backup.Spec.SyncedFromProvider = true
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
@@ -168,10 +168,10 @@ func TestControllerReconcile(t *testing.T) {
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
 
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, result)
+		assert.Equal(t, ctrl.Result{}, result)
 	})
 
-	t.Run("a retrying stage stops the pipeline and requeues", func(t *testing.T) {
+	t.Run("a failing stage stops the pipeline and reports the error", func(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything).
@@ -181,7 +181,7 @@ func TestControllerReconcile(t *testing.T) {
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
 
 		assert.Equal(t, assert.AnError, err)
-		assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, result)
+		assert.Equal(t, ctrl.Result{}, result)
 	})
 
 	t.Run("an aborting stage stops the pipeline without requeueing", func(t *testing.T) {

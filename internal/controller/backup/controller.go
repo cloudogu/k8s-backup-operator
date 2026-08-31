@@ -91,17 +91,44 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	metrics.InitBackupStatusMetrics(backup.Namespace, backup.Name)
 	metrics.InitInvalidLeaseTotalMetric(backup.Namespace, backup.Name)
 
-	for _, ensure := range c.getStagesForOperation(requiredOperation(&backup)) {
-		nextAction, err := ensure(ctx, &backup)
-		switch nextAction {
-		case Retry:
-			return ctrl.Result{RequeueAfter: c.requeueAfter}, err
-		case Abort:
-			return ctrl.Result{}, err
-		}
+	return runStages(ctx, &backup, c.requeueAfter, c.asStages(c.getStagesForOperation(requiredOperation(&backup)))...)
+}
+
+// asStages adapts the stages that still speak the old (action, error) vocabulary to the stage
+// engine, so they can be migrated one by one. It disappears with the last ensureFunction.
+func (c *Controller) asStages(ensureFunctions []ensureFunction) []stage {
+	stages := make([]stage, 0, len(ensureFunctions))
+	for _, ensure := range ensureFunctions {
+		stages = append(stages, c.asStage(ensure))
 	}
 
-	return ctrl.Result{}, nil
+	return stages
+}
+
+// asStage translates one ensureFunction into a stage. The ensureFunctions mutate the Backup they are
+// given, so the stage hands the very same object back.
+func (c *Controller) asStage(ensure ensureFunction) stage {
+	return func(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
+		nextAction, err := ensure(ctx, backup)
+
+		switch nextAction {
+		case Retry:
+			// Error always wins
+			if err != nil {
+				return backup, retryOnError(err)
+			}
+
+			return backup, retryAfter(c.requeueAfter)
+		case Abort:
+			if err != nil {
+				return backup, retryOnError(err)
+			}
+
+			return backup, abort()
+		default: // Next
+			return backup, next()
+		}
+	}
 }
 
 func (c *Controller) getStagesForOperation(op operation) []ensureFunction {
