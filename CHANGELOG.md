@@ -5,8 +5,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- [#119, #125, #129] Add detailed status conditions and Kubernetes events for `Backup`, `Restore`, and
+  `BackupSchedule` resources, as well as condition transition metrics for backups and restores. The legacy backup and
+  restore status fields continue to be updated for compatibility.
+- [#119, #129] Coordinate backup and restore operations within a namespace. If another operation is already running,
+  subsequent operations wait instead of modifying the EcoSystem at the same time.
+
 ### Changed
-- [#119] changed the repository structure to comply with server recommendations ([see here](https://go.dev/doc/modules/layout#server-project)) and reduce unnecessary public visibility of packages.
+- [#119, #129] Rework backup and restore handling into non-blocking, idempotent reconciliation workflows.
+  - Progress is persisted on the custom resources and the actual cluster and provider state is verified before each
+    step.
+  - Interrupted operations can continue after an operator restart, crash, temporary error, or missed event without
+    starting the entire operation again.
+  - Creation, provider observation, workload recovery, finalization, and deletion are reconciled independently. A
+    successful result is reported only after the corresponding cleanup and recovery steps have completed.
+- [#129] Report a restore as successful only after the additional workloads, that are managed during the restore have
+  returned to their desired replica counts and become ready.
+- [#119] Continuously synchronize `Backup` resources with their Velero counterparts, including corresponding
+  deletions.
+- [#125] Continuously reconcile the `CronJob` managed by a `BackupSchedule`, restoring its configured schedule,
+  operator image, labels, owner reference, and image pull secrets if they drift.
+- [#119] Change the repository structure to follow the
+  [recommended Go server project layout](https://go.dev/doc/modules/layout#server-project) and reduce unnecessary
+  public visibility of packages.
 
 ## [v3.3.4] - 2026-07-24
 ### Added
