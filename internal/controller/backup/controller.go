@@ -27,11 +27,11 @@ type reconciler interface {
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureOrphanedBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
+	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
+	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
+	ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
+	ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (action, error)
@@ -91,18 +91,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	metrics.InitBackupStatusMetrics(backup.Namespace, backup.Name)
 	metrics.InitInvalidLeaseTotalMetric(backup.Namespace, backup.Name)
 
-	return runStages(ctx, &backup, c.requeueAfter, c.asStages(c.getStagesForOperation(requiredOperation(&backup)))...)
-}
-
-// asStages adapts the stages that still speak the old (action, error) vocabulary to the stage
-// engine, so they can be migrated one by one. It disappears with the last ensureFunction.
-func (c *Controller) asStages(ensureFunctions []ensureFunction) []stage {
-	stages := make([]stage, 0, len(ensureFunctions))
-	for _, ensure := range ensureFunctions {
-		stages = append(stages, c.asStage(ensure))
-	}
-
-	return stages
+	return runStages(ctx, &backup, c.requeueAfter, c.getStagesForOperation(requiredOperation(&backup))...)
 }
 
 // asStage translates one ensureFunction into a stage. The ensureFunctions mutate the Backup they are
@@ -131,48 +120,51 @@ func (c *Controller) asStage(ensure ensureFunction) stage {
 	}
 }
 
-func (c *Controller) getStagesForOperation(op operation) []ensureFunction {
+// getStagesForOperation returns the stages this reconciliation has to run, in order. Stages still
+// wrapped in c.asStage speak the old (action, error) vocabulary; the wrapper disappears with the last
+// of them.
+func (c *Controller) getStagesForOperation(op operation) []stage {
 	switch op {
 	case operationDelete:
 		// MaintenanceModeDeactivation needs lease, so comes first. Lease second, because
 		// after ensureProviderBackupDeleted there is no backup anymore to release the lease on.
 		return append(c.cleanupStages(),
-			c.reconciler.ensureProviderBackupDeleted,
+			c.asStage(c.reconciler.ensureProviderBackupDeleted),
 		)
 	case operationIgnore:
 		// Succeeded is written only after cleanup, so a terminal backup has no work left but to
 		// verify that the provider backup it mirrors is still there.
-		return []ensureFunction{
-			c.reconciler.ensureOrphanedBackupDeleted,
+		return []stage{
+			c.asStage(c.reconciler.ensureOrphanedBackupDeleted),
 		}
 	case operationFinalize:
 		return c.finalizeStages()
 	default: // operationCreate
-		return append([]ensureFunction{
-			c.reconciler.ensureVeleroStatusSynced,
+		return append([]stage{
+			c.asStage(c.reconciler.ensureVeleroStatusSynced),
 			c.reconciler.ensureBackupSetup,
 			c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired,
 			c.reconciler.ensureBackupIsPrepared,
 			c.reconciler.ensureActiveBackupLease,
 			c.reconciler.ensureMaintenanceActivated,
-			c.reconciler.ensureProviderBackupCreated,
-			c.reconciler.ensureProviderBackupCompleted,
+			c.asStage(c.reconciler.ensureProviderBackupCreated),
+			c.asStage(c.reconciler.ensureProviderBackupCompleted),
 		}, c.finalizeStages()...)
 	}
 }
 
 // finalizeStages post-process a finished backup run
-func (c *Controller) finalizeStages() []ensureFunction {
+func (c *Controller) finalizeStages() []stage {
 	return append(c.cleanupStages(),
-		c.reconciler.ensureBackupRunCompleted,
+		c.asStage(c.reconciler.ensureBackupRunCompleted),
 	)
 }
 
 // cleanupStages returns resources owned by an active backup run in release order.
-func (c *Controller) cleanupStages() []ensureFunction {
-	return []ensureFunction{
-		c.reconciler.ensureMaintenanceDeactivated,
-		c.reconciler.ensureBackupLeaseReleased,
+func (c *Controller) cleanupStages() []stage {
+	return []stage{
+		c.asStage(c.reconciler.ensureMaintenanceDeactivated),
+		c.asStage(c.reconciler.ensureBackupLeaseReleased),
 	}
 }
 

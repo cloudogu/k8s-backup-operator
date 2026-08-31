@@ -33,10 +33,10 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(time.Duration(timeLimitInMinutes)*time.Minute - time.Millisecond))
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 
 		canceledCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
 		assert.NotNil(t, canceledCondition)
@@ -65,10 +65,10 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 
 		require.True(t, backup.Status.StartTimestamp.IsZero())
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		canceledCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
 		assert.NotNil(t, canceledCondition)
@@ -97,10 +97,10 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 
 		canceledCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
 		assert.NotNil(t, canceledCondition)
@@ -130,10 +130,10 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		canceledCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
 		assert.NotNil(t, canceledCondition)
@@ -162,10 +162,10 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		canceledCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
 		assert.NotNil(t, canceledCondition)
@@ -195,10 +195,10 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
 
-		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 
 		canceledCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
 		assert.NotNil(t, canceledCondition)

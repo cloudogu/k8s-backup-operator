@@ -30,8 +30,13 @@ func next() stageOutcome {
 	return stageOutcome{action: actionNext}
 }
 
-// retryAfter ends the reconciliation and asks for another one after the given delay. A delay that is
-// not usable falls back to the controller's requeue delay in result.
+// retry ends the reconciliation and asks for another one at the controller's requeue cadence
+func retry() stageOutcome {
+	return stageOutcome{action: actionRetry}
+}
+
+// retryAfter ends the reconciliation and asks for another one after the given delay.
+// A delay that is not usable falls back to the controller's requeue delay in result.
 func retryAfter(delay time.Duration) stageOutcome {
 	return stageOutcome{action: actionRetry, requeueAfter: delay}
 }

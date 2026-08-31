@@ -16,38 +16,38 @@ import (
 
 const backupLeaseHolderKind = "Backup"
 
-func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
 	result, err := manager.Acquire(ctx, backup, backupLeaseHolderKind)
 	return c.backupLeaseAction(ctx, backup, result, err)
 }
 
-func (c *defaultReconciler) backupLeaseAction(ctx context.Context, backup *backupv1.Backup, result leases.Result, err error) (action, error) {
+func (c *defaultReconciler) backupLeaseAction(ctx context.Context, backup *backupv1.Backup, result leases.Result, err error) (*backupv1.Backup, stageOutcome) {
 	if err != nil {
-		return Abort, fmt.Errorf("acquire backup lease for backup %s: %w", backup.Name, err)
+		return backup, retryOnError(fmt.Errorf("acquire backup lease for backup %s: %w", backup.Name, err))
 	}
 	switch result.State {
 	case leases.StateHeld:
 		logging.Debug(ctx, "ensureActiveBackupLease: backup lease is held -> NEXT")
-		return Next, nil
+		return backup, next()
 	case leases.StateAcquired:
 		logging.Info(ctx, "acquired the backup lease", "lease", leases.DefaultName)
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the acquired backup lease must be observed again")
 		c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupStarted, "The backup has started")
-		return Retry, nil
+		return backup, retry()
 	case leases.StateConflict:
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the backup lease was modified concurrently")
-		return Retry, nil
+		return backup, retry()
 	case leases.StateWaiting:
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "another operation still holds the backup lease", "holder", result.HolderName)
-		return Retry, nil
+		return backup, retry()
 	case leases.StateInvalid:
 		metrics.UpdateInvalidLeaseTotalMetric(backup.Namespace, backup.Name)
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Acquiring the backup lease failed")
-		return Abort, fmt.Errorf("backup %s is blocked by invalid lease %s/%s without a resolvable holder", backup.Name, backup.Namespace, leases.DefaultName)
+		return backup, retryOnError(fmt.Errorf("backup %s is blocked by invalid lease %s/%s without a resolvable holder", backup.Name, backup.Namespace, leases.DefaultName))
 	default:
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Acquiring the backup lease failed with unknown state")
-		return Abort, fmt.Errorf("unknown backup lease acquisition state %d", result.State)
+		return backup, retryOnError(fmt.Errorf("unknown backup lease acquisition state %d", result.State))
 	}
 }
 

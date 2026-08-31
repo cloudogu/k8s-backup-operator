@@ -20,10 +20,10 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 			Return(true, nil)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 	})
 
 	t.Run("If the maintenance mode is not active, activate it, set succeeded to unknown and retry", func(t *testing.T) {
@@ -42,10 +42,10 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 			Return(nil)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		assert.NotNil(t, succeededCondition)
@@ -65,10 +65,10 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 			Return(false, assert.AnError)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If activation of maintenance mode failed, then abort", func(t *testing.T) {
@@ -83,10 +83,10 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 			Return(assert.AnError)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 }

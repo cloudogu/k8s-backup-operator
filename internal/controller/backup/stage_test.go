@@ -36,7 +36,12 @@ func TestStageOutcomeNeverCombinesAnErrorWithAnExplicitRequeue(t *testing.T) {
 			wantResult: ctrl.Result{},
 		},
 		{
-			name:       "controlled retry requeues after the given delay",
+			name:       "controlled retry requeues at the controller's cadence",
+			outcome:    retry(),
+			wantResult: ctrl.Result{RequeueAfter: stageTestRequeueDelay},
+		},
+		{
+			name:       "a domain delay requeues after that delay",
 			outcome:    retryAfter(30 * time.Second),
 			wantResult: ctrl.Result{RequeueAfter: 30 * time.Second},
 		},
@@ -63,6 +68,7 @@ func TestStageOutcomeNeverCombinesAnErrorWithAnExplicitRequeue(t *testing.T) {
 
 func TestStageOutcomeCannotSilentlyDropARetry(t *testing.T) {
 	tests := map[string]stageOutcome{
+		"no delay":       retry(),
 		"zero delay":     retryAfter(0),
 		"negative delay": retryAfter(-time.Minute),
 		"nil error":      retryOnError(nil),

@@ -26,9 +26,9 @@ func TestBackupLease(t *testing.T) {
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup).Build()
 		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
-		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		_, outcome := reconciler.ensureActiveBackupLease(ctx, backup)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		lease := &coordinationv1.Lease{}
 		require.NoError(t, k8sClient.Get(ctx, client.ObjectKey{Namespace: backup.Namespace, Name: leases.DefaultName}, lease))
@@ -37,9 +37,9 @@ func TestBackupLease(t *testing.T) {
 		assert.Equal(t, backup.Name, lease.Annotations[leases.HolderNameAnnotation])
 		assert.Equal(t, backupLeaseHolderKind, lease.Annotations[leases.HolderKindAnnotation])
 
-		nextAction, err = reconciler.ensureActiveBackupLease(ctx, backup)
-		require.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		_, outcome = reconciler.ensureActiveBackupLease(ctx, backup)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 	})
 
 	t.Run("waits for a restore holding the same lease", func(t *testing.T) {
@@ -52,9 +52,9 @@ func TestBackupLease(t *testing.T) {
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup, lease).Build()
 		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
-		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		_, outcome := reconciler.ensureActiveBackupLease(ctx, backup)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		stored := &coordinationv1.Lease{}
 		require.NoError(t, k8sClient.Get(ctx, client.ObjectKeyFromObject(lease), stored))
@@ -71,10 +71,10 @@ func TestBackupLease(t *testing.T) {
 		k8sClient := newFakeClientBuilder(t).WithObjects(canceledBackup, waitingBackup, lease).Build()
 		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureActiveBackupLease(ctx, waitingBackup)
+		_, outcome := reconciler.ensureActiveBackupLease(ctx, waitingBackup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 		stored := &coordinationv1.Lease{}
 		require.NoError(t, k8sClient.Get(ctx, client.ObjectKeyFromObject(lease), stored))
 		assert.True(t, leases.IsHolder(stored, canceledBackup, backupLeaseHolderKind))
@@ -87,10 +87,10 @@ func TestBackupLease(t *testing.T) {
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup, lease).Build()
 		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
+		_, outcome := reconciler.ensureActiveBackupLease(ctx, backup)
 
-		assert.Equal(t, Abort, nextAction)
-		require.ErrorContains(t, err, "blocked by invalid lease")
+		assert.Equal(t, actionRetry, outcome.action)
+		require.ErrorContains(t, outcome.err, "blocked by invalid lease")
 	})
 
 	t.Run("reports an error while acquiring the lease", func(t *testing.T) {
@@ -102,20 +102,20 @@ func TestBackupLease(t *testing.T) {
 		}).Build()
 		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
+		_, outcome := reconciler.ensureActiveBackupLease(ctx, backup)
 
-		assert.Equal(t, Abort, nextAction)
-		require.ErrorContains(t, err, "acquire backup lease")
+		assert.Equal(t, actionRetry, outcome.action)
+		require.ErrorContains(t, outcome.err, "acquire backup lease")
 	})
 
 	t.Run("rejects an unknown acquisition state", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		reconciler := NewReconciler(nil, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.backupLeaseAction(ctx, backup, leases.Result{State: leases.State(99)}, nil)
+		_, outcome := reconciler.backupLeaseAction(ctx, backup, leases.Result{State: leases.State(99)}, nil)
 
-		assert.Equal(t, Abort, nextAction)
-		require.ErrorContains(t, err, "unknown backup lease acquisition state 99")
+		assert.Equal(t, actionRetry, outcome.action)
+		require.ErrorContains(t, outcome.err, "unknown backup lease acquisition state 99")
 	})
 }
 

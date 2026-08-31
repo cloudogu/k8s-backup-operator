@@ -254,7 +254,7 @@ func (c *defaultReconciler) ensureOrphanedBackupDeleted(ctx context.Context, bac
 	return Retry, nil
 }
 
-func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	metadataChanged := mergeMissingOrChangedValues(&backup.Labels, defaultLabels)
 
 	var blueprintList = blueprintv3.BlueprintList{}
@@ -262,7 +262,7 @@ func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backu
 	// no blueprint or no clueprint crd
 	if err != nil {
 		if !errors.IsNotFoundError(err) && !meta.IsNoMatchError(err) {
-			return Abort, fmt.Errorf("list blueprints: %w", err)
+			return backup, retryOnError(fmt.Errorf("list blueprints: %w", err))
 		}
 		blueprintList.Items = nil
 	}
@@ -273,7 +273,7 @@ func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backu
 
 		dogusAsJson, jsonerr := json.Marshal(blueprint.Spec.Blueprint.Dogus)
 		if jsonerr != nil {
-			return Abort, fmt.Errorf("marshal blueprint dogus to json: %w", jsonerr)
+			return backup, retryOnError(fmt.Errorf("marshal blueprint dogus to json: %w", jsonerr))
 		}
 
 		annotation := map[string]string{
@@ -287,17 +287,17 @@ func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backu
 	metadataChanged = controllerutil.AddFinalizer(backup, backupv1.BackupFinalizer) || metadataChanged
 
 	if !metadataChanged {
-		return Next, nil
+		return backup, next()
 	}
 
 	// write backup
 	err = c.client.Update(ctx, backup)
 	if err != nil {
-		return Abort, fmt.Errorf("update backup to set labels, annotations and finalizer: %w", err)
+		return backup, retryOnError(fmt.Errorf("update backup to set labels, annotations and finalizer: %w", err))
 	}
 
 	logging.Info(ctx, "persisted backup labels, annotations and finalizer")
-	return Next, nil
+	return backup, next()
 }
 
 func mergeMissingOrChangedValues(target *map[string]string, desired map[string]string) bool {
@@ -317,10 +317,10 @@ func mergeMissingOrChangedValues(target *map[string]string, desired map[string]s
 	return changed
 }
 
-func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	timeWindowHasExpired, err := c.hasTimeWindowExpired(ctx, backup)
 	if err != nil {
-		return Abort, err
+		return backup, retryOnError(err)
 	}
 
 	if !timeWindowHasExpired {
@@ -335,9 +335,9 @@ func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx con
 			})
 		})
 		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window not expired'")
+			return backup, retryOnError(fmt.Errorf("patch status to mark the canceled condition as 'time window not expired'"))
 		}
-		return Next, nil
+		return backup, next()
 	}
 
 	backupHasNotStarted := backup.Status.StartTimestamp.IsZero()
@@ -349,10 +349,10 @@ func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx con
 
 }
 
-func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	readiness, err := veleroprovider.CheckReady(ctx, c.client, backup.Namespace, c.backupStorageName)
 	if err != nil {
-		return Abort, err
+		return backup, retryOnError(err)
 	}
 
 	prepared := metav1.Condition{
@@ -370,7 +370,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		meta.SetStatusCondition(&status.Conditions, prepared)
 	})
 	if patchErr != nil {
-		return Abort, fmt.Errorf("patch conditions to report the provider readiness: %w", patchErr)
+		return backup, retryOnError(fmt.Errorf("patch conditions to report the provider readiness: %w", patchErr))
 	}
 
 	if !readiness.Ready {
@@ -385,26 +385,26 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 			c.recorder.Event(backup, corev1.EventTypeWarning, readiness.Reason, readiness.Message)
 		}
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider is not ready")
-		return Retry, nil
+		return backup, retry()
 	}
 
 	logging.Debug(ctx, "ensureBackupIsPrepared: the provider is ready -> Prepared = True, NEXT")
 	if reportPrepared {
 		logging.Info(ctx, "backup prepared", "backupStorageLocation", c.backupStorageName)
 	}
-	return Next, nil
+	return backup, next()
 }
 
-func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	isActive, err := c.maintenanceGateway.isMaintenanceModeActive(ctx)
 	if err != nil {
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesStatusFailed, "Failed to get maintenance mode status")
-		return Abort, fmt.Errorf("check if maintenance is active: %w", err)
+		return backup, retryOnError(fmt.Errorf("check if maintenance is active: %w", err))
 	}
 
 	if isActive {
 		logging.Debug(ctx, "ensureMaintenanceActivated: is active -> NEXT")
-		return Next, nil
+		return backup, next()
 	}
 
 	logging.Debug(ctx, "ensureMaintenanceActivated: maintenance mode is not active -> activate it; RETRY")
@@ -412,7 +412,7 @@ func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, back
 	maintenanceErr := c.maintenanceGateway.activateMaintenanceMode(ctx, maintenanceModeTitle, maintenanceModeText)
 	if maintenanceErr != nil {
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesActivationFailed, "Maintenance mode activation has failed")
-		return Abort, fmt.Errorf("activate maintenance mode: %w", maintenanceErr)
+		return backup, retryOnError(fmt.Errorf("activate maintenance mode: %w", maintenanceErr))
 	}
 	logging.Info(ctx, "activated maintenance mode")
 
@@ -425,11 +425,11 @@ func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, back
 		})
 	})
 	if patchErr != nil {
-		return Abort, fmt.Errorf("patch status to mark the complete condition as failed: %w", patchErr)
+		return backup, retryOnError(fmt.Errorf("patch status to mark the complete condition as failed: %w", patchErr))
 	}
 	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the maintenance mode was activated")
 	c.recorder.Event(backup, corev1.EventTypeNormal, reasonMaintenanceModesActivation, "Maintenance mode was activated")
-	return Retry, nil
+	return backup, retry()
 }
 
 func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup) (action, error) {
@@ -718,7 +718,7 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 	return nextAction, nil
 }
 
-func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup has not started -> Canceled = True, RETRY")
 
 	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
@@ -730,20 +730,20 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.
 		})
 	})
 	if patchErr != nil {
-		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window not expired'")
+		return backup, retryOnError(fmt.Errorf("patch status to mark the canceled condition as 'time window not expired'"))
 	}
 	logging.Info(ctx, "canceled the backup", "reason", "the time window expired before the backup started")
 	c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupNotStarted, "The backup is being canceled - time window expired")
 	// Canceled = True routes the next pass to operationFinalize, which writes the terminal Succeeded
 	// condition and closes the run -> Retry
 	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the canceled backup run must be finalized")
-	return Retry, nil
+	return backup, retry()
 }
 
-func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	veleroBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
 	if err != nil {
-		return Abort, fmt.Errorf("get velero backup: %w", err)
+		return backup, retryOnError(fmt.Errorf("get velero backup: %w", err))
 	}
 
 	// A not available Velero, but available CRD will lead to a CR without a status.
@@ -762,13 +762,13 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 			})
 		})
 		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and provider backup is missing'")
+			return backup, retryOnError(fmt.Errorf("patch status to mark the canceled condition as 'time window expired and provider backup is missing'"))
 		}
 
 		logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup no longer exists or was not touched once")
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredProviderBackupMissing, "Provider backup no longer existed or was not touched once when the time window expired")
 		// Retry for finalize
-		return Retry, nil
+		return backup, retry()
 	}
 
 	logging.Debug(ctx,
@@ -790,10 +790,10 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 			})
 		})
 		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'")
+			return backup, retryOnError(fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'"))
 		}
 		c.recorder.Event(backup, corev1.EventTypeNormal, reasonTimeWindowExpiredBackupInProgress, "The backup was running when the time window expired -> Continue")
-		return Next, nil
+		return backup, next()
 	}
 
 	if hasProviderBackupFailed(veleroBackup) {
@@ -808,7 +808,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 			})
 		})
 		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup has failed'")
+			return backup, retryOnError(fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup has failed'"))
 		}
 
 		logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup had failed", "phase", veleroBackup.Status.Phase)
@@ -817,7 +817,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 		// next pass to operationFinalize, which deactivates the maintenance mode, releases the lease
 		// and writes the terminal Succeeded condition. -> Retry
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the canceled backup run must be finalized")
-		return Retry, nil
+		return backup, retry()
 	}
 
 	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
@@ -829,10 +829,10 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 		})
 	})
 	if patchErr != nil {
-		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup has succeeded'")
+		return backup, retryOnError(fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup has succeeded'"))
 	}
 
-	return Next, nil
+	return backup, next()
 }
 
 func (c *defaultReconciler) hasTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (bool, error) {

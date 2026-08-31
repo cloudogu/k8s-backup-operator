@@ -24,10 +24,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
@@ -47,10 +47,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
@@ -70,10 +70,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
@@ -92,13 +92,13 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		recorder := record.NewFakeRecorder(100)
 		reconciler := NewReconciler(fakeClient, recorder, nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		_, outcome := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 		// second call to verify only one report
-		nextAction, err = reconciler.ensureBackupIsPrepared(context.Background(), backup)
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		_, outcome = reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		require.Len(t, recorder.Events, 1, "the unchanged provider state must be reported only once")
 		assert.Contains(t, <-recorder.Events, veleroprovider.ReasonVeleroBackupStorageLocationNotFound)
@@ -115,10 +115,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If the velero backup storage is unavailable and a patch error occurred then abort", func(t *testing.T) {
@@ -133,10 +133,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If the velero backup storage is available and a patch error occurred then abort", func(t *testing.T) {
@@ -151,10 +151,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If the velero backup storage resource was not found and a patch error occurred then abort", func(t *testing.T) {
@@ -168,10 +168,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 	})
 }

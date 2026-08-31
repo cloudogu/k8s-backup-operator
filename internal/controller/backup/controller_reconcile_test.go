@@ -175,7 +175,7 @@ func TestControllerReconcile(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything).
-			Return(Retry, assert.AnError)
+			Return(nil, retryOnError(assert.AnError))
 		allowRemainingStages(reconcilerMock)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -188,12 +188,12 @@ func TestControllerReconcile(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
 			ensureBackupIsPrepared(context.Background(), mock.Anything).
-			Return(Abort, assert.AnError)
+			Return(nil, abort())
 		allowRemainingStages(reconcilerMock)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
 
-		assert.Equal(t, assert.AnError, err)
+		assert.NoError(t, err)
 		assert.Equal(t, ctrl.Result{}, result)
 	})
 
@@ -201,7 +201,7 @@ func TestControllerReconcile(t *testing.T) {
 		reconcilerMock, controller := newTestFixtureForControllerTest(t)
 		reconcilerMock.EXPECT().
 			ensureMaintenanceActivated(context.Background(), mock.Anything).
-			Return(Retry, nil)
+			Return(nil, retry())
 		allowRemainingStages(reconcilerMock)
 
 		result, err := controller.Reconcile(context.Background(), newReconcilerRequest("ns", "backup"))
@@ -244,16 +244,23 @@ func recordStages(reconcilerMock *mockReconciler, executed *[]string) {
 		}
 	}
 
+	recordStage := func(name string) func(context.Context, *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
+		return func(_ context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
+			*executed = append(*executed, name)
+			return backup, next()
+		}
+	}
+
 	expecter := reconcilerMock.EXPECT()
 	expecter.ensureBackupLeaseReleased(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupLeaseReleased")).Maybe()
 	expecter.ensureProviderBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureProviderBackupDeleted")).Maybe()
 	expecter.ensureOrphanedBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureOrphanedBackupDeleted")).Maybe()
 	expecter.ensureVeleroStatusSynced(mock.Anything, mock.Anything).RunAndReturn(record("ensureVeleroStatusSynced")).Maybe()
-	expecter.ensureBackupSetup(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupSetup")).Maybe()
-	expecter.ensureBackupIsCanceledAfterTimeWindowExpired(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupIsCanceledAfterTimeWindowExpired")).Maybe()
-	expecter.ensureBackupIsPrepared(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupIsPrepared")).Maybe()
-	expecter.ensureActiveBackupLease(mock.Anything, mock.Anything).RunAndReturn(record("ensureActiveBackupLease")).Maybe()
-	expecter.ensureMaintenanceActivated(mock.Anything, mock.Anything).RunAndReturn(record("ensureMaintenanceActivated")).Maybe()
+	expecter.ensureBackupSetup(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureBackupSetup")).Maybe()
+	expecter.ensureBackupIsCanceledAfterTimeWindowExpired(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureBackupIsCanceledAfterTimeWindowExpired")).Maybe()
+	expecter.ensureBackupIsPrepared(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureBackupIsPrepared")).Maybe()
+	expecter.ensureActiveBackupLease(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureActiveBackupLease")).Maybe()
+	expecter.ensureMaintenanceActivated(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureMaintenanceActivated")).Maybe()
 	expecter.ensureProviderBackupCreated(mock.Anything, mock.Anything).RunAndReturn(record("ensureProviderBackupCreated")).Maybe()
 	expecter.ensureProviderBackupCompleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureProviderBackupCompleted")).Maybe()
 	expecter.ensureMaintenanceDeactivated(mock.Anything, mock.Anything).RunAndReturn(record("ensureMaintenanceDeactivated")).Maybe()

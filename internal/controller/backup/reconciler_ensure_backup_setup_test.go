@@ -25,13 +25,13 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		expectedLabels := map[string]string{}
 		maps.Copy(expectedLabels, defaultLabels)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		assert.True(t, reflect.DeepEqual(backup.Labels, expectedLabels))
 		assert.True(t, updateCalled)
 	})
@@ -47,14 +47,14 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupSetup(context.Background(), backup)
 
 		expectedLabels := map[string]string{}
 		maps.Copy(expectedLabels, backup.Labels)
 		maps.Copy(expectedLabels, defaultLabels)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		assert.True(t, reflect.DeepEqual(backup.Labels, expectedLabels))
 		assert.True(t, updateCalled)
 	})
@@ -66,10 +66,10 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupSetup(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 
 		expectedFinalizers := []string{backupv1.BackupFinalizer}
 		assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
@@ -86,10 +86,10 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupSetup(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 
 		expectedFinalizers := []string{backupv1.BackupFinalizer, "finalizer01", "finalizer02"}
 		assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
@@ -111,10 +111,10 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupSetup(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		assert.Equal(t, "blueprint-display-name", backup.Annotations[blueprintIdAnnotation])
 		assert.JSONEq(t, `[{"name": "dogu01"}, {"name": "dogu02"}]`, backup.Annotations[blueprintDogusAnnotation])
 		assert.True(t, updateCalled)
@@ -139,10 +139,10 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupSetup(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		assert.ElementsMatch(t,
 			[]string{"example.com/anno1", "example.com/anno2", blueprintIdAnnotation, blueprintDogusAnnotation},
 			slices.Collect(maps.Keys(backup.Annotations)),
@@ -168,10 +168,10 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupSetup(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		assert.False(t, updateCalled)
 	})
 
@@ -194,10 +194,10 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupSetup(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		assert.True(t, updateCalled)
 		assert.Equal(t, defaultLabels["app"], backup.Labels["app"])
 		assert.Equal(t, "blueprint-display-name", backup.Annotations[blueprintIdAnnotation])
@@ -224,10 +224,10 @@ func TestEnsureBackupSetup(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		_, outcome := reconciler.ensureBackupSetup(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		assert.True(t, updateCalled)
 		assert.Contains(t, backup.Finalizers, backupv1.BackupFinalizer)
 	})
