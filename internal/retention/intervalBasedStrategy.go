@@ -63,9 +63,10 @@ func filterByRetentionMode(intervalBackupMappings map[timeInterval][]v1.Backup, 
 	for interval, backups := range intervalBackupMappings {
 		var newRemoved, newRetained []v1.Backup
 
-		if interval.retentionMode == keepAllIntervalMode {
+		switch interval.retentionMode {
+		case keepAllIntervalMode:
 			newRemoved, newRetained = retainAllBackups(backups)
-		} else if interval.retentionMode == keepOldestIntervalMode {
+		case keepOldestIntervalMode:
 			newRemoved, newRetained = retainOldestBackup(backups)
 		}
 		removedBackups = append(removedBackups, newRemoved...)

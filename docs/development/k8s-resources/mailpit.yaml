@@ -14,6 +14,7 @@ spec:
       labels:
         app: mailpit
     spec:
+      automountServiceAccountToken: false # Sonar flagged this as a security risk
       containers:
         - name: mailpit
           image: axllent/mailpit:latest

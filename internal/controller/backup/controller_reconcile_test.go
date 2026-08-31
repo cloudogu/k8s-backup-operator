@@ -28,6 +28,7 @@ const requeueAfterTest = time.Duration(5) * time.Second
 func TestControllerReconcileStageOrder(t *testing.T) {
 	createStages := []string{
 		"ensureVeleroStatusSynced",
+		"ensureConditionsInitialized",
 		"ensureBackupSetup",
 		"ensureBackupIsCanceledAfterTimeWindowExpired",
 		"ensureBackupIsPrepared",
@@ -256,6 +257,7 @@ func recordStages(reconcilerMock *mockReconciler, executed *[]string) {
 	expecter.ensureProviderBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureProviderBackupDeleted")).Maybe()
 	expecter.ensureOrphanedBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureOrphanedBackupDeleted")).Maybe()
 	expecter.ensureVeleroStatusSynced(mock.Anything, mock.Anything).RunAndReturn(record("ensureVeleroStatusSynced")).Maybe()
+	expecter.ensureConditionsInitialized(mock.Anything, mock.Anything).RunAndReturn(record("ensureConditionsInitialized")).Maybe()
 	expecter.ensureBackupSetup(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureBackupSetup")).Maybe()
 	expecter.ensureBackupIsCanceledAfterTimeWindowExpired(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureBackupIsCanceledAfterTimeWindowExpired")).Maybe()
 	expecter.ensureBackupIsPrepared(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureBackupIsPrepared")).Maybe()

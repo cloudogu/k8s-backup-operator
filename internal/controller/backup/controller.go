@@ -27,6 +27,7 @@ type reconciler interface {
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureOrphanedBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureConditionsInitialized(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
@@ -142,6 +143,7 @@ func (c *Controller) getStagesForOperation(op operation) []stage {
 	default: // operationCreate
 		return append([]stage{
 			c.asStage(c.reconciler.ensureVeleroStatusSynced),
+			c.asStage(c.reconciler.ensureConditionsInitialized),
 			c.reconciler.ensureBackupSetup,
 			c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired,
 			c.reconciler.ensureBackupIsPrepared,
@@ -169,6 +171,10 @@ func (c *Controller) cleanupStages() []stage {
 }
 
 // SetupWithManager sets up the controller with the Manager.
+//
+// The event filter is deliberate: a Velero backup can already exist before
+// its Backup CR does, so the CR can never own it, and there are no owned children to watch. Provider
+// progress is therefore awaited by requeueing, not by events.
 func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		WithEventFilter(predicate.Or(

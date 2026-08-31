@@ -38,7 +38,7 @@ func TestConditionsUpdaterRecordsPersistedConditionStatusTransitions(t *testing.
 	)
 	assert.Equal(t, 1.0, testutil.ToFloat64(counter))
 	assert.Equal(t, 1.0, testutil.ToFloat64(metrics.BackupStatusTransitionsTotal.WithLabelValues(
-		backup.Namespace, backup.Name, backupv1.BackupStatusInProgress, // NOSONAR -- legacy backup status compatibility
+		backup.Namespace, backup.Name, backupv1.BackupStatusInProgress, //nolint:staticcheck // legacy backup status compatibility
 	)))
 }
 
@@ -63,7 +63,7 @@ func TestConditionsUpdaterDoesNotRecordNewOrUnchangedConditions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, testutil.CollectAndCount(metrics.BackupConditionTransitionsTotal))
 	assert.Equal(t, 1.0, testutil.ToFloat64(metrics.BackupStatusTransitionsTotal.WithLabelValues(
-		backup.Namespace, backup.Name, backupv1.BackupStatusInProgress, // NOSONAR -- legacy backup status compatibility
+		backup.Namespace, backup.Name, backupv1.BackupStatusInProgress, //nolint:staticcheck // legacy backup status compatibility
 	)))
 }
 
@@ -110,13 +110,13 @@ func TestLegacyBackupStatusFor(t *testing.T) {
 		current    string
 		expected   string
 	}{
-		{name: "preserves a status without conditions", current: backupv1.BackupStatusNew, expected: backupv1.BackupStatusNew},                                                                                                                                                         // NOSONAR -- legacy backup status compatibility
-		{name: "maps a non-terminal workflow condition to in progress", conditions: []metav1.Condition{{Type: backupv1.ConditionPrepared, Status: metav1.ConditionFalse}}, expected: backupv1.BackupStatusInProgress},                                                                  // NOSONAR -- legacy backup status compatibility
-		{name: "maps running provider backup to in progress", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionUnknown}}, expected: backupv1.BackupStatusInProgress},                                                                         // NOSONAR -- legacy backup status compatibility
-		{name: "maps successful provider backup to completed", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusCompleted},                                                                            // NOSONAR -- legacy backup status compatibility
-		{name: "maps failed provider backup to failed", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionFalse}}, expected: backupv1.BackupStatusFailed},                                                                                     // NOSONAR -- legacy backup status compatibility
-		{name: "maps canceled backup to failed", conditions: []metav1.Condition{{Type: backupv1.ConditionCanceled, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusFailed},                                                                                              // NOSONAR -- legacy backup status compatibility
-		{name: "maps deleting backup to deleting with highest priority", conditions: []metav1.Condition{{Type: backupv1.ConditionDeleting, Status: metav1.ConditionTrue}, {Type: backupv1.ConditionSucceeded, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusDeleting}, // NOSONAR -- legacy backup status compatibility
+		{name: "preserves a status without conditions", current: backupv1.BackupStatusNew, expected: backupv1.BackupStatusNew},                                                                                                                                                         //nolint:staticcheck // legacy backup status compatibility
+		{name: "maps a non-terminal workflow condition to in progress", conditions: []metav1.Condition{{Type: backupv1.ConditionPrepared, Status: metav1.ConditionFalse}}, expected: backupv1.BackupStatusInProgress},                                                                  //nolint:staticcheck // legacy backup status compatibility
+		{name: "maps running provider backup to in progress", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionUnknown}}, expected: backupv1.BackupStatusInProgress},                                                                         //nolint:staticcheck // legacy backup status compatibility
+		{name: "maps successful provider backup to completed", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusCompleted},                                                                            //nolint:staticcheck // legacy backup status compatibility
+		{name: "maps failed provider backup to failed", conditions: []metav1.Condition{{Type: backupv1.ConditionSucceeded, Status: metav1.ConditionFalse}}, expected: backupv1.BackupStatusFailed},                                                                                     //nolint:staticcheck // legacy backup status compatibility
+		{name: "maps canceled backup to failed", conditions: []metav1.Condition{{Type: backupv1.ConditionCanceled, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusFailed},                                                                                              //nolint:staticcheck // legacy backup status compatibility
+		{name: "maps deleting backup to deleting with highest priority", conditions: []metav1.Condition{{Type: backupv1.ConditionDeleting, Status: metav1.ConditionTrue}, {Type: backupv1.ConditionSucceeded, Status: metav1.ConditionTrue}}, expected: backupv1.BackupStatusDeleting}, //nolint:staticcheck // legacy backup status compatibility
 	}
 
 	for _, tt := range tests {
@@ -143,22 +143,22 @@ func TestConditionsUpdaterPersistsAndRecordsLegacyStatusTransitions(t *testing.T
 		})
 	})
 	require.NoError(t, err)
-	assert.Equal(t, backupv1.BackupStatusInProgress, backup.Status.Status) // NOSONAR -- legacy backup status compatibility
+	assert.Equal(t, backupv1.BackupStatusInProgress, backup.Status.Status) //nolint:staticcheck // legacy backup status compatibility
 
 	err = updater.updateStatus(context.Background(), backup, func(status *backupv1.BackupStatus) {
 		status.Conditions[0].Status = metav1.ConditionTrue
 	})
 	require.NoError(t, err)
-	assert.Equal(t, backupv1.BackupStatusCompleted, backup.Status.Status) // NOSONAR -- legacy backup status compatibility
+	assert.Equal(t, backupv1.BackupStatusCompleted, backup.Status.Status) //nolint:staticcheck // legacy backup status compatibility
 
 	stored := &backupv1.Backup{}
 	require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), stored))
-	assert.Equal(t, backupv1.BackupStatusCompleted, stored.Status.Status) // NOSONAR -- legacy backup status compatibility
+	assert.Equal(t, backupv1.BackupStatusCompleted, stored.Status.Status) //nolint:staticcheck // legacy backup status compatibility
 
 	assert.Equal(t, 1.0, testutil.ToFloat64(metrics.BackupStatusTransitionsTotal.WithLabelValues(
-		backup.Namespace, backup.Name, backupv1.BackupStatusInProgress, // NOSONAR -- legacy backup status compatibility
+		backup.Namespace, backup.Name, backupv1.BackupStatusInProgress, //nolint:staticcheck // legacy backup status compatibility
 	)))
 	assert.Equal(t, 1.0, testutil.ToFloat64(metrics.BackupStatusTransitionsTotal.WithLabelValues(
-		backup.Namespace, backup.Name, backupv1.BackupStatusCompleted, // NOSONAR -- legacy backup status compatibility
+		backup.Namespace, backup.Name, backupv1.BackupStatusCompleted, //nolint:staticcheck // legacy backup status compatibility
 	)))
 }

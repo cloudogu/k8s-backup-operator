@@ -8,12 +8,11 @@ import (
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 )
 
 const (
-	// ReasonPending marks a restore that has been observed but not yet started.
-	ReasonPending = "Pending"
 	// ReasonWaitingForActiveRestore marks a restore that must wait because another restore
 	// currently holds the namespace-wide restore arbitration.
 	ReasonWaitingForActiveRestore = "WaitingForActiveRestore"
@@ -85,35 +84,23 @@ const (
 	ReasonMaintenanceModeDeactivated = "MaintenanceModeDeactivated"
 )
 
-// workflowConditionTypes are the conditions every running restore carries, in the order a reader of
-// the status should see them.
-var workflowConditionTypes = []string{
-	k8sv1.ConditionSucceeded,
-	k8sv1.ConditionPrepared,
-	k8sv1.ConditionProviderSucceeded,
-	k8sv1.ConditionWorkloadsRecovered,
+// initialWorkflowConditions are the conditions every running restore carries, in the order a reader
+// of the status should see them, with the value they hold before any stage observed them.
+var initialWorkflowConditions = []metav1.Condition{
+	pendingMilestone(k8sv1.ConditionSucceeded),
+	pendingMilestone(k8sv1.ConditionPrepared),
+	pendingMilestone(k8sv1.ConditionProviderSucceeded),
+	pendingMilestone(k8sv1.ConditionWorkloadsRecovered),
 }
 
-// missingWorkflowConditions returns the workflow conditions the restore does not carry yet, as
-// Unknown. A condition that is already present is never returned, so a milestone that a stage has
-// already resolved cannot fall back to Unknown.
-func missingWorkflowConditions(restore *k8sv1.Restore) []metav1.Condition {
-	var missing []metav1.Condition
-
-	for _, conditionType := range workflowConditionTypes {
-		if meta.FindStatusCondition(restore.Status.Conditions, conditionType) != nil {
-			continue
-		}
-
-		missing = append(missing, metav1.Condition{
-			Type:    conditionType,
-			Status:  metav1.ConditionUnknown,
-			Reason:  ReasonPending,
-			Message: "The restore workflow has not reached this milestone yet.",
-		})
+// pendingMilestone is a milestone of the restore workflow that has not been reached yet.
+func pendingMilestone(conditionType string) metav1.Condition {
+	return metav1.Condition{
+		Type:    conditionType,
+		Status:  metav1.ConditionUnknown,
+		Reason:  conditions.ReasonPending,
+		Message: "The restore workflow has not reached this milestone yet.",
 	}
-
-	return missing
 }
 
 // reachedMilestone is a reached milestone of the restore workflow.
@@ -158,12 +145,12 @@ func findSuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 // by metadata.deletionTimestamp, not by status.
 func determineLegacySuccessfulCondition(restore *k8sv1.Restore) *metav1.Condition {
 	var status metav1.ConditionStatus
-	switch restore.Status.Status { // NOSONAR -- legacy restore status compatibility
-	case k8sv1.RestoreStatusCompleted: // NOSONAR -- legacy restore status compatibility
+	switch restore.Status.Status {
+	case k8sv1.RestoreStatusCompleted: //nolint:staticcheck // legacy restore status compatibility
 		status = metav1.ConditionTrue
-	case k8sv1.RestoreStatusFailed: // NOSONAR -- legacy restore status compatibility
+	case k8sv1.RestoreStatusFailed: //nolint:staticcheck // legacy restore status compatibility
 		status = metav1.ConditionFalse
-	case k8sv1.RestoreStatusInProgress: // NOSONAR -- legacy restore status compatibility
+	case k8sv1.RestoreStatusInProgress: //nolint:staticcheck // legacy restore status compatibility
 		status = metav1.ConditionUnknown
 	default:
 		return nil
@@ -197,26 +184,26 @@ func isTerminal(restore *k8sv1.Restore) bool {
 }
 
 func isTerminalLegacyStatus(status string) bool {
-	return status == k8sv1.RestoreStatusCompleted || status == k8sv1.RestoreStatusFailed // NOSONAR -- legacy restore status compatibility
+	return status == k8sv1.RestoreStatusCompleted || status == k8sv1.RestoreStatusFailed //nolint:staticcheck // legacy restore status compatibility
 }
 
 // legacyStatusFor maps conditions to the deprecated status field.
 func legacyStatusFor(restore *k8sv1.Restore) string {
 	if restore.DeletionTimestamp != nil && !restore.DeletionTimestamp.IsZero() {
-		return k8sv1.RestoreStatusDeleting // NOSONAR -- legacy restore status compatibility
+		return k8sv1.RestoreStatusDeleting //nolint:staticcheck // legacy restore status compatibility
 	}
 
 	switch condition := findSuccessfulCondition(restore); {
 	case condition == nil && (len(restore.Status.Conditions) == 0 || isTerminalLegacyStatus(restore.Status.Status)):
 		return restore.Status.Status
 	case condition == nil:
-		return k8sv1.RestoreStatusInProgress // NOSONAR -- legacy restore status compatibility
+		return k8sv1.RestoreStatusInProgress //nolint:staticcheck // legacy restore status compatibility
 	case condition.Status == metav1.ConditionTrue:
-		return k8sv1.RestoreStatusCompleted // NOSONAR -- legacy restore status compatibility
+		return k8sv1.RestoreStatusCompleted //nolint:staticcheck // legacy restore status compatibility
 	case condition.Status == metav1.ConditionFalse:
-		return k8sv1.RestoreStatusFailed // NOSONAR -- legacy restore status compatibility
+		return k8sv1.RestoreStatusFailed //nolint:staticcheck // legacy restore status compatibility
 	default:
-		return k8sv1.RestoreStatusInProgress // NOSONAR -- legacy restore status compatibility
+		return k8sv1.RestoreStatusInProgress //nolint:staticcheck // legacy restore status compatibility
 	}
 }
 

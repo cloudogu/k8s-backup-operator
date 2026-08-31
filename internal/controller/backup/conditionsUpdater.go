@@ -98,23 +98,23 @@ func determineBackupConditionTransitions(
 // migrated to conditions.
 func legacyBackupStatusFor(backup *backupv1.Backup) string {
 	if meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionDeleting) {
-		return backupv1.BackupStatusDeleting // NOSONAR -- legacy backup status compatibility
+		return backupv1.BackupStatusDeleting //nolint:staticcheck // legacy backup status compatibility
 	}
 	if meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled) {
-		return backupv1.BackupStatusFailed // NOSONAR -- legacy backup status compatibility
+		return backupv1.BackupStatusFailed //nolint:staticcheck // legacy backup status compatibility
 	}
 	if succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded); succeeded != nil {
 		switch succeeded.Status {
 		case metav1.ConditionTrue:
-			return backupv1.BackupStatusCompleted // NOSONAR -- legacy backup status compatibility
+			return backupv1.BackupStatusCompleted //nolint:staticcheck // legacy backup status compatibility
 		case metav1.ConditionFalse:
-			return backupv1.BackupStatusFailed // NOSONAR -- legacy backup status compatibility
+			return backupv1.BackupStatusFailed //nolint:staticcheck // legacy backup status compatibility
 		default:
-			return backupv1.BackupStatusInProgress // NOSONAR -- legacy backup status compatibility
+			return backupv1.BackupStatusInProgress //nolint:staticcheck // legacy backup status compatibility
 		}
 	}
 	if len(backup.Status.Conditions) > 0 {
-		return backupv1.BackupStatusInProgress
-	} // NOSONAR -- legacy backup status compatibility
+		return backupv1.BackupStatusInProgress //nolint:staticcheck // legacy backup status compatibility
+	}
 	return backup.Status.Status
 }

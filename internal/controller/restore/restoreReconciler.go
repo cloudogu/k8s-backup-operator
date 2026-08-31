@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
@@ -157,7 +156,7 @@ func requiredOperation(restore *k8sv1.Restore) operation {
 // running restore shows the milestones it has not reached yet instead of hiding them. Only absent
 // conditions are written, so a milestone a later stage resolved is never reset to Unknown.
 func (r *restoreReconciler) ensureConditionsInitialized(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
-	missing := missingWorkflowConditions(restore)
+	missing := conditions.Missing(restore.Status.Conditions, initialWorkflowConditions)
 	if len(missing) == 0 {
 		return restore, next()
 	}
@@ -549,7 +548,7 @@ func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *
 // compatibility write is no-op-aware and ends the reconciliation when it changes the Restore.
 func (r *restoreReconciler) ensureDeletingStatus(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	// Check legacy state first
-	if restore.Status.Status == k8sv1.RestoreStatusDeleting { // NOSONAR -- legacy restore status compatibility
+	if restore.Status.Status == k8sv1.RestoreStatusDeleting { //nolint:staticcheck // legacy restore status compatibility
 		return restore, next()
 	}
 
@@ -701,34 +700,6 @@ func (r *restoreReconciler) reportUnreachedMilestone(ctx context.Context, restor
 	}
 
 	return updated, retryOnError(stageErr)
-}
-
-// performOperation executes the given operationFn, reports its outcome as an event and translates a
-// failure into a retry. The stage outcome is the only requeue authority; there is no separate
-// requeue orchestration writing the deprecated scalar status any more.
-func (r *restoreReconciler) performOperation(
-	ctx context.Context,
-	restore *k8sv1.Restore,
-	eventReason string,
-	operationFn func(context.Context, *k8sv1.Restore) error,
-) stageOutcome {
-	operationError := operationFn(ctx, restore)
-	eventType := corev1.EventTypeNormal
-	message := fmt.Sprintf("%s successful", eventReason)
-	if operationError != nil {
-		eventType = corev1.EventTypeWarning
-		printError := strings.ReplaceAll(operationError.Error(), "\n", "")
-		message = fmt.Sprintf("%s failed. Reason: %s", eventReason, printError)
-		logging.Error(ctx, operationError, message)
-	}
-
-	r.recorder.Event(restore, eventType, eventReason, message)
-
-	if operationError != nil {
-		return retryOnError(fmt.Errorf("%s of restore %s failed: %w", eventReason, restore.Name, operationError))
-	}
-
-	return abort()
 }
 
 // SetupWithManager sets up the controller with the Manager.

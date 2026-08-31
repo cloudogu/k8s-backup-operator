@@ -351,12 +351,10 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldSignalHandlerFunc := ctrl.SetupSignalHandler
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			ctrl.SetupSignalHandler = oldSignalHandlerFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 		}()
 
@@ -379,7 +377,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().AddHealthzCheck("healthz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().AddReadyzCheck("readyz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetClient().Return(nil)
-		ctrlManMock.EXPECT().Start(mock.Anything).Return(assert.AnError)
+		ctrlManMock.EXPECT().Start(testCtx).Return(assert.AnError)
 
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return ctrlManMock, nil
@@ -387,10 +385,6 @@ func Test_startOperator(t *testing.T) {
 		ctrl.GetConfigOrDie = func() *rest.Config {
 			return restConfig
 		}
-		ctrl.SetupSignalHandler = func() context.Context {
-			return testCtx
-		}
-
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {
@@ -415,12 +409,10 @@ func Test_startOperator(t *testing.T) {
 
 		oldNewManagerFunc := ctrl.NewManager
 		oldGetConfigFunc := ctrl.GetConfigOrDie
-		oldSignalHandlerFunc := ctrl.SetupSignalHandler
 		oldNewAdditionalImageGetterFunc := newAdditionalImageGetter
 		defer func() {
 			ctrl.NewManager = oldNewManagerFunc
 			ctrl.GetConfigOrDie = oldGetConfigFunc
-			ctrl.SetupSignalHandler = oldSignalHandlerFunc
 			newAdditionalImageGetter = oldNewAdditionalImageGetterFunc
 		}()
 
@@ -444,7 +436,7 @@ func Test_startOperator(t *testing.T) {
 		ctrlManMock.EXPECT().AddReadyzCheck("readyz", mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetClient().Return(nil)
 
-		ctrlManMock.EXPECT().Start(mock.Anything).Return(nil)
+		ctrlManMock.EXPECT().Start(testCtx).Return(nil)
 
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return ctrlManMock, nil
@@ -452,10 +444,6 @@ func Test_startOperator(t *testing.T) {
 		ctrl.GetConfigOrDie = func() *rest.Config {
 			return restConfig
 		}
-		ctrl.SetupSignalHandler = func() context.Context {
-			return testCtx
-		}
-
 		additionalImageGetterMock := newMockAdditionalImageGetter(t)
 		additionalImageGetterMock.EXPECT().ImageForKey(testCtx, "operatorImage").Return("bitnamilegacy/kubectl:1.27.7", nil)
 		newAdditionalImageGetter = func(_ kubernetes.Interface, _ string) schedulecontroller.OperatorImageGetter {

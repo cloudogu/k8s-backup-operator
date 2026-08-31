@@ -8,6 +8,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func TestMissing(t *testing.T) {
+	succeeded := metav1.Condition{Type: "Succeeded", Status: metav1.ConditionUnknown, Reason: ReasonPending}
+	prepared := metav1.Condition{Type: "Prepared", Status: metav1.ConditionUnknown, Reason: ReasonPending}
+	canceled := metav1.Condition{Type: "Canceled", Status: metav1.ConditionFalse, Reason: ReasonPending}
+	desired := []metav1.Condition{succeeded, prepared, canceled}
+
+	t.Run("returns all desired conditions in order for a resource without conditions", func(t *testing.T) {
+		assert.Equal(t, desired, Missing(nil, desired))
+	})
+
+	t.Run("returns only the absent conditions", func(t *testing.T) {
+		existing := []metav1.Condition{{Type: "Prepared", Status: metav1.ConditionUnknown, Reason: ReasonPending}}
+
+		assert.Equal(t, []metav1.Condition{succeeded, canceled}, Missing(existing, desired))
+	})
+
+	t.Run("does not return a present condition with a different reason", func(t *testing.T) {
+		resolved := []metav1.Condition{{Type: "Prepared", Status: metav1.ConditionTrue, Reason: "PreparationCompleted"}}
+
+		assert.NotContains(t, Missing(resolved, desired), prepared)
+	})
+
+	t.Run("returns nothing when every desired condition is present", func(t *testing.T) {
+		existing := []metav1.Condition{
+			{Type: "Canceled", Status: metav1.ConditionTrue, Reason: "TimeWindowExpired"},
+			{Type: "Succeeded", Status: metav1.ConditionFalse, Reason: "BackupCanceled"},
+			{Type: "Prepared", Status: metav1.ConditionTrue, Reason: "PreparationCompleted"},
+		}
+
+		assert.Empty(t, Missing(existing, desired))
+	})
+}
+
 func TestWillChange(t *testing.T) {
 	desired := metav1.Condition{Type: "Prepared", Status: metav1.ConditionTrue, Reason: "Available", Message: "available"}
 

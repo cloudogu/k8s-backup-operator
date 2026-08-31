@@ -1,6 +1,7 @@
 package restore
 
 import (
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,7 +28,7 @@ func TestScaleUpInitiationPersistsItsProgressAndRequeues(t *testing.T) {
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assert.Equal(t, 1, writes.total(), "the initiation must only persist its progress")
 	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonScaleUpInitiated)
-	assertPersistedCondition(t, testClient, k8sv1.ConditionSucceeded, metav1.ConditionUnknown, ReasonPending)
+	assertPersistedCondition(t, testClient, k8sv1.ConditionSucceeded, metav1.ConditionUnknown, conditions.ReasonPending)
 	condition := meta.FindStatusCondition(updated.Status.Conditions, k8sv1.ConditionWorkloadsRecovered)
 	require.NotNil(t, condition)
 	assert.Equal(t, ReasonScaleUpInitiated, condition.Reason)
@@ -104,7 +105,7 @@ func TestFailedScaleUpInitiationReportsRecoveryFalseAndRetries(t *testing.T) {
 	assert.ErrorIs(t, outcome.err, assert.AnError)
 	assert.ErrorContains(t, outcome.err, "failed to initiate workload scale-up after restore")
 	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionFalse, ReasonWorkloadRecoveryFailed)
-	assertPersistedCondition(t, testClient, k8sv1.ConditionSucceeded, metav1.ConditionUnknown, ReasonPending)
+	assertPersistedCondition(t, testClient, k8sv1.ConditionSucceeded, metav1.ConditionUnknown, conditions.ReasonPending)
 }
 
 func TestUnpersistableScaleUpInitiationIsRetried(t *testing.T) {
