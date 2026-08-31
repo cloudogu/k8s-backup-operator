@@ -640,6 +640,29 @@ func (c *defaultReconciler) patchStatus(ctx context.Context, backup *backupv1.Ba
 	return newConditionsUpdater(c.client).updateStatus(ctx, backup, updateFn)
 }
 
+// ensureConditionsInitialized makes a backup that is about to run observable: every condition of the
+// workflow is written in one status write, before any stage acts, so that a running backup shows the
+// milestones it has not reached yet instead of hiding them. Only absent conditions are written, so a
+// condition a later stage resolved is never reset to its seed value.
+func (c *defaultReconciler) ensureConditionsInitialized(ctx context.Context, backup *backupv1.Backup) (action, error) {
+	missing := conditions.Missing(backup.Status.Conditions, initialBackupConditions)
+	if len(missing) == 0 {
+		return Next, nil
+	}
+
+	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		for _, condition := range missing {
+			meta.SetStatusCondition(&status.Conditions, condition)
+		}
+	})
+	if patchErr != nil {
+		return Abort, fmt.Errorf("patch status to initialize the backup conditions: %w", patchErr)
+	}
+
+	logging.Info(ctx, "initialized the backup conditions")
+	return Next, nil
+}
+
 func (c *defaultReconciler) ensureVeleroStatusSynced(
 	ctx context.Context,
 	backup *backupv1.Backup,

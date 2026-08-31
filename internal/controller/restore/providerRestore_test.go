@@ -2,6 +2,7 @@ package restore
 
 import (
 	"context"
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"testing"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -54,7 +55,7 @@ func TestProviderRestoreStageCreatesOwnedChildWithoutWaiting(t *testing.T) {
 	assert.True(t, velero.IsOwnedRestore(restore, child), "the created child must be owned by the restore")
 	assert.Equal(t, testBackup, child.Spec.BackupName)
 
-	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionUnknown, ReasonPending)
+	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionUnknown, conditions.ReasonPending)
 }
 
 func TestARepeatedReconciliationNeverStartsASecondProviderRestore(t *testing.T) {
