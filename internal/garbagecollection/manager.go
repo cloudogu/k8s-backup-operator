@@ -71,7 +71,7 @@ func (m *manager) CollectGarbage(ctx context.Context) error {
 
 func filterCompleted(backups []v1.Backup) (completed []v1.Backup) {
 	for _, backup := range backups {
-		if backup.Status.Status == v1.BackupStatusCompleted {
+		if backup.Status.Status == v1.BackupStatusCompleted { //nolint:staticcheck // legacy restore status compatibility
 			completed = append(completed, backup)
 		}
 	}

@@ -150,7 +150,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, Retry, nextAction)
-		assert.Equal(t, backupv1.BackupStatusInProgress, backup.Status.Status) // NOSONAR -- legacy backup status compatibility
+		assert.Equal(t, backupv1.BackupStatusInProgress, backup.Status.Status) //nolint:staticcheck // legacy restore status compatibility
 		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionUnknown, reasonVeleroBackupRunning)
 		assertCondition(t, backup, backupv1.ConditionProviderSucceeded, metav1.ConditionUnknown, reasonVeleroBackupRunning)
 	})

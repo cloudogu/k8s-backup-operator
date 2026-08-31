@@ -150,6 +150,6 @@ func applyConditions(restore *k8sv1.Restore, conditions []metav1.Condition) []co
 		}
 	}
 
-	restore.Status.Status = legacyStatusFor(restore) // NOSONAR -- legacy restore status compatibility
+	restore.Status.Status = legacyStatusFor(restore) //nolint:staticcheck // legacy restore status compatibility
 	return transitions
 }
