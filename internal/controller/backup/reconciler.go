@@ -127,82 +127,8 @@ func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGate
 }
 
 func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	isBackupDeleting := !backup.DeletionTimestamp.IsZero()
-	if isBackupDeleting {
-		var veleroBackup, err = c.getProviderBackup(ctx, backup.GetNamespacedName())
-		if err != nil {
-			c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, "Failed to get provider backup")
-			return Abort, fmt.Errorf("get the velero backup resource to check if it exists: %w", err)
-		}
-		if veleroBackup == nil {
-			logging.Debug(ctx, "ensureProviderBackupDeleted: backup is deleted and provider backup not found -> remove finalizer, ABORT")
-
-			controllerutil.RemoveFinalizer(backup, backupv1.BackupFinalizer)
-			updateErr := c.client.Update(ctx, backup)
-			if updateErr != nil {
-				c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupDeletingFailed, "Failed to remove backup finalizer")
-				return Abort, fmt.Errorf("update backup after removing finalizer: %w", updateErr)
-			}
-			// Removing the finalizer releases the backup for deletion, so this is the last point at
-			// which the deletion can be reported.
-			logging.Info(ctx, "deleted the backup")
-			// This is for the sake of completeness only - the object will be gone
-			c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupDeleting, "Removed finalizer - deletion completed")
-			return Abort, nil
-		}
-
-		if isProviderBackupInProgress(veleroBackup) {
-			if cleanupErr := veleroprovider.DeleteVeleroDeleteBackupRequestIfExists(ctx, c.client, backup); cleanupErr != nil {
-				return Abort, cleanupErr
-			}
-
-			patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-				meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-					Type:    backupv1.ConditionDeleting,
-					Status:  metav1.ConditionTrue,
-					Reason:  reasonWaitingForProviderBackupCompletion,
-					Message: fmt.Sprintf("Waiting for the provider backup to complete before deleting it (phase: %s)", veleroBackup.Status.Phase),
-				})
-			})
-			if patchErr != nil {
-				return Abort, fmt.Errorf("patch conditions while waiting for provider backup completion: %w", patchErr)
-			}
-			c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupDeletion, "Waiting for the provider backup to complete")
-			return Retry, nil
-		}
-
-		deleteReq, createErr := veleroprovider.CreateVeleroDeleteBackupRequestIfNotExists(ctx, c.client, backup)
-		if createErr != nil {
-			c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, "Failed to create provider delete request")
-			return Abort, createErr
-		}
-		waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionDeleting, c.clock.Now())
-		deleting := metav1.Condition{
-			Type:    backupv1.ConditionDeleting,
-			Status:  metav1.ConditionTrue,
-			Reason:  reasonBackupDeleting,
-			Message: fmt.Sprintf("Backup is deleting (phase: %s, running for %s)", deleteReq.Status.Phase, conditions.FormatWaitDuration(waited)),
-		}
-		reportDeleting := conditions.WillChange(backup.Status.Conditions, deleting)
-
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, deleting)
-		})
-		if patchErr != nil {
-			return Abort, fmt.Errorf("patch conditions to mark backup as deleting: %w", patchErr)
-		}
-		if reportDeleting {
-			// The delete request carries the provider errors of a deletion that cannot finish. They
-			// are reported here because they are otherwise only visible on the delete request itself.
-			logging.Info(ctx, "waiting for the velero backup to be deleted",
-				"phase", deleteReq.Status.Phase,
-				"running for", conditions.FormatWaitDuration(waited),
-				"providerErrors", deleteReq.Status.Errors,
-			)
-		}
-		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup deletion is still in progress")
-		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupDeletion, "The provider backup deletion is still in progress")
-		return Retry, nil
+	if !backup.DeletionTimestamp.IsZero() {
+		return c.ensureDeletingProviderBackup(ctx, backup)
 	}
 
 	logging.Debug(ctx, "ensureProviderBackupDeleted: backup is not deleted -> mark backup as not deleting, NEXT")
@@ -219,6 +145,96 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 		return Abort, fmt.Errorf("patch condition to mark backup as not deleting: %w", patchErr)
 	}
 	return Next, nil
+}
+
+func (c *defaultReconciler) ensureDeletingProviderBackup(ctx context.Context, backup *backupv1.Backup) (action, error) {
+	veleroBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
+	if err != nil {
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, "Failed to get provider backup")
+		return Abort, fmt.Errorf("get the velero backup resource to check if it exists: %w", err)
+	}
+	if veleroBackup == nil {
+		return c.finalizeProviderBackupDeletion(ctx, backup)
+	}
+	if isProviderBackupInProgress(veleroBackup) {
+		return c.waitForProviderBackupBeforeDeletion(ctx, backup, veleroBackup)
+	}
+
+	return c.ensureProviderBackupDeletionRequested(ctx, backup)
+}
+
+func (c *defaultReconciler) finalizeProviderBackupDeletion(ctx context.Context, backup *backupv1.Backup) (action, error) {
+	logging.Debug(ctx, "ensureProviderBackupDeleted: backup is deleted and provider backup not found -> remove finalizer, ABORT")
+
+	controllerutil.RemoveFinalizer(backup, backupv1.BackupFinalizer)
+	if err := c.client.Update(ctx, backup); err != nil {
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupDeletingFailed, "Failed to remove backup finalizer")
+		return Abort, fmt.Errorf("update backup after removing finalizer: %w", err)
+	}
+	// Removing the finalizer releases the backup for deletion, so this is the last point at
+	// which the deletion can be reported.
+	logging.Info(ctx, "deleted the backup")
+	// This is for the sake of completeness only - the object will be gone
+	c.recorder.Event(backup, corev1.EventTypeNormal, reasonBackupDeleting, "Removed finalizer - deletion completed")
+	return Abort, nil
+}
+
+func (c *defaultReconciler) waitForProviderBackupBeforeDeletion(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	veleroBackup *velerov1.Backup,
+) (action, error) {
+	if err := veleroprovider.DeleteVeleroDeleteBackupRequestIfExists(ctx, c.client, backup); err != nil {
+		return Abort, err
+	}
+
+	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
+			Type:    backupv1.ConditionDeleting,
+			Status:  metav1.ConditionTrue,
+			Reason:  reasonWaitingForProviderBackupCompletion,
+			Message: fmt.Sprintf("Waiting for the provider backup to complete before deleting it (phase: %s)", veleroBackup.Status.Phase),
+		})
+	})
+	if patchErr != nil {
+		return Abort, fmt.Errorf("patch conditions while waiting for provider backup completion: %w", patchErr)
+	}
+	c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupDeletion, "Waiting for the provider backup to complete")
+	return Retry, nil
+}
+
+func (c *defaultReconciler) ensureProviderBackupDeletionRequested(ctx context.Context, backup *backupv1.Backup) (action, error) {
+	deleteReq, err := veleroprovider.CreateVeleroDeleteBackupRequestIfNotExists(ctx, c.client, backup)
+	if err != nil {
+		c.recorder.Event(backup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, "Failed to create provider delete request")
+		return Abort, err
+	}
+	waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionDeleting, c.clock.Now())
+	deleting := metav1.Condition{
+		Type:    backupv1.ConditionDeleting,
+		Status:  metav1.ConditionTrue,
+		Reason:  reasonBackupDeleting,
+		Message: fmt.Sprintf("Backup is deleting (phase: %s, running for %s)", deleteReq.Status.Phase, conditions.FormatWaitDuration(waited)),
+	}
+	reportDeleting := conditions.WillChange(backup.Status.Conditions, deleting)
+
+	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, deleting)
+	}); err != nil {
+		return Abort, fmt.Errorf("patch conditions to mark backup as deleting: %w", err)
+	}
+	if reportDeleting {
+		// The delete request carries the provider errors of a deletion that cannot finish. They
+		// are reported here because they are otherwise only visible on the delete request itself.
+		logging.Info(ctx, "waiting for the velero backup to be deleted",
+			"phase", deleteReq.Status.Phase,
+			"running for", conditions.FormatWaitDuration(waited),
+			"providerErrors", deleteReq.Status.Errors,
+		)
+	}
+	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup deletion is still in progress")
+	c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupDeletion, "The provider backup deletion is still in progress")
+	return Retry, nil
 }
 
 // ensureOrphanedBackupDeleted deletes a terminal backup whose provider backup has disappeared.
@@ -473,85 +489,107 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 }
 
 func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	var providerBackup, err = c.getProviderBackup(ctx, backup.GetNamespacedName())
+	providerBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
 	if err != nil || providerBackup == nil {
 		return Abort, fmt.Errorf("checking velero backup resource for completion: %w", err)
 	}
 
 	if isProviderBackupInProgress(providerBackup) {
-		logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup is in progress -> RETRY")
-
-		// The elapsed time is part of the message, so the message changes once per minute and the
-		// guard below turns into a heartbeat for a wait that spans many reconciliations.
-		waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionProviderSucceeded, c.clock.Now())
-		inProgress := metav1.Condition{
-			Type:    backupv1.ConditionProviderSucceeded,
-			Status:  metav1.ConditionUnknown,
-			Reason:  reasonProviderBackupInProgress,
-			Message: fmt.Sprintf("Provider backup is in progress (running for %s).", conditions.FormatWaitDuration(waited)),
-		}
-		reportProgress := conditions.WillChange(backup.Status.Conditions, inProgress)
-
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, inProgress)
-		})
-		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
-		}
-		if reportProgress {
-			logging.Info(ctx, "waiting for the velero backup to complete",
-				"phase", providerBackup.Status.Phase,
-				"running for", conditions.FormatWaitDuration(waited),
-			)
-		}
-		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup is still in progress")
-		return Retry, nil
+		return c.handleProviderBackupInProgress(ctx, backup, providerBackup)
 	}
-
 	if hasProviderBackupFailed(providerBackup) {
-		logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup has failed -> ABORT")
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-				Type:    backupv1.ConditionProviderSucceeded,
-				Status:  metav1.ConditionFalse,
-				Reason:  reasonProviderBackupFailed,
-				Message: "Provider backup has failed.",
-			})
-			if status.CompletionTimestamp.IsZero() {
-				status.CompletionTimestamp = metav1.NewTime(c.clock.Now())
-			}
-		})
-		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
-		}
-		// Velero rejecting or failing a backup is an expected outcome of this stage rather than an
-		// operator error, so it is reported without an error.
-		logging.Info(ctx, "the velero backup failed", "phase", providerBackup.Status.Phase)
-		return Next, nil
+		return c.handleProviderBackupFailed(ctx, backup, providerBackup)
 	}
-
 	if hasProviderBackupSucceeded(providerBackup) {
-		logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup has succeeded -> NEXT")
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-				Type:    backupv1.ConditionProviderSucceeded,
-				Status:  metav1.ConditionTrue,
-				Reason:  reasonProviderBackupSucceeded,
-				Message: "Provider backup has succeeded.",
-			})
-			if status.CompletionTimestamp.IsZero() {
-				status.CompletionTimestamp = metav1.NewTime(c.clock.Now())
-			}
-		})
-		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
-		}
-		logging.Info(ctx, "the velero backup succeeded", "phase", providerBackup.Status.Phase)
-		c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupSucceeded, "Provider Backup completed")
-		return Next, nil
+		return c.handleProviderBackupSucceeded(ctx, backup, providerBackup)
 	}
 
 	return Abort, fmt.Errorf("provider backup with status='%s' should not occur here", providerBackup.Status.Phase)
+}
+
+func (c *defaultReconciler) handleProviderBackupInProgress(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	providerBackup *velerov1.Backup,
+) (action, error) {
+	logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup is in progress -> RETRY")
+
+	// The elapsed time is part of the message, so the message changes once per minute and the
+	// guard below turns into a heartbeat for a wait that spans many reconciliations.
+	waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionProviderSucceeded, c.clock.Now())
+	inProgress := metav1.Condition{
+		Type:    backupv1.ConditionProviderSucceeded,
+		Status:  metav1.ConditionUnknown,
+		Reason:  reasonProviderBackupInProgress,
+		Message: fmt.Sprintf("Provider backup is in progress (running for %s).", conditions.FormatWaitDuration(waited)),
+	}
+	reportProgress := conditions.WillChange(backup.Status.Conditions, inProgress)
+
+	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, inProgress)
+	}); err != nil {
+		return Abort, fmt.Errorf("patch status of backup resource: %w", err)
+	}
+	if reportProgress {
+		logging.Info(ctx, "waiting for the velero backup to complete",
+			"phase", providerBackup.Status.Phase,
+			"running for", conditions.FormatWaitDuration(waited),
+		)
+	}
+	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup is still in progress")
+	return Retry, nil
+}
+
+func (c *defaultReconciler) handleProviderBackupFailed(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	providerBackup *velerov1.Backup,
+) (action, error) {
+	logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup has failed -> ABORT")
+	if err := c.patchProviderBackupCompletedStatus(ctx, backup, metav1.ConditionFalse, reasonProviderBackupFailed, "Provider backup has failed."); err != nil {
+		return Abort, err
+	}
+	// Velero rejecting or failing a backup is an expected outcome of this stage rather than an
+	// operator error, so it is reported without an error.
+	logging.Info(ctx, "the velero backup failed", "phase", providerBackup.Status.Phase)
+	return Next, nil
+}
+
+func (c *defaultReconciler) handleProviderBackupSucceeded(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	providerBackup *velerov1.Backup,
+) (action, error) {
+	logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup has succeeded -> NEXT")
+	if err := c.patchProviderBackupCompletedStatus(ctx, backup, metav1.ConditionTrue, reasonProviderBackupSucceeded, "Provider backup has succeeded."); err != nil {
+		return Abort, err
+	}
+	logging.Info(ctx, "the velero backup succeeded", "phase", providerBackup.Status.Phase)
+	c.recorder.Event(backup, corev1.EventTypeNormal, reasonProviderBackupSucceeded, "Provider Backup completed")
+	return Next, nil
+}
+
+func (c *defaultReconciler) patchProviderBackupCompletedStatus(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	conditionStatus metav1.ConditionStatus,
+	reason string,
+	message string,
+) error {
+	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
+			Type:    backupv1.ConditionProviderSucceeded,
+			Status:  conditionStatus,
+			Reason:  reason,
+			Message: message,
+		})
+		if status.CompletionTimestamp.IsZero() {
+			status.CompletionTimestamp = metav1.NewTime(c.clock.Now())
+		}
+	}); err != nil {
+		return fmt.Errorf("patch status of backup resource: %w", err)
+	}
+	return nil
 }
 
 func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (action, error) {
@@ -684,31 +722,7 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		Reason:  reasonVeleroStatusSynced,
 		Message: "The backup already exists in Velero.",
 	}
-	succeeded := metav1.Condition{
-		Type:   backupv1.ConditionSucceeded,
-		Status: metav1.ConditionUnknown,
-	}
-
-	nextAction := Retry
-	report := ""
-	switch {
-	case veleroBackup.Status.Phase == velerov1.BackupPhaseCompleted:
-		succeeded.Status = metav1.ConditionTrue
-		succeeded.Reason = reasonVeleroStatusSynced
-		succeeded.Message = "The succeeded backup status was synchronized from Velero."
-		report = "synchronized the succeeded velero backup status"
-		nextAction = Abort
-	case slices.Contains(veleroBackupFailedPhases, veleroBackup.Status.Phase):
-		succeeded.Status = metav1.ConditionFalse
-		succeeded.Reason = reasonVeleroBackupFailed
-		succeeded.Message = fmt.Sprintf("The Velero backup failed in phase %s.", veleroBackup.Status.Phase)
-		report = "synchronized the failed velero backup status"
-		nextAction = Abort
-	default:
-		succeeded.Reason = reasonVeleroBackupRunning
-		succeeded.Message = fmt.Sprintf("The Velero backup is in phase %s.", veleroBackup.Status.Phase)
-		report = "waiting for the synchronized velero backup to complete"
-	}
+	succeeded, nextAction, report := veleroStatusSyncOutcome(veleroBackup.Status.Phase)
 
 	// Set providerSucceeded and Succeeded together to keep the guards working correctly
 	providerSucceeded := succeeded
@@ -739,6 +753,29 @@ func (c *defaultReconciler) ensureVeleroStatusSynced(
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the synchronized provider backup is still in progress")
 	}
 	return nextAction, nil
+}
+
+func veleroStatusSyncOutcome(phase velerov1.BackupPhase) (metav1.Condition, action, string) {
+	succeeded := metav1.Condition{
+		Type:   backupv1.ConditionSucceeded,
+		Status: metav1.ConditionUnknown,
+	}
+	switch {
+	case phase == velerov1.BackupPhaseCompleted:
+		succeeded.Status = metav1.ConditionTrue
+		succeeded.Reason = reasonVeleroStatusSynced
+		succeeded.Message = "The succeeded backup status was synchronized from Velero."
+		return succeeded, Abort, "synchronized the succeeded velero backup status"
+	case slices.Contains(veleroBackupFailedPhases, phase):
+		succeeded.Status = metav1.ConditionFalse
+		succeeded.Reason = reasonVeleroBackupFailed
+		succeeded.Message = fmt.Sprintf("The Velero backup failed in phase %s.", phase)
+		return succeeded, Abort, "synchronized the failed velero backup status"
+	default:
+		succeeded.Reason = reasonVeleroBackupRunning
+		succeeded.Message = fmt.Sprintf("The Velero backup is in phase %s.", phase)
+		return succeeded, Retry, "waiting for the synchronized velero backup to complete"
+	}
 }
 
 func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.Context, backup *backupv1.Backup) (action, error) {
@@ -772,26 +809,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 	// A not available Velero, but available CRD will lead to a CR without a status.
 	// If it has no Status after the timeout, it wasn't touched once -> CANCEL
 	if veleroBackup == nil || reflect.DeepEqual(veleroBackup.Status, velerov1.BackupStatus{}) {
-		// getProviderBackup returns (nil, nil) on NotFound. The backup has a start timestamp, so the
-		// provider backup was deleted underneath us and this run can never complete.
-		logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, provider backup is gone or was not touched once -> Canceled = True, RETRY")
-
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-				Type:    backupv1.ConditionCanceled,
-				Status:  metav1.ConditionTrue,
-				Reason:  reasonTimeWindowExpiredProviderBackupMissing,
-				Message: "The provider backup no longer existed or was not touched once when the time window expired.",
-			})
-		})
-		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and provider backup is missing'")
-		}
-
-		logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup no longer exists or was not touched once")
-		c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredProviderBackupMissing, "Provider backup no longer existed or was not touched once when the time window expired")
-		// Retry for finalize
-		return Retry, nil
+		return c.handleMissingProviderBackupAfterTimeWindowExpired(ctx, backup)
 	}
 
 	logging.Debug(ctx,
@@ -802,56 +820,99 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 	)
 
 	if isProviderBackupInProgress(veleroBackup) {
-		logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup is running -> Canceled = False, NEXT")
-
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-				Type:    backupv1.ConditionCanceled,
-				Status:  metav1.ConditionFalse,
-				Reason:  reasonTimeWindowExpiredBackupInProgress,
-				Message: "The backup was running when the time window expired.",
-			})
-		})
-		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'")
-		}
-		c.recorder.Event(backup, corev1.EventTypeNormal, reasonTimeWindowExpiredBackupInProgress, "The backup was running when the time window expired -> Continue")
-		return Next, nil
+		return c.handleInProgressProviderBackupAfterTimeWindowExpired(ctx, backup)
 	}
-
 	if hasProviderBackupFailed(veleroBackup) {
-		logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup failed -> Canceled = True, RETRY")
-
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-				Type:    backupv1.ConditionCanceled,
-				Status:  metav1.ConditionTrue,
-				Reason:  reasonTimeWindowExpiredBackupFailed,
-				Message: "The backup had failed when the time window expired.",
-			})
-		})
-		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup has failed'")
-		}
-
-		logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup had failed", "phase", veleroBackup.Status.Phase)
-		c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupFailed, "The backup had failed when the time window expired")
-		// This backup may still hold the lease and the maintenance mode. Canceled = True routes the
-		// next pass to operationFinalize, which deactivates the maintenance mode, releases the lease
-		// and writes the terminal Succeeded condition. -> Retry
-		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the canceled backup run must be finalized")
-		return Retry, nil
+		return c.handleFailedProviderBackupAfterTimeWindowExpired(ctx, backup, veleroBackup)
 	}
 
-	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+	return c.handleSucceededProviderBackupAfterTimeWindowExpired(ctx, backup)
+}
+
+func (c *defaultReconciler) handleMissingProviderBackupAfterTimeWindowExpired(
+	ctx context.Context,
+	backup *backupv1.Backup,
+) (action, error) {
+	// getProviderBackup returns (nil, nil) on NotFound. The backup has a start timestamp, so the
+	// provider backup was deleted underneath us and this run can never complete.
+	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, provider backup is gone or was not touched once -> Canceled = True, RETRY")
+
+	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
+			Type:    backupv1.ConditionCanceled,
+			Status:  metav1.ConditionTrue,
+			Reason:  reasonTimeWindowExpiredProviderBackupMissing,
+			Message: "The provider backup no longer existed or was not touched once when the time window expired.",
+		})
+	}); err != nil {
+		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and provider backup is missing'")
+	}
+
+	logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup no longer exists or was not touched once")
+	c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredProviderBackupMissing, "Provider backup no longer existed or was not touched once when the time window expired")
+	// Retry for finalize
+	return Retry, nil
+}
+
+func (c *defaultReconciler) handleInProgressProviderBackupAfterTimeWindowExpired(
+	ctx context.Context,
+	backup *backupv1.Backup,
+) (action, error) {
+	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup is running -> Canceled = False, NEXT")
+
+	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
+			Type:    backupv1.ConditionCanceled,
+			Status:  metav1.ConditionFalse,
+			Reason:  reasonTimeWindowExpiredBackupInProgress,
+			Message: "The backup was running when the time window expired.",
+		})
+	}); err != nil {
+		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'")
+	}
+	c.recorder.Event(backup, corev1.EventTypeNormal, reasonTimeWindowExpiredBackupInProgress, "The backup was running when the time window expired -> Continue")
+	return Next, nil
+}
+
+func (c *defaultReconciler) handleFailedProviderBackupAfterTimeWindowExpired(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	veleroBackup *velerov1.Backup,
+) (action, error) {
+	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup failed -> Canceled = True, RETRY")
+
+	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
+			Type:    backupv1.ConditionCanceled,
+			Status:  metav1.ConditionTrue,
+			Reason:  reasonTimeWindowExpiredBackupFailed,
+			Message: "The backup had failed when the time window expired.",
+		})
+	}); err != nil {
+		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup has failed'")
+	}
+
+	logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup had failed", "phase", veleroBackup.Status.Phase)
+	c.recorder.Event(backup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupFailed, "The backup had failed when the time window expired")
+	// This backup may still hold the lease and the maintenance mode. Canceled = True routes the
+	// next pass to operationFinalize, which deactivates the maintenance mode, releases the lease
+	// and writes the terminal Succeeded condition. -> Retry
+	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the canceled backup run must be finalized")
+	return Retry, nil
+}
+
+func (c *defaultReconciler) handleSucceededProviderBackupAfterTimeWindowExpired(
+	ctx context.Context,
+	backup *backupv1.Backup,
+) (action, error) {
+	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 			Type:    backupv1.ConditionCanceled,
 			Status:  metav1.ConditionFalse,
 			Reason:  reasonTimeWindowExpiredBackupSucceeded,
 			Message: "The backup has succeeded when the time window expired.",
 		})
-	})
-	if patchErr != nil {
+	}); err != nil {
 		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup has succeeded'")
 	}
 

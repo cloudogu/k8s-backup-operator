@@ -25,32 +25,47 @@ func (r *restoreReconciler) ensureWorkloadsReady(
 
 	condition := meta.FindStatusCondition(restore.Status.Conditions, k8sv1.ConditionWorkloadsRecovered)
 	if !ready {
-		if condition != nil &&
-			condition.Status == metav1.ConditionUnknown &&
-			condition.Reason == ReasonWaitingForWorkloads {
-			logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workloads have not reached their target state yet")
-			return restore, retryAfter(defaultRequeueDelay)
-		}
+		return r.handleWorkloadsNotReady(ctx, restore, condition)
+	}
+	return r.handleWorkloadsReady(ctx, restore, condition)
+}
 
-		updated, updateErr := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
-			Type:    k8sv1.ConditionWorkloadsRecovered,
-			Status:  metav1.ConditionUnknown,
-			Reason:  ReasonWaitingForWorkloads,
-			Message: "The workloads have not reached their target replica count and availability yet.",
-		})
-		if updateErr != nil {
-			return restore, retryOnError(fmt.Errorf(
-				"failed to persist workload readiness wait for restore %s: %w",
-				restore.Name,
-				updateErr,
-			))
-		}
-
-		logging.Info(ctx, "waiting for the workloads to become ready")
-		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workload readiness wait was persisted")
-		return updated, retryAfter(defaultRequeueDelay)
+func (r *restoreReconciler) handleWorkloadsNotReady(
+	ctx context.Context,
+	restore *k8sv1.Restore,
+	condition *metav1.Condition,
+) (*k8sv1.Restore, stageOutcome) {
+	if condition != nil &&
+		condition.Status == metav1.ConditionUnknown &&
+		condition.Reason == ReasonWaitingForWorkloads {
+		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workloads have not reached their target state yet")
+		return restore, retryAfter(defaultRequeueDelay)
 	}
 
+	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
+		Type:    k8sv1.ConditionWorkloadsRecovered,
+		Status:  metav1.ConditionUnknown,
+		Reason:  ReasonWaitingForWorkloads,
+		Message: "The workloads have not reached their target replica count and availability yet.",
+	})
+	if err != nil {
+		return restore, retryOnError(fmt.Errorf(
+			"failed to persist workload readiness wait for restore %s: %w",
+			restore.Name,
+			err,
+		))
+	}
+
+	logging.Info(ctx, "waiting for the workloads to become ready")
+	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workload readiness wait was persisted")
+	return updated, retryAfter(defaultRequeueDelay)
+}
+
+func (r *restoreReconciler) handleWorkloadsReady(
+	ctx context.Context,
+	restore *k8sv1.Restore,
+	condition *metav1.Condition,
+) (*k8sv1.Restore, stageOutcome) {
 	if condition != nil &&
 		condition.Status == metav1.ConditionUnknown &&
 		(condition.Reason == ReasonWorkloadsReady ||

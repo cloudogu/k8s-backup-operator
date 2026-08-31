@@ -15,7 +15,7 @@ func (kls *removeAllButKeepLatestStrategy) FilterForRemoval(allBackups []v1.Back
 
 	var latestBackupIndex int
 	for i, backup := range allBackups {
-		moreRecent := backup.Status.StartTimestamp.Time.
+		moreRecent := backup.Status.StartTimestamp.
 			After(allBackups[latestBackupIndex].Status.StartTimestamp.Time)
 		if moreRecent {
 			latestBackupIndex = i
