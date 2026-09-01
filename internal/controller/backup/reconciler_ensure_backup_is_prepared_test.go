@@ -11,7 +11,7 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 )
 
 func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
@@ -89,7 +89,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		recorder := record.NewFakeRecorder(100)
+		recorder := events.NewFakeRecorder(100)
 		reconciler := NewReconciler(fakeClient, recorder, nil, newRealClock(), "default")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
