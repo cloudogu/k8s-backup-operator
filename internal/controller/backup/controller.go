@@ -23,9 +23,9 @@ const (
 )
 
 type reconciler interface {
-	ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
-	ensureOrphanedBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureOrphanedBackupDeleted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureConditionsInitialized(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
@@ -35,8 +35,8 @@ type reconciler interface {
 	ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
-	ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureBackupRunCompleted(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
+	ensureBackupRunCompleted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 }
 
 type operation int
@@ -121,9 +121,7 @@ func (c *Controller) asStage(ensure ensureFunction) stage {
 	}
 }
 
-// getStagesForOperation returns the stages this reconciliation has to run, in order. Stages still
-// wrapped in c.asStage speak the old (action, error) vocabulary; the wrapper disappears with the last
-// of them.
+// getStagesForOperation returns the stages this reconciliation has to run, in order.
 func (c *Controller) getStagesForOperation(op operation) []stage {
 	switch op {
 	case operationDelete:
@@ -136,7 +134,7 @@ func (c *Controller) getStagesForOperation(op operation) []stage {
 		// Succeeded is written only after cleanup, so a terminal backup has no work left but to
 		// verify that the provider backup it mirrors is still there.
 		return []stage{
-			c.asStage(c.reconciler.ensureOrphanedBackupDeleted),
+			c.reconciler.ensureOrphanedBackupDeleted,
 		}
 	case operationFinalize:
 		return c.finalizeStages()
@@ -158,15 +156,15 @@ func (c *Controller) getStagesForOperation(op operation) []stage {
 // finalizeStages post-process a finished backup run
 func (c *Controller) finalizeStages() []stage {
 	return append(c.cleanupStages(),
-		c.asStage(c.reconciler.ensureBackupRunCompleted),
+		c.reconciler.ensureBackupRunCompleted,
 	)
 }
 
 // cleanupStages returns resources owned by an active backup run in release order.
 func (c *Controller) cleanupStages() []stage {
 	return []stage{
-		c.asStage(c.reconciler.ensureMaintenanceDeactivated),
-		c.asStage(c.reconciler.ensureBackupLeaseReleased),
+		c.reconciler.ensureMaintenanceDeactivated,
+		c.reconciler.ensureBackupLeaseReleased,
 	}
 }
 

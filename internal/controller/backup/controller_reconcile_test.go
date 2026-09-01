@@ -238,13 +238,6 @@ func TestRequiredOperation(t *testing.T) {
 // recordStages lets every stage record that it ran and continue, so that a test can assert the
 // exact sequence the controller executed.
 func recordStages(reconcilerMock *mockReconciler, executed *[]string) {
-	record := func(name string) func(context.Context, *backupv1.Backup) (action, error) {
-		return func(context.Context, *backupv1.Backup) (action, error) {
-			*executed = append(*executed, name)
-			return Next, nil
-		}
-	}
-
 	recordStage := func(name string) func(context.Context, *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 		return func(_ context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 			*executed = append(*executed, name)
@@ -253,9 +246,9 @@ func recordStages(reconcilerMock *mockReconciler, executed *[]string) {
 	}
 
 	expecter := reconcilerMock.EXPECT()
-	expecter.ensureBackupLeaseReleased(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupLeaseReleased")).Maybe()
+	expecter.ensureBackupLeaseReleased(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureBackupLeaseReleased")).Maybe()
 	expecter.ensureProviderBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureProviderBackupDeleted")).Maybe()
-	expecter.ensureOrphanedBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureOrphanedBackupDeleted")).Maybe()
+	expecter.ensureOrphanedBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureOrphanedBackupDeleted")).Maybe()
 	expecter.ensureVeleroStatusSynced(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureVeleroStatusSynced")).Maybe()
 	expecter.ensureConditionsInitialized(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureConditionsInitialized")).Maybe()
 	expecter.ensureBackupSetup(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureBackupSetup")).Maybe()
@@ -265,8 +258,8 @@ func recordStages(reconcilerMock *mockReconciler, executed *[]string) {
 	expecter.ensureMaintenanceActivated(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureMaintenanceActivated")).Maybe()
 	expecter.ensureProviderBackupCreated(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureProviderBackupCreated")).Maybe()
 	expecter.ensureProviderBackupCompleted(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureProviderBackupCompleted")).Maybe()
-	expecter.ensureMaintenanceDeactivated(mock.Anything, mock.Anything).RunAndReturn(record("ensureMaintenanceDeactivated")).Maybe()
-	expecter.ensureBackupRunCompleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupRunCompleted")).Maybe()
+	expecter.ensureMaintenanceDeactivated(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureMaintenanceDeactivated")).Maybe()
+	expecter.ensureBackupRunCompleted(mock.Anything, mock.Anything).RunAndReturn(recordStage("ensureBackupRunCompleted")).Maybe()
 }
 
 func withCondition(backup *backupv1.Backup, conditionType string, status metav1.ConditionStatus) *backupv1.Backup {

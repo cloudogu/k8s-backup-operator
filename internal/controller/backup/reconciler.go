@@ -239,22 +239,22 @@ func (c *defaultReconciler) ensureProviderBackupDeletionRequested(ctx context.Co
 
 // ensureOrphanedBackupDeleted deletes a terminal backup whose provider backup has disappeared.
 // A completed backup without providerBackup cannot be restored.
-func (c *defaultReconciler) ensureOrphanedBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureOrphanedBackupDeleted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	// A backup that never started never had a provider backup. That is the case for a run that was canceled
 	// before it reached the provider. Backup can stay for failure history reasons.
 	if backup.Status.StartTimestamp.IsZero() {
 		logging.Debug(ctx, "ensureOrphanedBackupDeleted: the backup never started -> NEXT")
-		return Next, nil
+		return backup, next()
 	}
 
 	providerBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
 	if err != nil {
-		return Abort, fmt.Errorf("get the velero backup resource to check if it still exists: %w", err)
+		return backup, retryOnError(fmt.Errorf("get the velero backup resource to check if it still exists: %w", err))
 	}
 
 	if providerBackup != nil {
 		logging.Debug(ctx, "ensureOrphanedBackupDeleted: the provider backup still exists -> NEXT")
-		return Next, nil
+		return backup, next()
 	}
 
 	logging.Debug(ctx, "ensureOrphanedBackupDeleted: the provider backup is gone -> delete the backup, ABORT")
@@ -263,11 +263,11 @@ func (c *defaultReconciler) ensureOrphanedBackupDeleted(ctx context.Context, bac
 	deleteErr := c.client.Delete(ctx, backup)
 	if deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupDeletingFailed, "Failed to delete the backup of a missing provider backup")
-		return Abort, fmt.Errorf("delete backup whose provider backup no longer exists: %w", deleteErr)
+		return backup, retryOnError(fmt.Errorf("delete backup whose provider backup no longer exists: %w", deleteErr))
 	}
 
 	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the deletion of the backup must be finalized")
-	return Retry, nil
+	return backup, retry()
 }
 
 func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
@@ -592,13 +592,13 @@ func (c *defaultReconciler) patchProviderBackupCompletedStatus(
 	return nil
 }
 
-func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	// Safety-net, should normally not happen. Retry until provider is finished. A backup that is
 	// being deleted is let through, mirroring ensureBackupLeaseReleased: its run is over either way
 	// and the deletion path is the last chance to give the maintenance mode back.
 	if !isPostProcessing(backup) && backup.DeletionTimestamp.IsZero() {
 		logging.Debug(ctx, "ensureMaintenanceDeactivated: the backup run is not finished -> RETRY")
-		return Retry, nil
+		return backup, retry()
 	}
 
 	// The maintenance mode is owned by the lease holder. Without this gate a backup that owns no
@@ -606,22 +606,22 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 	// the maintenance mode that a concurrently running backup depends on.
 	holdsLease, err := c.holdsBackupLease(ctx, backup)
 	if err != nil {
-		return Abort, err
+		return backup, retryOnError(err)
 	}
 	if !holdsLease {
 		logging.Debug(ctx, "ensureMaintenanceDeactivated: the backup does not hold the backup lease -> NEXT")
-		return Next, nil
+		return backup, next()
 	}
 
 	maintenanceModeIsActive, err := c.maintenanceGateway.isMaintenanceModeActive(ctx)
 	if err != nil {
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesStatusFailed, "Failed to get maintenance mode status")
-		return Abort, fmt.Errorf("check maintenance mode: %w", err)
+		return backup, retryOnError(fmt.Errorf("check maintenance mode: %w", err))
 	}
 
 	if !maintenanceModeIsActive {
 		logging.Debug(ctx, "ensureMaintenanceDeactivated: is not active -> NEXT")
-		return Next, nil
+		return backup, next()
 	}
 
 	logging.Debug(ctx, "ensureMaintenanceDeactivated: is active and the backup run is finished -> deactivate it, NEXT")
@@ -629,19 +629,19 @@ func (c *defaultReconciler) ensureMaintenanceDeactivated(ctx context.Context, ba
 	maintenanceErr := c.maintenanceGateway.deactivateMaintenanceMode(ctx)
 	if maintenanceErr != nil {
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonMaintenanceModesDeactivationFailed, "Failed to deactivate maintenance mode")
-		return Abort, fmt.Errorf("deactivate maintenance mode: %w", maintenanceErr)
+		return backup, retryOnError(fmt.Errorf("deactivate maintenance mode: %w", maintenanceErr))
 	}
 	logging.Info(ctx, "deactivated maintenance mode")
 	c.recorder.Event(backup, corev1.EventTypeNormal, reasonMaintenanceModesDeactivation, "Maintenance mode deactivated")
-	return Next, nil
+	return backup, next()
 }
 
 // ensureBackupRunCompleted writes the terminal Succeeded condition and closes the run.
-func (c *defaultReconciler) ensureBackupRunCompleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureBackupRunCompleted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	// Safety-net, should normally not happen. Retry until provider is finished
 	if !isPostProcessing(backup) {
 		logging.Debug(ctx, "ensureBackupRunCompleted: the backup run is not finished -> RETRY")
-		return Retry, nil
+		return backup, retry()
 	}
 
 	// A run without a provider result got here through the cancellation, so the provider result is
@@ -663,7 +663,7 @@ func (c *defaultReconciler) ensureBackupRunCompleted(ctx context.Context, backup
 		meta.SetStatusCondition(&status.Conditions, succeeded)
 	})
 	if patchErr != nil {
-		return Abort, fmt.Errorf("patch status to complete the backup run: %w", patchErr)
+		return backup, retryOnError(fmt.Errorf("patch status to complete the backup run: %w", patchErr))
 	}
 
 	if succeeded.Status == metav1.ConditionTrue {
@@ -671,7 +671,7 @@ func (c *defaultReconciler) ensureBackupRunCompleted(ctx context.Context, backup
 	}
 	logging.Info(ctx, "backup finished", "outcome", backupRunOutcome(backup), "duration", backupRunDuration(backup))
 	logging.Debug(ctx, "ensureBackupRunCompleted: the backup run is complete -> ABORT")
-	return Abort, nil
+	return backup, abort()
 }
 
 func (c *defaultReconciler) patchStatus(ctx context.Context, backup *backupv1.Backup, updateFn statusUpdate) error {

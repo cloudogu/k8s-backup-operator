@@ -16,10 +16,10 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If the backup is being deleted while its run is unfinished, deactivate the maintenance mode it holds", func(t *testing.T) {
@@ -36,10 +36,10 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 			Return(nil)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 	})
 
 	t.Run("If the backup is being deleted without holding the backup lease, leave the maintenance mode alone", func(t *testing.T) {
@@ -51,10 +51,10 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 	})
 
 	t.Run("If the backup does not hold the backup lease, proceed without touching the maintenance mode", func(t *testing.T) {
@@ -67,10 +67,10 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 	})
 
 	t.Run("If there is no backup lease at all, proceed without touching the maintenance mode", func(t *testing.T) {
@@ -79,10 +79,10 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 	})
 
 	t.Run("If maintenance mode is not active, proceed to the next step", func(t *testing.T) {
@@ -94,10 +94,10 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 			Return(false, nil)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 	})
 
 	deactivatingRuns := []struct {
@@ -131,10 +131,10 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 				Return(nil)
 			reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-			nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), test.backup)
+			_, outcome := reconciler.ensureMaintenanceDeactivated(context.Background(), test.backup)
 
-			assert.NoError(t, err)
-			assert.Equal(t, Next, nextAction)
+			assert.NoError(t, outcome.err)
+			assert.Equal(t, actionNext, outcome.action)
 		})
 	}
 
@@ -147,10 +147,10 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 			Return(false, assert.AnError)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.Equal(t, Abort, nextAction)
+		assert.ErrorIs(t, outcome.err, assert.AnError)
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If the maintenance mode cannot be deactivated, abort", func(t *testing.T) {
@@ -165,9 +165,9 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 			Return(assert.AnError)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
+		_, outcome := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.Equal(t, Abort, nextAction)
+		assert.ErrorIs(t, outcome.err, assert.AnError)
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 }

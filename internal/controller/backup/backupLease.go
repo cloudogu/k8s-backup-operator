@@ -61,26 +61,26 @@ func (c *defaultReconciler) holdsBackupLease(ctx context.Context, backup *backup
 	return holds, nil
 }
 
-func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
 	// Safety-net, should normally not happen. Retry until provider is finished
 	if !isPostProcessing(backup) && backup.DeletionTimestamp.IsZero() {
 		logging.Debug(ctx, "ensureBackupLeaseReleased: the backup run is not finished -> RETRY")
-		return Retry, nil
+		return backup, retry()
 	}
 
 	manager := leases.NewManager(c.client, backup.Namespace, leases.DefaultName, backupHolderResolver{client: c.client})
 	released, err := manager.Release(ctx, backup, backupLeaseHolderKind)
 	if err != nil {
 		c.recorder.Event(backup, corev1.EventTypeWarning, reasonBackupLeaseFailed, "Releasing the backup lease failed")
-		return Abort, fmt.Errorf("release backup lease for backup %s: %w", backup.Name, err)
+		return backup, retryOnError(fmt.Errorf("release backup lease for backup %s: %w", backup.Name, err))
 	}
 	if !released {
 		logging.Debug(ctx, "ensureBackupLeaseReleased: backup does not hold the lease -> NEXT")
-		return Next, nil
+		return backup, next()
 	}
 
 	logging.Info(ctx, "released the backup lease", "lease", leases.DefaultName)
-	return Next, nil
+	return backup, next()
 }
 
 // backupRunOutcome derives how a finished backup run ended from its conditions.

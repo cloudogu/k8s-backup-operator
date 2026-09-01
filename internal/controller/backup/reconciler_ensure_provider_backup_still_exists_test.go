@@ -27,12 +27,12 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction, "the deletion has to be finalized even if its update event is lost")
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action, "the deletion has to be finalized even if its update event is lost")
 
-		err = fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), &backupv1.Backup{})
+		err := fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), &backupv1.Backup{})
 		assert.True(t, apierrors.IsNotFound(err), "the backup of a missing provider backup must be deleted")
 	})
 
@@ -42,10 +42,10 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), &backupv1.Backup{}))
 	})
 
@@ -55,10 +55,10 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), &backupv1.Backup{}),
 			"a canceled backup that never reached the provider must survive")
 	})
@@ -69,9 +69,9 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).WithObjects(backup).Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
 
-		require.ErrorIs(t, err, assert.AnError)
-		assert.Equal(t, Abort, nextAction)
+		require.ErrorIs(t, outcome.err, assert.AnError)
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 }

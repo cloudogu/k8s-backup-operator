@@ -126,10 +126,10 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionUnknown)
 		reconciler := NewReconciler(nil, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup)
+		_, outcome := reconciler.ensureBackupLeaseReleased(ctx, backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	tests := []struct {
@@ -148,10 +148,10 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 			k8sClient := newFakeClientBuilder(t).WithObjects(lease).Build()
 			reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-			nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, tt.backup)
+			_, outcome := reconciler.ensureBackupLeaseReleased(ctx, tt.backup)
 
-			require.NoError(t, err)
-			assert.Equal(t, Next, nextAction)
+			require.NoError(t, outcome.err)
+			assert.Equal(t, actionNext, outcome.action)
 			stored := &coordinationv1.Lease{}
 			assert.Error(t, k8sClient.Get(ctx, client.ObjectKeyFromObject(lease), stored))
 		})
@@ -166,10 +166,10 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 		}).Build()
 		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup)
+		_, outcome := reconciler.ensureBackupLeaseReleased(ctx, backup)
 
-		assert.Equal(t, Abort, nextAction)
-		require.ErrorContains(t, err, "release backup lease")
+		assert.Equal(t, actionRetry, outcome.action)
+		require.ErrorContains(t, outcome.err, "release backup lease")
 	})
 }
 
