@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -105,7 +105,7 @@ type Clock interface {
 }
 
 type eventRecorder interface {
-	record.EventRecorder
+	events.EventRecorder
 }
 
 type defaultReconciler struct {

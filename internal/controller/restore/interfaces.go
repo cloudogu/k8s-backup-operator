@@ -6,7 +6,7 @@ import (
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -16,7 +16,7 @@ type k8sClient interface {
 }
 
 type eventRecorder interface {
-	record.EventRecorder
+	events.EventRecorder
 }
 
 type controllerManager interface {
