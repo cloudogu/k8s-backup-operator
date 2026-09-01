@@ -241,7 +241,7 @@ func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restor
 	}
 
 	if conflictErr := velero.CheckRestoreForConflicts(restore, child); conflictErr != nil {
-		return r.failOnProviderChildConflict(ctx, restore, conflictErr)
+		return r.failOnProviderChildConflict(ctx, restore, child, conflictErr)
 	}
 
 	return restore, next()
@@ -249,8 +249,8 @@ func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restor
 
 // failOnProviderChildConflict reports an existing provider restore that this Restore may not adopt as
 // a terminal failure, before any preparation ran.
-func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, restore *k8sv1.Restore, conflictErr error) (*k8sv1.Restore, stageOutcome) {
-	r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore, conflictErr.Error())
+func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, restore *k8sv1.Restore, child *velerov1.Restore, conflictErr error) (*k8sv1.Restore, stageOutcome) {
+	r.recorder.Eventf(restore, child, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore, conflictErr.Error())
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
 		metav1.Condition{
@@ -439,7 +439,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 		// number of retries will change that.
 		var conflictErr *velero.ConflictError
 		if errors.As(err, &conflictErr) {
-			return r.failOnProviderChildConflict(ctx, restore, conflictErr)
+			return r.failOnProviderChildConflict(ctx, restore, nil, conflictErr)
 		}
 
 		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonProviderRestoreFailed, actionCreateProviderRestore, err.Error())
@@ -480,7 +480,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 	message := fmt.Sprintf("The provider restore %q reports the phase %q.", child.Name, child.Status.Phase)
 	if status == metav1.ConditionTrue {
 		message = fmt.Sprintf("The provider restored the backup %q.", restore.Spec.BackupName)
-		r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, k8sv1.CreateEventReason, actionCompleteProviderRestore, "Successfully completed the provider restore [%s]", child.Name)
+		r.recorder.Eventf(restore, child, corev1.EventTypeNormal, k8sv1.CreateEventReason, actionCompleteProviderRestore, "Successfully completed the provider restore [%s]", child.Name)
 	}
 
 	observation := metav1.Condition{
@@ -523,7 +523,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 // failOnProviderRestore reports a terminally failed provider restore.
 func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *k8sv1.Restore, child *velerov1.Restore, reason string) (*k8sv1.Restore, stageOutcome) {
 	message := fmt.Sprintf("The provider restore %q failed terminally in the phase %q.", child.Name, child.Status.Phase)
-	r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCompleteProviderRestore, message)
+	r.recorder.Eventf(restore, child, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCompleteProviderRestore, message)
 	// Velero failing the restore is an outcome of this stage rather than an operator error.
 	logging.Info(ctx, "the velero restore failed", "phase", child.Status.Phase)
 
@@ -617,7 +617,7 @@ func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, re
 
 		logging.Info(ctx, message)
 		r.recorder.Eventf(
-			restore, nil,
+			restore, child,
 			corev1.EventTypeWarning,
 			k8sv1.DeleteEventReason, actionDeleteProviderRestore,
 			message,

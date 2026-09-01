@@ -178,7 +178,7 @@ func (c *defaultReconciler) ensureDeletingProviderBackup(ctx context.Context, ba
 		return c.waitForProviderBackupBeforeDeletion(ctx, backup, veleroBackup)
 	}
 
-	return c.ensureProviderBackupDeletionRequested(ctx, backup)
+	return c.ensureProviderBackupDeletionRequested(ctx, backup, veleroBackup)
 }
 
 func (c *defaultReconciler) finalizeProviderBackupDeletion(ctx context.Context, backup *backupv1.Backup) (action, error) {
@@ -200,7 +200,7 @@ func (c *defaultReconciler) finalizeProviderBackupDeletion(ctx context.Context, 
 func (c *defaultReconciler) waitForProviderBackupBeforeDeletion(
 	ctx context.Context,
 	backup *backupv1.Backup,
-	veleroBackup *velerov1.Backup,
+	providerBackup *velerov1.Backup,
 ) (action, error) {
 	if err := veleroprovider.DeleteVeleroDeleteBackupRequestIfExists(ctx, c.client, backup); err != nil {
 		return Abort, err
@@ -211,20 +211,20 @@ func (c *defaultReconciler) waitForProviderBackupBeforeDeletion(
 			Type:    backupv1.ConditionDeleting,
 			Status:  metav1.ConditionTrue,
 			Reason:  reasonWaitingForProviderBackupCompletion,
-			Message: fmt.Sprintf("Waiting for the provider backup to complete before deleting it (phase: %s)", veleroBackup.Status.Phase),
+			Message: fmt.Sprintf("Waiting for the provider backup to complete before deleting it (phase: %s)", providerBackup.Status.Phase),
 		})
 	})
 	if patchErr != nil {
 		return Abort, fmt.Errorf("patch conditions while waiting for provider backup completion: %w", patchErr)
 	}
-	c.recorder.Eventf(backup, nil, corev1.EventTypeNormal, reasonProviderBackupDeletion, actionDeleteProviderBackup, "Waiting for the provider backup to complete")
+	c.recorder.Eventf(backup, providerBackup, corev1.EventTypeNormal, reasonProviderBackupDeletion, actionDeleteProviderBackup, "Waiting for the provider backup to complete")
 	return Retry, nil
 }
 
-func (c *defaultReconciler) ensureProviderBackupDeletionRequested(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureProviderBackupDeletionRequested(ctx context.Context, backup *backupv1.Backup, providerBackup *velerov1.Backup) (action, error) {
 	deleteReq, err := veleroprovider.CreateVeleroDeleteBackupRequestIfNotExists(ctx, c.client, backup)
 	if err != nil {
-		c.recorder.Eventf(backup, nil, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, actionDeleteProviderBackup, "Failed to create provider delete request")
+		c.recorder.Eventf(backup, providerBackup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, actionDeleteProviderBackup, "Failed to create provider delete request")
 		return Abort, err
 	}
 	waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionDeleting, c.clock.Now())
@@ -251,7 +251,7 @@ func (c *defaultReconciler) ensureProviderBackupDeletionRequested(ctx context.Co
 		)
 	}
 	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup deletion is still in progress")
-	c.recorder.Eventf(backup, nil, corev1.EventTypeNormal, reasonProviderBackupDeletion, actionDeleteProviderBackup, "The provider backup deletion is still in progress")
+	c.recorder.Eventf(backup, providerBackup, corev1.EventTypeNormal, reasonProviderBackupDeletion, actionDeleteProviderBackup, "The provider backup deletion is still in progress")
 	return Retry, nil
 }
 
@@ -497,7 +497,7 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
 		}
 
-		c.recorder.Eventf(backup, nil, corev1.EventTypeNormal, reasonProviderBackupInProgress, actionCreateProviderBackup, "Provider backup started")
+		c.recorder.Eventf(backup, veleroBackupCr, corev1.EventTypeNormal, reasonProviderBackupInProgress, actionCreateProviderBackup, "Provider backup started")
 		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup was created")
 		return Retry, nil
 	}
@@ -583,7 +583,7 @@ func (c *defaultReconciler) handleProviderBackupSucceeded(
 		return Abort, err
 	}
 	logging.Info(ctx, "the velero backup succeeded", "phase", providerBackup.Status.Phase)
-	c.recorder.Eventf(backup, nil, corev1.EventTypeNormal, reasonProviderBackupSucceeded, actionCompleteProviderBackup, "Provider Backup completed")
+	c.recorder.Eventf(backup, providerBackup, corev1.EventTypeNormal, reasonProviderBackupSucceeded, actionCompleteProviderBackup, "Provider Backup completed")
 	return Next, nil
 }
 
@@ -838,7 +838,7 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 	)
 
 	if isProviderBackupInProgress(veleroBackup) {
-		return c.handleInProgressProviderBackupAfterTimeWindowExpired(ctx, backup)
+		return c.handleInProgressProviderBackupAfterTimeWindowExpired(ctx, backup, veleroBackup)
 	}
 	if hasProviderBackupFailed(veleroBackup) {
 		return c.handleFailedProviderBackupAfterTimeWindowExpired(ctx, backup, veleroBackup)
@@ -875,6 +875,7 @@ func (c *defaultReconciler) handleMissingProviderBackupAfterTimeWindowExpired(
 func (c *defaultReconciler) handleInProgressProviderBackupAfterTimeWindowExpired(
 	ctx context.Context,
 	backup *backupv1.Backup,
+	providerBackup *velerov1.Backup,
 ) (action, error) {
 	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup is running -> Canceled = False, NEXT")
 
@@ -888,7 +889,7 @@ func (c *defaultReconciler) handleInProgressProviderBackupAfterTimeWindowExpired
 	}); err != nil {
 		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'")
 	}
-	c.recorder.Eventf(backup, nil, corev1.EventTypeNormal, reasonTimeWindowExpiredBackupInProgress, actionContinueBackup, "The backup was running when the time window expired -> Continue")
+	c.recorder.Eventf(backup, providerBackup, corev1.EventTypeNormal, reasonTimeWindowExpiredBackupInProgress, actionContinueBackup, "The backup was running when the time window expired -> Continue")
 	return Next, nil
 }
 
@@ -911,7 +912,7 @@ func (c *defaultReconciler) handleFailedProviderBackupAfterTimeWindowExpired(
 	}
 
 	logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup had failed", "phase", veleroBackup.Status.Phase)
-	c.recorder.Eventf(backup, nil, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupFailed, actionCancelBackup, "The backup had failed when the time window expired")
+	c.recorder.Eventf(backup, veleroBackup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupFailed, actionCancelBackup, "The backup had failed when the time window expired")
 	// This backup may still hold the lease and the maintenance mode. Canceled = True routes the
 	// next pass to operationFinalize, which deactivates the maintenance mode, releases the lease
 	// and writes the terminal Succeeded condition. -> Retry

@@ -74,14 +74,14 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 	switch operation {
 	case controllerutil.OperationResultCreated:
 		c.recorder.Eventf(
-			schedule, nil,
+			schedule, cronJob,
 			corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason, actionCreateCronJob,
 			"Created CronJob %q.", cronJob.Name,
 		)
 
 	case controllerutil.OperationResultUpdated:
 		c.recorder.Eventf(
-			schedule, nil,
+			schedule, cronJob,
 			corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason, actionUpdateCronJob,
 			"Updated CronJob %q.", cronJob.Name,
 		)

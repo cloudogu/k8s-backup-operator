@@ -26,7 +26,7 @@ func TestCronJobManagerDelete(t *testing.T) {
 	manager := defaultCronJobManager{Client: fakeClient, recorder: recorder, scheme: scheme}
 
 	require.NoError(t, manager.delete(context.Background(), schedule))
-	requireRecordedEvent(t, recorder, schedule, corev1.EventTypeNormal, backupv1.CronJobDeletionRequestedEventReason, actionDeleteCronJob, `Requested deletion of CronJob "backup-schedule-daily".`)
+	requireRecordedEvent(t, recorder, schedule, nil, corev1.EventTypeNormal, backupv1.CronJobDeletionRequestedEventReason, actionDeleteCronJob, `Requested deletion of CronJob "backup-schedule-daily".`)
 	// twice to check for idempotence
 	require.NoError(t, manager.delete(context.Background(), schedule))
 	requireNoRecordedEvent(t, recorder)
@@ -56,5 +56,5 @@ func TestCronJobManagerDeleteReturnsError(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, assert.AnError)
 	assert.ErrorContains(t, err, "failed to delete CronJob")
-	requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, backupv1.CronJobDeletionFailedEventReason, actionDeleteCronJob, `Failed to delete CronJob "backup-schedule-daily"`, assert.AnError.Error())
+	requireRecordedEventContains(t, recorder, schedule, nil, corev1.EventTypeWarning, backupv1.CronJobDeletionFailedEventReason, actionDeleteCronJob, `Failed to delete CronJob "backup-schedule-daily"`, assert.AnError.Error())
 }
