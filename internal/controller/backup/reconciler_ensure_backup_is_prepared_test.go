@@ -104,7 +104,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Contains(t, <-recorder.Events, veleroprovider.ReasonVeleroBackupStorageLocationNotFound)
 	})
 
-	t.Run("If an error occurred while getting the backup storage location resource then abort", func(t *testing.T) {
+	t.Run("If an error occurred while getting the backup storage location resource then retry with erro", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		counter := &callCounter{
 			getCallError: assert.AnError,
@@ -121,7 +121,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If the velero backup storage is unavailable and a patch error occurred then abort", func(t *testing.T) {
+	t.Run("If the velero backup storage is unavailable and a patch error occurred then retry with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseUnavailable)
 		counter := &callCounter{
@@ -139,7 +139,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If the velero backup storage is available and a patch error occurred then abort", func(t *testing.T) {
+	t.Run("If the velero backup storage is available and a patch error occurred then retry with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		counter := &callCounter{
@@ -157,7 +157,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If the velero backup storage resource was not found and a patch error occurred then abort", func(t *testing.T) {
+	t.Run("If the velero backup storage resource was not found and a patch error occurred then retry with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		counter := &callCounter{
 			subResourcePatchCallError: assert.AnError,

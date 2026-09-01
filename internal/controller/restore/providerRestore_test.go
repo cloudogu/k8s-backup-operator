@@ -46,7 +46,7 @@ func TestProviderRestoreStageCreatesOwnedChildWithoutWaiting(t *testing.T) {
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0])
 	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
 		"starting the restore must create the child and write nothing else")
 
@@ -82,7 +82,7 @@ func TestARepeatedReconciliationNeverStartsASecondProviderRestore(t *testing.T) 
 	require.NoError(t, firstErrs[0])
 	require.NoError(t, laterErrs[0])
 	require.NoError(t, laterErrs[1])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, firstResults[0])
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, firstResults[0])
 	for index := range laterResults {
 		assert.Equal(t, ctrl.Result{RequeueAfter: providerObservationRecoveryDelay}, laterResults[index],
 			"the restarted operator must observe the adopted child instead of starting a new restore")

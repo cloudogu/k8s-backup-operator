@@ -43,7 +43,7 @@ func TestEnsureProviderRestoreDeletedDeletesAnOwnedChildAndWaitsForItsDisappeara
 	updated, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
 
 	assert.Equal(t, restore, updated)
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome,
+	assert.Equal(t, retry(), outcome,
 		"an accepted delete request must be verified by a later reconciliation")
 	assert.Equal(t, 1, writes.child.deletes)
 	assert.Equal(t, 1, writes.total())
@@ -64,7 +64,7 @@ func TestEnsureProviderRestoreDeletedDeletesAnUnownedChildOfALegacyRestore(t *te
 
 	_, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
 
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
+	assert.Equal(t, retry(), outcome)
 	assert.Equal(t, 1, writes.child.deletes,
 		"legacy restores predate owner references, so their namesake child is still deleted")
 }
@@ -107,7 +107,7 @@ func TestEnsureProviderRestoreDeletedWaitsForATerminatingOwnedChildWithoutDeleti
 	updated, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
 
 	assert.Equal(t, restore, updated)
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
+	assert.Equal(t, retry(), outcome)
 	assert.Equal(t, 0, writes.total(), "a child whose deletion is in progress must not receive another delete")
 }
 

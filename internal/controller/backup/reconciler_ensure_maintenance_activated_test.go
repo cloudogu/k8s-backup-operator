@@ -71,7 +71,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If activation of maintenance mode failed, then abort", func(t *testing.T) {
+	t.Run("If activation of maintenance mode failed, then retry with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		fakeClient := newFakeClientBuilder(t).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)

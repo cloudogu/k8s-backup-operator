@@ -138,7 +138,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		})
 	}
 
-	t.Run("If the maintenance mode state cannot be read, abort", func(t *testing.T) {
+	t.Run("If the maintenance mode state cannot be read, retry with error", func(t *testing.T) {
 		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, newHeldBackupLeaseForTest(backup)).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
@@ -153,7 +153,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If the maintenance mode cannot be deactivated, abort", func(t *testing.T) {
+	t.Run("If the maintenance mode cannot be deactivated, retry with error", func(t *testing.T) {
 		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, newHeldBackupLeaseForTest(backup)).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)

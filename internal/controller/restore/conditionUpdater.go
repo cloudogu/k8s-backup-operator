@@ -9,7 +9,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/retry"
+	k8sretry "k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -59,7 +59,7 @@ func (u *conditionUpdater) persistConditions(
 ) (conditionUpdateResult, error) {
 	current := restore
 	result := conditionUpdateResult{restore: restore}
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	err := k8sretry.RetryOnConflict(k8sretry.DefaultRetry, func() error {
 		updated, updateErr := u.tryPersistConditions(ctx, current, conditions)
 		if apierrors.IsConflict(updateErr) {
 			refreshed := &k8sv1.Restore{}

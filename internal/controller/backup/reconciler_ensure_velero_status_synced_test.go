@@ -170,7 +170,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		assert.True(t, backup.Status.CompletionTimestamp.IsZero())
 	})
 
-	t.Run("missing Velero backup aborts", func(t *testing.T) {
+	t.Run("missing Velero backup retries with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		backup.Spec.SyncedFromProvider = true
 		reconciler := NewReconciler(newFakeClientBuilder(t).WithObjects(backup).Build(), newTestEventRecorder(), nil, newRealClock(), "default")
@@ -181,7 +181,7 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("status patch failure aborts", func(t *testing.T) {
+	t.Run("status patch failure retries with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		backup.Spec.SyncedFromProvider = true
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)

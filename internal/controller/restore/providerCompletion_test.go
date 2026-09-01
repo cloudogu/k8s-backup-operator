@@ -88,8 +88,8 @@ func TestACompletedProviderRestoreResolvesItsMilestoneAndThenContinuesTheWorkflo
 
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the resolved milestone must end the reconciliation")
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[1], "the workflow continues once the milestone is stored")
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0], "the resolved milestone must end the reconciliation")
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[1], "the workflow continues once the milestone is stored")
 	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
 		"one milestone per reconciliation, and the child must never be written")
 	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionTrue, ReasonProviderRestoreCompleted)
@@ -247,6 +247,6 @@ func TestAVanishedChildLeavesTheRestoreResumable(t *testing.T) {
 
 	updated, outcome := reconciler.ensureProviderCompletion(testCtx, restore)
 
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
+	assert.Equal(t, retry(), outcome)
 	assert.False(t, isTerminal(updated), "a missing child is not an outcome")
 }

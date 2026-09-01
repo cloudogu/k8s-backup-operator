@@ -37,8 +37,8 @@ func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing
 
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the metadata write must end the reconciliation")
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[1], "the started provider restore must end the reconciliation")
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0], "the metadata write must end the reconciliation")
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[1], "the started provider restore must end the reconciliation")
 	assert.Equal(t, []recordedClientAction{updateOf(restore), createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
 		"the finalizer and the labels must be written in one update, and only once, before the restore starts")
 	assertPersistedMetadata(t, fixture.client, testRestore)
@@ -64,7 +64,7 @@ func TestEnsureMetadataDoesNotWriteAgain(t *testing.T) {
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "a converged restore must start the provider restore right away")
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0], "a converged restore must start the provider restore right away")
 	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
 		"a restore with metadata must not be written again")
 }

@@ -9,9 +9,6 @@ import (
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
-// defaultRequeueDelay is used as fallback when a stage asks for a controlled retry without a usable delay.
-const defaultRequeueDelay = 5 * time.Second
-
 // providerObservationRecoveryDelay is the delay a stage uses while it waits for the provider to
 // decide. The owned child's events are the observation path, so this timer only ever matters when a
 // watch event was lost.
@@ -39,6 +36,11 @@ func next() stageOutcome {
 	return stageOutcome{action: actionNext}
 }
 
+// retry ends the reconciliation and asks for another one at the controller's configured requeue time.
+func retry() stageOutcome {
+	return stageOutcome{action: actionRetry}
+}
+
 func retryAfter(delay time.Duration) stageOutcome {
 	return stageOutcome{action: actionRetry, requeueAfter: delay}
 }
@@ -48,7 +50,7 @@ func retryAfter(delay time.Duration) stageOutcome {
 // treated as an immediate controlled retry instead.
 func retryOnError(err error) stageOutcome {
 	if err == nil {
-		return retryAfter(defaultRequeueDelay)
+		return retry()
 	}
 
 	return stageOutcome{action: actionRetry, err: err}

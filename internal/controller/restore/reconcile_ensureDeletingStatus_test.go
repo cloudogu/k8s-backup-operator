@@ -32,7 +32,7 @@ func TestEnsureDeletingStatusPersistsTheLegacyStatusAndEndsTheReconciliation(t *
 
 	require.NotNil(t, updated)
 	assert.Equal(t, k8sv1.RestoreStatusDeleting, updated.Status.Status) //nolint:staticcheck // legacy restore status compatibility
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome,
+	assert.Equal(t, retry(), outcome,
 		"the status write must end the reconciliation so no second mutation runs")
 	assert.Equal(t, 1, writes.parent.statusUpdates)
 	assert.Equal(t, 1, writes.total())

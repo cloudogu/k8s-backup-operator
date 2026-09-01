@@ -53,5 +53,5 @@ func (r *restoreReconciler) ensureScaleUpFinalized(
 	}
 
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the finalized workload scale-up was persisted")
-	return updated, retryAfter(defaultRequeueDelay)
+	return updated, retry()
 }

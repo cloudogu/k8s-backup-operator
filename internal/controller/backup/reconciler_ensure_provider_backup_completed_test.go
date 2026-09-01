@@ -156,7 +156,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
 
-	t.Run("If the velero backup is not in status InProgress, Failed or Succeeded, abort", func(t *testing.T) {
+	t.Run("If the velero backup is not in status InProgress, Failed or Succeeded, retrywith error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseDeleting)
 		counter := &callCounter{}
@@ -172,7 +172,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If getting the velero backup resource failed, abort", func(t *testing.T) {
+	t.Run("If getting the velero backup resource failed, retry with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		counter := &callCounter{
 			getCallError: errors.New("get error"),
@@ -190,7 +190,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If patching the status fails, abort", func(t *testing.T) {
+	t.Run("If patching the status fails, retry with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
 		counter := &callCounter{

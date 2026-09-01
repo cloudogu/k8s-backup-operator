@@ -35,7 +35,7 @@ func TestWorkloadsNotReadyPersistWaitingReasonAndRequeue(t *testing.T) {
 
 	updated, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
 
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
+	assert.Equal(t, retry(), outcome)
 	assert.Equal(t, 1, writes.total())
 	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonWaitingForWorkloads)
 	condition := meta.FindStatusCondition(updated.Status.Conditions, k8sv1.ConditionWorkloadsRecovered)
@@ -55,7 +55,7 @@ func TestWorkloadsStillNotReadyRequeueWithoutAnotherStatusWrite(t *testing.T) {
 
 	updated, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
 
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
+	assert.Equal(t, retry(), outcome)
 	assert.Same(t, restore, updated)
 	assert.Equal(t, 0, writes.total())
 }
@@ -71,7 +71,7 @@ func TestReadyWorkloadsPersistReadyReasonAndRequeue(t *testing.T) {
 
 	_, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
 
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
+	assert.Equal(t, retry(), outcome)
 	assert.Equal(t, 1, writes.total())
 	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonWorkloadsReady)
 }
@@ -119,7 +119,7 @@ func TestWorkloadReadinessRegressionReturnsToWaiting(t *testing.T) {
 
 	_, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
 
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
+	assert.Equal(t, retry(), outcome)
 	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonWaitingForWorkloads)
 }
 

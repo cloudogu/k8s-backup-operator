@@ -44,7 +44,7 @@ func TestRestoreCompletionDoesNotCompleteBeforeMaintenanceModeDeactivation(t *te
 
 	updated, outcome := reconciler.ensureRestoreCompleted(testCtx, restore)
 
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
+	assert.Equal(t, retry(), outcome)
 	assert.Same(t, restore, updated)
 	assert.Equal(t, 0, writes.total())
 }

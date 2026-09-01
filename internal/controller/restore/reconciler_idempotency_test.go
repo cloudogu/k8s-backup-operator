@@ -131,7 +131,7 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 		require.NoError(t, stagedErrs[index])
 	}
 	for index, result := range staged[:4] {
-		require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, result, "stage %d must end its reconciliation", index+1)
+		require.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, result, "stage %d must end its reconciliation", index+1)
 	}
 	require.Equal(t, ctrl.Result{RequeueAfter: providerObservationRecoveryDelay}, staged[4],
 		"waiting for the provider must never occupy a worker")
@@ -150,9 +150,9 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	for index := range finishingErrs {
 		require.NoError(t, finishingErrs[index])
 	}
-	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, finishing[0], "the resolved provider milestone ends its reconciliation")
+	require.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, finishing[0], "the resolved provider milestone ends its reconciliation")
 	for index := 1; index < 5; index++ {
-		require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, finishing[index], "recovery stage %d must end its reconciliation", index)
+		require.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, finishing[index], "recovery stage %d must end its reconciliation", index)
 	}
 	require.Equal(t, ctrl.Result{}, finishing[5], "the finished workflow must not be requeued")
 
@@ -229,8 +229,8 @@ func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheP
 
 	require.NoError(t, repeatedErrs[0])
 	require.NoError(t, continuedErrs[0])
-	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, repeated[0], "the repeated preparation ends its reconciliation")
-	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, continued[0], "the started provider restore ends its reconciliation")
+	require.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, repeated[0], "the repeated preparation ends its reconciliation")
+	require.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, continued[0], "the started provider restore ends its reconciliation")
 
 	require.Equal(t, []recordedClientAction{
 		statusUpdateOf(restore),                // Prepared, reached the second time around
@@ -282,7 +282,7 @@ func TestATransientStageFailureIsRetriedWithoutRepeatingAnEarlierDestructiveStag
 		require.NoError(t, recoveredErrs[index], "reconciliation %d after the failure", index+1)
 	}
 	for index := 0; index < 4; index++ {
-		require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, recovered[index], "stage %d after retry must end its reconciliation", index+1)
+		require.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, recovered[index], "stage %d after retry must end its reconciliation", index+1)
 	}
 	require.Equal(t, ctrl.Result{}, recovered[4], "the finished workflow must not be requeued")
 

@@ -95,7 +95,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		assert.Equal(t, 0, counter.subResourcePatchCount)
 	})
 
-	t.Run("If retrieving the Velero backup resource fails, abort", func(t *testing.T) {
+	t.Run("If retrieving the Velero backup resource fails, retry with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		counter := &callCounter{
 			getCallError: errors.New("get error"),
@@ -113,7 +113,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If patching the status fails, abort", func(t *testing.T) {
+	t.Run("If patching the status fails, retry with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		counter := &callCounter{
 			subResourcePatchCallError: errors.New("patch error"),
@@ -131,7 +131,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If creating the Velero backup resource fails, abort", func(t *testing.T) {
+	t.Run("If creating the Velero backup resource fails, retry with error", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		counter := &callCounter{
 			createCallError: errors.New("create error"),

@@ -72,7 +72,7 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the preparation must end the reconciliation")
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0], "the preparation must end the reconciliation")
 	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
 		"the preparation must persist its milestone in one status write")
 	assert.Equal(t, []string{"provider-ready", "maintenance", "scale-down", "cleanup"}, stageOrder)
@@ -100,7 +100,7 @@ func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testi
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0])
 	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
 		"a prepared restore must not be written again, it must start the provider restore")
 }
@@ -160,7 +160,7 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 
 	require.NoError(t, errs[0])
 	// expected requeue, because of condition write
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0])
 	assertPreparedCondition(t, fixture.client, metav1.ConditionTrue, ReasonPreparationCompleted)
 }
 

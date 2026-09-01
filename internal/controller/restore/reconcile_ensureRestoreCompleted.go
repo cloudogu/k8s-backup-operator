@@ -28,7 +28,7 @@ func (r *restoreReconciler) ensureRestoreCompleted(
 		recovery.Status != metav1.ConditionUnknown ||
 		recovery.Reason != ReasonMaintenanceModeDeactivated {
 		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workload recovery has not completed yet")
-		return restore, retryAfter(defaultRequeueDelay)
+		return restore, retry()
 	}
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,

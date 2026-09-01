@@ -59,5 +59,5 @@ func (r *restoreReconciler) ensureScaleUpInitiated(
 	// idempotently before the workflow proceeds to workload observation.
 	logging.Info(ctx, "scaling up the workloads")
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the initiated workload scale-up was persisted")
-	return updated, retryAfter(defaultRequeueDelay)
+	return updated, retry()
 }

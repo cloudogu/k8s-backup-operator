@@ -25,7 +25,7 @@ func TestScaleUpInitiationPersistsItsProgressAndRequeues(t *testing.T) {
 
 	updated, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
 
-	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
+	assert.Equal(t, retry(), outcome)
 	assert.Equal(t, 1, writes.total(), "the initiation must only persist its progress")
 	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonScaleUpInitiated)
 	assertPersistedCondition(t, testClient, k8sv1.ConditionSucceeded, metav1.ConditionUnknown, conditions.ReasonPending)

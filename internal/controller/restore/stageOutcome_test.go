@@ -57,6 +57,7 @@ func TestStageOutcomeNeverCombinesAnErrorWithAnExplicitRequeue(t *testing.T) {
 
 func TestStageOutcomeCannotSilentlyDropARetry(t *testing.T) {
 	tests := map[string]stageOutcome{
+		"no delay":       retry(),
 		"zero delay":     retryAfter(0),
 		"negative delay": retryAfter(-time.Minute),
 		"nil error":      retryOnError(nil),
@@ -67,7 +68,7 @@ func TestStageOutcomeCannotSilentlyDropARetry(t *testing.T) {
 			result, err := outcome.result(requeueAfterTest)
 
 			require.NoError(t, err)
-			assert.Equal(t, defaultRequeueDelay, result.RequeueAfter)
+			assert.Equal(t, requeueAfterTest, result.RequeueAfter)
 		})
 	}
 }

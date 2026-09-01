@@ -39,7 +39,7 @@ func (r *restoreReconciler) handleWorkloadsNotReady(
 		condition.Status == metav1.ConditionUnknown &&
 		condition.Reason == ReasonWaitingForWorkloads {
 		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workloads have not reached their target state yet")
-		return restore, retryAfter(defaultRequeueDelay)
+		return restore, retry()
 	}
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
@@ -58,7 +58,7 @@ func (r *restoreReconciler) handleWorkloadsNotReady(
 
 	logging.Info(ctx, "waiting for the workloads to become ready")
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workload readiness wait was persisted")
-	return updated, retryAfter(defaultRequeueDelay)
+	return updated, retry()
 }
 
 func (r *restoreReconciler) handleWorkloadsReady(
@@ -90,5 +90,5 @@ func (r *restoreReconciler) handleWorkloadsReady(
 
 	logging.Info(ctx, "the workloads are ready")
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the workload readiness was persisted")
-	return updated, retryAfter(defaultRequeueDelay)
+	return updated, retry()
 }

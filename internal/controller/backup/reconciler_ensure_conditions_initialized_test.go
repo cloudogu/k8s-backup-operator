@@ -75,7 +75,7 @@ func TestEnsureConditionsInitialized(t *testing.T) {
 		assert.Zero(t, patches, "a backup that carries every condition must not be patched again")
 	})
 
-	t.Run("It should abort with a wrapped error when the status write fails", func(t *testing.T) {
+	t.Run("It should retry with a wrapped error when the status write fails", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		patchErr := errors.NewInternalError(assert.AnError)
 		fakeClient := newFakeClientForEnsureConditionsInitializedTest(t, backup, new(int), patchErr)

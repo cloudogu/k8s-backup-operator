@@ -38,11 +38,11 @@ func (r *restoreReconciler) ensureActiveRestoreLease(ctx context.Context, restor
 		logging.Info(ctx, "acquired the restore lease", "lease", restoreLeaseName)
 		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the acquired restore lease must be observed again")
 		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonRestoreStarted, "The restore has started")
-		return restore, retryAfter(defaultRequeueDelay)
+		return restore, retry()
 	case leases.StateConflict:
 		// An optimistic-lock conflict must be observed in a new reconciliation.
 		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore lease was modified concurrently")
-		return restore, retryAfter(defaultRequeueDelay)
+		return restore, retry()
 	case leases.StateInvalid:
 		return r.reportInvalidRestoreLease(ctx, restore)
 	case leases.StateWaiting:
@@ -68,7 +68,7 @@ func (r *restoreReconciler) continueWithAcquiredLease(ctx context.Context, resto
 		return restore, retryOnError(fmt.Errorf("failed to report lease acquisition for restore %s: %w", restore.Name, err))
 	}
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the acquired restore lease was persisted")
-	return updated, retryAfter(defaultRequeueDelay)
+	return updated, retry()
 }
 
 func (r *restoreReconciler) reportWaitingForLease(ctx context.Context, restore *k8sv1.Restore, holderName string) (*k8sv1.Restore, stageOutcome) {
@@ -92,7 +92,7 @@ func (r *restoreReconciler) reportWaitingForLease(ctx context.Context, restore *
 		logging.Info(ctx, "waiting for the restore lease", "holder", holderName)
 	}
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "another operation still holds the restore lease")
-	return updated, retryAfter(defaultRequeueDelay)
+	return updated, retry()
 }
 
 func (r *restoreReconciler) reportInvalidRestoreLease(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {

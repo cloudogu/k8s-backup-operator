@@ -197,7 +197,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 		assert.Contains(t, deletingCondition.Message, "InProgress")
 	})
 
-	t.Run("If retrieving the Velero backup resource failed, abort.", func(t *testing.T) {
+	t.Run("If retrieving the Velero backup resource failed, retry with error", func(t *testing.T) {
 		backup := newDeletedBackupForReconcilerTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).
@@ -218,7 +218,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If retrieving the delete backup request failed, abort.", func(t *testing.T) {
+	t.Run("If retrieving the delete backup request failed, retry with error", func(t *testing.T) {
 		backup := newDeletedBackupForReconcilerTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).
@@ -242,7 +242,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If creating the delete backup request failed, abort.", func(t *testing.T) {
+	t.Run("If creating the delete backup request failed, retry with error", func(t *testing.T) {
 		backup := newDeletedBackupForReconcilerTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).
@@ -266,7 +266,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 		assert.Equal(t, actionRetry, outcome.action)
 	})
 
-	t.Run("If patching status the backup failed, abort.", func(t *testing.T) {
+	t.Run("If patching status the backup failed, retry with error", func(t *testing.T) {
 		backup := newDeletedBackupForReconcilerTest("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).

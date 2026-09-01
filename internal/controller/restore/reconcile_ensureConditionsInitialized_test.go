@@ -43,8 +43,8 @@ func TestTheFirstReconcileOfANewRestoreInitializesAllWorkflowConditions(t *testi
 
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the initializing write must end the reconciliation")
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[1], "the second reconciliation belongs to the metadata stage")
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0], "the initializing write must end the reconciliation")
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[1], "the second reconciliation belongs to the metadata stage")
 	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), updateOf(restore)}, fixture.clientActions.snapshot(),
 		"the conditions must be initialized in one write, before the metadata and only once")
 
@@ -73,7 +73,7 @@ func TestConditionInitializationDoesNotResetAResolvedCondition(t *testing.T) {
 	results, errs := fixture.reconcileTimes(testCtx, request, 1)
 
 	require.NoError(t, errs[0])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0])
 
 	stored := &k8sv1.Restore{}
 	require.NoError(t, fixture.client.Get(testCtx, request.NamespacedName, stored))
@@ -103,7 +103,7 @@ func TestARestoreInterruptedAtAnUnknownOutcomeContinues(t *testing.T) {
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0])
 	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
 		"the restore must continue with the provider restore instead of being written again")
 }
@@ -121,7 +121,7 @@ func TestALegacyRestoreWithAnUninterpretableStatusIsInitializedInstead(t *testin
 	results, errs := fixture.reconcileTimes(testCtx, request, 1)
 
 	require.NoError(t, errs[0])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0])
 
 	stored := &k8sv1.Restore{}
 	require.NoError(t, fixture.client.Get(testCtx, request.NamespacedName, stored))

@@ -14,14 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type action int
-
-const (
-	Next action = iota
-	Retry
-	Abort
-)
-
 type reconciler interface {
 	ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
@@ -63,8 +55,6 @@ func requiredOperation(backup *backupv1.Backup) operation {
 	return operationCreate
 }
 
-type ensureFunction func(ctx context.Context, backup *backupv1.Backup) (action, error)
-
 func NewController(client client.Client, reconciler reconciler, requeueAfter time.Duration) *Controller {
 	return &Controller{
 		client:       client,
@@ -93,32 +83,6 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	metrics.InitInvalidLeaseTotalMetric(backup.Namespace, backup.Name)
 
 	return runStages(ctx, &backup, c.requeueAfter, c.getStagesForOperation(requiredOperation(&backup))...)
-}
-
-// asStage translates one ensureFunction into a stage. The ensureFunctions mutate the Backup they are
-// given, so the stage hands the very same object back.
-func (c *Controller) asStage(ensure ensureFunction) stage {
-	return func(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome) {
-		nextAction, err := ensure(ctx, backup)
-
-		switch nextAction {
-		case Retry:
-			// Error always wins
-			if err != nil {
-				return backup, retryOnError(err)
-			}
-
-			return backup, retryAfter(c.requeueAfter)
-		case Abort:
-			if err != nil {
-				return backup, retryOnError(err)
-			}
-
-			return backup, abort()
-		default: // Next
-			return backup, next()
-		}
-	}
 }
 
 // getStagesForOperation returns the stages this reconciliation has to run, in order.

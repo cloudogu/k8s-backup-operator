@@ -46,7 +46,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
 
 		assert.Same(t, restore, actualRestore)
-		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+		assert.Equal(t, retry(), actualOutcome)
 	})
 
 	for _, test := range []struct {
@@ -87,7 +87,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 
 			assert.Same(t, restore, actualRestore)
 			if test.wantRetry {
-				assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+				assert.Equal(t, retry(), actualOutcome)
 			} else {
 				require.Error(t, actualOutcome.err)
 				assert.ErrorIs(t, actualOutcome.err, assert.AnError)
@@ -123,7 +123,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 
 		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
 
-		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+		assert.Equal(t, retry(), actualOutcome)
 		condition := findSuccessfulCondition(actualRestore)
 		require.NotNil(t, condition)
 		assert.Equal(t, metav1.ConditionUnknown, condition.Status)
@@ -167,7 +167,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 
 		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
 
-		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+		assert.Equal(t, retry(), actualOutcome)
 		condition := findSuccessfulCondition(actualRestore)
 		require.NotNil(t, condition)
 		assert.Equal(t, ReasonRestoreLeaseAcquired, condition.Reason)
@@ -228,7 +228,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 
 		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
 
-		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+		assert.Equal(t, retry(), actualOutcome)
 		condition := findSuccessfulCondition(actualRestore)
 		require.NotNil(t, condition)
 		assert.Equal(t, metav1.ConditionUnknown, condition.Status)
@@ -295,7 +295,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
 
 			assert.Same(t, restore, actualRestore)
-			assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+			assert.Equal(t, retry(), actualOutcome)
 		})
 	}
 
@@ -350,7 +350,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 				assert.ErrorIs(t, actualOutcome.err, test.updateError)
 				assert.ErrorContains(t, actualOutcome.err, "failed to take over stale lease")
 			} else {
-				assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
+				assert.Equal(t, retry(), actualOutcome)
 			}
 		})
 	}
