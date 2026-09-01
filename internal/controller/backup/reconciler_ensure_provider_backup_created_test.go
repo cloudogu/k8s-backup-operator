@@ -26,15 +26,15 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 
 		require.True(t, backup.Status.StartTimestamp.IsZero())
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		assert.NotNil(t, completedCondition)
 		assert.Equal(t, metav1.ConditionUnknown, completedCondition.Status)
 		assert.Equal(t, reasonProviderBackupResourceDoesNotExist, completedCondition.Reason)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		assert.False(t, backup.Status.StartTimestamp.IsZero())
 
@@ -55,15 +55,15 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		assert.NotNil(t, completedCondition)
 		assert.Equal(t, metav1.ConditionUnknown, completedCondition.Status)
 		assert.Equal(t, reasonProviderBackupResourceDoesNotExist, completedCondition.Reason)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		assert.WithinDuration(t, baseTime.Time, backup.Status.StartTimestamp.Time, time.Second)
 
@@ -86,10 +86,10 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 
 		assert.Equal(t, 0, counter.veleroBackupCreateCount)
 		assert.Equal(t, 0, counter.subResourcePatchCount)
@@ -106,11 +106,11 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "get error")
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.ErrorContains(t, outcome.err, "get error")
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If patching the status fails, abort", func(t *testing.T) {
@@ -124,11 +124,11 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "patch error")
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.ErrorContains(t, outcome.err, "patch error")
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If creating the Velero backup resource fails, abort", func(t *testing.T) {
@@ -142,10 +142,10 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "create error")
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.ErrorContains(t, outcome.err, "create error")
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 }

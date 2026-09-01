@@ -22,10 +22,10 @@ func TestEnsureConditionsInitialized(t *testing.T) {
 		fakeClient := newFakeClientForEnsureConditionsInitializedTest(t, backup, &patches, nil)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureConditionsInitialized(context.Background(), backup)
+		_, outcome := reconciler.ensureConditionsInitialized(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		assert.Equal(t, 1, patches, "the conditions must be seeded in a single status write")
 
 		stored := &backupv1.Backup{}
@@ -44,10 +44,10 @@ func TestEnsureConditionsInitialized(t *testing.T) {
 		fakeClient := newFakeClientForEnsureConditionsInitializedTest(t, backup, new(int), nil)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureConditionsInitialized(context.Background(), backup)
+		_, outcome := reconciler.ensureConditionsInitialized(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 
 		stored := &backupv1.Backup{}
 		require.NoError(t, fakeClient.Get(context.Background(), backup.GetNamespacedName(), stored))
@@ -68,10 +68,10 @@ func TestEnsureConditionsInitialized(t *testing.T) {
 		fakeClient := newFakeClientForEnsureConditionsInitializedTest(t, backup, &patches, nil)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureConditionsInitialized(context.Background(), backup)
+		_, outcome := reconciler.ensureConditionsInitialized(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		assert.Zero(t, patches, "a backup that carries every condition must not be patched again")
 	})
 
@@ -81,12 +81,12 @@ func TestEnsureConditionsInitialized(t *testing.T) {
 		fakeClient := newFakeClientForEnsureConditionsInitializedTest(t, backup, new(int), patchErr)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureConditionsInitialized(context.Background(), backup)
+		_, outcome := reconciler.ensureConditionsInitialized(context.Background(), backup)
 
-		assert.Equal(t, Abort, nextAction)
-		require.Error(t, err)
-		assert.ErrorIs(t, err, patchErr)
-		assert.ErrorContains(t, err, "patch status to initialize the backup conditions")
+		assert.Equal(t, actionRetry, outcome.action)
+		require.Error(t, outcome.err)
+		assert.ErrorIs(t, outcome.err, patchErr)
+		assert.ErrorContains(t, outcome.err, "patch status to initialize the backup conditions")
 	})
 }
 

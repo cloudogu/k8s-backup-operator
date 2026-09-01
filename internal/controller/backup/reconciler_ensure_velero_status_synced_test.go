@@ -21,10 +21,10 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		reconciler := NewReconciler(newFakeClientBuilder(t).WithObjects(backup).Build(), newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+		_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 	})
 
 	t.Run("completed Velero status and timestamps are synchronized", func(t *testing.T) {
@@ -41,10 +41,10 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+		_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Abort, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionAbort, outcome.action)
 		assert.Equal(t, backupv1.BackupStatusCompleted, backup.Status.Status)
 		assert.True(t, backup.Status.StartTimestamp.Equal(&start))
 		assert.True(t, backup.Status.CompletionTimestamp.Equal(&completion))
@@ -63,10 +63,10 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+		_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 		assert.Equal(t, backupv1.BackupStatusInProgress, backup.Status.Status)
 		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionUnknown, reasonVeleroBackupRunning)
 		assertCondition(t, backup, backupv1.ConditionProviderSucceeded, metav1.ConditionUnknown, reasonVeleroBackupRunning)
@@ -82,10 +82,10 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+		_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Abort, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionAbort, outcome.action)
 		assert.Equal(t, backupv1.BackupStatusFailed, backup.Status.Status)
 		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionFalse, reasonVeleroBackupFailed)
 		assertCondition(t, backup, backupv1.ConditionProviderSucceeded, metav1.ConditionFalse, reasonVeleroBackupFailed)
@@ -104,20 +104,20 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+		_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-		require.ErrorContains(t, err, "get velero backup to sync status")
-		assert.Equal(t, Abort, nextAction)
+		require.ErrorContains(t, outcome.err, "get velero backup to sync status")
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 	t.Run("local backup does not read Velero", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		counter := &callCounter{}
 		reconciler := NewReconciler(newFakeClientBuilderWithCounter(t, counter).WithObjects(backup).Build(), newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+		_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 		assert.Zero(t, counter.veleroBackupGetCount)
 	})
 
@@ -129,10 +129,10 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 			fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).WithStatusSubresource(backup).Build()
 			reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-			nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+			_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-			require.NoError(t, err)
-			assert.Equal(t, Abort, nextAction)
+			require.NoError(t, outcome.err)
+			assert.Equal(t, actionAbort, outcome.action)
 			assert.Equal(t, backupv1.BackupStatusFailed, backup.Status.Status)
 			assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionFalse, reasonVeleroBackupFailed)
 			assertCondition(t, backup, backupv1.ConditionProviderSucceeded, metav1.ConditionFalse, reasonVeleroBackupFailed)
@@ -146,10 +146,10 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).WithStatusSubresource(backup).Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+		_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 		assert.Equal(t, backupv1.BackupStatusInProgress, backup.Status.Status) //nolint:staticcheck // legacy backup status compatibility
 		assertCondition(t, backup, backupv1.ConditionSucceeded, metav1.ConditionUnknown, reasonVeleroBackupRunning)
 		assertCondition(t, backup, backupv1.ConditionProviderSucceeded, metav1.ConditionUnknown, reasonVeleroBackupRunning)
@@ -162,10 +162,10 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).WithStatusSubresource(backup).Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+		_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Abort, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionAbort, outcome.action)
 		assert.True(t, backup.Status.StartTimestamp.IsZero())
 		assert.True(t, backup.Status.CompletionTimestamp.IsZero())
 	})
@@ -175,10 +175,10 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		backup.Spec.SyncedFromProvider = true
 		reconciler := NewReconciler(newFakeClientBuilder(t).WithObjects(backup).Build(), newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+		_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-		require.ErrorContains(t, err, "get velero backup to sync status")
-		assert.Equal(t, Abort, nextAction)
+		require.ErrorContains(t, outcome.err, "get velero backup to sync status")
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("status patch failure aborts", func(t *testing.T) {
@@ -189,10 +189,10 @@ func TestCheckVeleroStatusSynced(t *testing.T) {
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).WithObjects(backup, veleroBackup).WithStatusSubresource(backup).Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
+		_, outcome := reconciler.ensureVeleroStatusSynced(context.Background(), backup)
 
-		require.ErrorContains(t, err, "patch backup status synchronized from Velero")
-		assert.Equal(t, Abort, nextAction)
+		require.ErrorContains(t, outcome.err, "patch backup status synchronized from Velero")
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 }
 

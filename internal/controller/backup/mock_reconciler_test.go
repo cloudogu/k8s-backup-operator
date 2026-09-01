@@ -373,28 +373,30 @@ func (_c *mockReconciler_ensureBackupSetup_Call) RunAndReturn(run func(context.C
 }
 
 // ensureConditionsInitialized provides a mock function with given fields: ctx, backup
-func (_m *mockReconciler) ensureConditionsInitialized(ctx context.Context, backup *v1.Backup) (action, error) {
+func (_m *mockReconciler) ensureConditionsInitialized(ctx context.Context, backup *v1.Backup) (*v1.Backup, stageOutcome) {
 	ret := _m.Called(ctx, backup)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ensureConditionsInitialized")
 	}
 
-	var r0 action
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (action, error)); ok {
+	var r0 *v1.Backup
+	var r1 stageOutcome
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, stageOutcome)); ok {
 		return rf(ctx, backup)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) action); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
 		r0 = rf(ctx, backup)
 	} else {
-		r0 = ret.Get(0).(action)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Backup)
+		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) stageOutcome); ok {
 		r1 = rf(ctx, backup)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(stageOutcome)
 	}
 
 	return r0, r1
@@ -419,12 +421,12 @@ func (_c *mockReconciler_ensureConditionsInitialized_Call) Run(run func(ctx cont
 	return _c
 }
 
-func (_c *mockReconciler_ensureConditionsInitialized_Call) Return(_a0 action, _a1 error) *mockReconciler_ensureConditionsInitialized_Call {
+func (_c *mockReconciler_ensureConditionsInitialized_Call) Return(_a0 *v1.Backup, _a1 stageOutcome) *mockReconciler_ensureConditionsInitialized_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockReconciler_ensureConditionsInitialized_Call) RunAndReturn(run func(context.Context, *v1.Backup) (action, error)) *mockReconciler_ensureConditionsInitialized_Call {
+func (_c *mockReconciler_ensureConditionsInitialized_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, stageOutcome)) *mockReconciler_ensureConditionsInitialized_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -603,28 +605,30 @@ func (_c *mockReconciler_ensureOrphanedBackupDeleted_Call) RunAndReturn(run func
 }
 
 // ensureProviderBackupCompleted provides a mock function with given fields: ctx, backup
-func (_m *mockReconciler) ensureProviderBackupCompleted(ctx context.Context, backup *v1.Backup) (action, error) {
+func (_m *mockReconciler) ensureProviderBackupCompleted(ctx context.Context, backup *v1.Backup) (*v1.Backup, stageOutcome) {
 	ret := _m.Called(ctx, backup)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ensureProviderBackupCompleted")
 	}
 
-	var r0 action
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (action, error)); ok {
+	var r0 *v1.Backup
+	var r1 stageOutcome
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, stageOutcome)); ok {
 		return rf(ctx, backup)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) action); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
 		r0 = rf(ctx, backup)
 	} else {
-		r0 = ret.Get(0).(action)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Backup)
+		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) stageOutcome); ok {
 		r1 = rf(ctx, backup)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(stageOutcome)
 	}
 
 	return r0, r1
@@ -649,39 +653,41 @@ func (_c *mockReconciler_ensureProviderBackupCompleted_Call) Run(run func(ctx co
 	return _c
 }
 
-func (_c *mockReconciler_ensureProviderBackupCompleted_Call) Return(_a0 action, _a1 error) *mockReconciler_ensureProviderBackupCompleted_Call {
+func (_c *mockReconciler_ensureProviderBackupCompleted_Call) Return(_a0 *v1.Backup, _a1 stageOutcome) *mockReconciler_ensureProviderBackupCompleted_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockReconciler_ensureProviderBackupCompleted_Call) RunAndReturn(run func(context.Context, *v1.Backup) (action, error)) *mockReconciler_ensureProviderBackupCompleted_Call {
+func (_c *mockReconciler_ensureProviderBackupCompleted_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, stageOutcome)) *mockReconciler_ensureProviderBackupCompleted_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ensureProviderBackupCreated provides a mock function with given fields: ctx, backup
-func (_m *mockReconciler) ensureProviderBackupCreated(ctx context.Context, backup *v1.Backup) (action, error) {
+func (_m *mockReconciler) ensureProviderBackupCreated(ctx context.Context, backup *v1.Backup) (*v1.Backup, stageOutcome) {
 	ret := _m.Called(ctx, backup)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ensureProviderBackupCreated")
 	}
 
-	var r0 action
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (action, error)); ok {
+	var r0 *v1.Backup
+	var r1 stageOutcome
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, stageOutcome)); ok {
 		return rf(ctx, backup)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) action); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
 		r0 = rf(ctx, backup)
 	} else {
-		r0 = ret.Get(0).(action)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Backup)
+		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) stageOutcome); ok {
 		r1 = rf(ctx, backup)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(stageOutcome)
 	}
 
 	return r0, r1
@@ -706,39 +712,41 @@ func (_c *mockReconciler_ensureProviderBackupCreated_Call) Run(run func(ctx cont
 	return _c
 }
 
-func (_c *mockReconciler_ensureProviderBackupCreated_Call) Return(_a0 action, _a1 error) *mockReconciler_ensureProviderBackupCreated_Call {
+func (_c *mockReconciler_ensureProviderBackupCreated_Call) Return(_a0 *v1.Backup, _a1 stageOutcome) *mockReconciler_ensureProviderBackupCreated_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockReconciler_ensureProviderBackupCreated_Call) RunAndReturn(run func(context.Context, *v1.Backup) (action, error)) *mockReconciler_ensureProviderBackupCreated_Call {
+func (_c *mockReconciler_ensureProviderBackupCreated_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, stageOutcome)) *mockReconciler_ensureProviderBackupCreated_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ensureProviderBackupDeleted provides a mock function with given fields: ctx, backup
-func (_m *mockReconciler) ensureProviderBackupDeleted(ctx context.Context, backup *v1.Backup) (action, error) {
+func (_m *mockReconciler) ensureProviderBackupDeleted(ctx context.Context, backup *v1.Backup) (*v1.Backup, stageOutcome) {
 	ret := _m.Called(ctx, backup)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ensureProviderBackupDeleted")
 	}
 
-	var r0 action
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (action, error)); ok {
+	var r0 *v1.Backup
+	var r1 stageOutcome
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, stageOutcome)); ok {
 		return rf(ctx, backup)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) action); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
 		r0 = rf(ctx, backup)
 	} else {
-		r0 = ret.Get(0).(action)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Backup)
+		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) stageOutcome); ok {
 		r1 = rf(ctx, backup)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(stageOutcome)
 	}
 
 	return r0, r1
@@ -763,39 +771,41 @@ func (_c *mockReconciler_ensureProviderBackupDeleted_Call) Run(run func(ctx cont
 	return _c
 }
 
-func (_c *mockReconciler_ensureProviderBackupDeleted_Call) Return(_a0 action, _a1 error) *mockReconciler_ensureProviderBackupDeleted_Call {
+func (_c *mockReconciler_ensureProviderBackupDeleted_Call) Return(_a0 *v1.Backup, _a1 stageOutcome) *mockReconciler_ensureProviderBackupDeleted_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockReconciler_ensureProviderBackupDeleted_Call) RunAndReturn(run func(context.Context, *v1.Backup) (action, error)) *mockReconciler_ensureProviderBackupDeleted_Call {
+func (_c *mockReconciler_ensureProviderBackupDeleted_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, stageOutcome)) *mockReconciler_ensureProviderBackupDeleted_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ensureVeleroStatusSynced provides a mock function with given fields: ctx, backup
-func (_m *mockReconciler) ensureVeleroStatusSynced(ctx context.Context, backup *v1.Backup) (action, error) {
+func (_m *mockReconciler) ensureVeleroStatusSynced(ctx context.Context, backup *v1.Backup) (*v1.Backup, stageOutcome) {
 	ret := _m.Called(ctx, backup)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ensureVeleroStatusSynced")
 	}
 
-	var r0 action
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (action, error)); ok {
+	var r0 *v1.Backup
+	var r1 stageOutcome
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, stageOutcome)); ok {
 		return rf(ctx, backup)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) action); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
 		r0 = rf(ctx, backup)
 	} else {
-		r0 = ret.Get(0).(action)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Backup)
+		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) stageOutcome); ok {
 		r1 = rf(ctx, backup)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(stageOutcome)
 	}
 
 	return r0, r1
@@ -820,12 +830,12 @@ func (_c *mockReconciler_ensureVeleroStatusSynced_Call) Run(run func(ctx context
 	return _c
 }
 
-func (_c *mockReconciler_ensureVeleroStatusSynced_Call) Return(_a0 action, _a1 error) *mockReconciler_ensureVeleroStatusSynced_Call {
+func (_c *mockReconciler_ensureVeleroStatusSynced_Call) Return(_a0 *v1.Backup, _a1 stageOutcome) *mockReconciler_ensureVeleroStatusSynced_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockReconciler_ensureVeleroStatusSynced_Call) RunAndReturn(run func(context.Context, *v1.Backup) (action, error)) *mockReconciler_ensureVeleroStatusSynced_Call {
+func (_c *mockReconciler_ensureVeleroStatusSynced_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, stageOutcome)) *mockReconciler_ensureVeleroStatusSynced_Call {
 	_c.Call.Return(run)
 	return _c
 }

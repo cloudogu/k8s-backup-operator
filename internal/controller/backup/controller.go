@@ -24,17 +24,17 @@ const (
 
 type reconciler interface {
 	ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureOrphanedBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureConditionsInitialized(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
+	ensureConditionsInitialized(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureBackupIsCanceledAfterTimeWindowExpired(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureActiveBackupLease(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
-	ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup) (action, error)
-	ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
+	ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (*backupv1.Backup, stageOutcome)
 	ensureMaintenanceDeactivated(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupRunCompleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 }
@@ -130,7 +130,7 @@ func (c *Controller) getStagesForOperation(op operation) []stage {
 		// MaintenanceModeDeactivation needs lease, so comes first. Lease second, because
 		// after ensureProviderBackupDeleted there is no backup anymore to release the lease on.
 		return append(c.cleanupStages(),
-			c.asStage(c.reconciler.ensureProviderBackupDeleted),
+			c.reconciler.ensureProviderBackupDeleted,
 		)
 	case operationIgnore:
 		// Succeeded is written only after cleanup, so a terminal backup has no work left but to
@@ -142,15 +142,15 @@ func (c *Controller) getStagesForOperation(op operation) []stage {
 		return c.finalizeStages()
 	default: // operationCreate
 		return append([]stage{
-			c.asStage(c.reconciler.ensureVeleroStatusSynced),
-			c.asStage(c.reconciler.ensureConditionsInitialized),
+			c.reconciler.ensureVeleroStatusSynced,
+			c.reconciler.ensureConditionsInitialized,
 			c.reconciler.ensureBackupSetup,
 			c.reconciler.ensureBackupIsCanceledAfterTimeWindowExpired,
 			c.reconciler.ensureBackupIsPrepared,
 			c.reconciler.ensureActiveBackupLease,
 			c.reconciler.ensureMaintenanceActivated,
-			c.asStage(c.reconciler.ensureProviderBackupCreated),
-			c.asStage(c.reconciler.ensureProviderBackupCompleted),
+			c.reconciler.ensureProviderBackupCreated,
+			c.reconciler.ensureProviderBackupCompleted,
 		}, c.finalizeStages()...)
 	}
 }

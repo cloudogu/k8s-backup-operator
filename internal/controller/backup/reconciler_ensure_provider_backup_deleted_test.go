@@ -28,10 +28,10 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 
 		require.True(t, backup.DeletionTimestamp.IsZero())
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionNext, outcome.action)
 
 		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
 		assert.NotNil(t, completedCondition)
@@ -60,10 +60,10 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Abort, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionAbort, outcome.action)
 
 		assert.Empty(t, backup.Finalizers)
 
@@ -102,10 +102,10 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		assert.Contains(t, backup.Finalizers, backupv1.BackupFinalizer)
 
@@ -149,10 +149,10 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
-		assert.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		// Do not create delete backup request
 		assert.Equal(t, 0, createDeleteBackupRequestCallCount)
@@ -184,10 +184,10 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			}).Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 		assert.Equal(t, 0, createCallCount)
 		assert.Equal(t, 1, deleteCallCount)
 		deletingCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
@@ -211,11 +211,11 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "get error")
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.ErrorContains(t, outcome.err, "get error")
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If retrieving the delete backup request failed, abort.", func(t *testing.T) {
@@ -235,11 +235,11 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "get error")
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.ErrorContains(t, outcome.err, "get error")
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If creating the delete backup request failed, abort.", func(t *testing.T) {
@@ -259,11 +259,11 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "create error")
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.ErrorContains(t, outcome.err, "create error")
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 	t.Run("If patching status the backup failed, abort.", func(t *testing.T) {
@@ -281,11 +281,11 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "patch status error")
-		assert.Equal(t, Abort, nextAction)
+		assert.Error(t, outcome.err)
+		assert.ErrorContains(t, outcome.err, "patch status error")
+		assert.Equal(t, actionRetry, outcome.action)
 	})
 
 }
@@ -318,10 +318,10 @@ func TestReconcilerReportsDeletionProgress(t *testing.T) {
 		clock.EXPECT().Now().Return(deletionStart.Add(2 * time.Minute)).Once()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clock, "default")
 
-		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+		_, outcome := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
-		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		require.NoError(t, outcome.err)
+		assert.Equal(t, actionRetry, outcome.action)
 
 		deletingCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
 		require.NotNil(t, deletingCondition)
