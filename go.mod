@@ -5,11 +5,10 @@ go 1.26.0
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/cloudogu/ces-commons-lib v0.3.0
-	github.com/cloudogu/k8s-backup-lib v1.6.1-0.20260825095622-1ef5bbfff811
+	github.com/cloudogu/k8s-backup-lib v1.9.0
 	github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0
 	github.com/cloudogu/k8s-dogu-lib/v2 v2.12.0
 	github.com/cloudogu/k8s-registry-lib v1.0.0
-	github.com/cloudogu/retry-lib v0.1.0
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/go-logr/logr v1.4.3
 	github.com/google/uuid v1.6.0
@@ -33,6 +32,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudogu/cesapp-lib v0.18.2 // indirect
+	github.com/cloudogu/retry-lib v0.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/eapache/go-resiliency v1.7.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
