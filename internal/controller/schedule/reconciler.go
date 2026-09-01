@@ -14,6 +14,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	actionValidateBackupSchedule = "ValidateBackupSchedule"
+	actionDeleteBackupSchedule   = "DeleteBackupSchedule"
+	actionSynchronizeCronJob     = "SynchronizeCronJob"
+	actionCreateCronJob          = "CreateCronJob"
+	actionDeleteCronJob          = "DeleteCronJob"
+	actionUpdateCronJob          = "UpdateCronJob"
+)
+
 type defaultReconciler struct {
 	client   client.Client
 	recorder eventRecorder
@@ -97,7 +106,7 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 
 	// only need to remove finalizers, not labels
 	if err := r.metadata.remove(ctx, schedule); err != nil {
-		r.recorder.Eventf(schedule, nil, corev1.EventTypeWarning, backupv1.FinalizerRemovalFailedEventReason, "",
+		r.recorder.Eventf(schedule, nil, corev1.EventTypeWarning, backupv1.FinalizerRemovalFailedEventReason, actionDeleteBackupSchedule,
 			"Failed to remove finalizer %q from BackupSchedule: %v", backupv1.BackupScheduleFinalizer, err,
 		)
 		return err
@@ -122,7 +131,7 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 		r.conditions.markNotReady(schedule, backupv1.ReasonInvalidSpec, "BackupSchedule spec is invalid: "+err.Error())
 		r.recorder.Eventf(
 			schedule, nil,
-			corev1.EventTypeWarning, backupv1.InvalidScheduleEventReason, "",
+			corev1.EventTypeWarning, backupv1.InvalidScheduleEventReason, actionValidateBackupSchedule,
 			"BackupSchedule has an invalid schedule: %v", err,
 		)
 

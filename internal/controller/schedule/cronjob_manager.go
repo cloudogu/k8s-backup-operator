@@ -65,7 +65,7 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 	})
 	if err != nil {
 		c.recorder.Eventf(
-			schedule, nil, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason, "",
+			schedule, nil, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason, actionSynchronizeCronJob,
 			"Failed to synchronize CronJob %q: %v", cronJob.Name, err,
 		)
 		return fmt.Errorf("failed to synchronize CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
@@ -75,14 +75,14 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 	case controllerutil.OperationResultCreated:
 		c.recorder.Eventf(
 			schedule, nil,
-			corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason, "",
+			corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason, actionCreateCronJob,
 			"Created CronJob %q.", cronJob.Name,
 		)
 
 	case controllerutil.OperationResultUpdated:
 		c.recorder.Eventf(
 			schedule, nil,
-			corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason, "",
+			corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason, actionUpdateCronJob,
 			"Updated CronJob %q.", cronJob.Name,
 		)
 
@@ -112,7 +112,7 @@ func (c defaultCronJobManager) delete(ctx context.Context, schedule *backupv1.Ba
 		return nil
 	}
 	if err != nil {
-		c.recorder.Eventf(schedule, nil, corev1.EventTypeWarning, backupv1.CronJobDeletionFailedEventReason, "",
+		c.recorder.Eventf(schedule, nil, corev1.EventTypeWarning, backupv1.CronJobDeletionFailedEventReason, actionDeleteCronJob,
 			"Failed to delete CronJob %q: %v", cronJob.Name, err,
 		)
 		return fmt.Errorf("failed to delete CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
@@ -120,7 +120,7 @@ func (c defaultCronJobManager) delete(ctx context.Context, schedule *backupv1.Ba
 
 	c.recorder.Eventf(
 		schedule, nil,
-		corev1.EventTypeNormal, backupv1.CronJobDeletionRequestedEventReason, "",
+		corev1.EventTypeNormal, backupv1.CronJobDeletionRequestedEventReason, actionDeleteCronJob,
 		"Requested deletion of CronJob %q.", cronJob.Name,
 	)
 

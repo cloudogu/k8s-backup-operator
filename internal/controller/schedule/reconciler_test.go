@@ -196,7 +196,7 @@ func Test_reconcileNormal(t *testing.T) {
 			assert.Len(t, schedule.Status.Conditions, 2)
 
 			if tt.validatorErr != nil {
-				requireRecordedEvent(t, recorder, schedule, corev1.EventTypeWarning, backupv1.InvalidScheduleEventReason, "BackupSchedule has an invalid schedule: invalid")
+				requireRecordedEvent(t, recorder, schedule, corev1.EventTypeWarning, backupv1.InvalidScheduleEventReason, actionValidateBackupSchedule, "BackupSchedule has an invalid schedule: invalid")
 			} else {
 				requireNoRecordedEvent(t, recorder)
 			}
@@ -255,7 +255,7 @@ func Test_reconcileDelete(t *testing.T) {
 			assert.Equal(t, tt.expectDeleteCalled, testCronJobs.deleteCalled)
 			assert.Equal(t, tt.expectMetadataRemove, testMetadata.removeCalled)
 			if tt.metadataErr != nil {
-				requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, backupv1.FinalizerRemovalFailedEventReason, "Failed to remove finalizer", backupv1.BackupScheduleFinalizer, tt.metadataErr.Error())
+				requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, backupv1.FinalizerRemovalFailedEventReason, actionDeleteBackupSchedule, "Failed to remove finalizer", backupv1.BackupScheduleFinalizer, tt.metadataErr.Error())
 			} else {
 				requireNoRecordedEvent(t, recorder)
 			}

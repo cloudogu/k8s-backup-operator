@@ -16,6 +16,7 @@ type recordedEvent struct {
 	object    runtime.Object
 	eventType string
 	reason    string
+	action    string
 	message   string
 }
 
@@ -27,20 +28,13 @@ func newFakeEventRecorder() *fakeEventRecorder {
 	return &fakeEventRecorder{}
 }
 
-// implement the record.EventRecorder interface
-func (r *fakeEventRecorder) Event(object runtime.Object, eventType, reason, message string) {
-	r.events = append(r.events, recordedEvent{object: object, eventType: eventType, reason: reason, message: message})
+func (r *fakeEventRecorder) Eventf(regarding runtime.Object, _ runtime.Object, eventType, reason, action, note string, args ...interface{}) {
+	r.events = append(r.events, recordedEvent{
+		object: regarding, eventType: eventType, reason: reason, action: action, message: fmt.Sprintf(note, args...),
+	})
 }
 
-func (r *fakeEventRecorder) Eventf(object runtime.Object, eventType, reason, messageFmt string, args ...interface{}) {
-	r.Event(object, eventType, reason, fmt.Sprintf(messageFmt, args...))
-}
-
-func (r *fakeEventRecorder) AnnotatedEventf(object runtime.Object, _ map[string]string, eventType, reason, messageFmt string, args ...interface{}) {
-	r.Eventf(object, eventType, reason, messageFmt, args...)
-}
-
-func requireRecordedEvent(t *testing.T, recorder *fakeEventRecorder, expectedObject runtime.Object, expectedType, expectedReason, expectedMessage string) {
+func requireRecordedEvent(t *testing.T, recorder *fakeEventRecorder, expectedObject runtime.Object, expectedType, expectedReason, expectedAction, expectedMessage string) {
 	if len(recorder.events) == 0 {
 		require.Fail(t, "expected a Kubernetes Event, but none was recorded", "expected reason %q and message %q", expectedReason, expectedMessage)
 		return
@@ -51,10 +45,11 @@ func requireRecordedEvent(t *testing.T, recorder *fakeEventRecorder, expectedObj
 	require.Same(t, expectedObject, event.object)
 	require.Equal(t, expectedType, event.eventType)
 	require.Equal(t, expectedReason, event.reason)
+	require.Equal(t, expectedAction, event.action)
 	require.Equal(t, expectedMessage, event.message)
 }
 
-func requireRecordedEventContains(t *testing.T, recorder *fakeEventRecorder, expectedObject runtime.Object, expectedType, expectedReason string, expectedMessageParts ...string) {
+func requireRecordedEventContains(t *testing.T, recorder *fakeEventRecorder, expectedObject runtime.Object, expectedType, expectedReason, expectedAction string, expectedMessageParts ...string) {
 	if len(recorder.events) == 0 {
 		require.Fail(t, "expected a Kubernetes Event, but none was recorded")
 		return
@@ -65,6 +60,7 @@ func requireRecordedEventContains(t *testing.T, recorder *fakeEventRecorder, exp
 	require.Same(t, expectedObject, event.object)
 	require.Equal(t, expectedType, event.eventType)
 	require.Equal(t, expectedReason, event.reason)
+	require.Equal(t, expectedAction, event.action)
 	for _, expectedPart := range expectedMessageParts {
 		if !strings.Contains(event.message, expectedPart) {
 			require.Failf(t, "recorded event message does not contain expected text", "message %q does not contain %q", event.message, expectedPart)
