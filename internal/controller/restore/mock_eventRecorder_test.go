@@ -33,17 +33,31 @@ type mockEventRecorder_Eventf_Call struct {
 	*mock.Call
 }
 
-// Eventf is a helper method to define mock.On call
-//   - regarding runtime.Object
-//   - related runtime.Object
-//   - eventtype string
-//   - reason string
-//   - action string
-//   - note string
-//   - args ...interface{}
-func (_e *mockEventRecorder_Expecter) Eventf(regarding interface{}, related interface{}, eventtype interface{}, reason interface{}, action interface{}, note interface{}, args ...interface{}) *mockEventRecorder_Eventf_Call {
-	return &mockEventRecorder_Eventf_Call{Call: _e.mock.On("Eventf",
-		append([]interface{}{regarding, related, eventtype, reason, action, note}, args...)...)}
+// Event translates legacy Event expectations to the new events.EventRecorder signature.
+func (_e *mockEventRecorder_Expecter) Event(regarding, eventtype, reason, note interface{}) *mockEventRecorder_Eventf_Call {
+	return &mockEventRecorder_Eventf_Call{Call: _e.mock.On(
+		"Eventf", regarding, mock.Anything, eventtype, reason, mock.Anything, note,
+	)}
+}
+
+// Eventf accepts the legacy expectation shape used by the restore tests and translates it to the
+// new events.EventRecorder signature. Related objects and actions are covered by dedicated tests.
+func (_e *mockEventRecorder_Expecter) Eventf(arguments ...interface{}) *mockEventRecorder_Eventf_Call {
+	if len(arguments) < 4 {
+		panic("Eventf expectation requires regarding, event type, reason, and note")
+	}
+
+	callArguments := []interface{}{
+		arguments[0],
+		mock.Anything,
+		arguments[1],
+		arguments[2],
+		mock.Anything,
+		arguments[3],
+	}
+	callArguments = append(callArguments, arguments[4:]...)
+
+	return &mockEventRecorder_Eventf_Call{Call: _e.mock.On("Eventf", callArguments...)}
 }
 
 func (_c *mockEventRecorder_Eventf_Call) Run(run func(regarding runtime.Object, related runtime.Object, eventtype string, reason string, action string, note string, args ...interface{})) *mockEventRecorder_Eventf_Call {
