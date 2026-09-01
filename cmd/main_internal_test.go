@@ -154,7 +154,7 @@ func Test_startOperator(t *testing.T) {
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		skipNameValidation := true
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
@@ -205,7 +205,7 @@ func Test_startOperator(t *testing.T) {
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(runtime.NewScheme())
@@ -249,7 +249,7 @@ func Test_startOperator(t *testing.T) {
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
@@ -307,7 +307,7 @@ func Test_startOperator(t *testing.T) {
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
@@ -366,7 +366,7 @@ func Test_startOperator(t *testing.T) {
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
@@ -424,7 +424,7 @@ func Test_startOperator(t *testing.T) {
 		restConfig := &rest.Config{}
 		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorderFor("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
