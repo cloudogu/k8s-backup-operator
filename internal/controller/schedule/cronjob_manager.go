@@ -32,7 +32,6 @@ type defaultCronJobManager struct {
 }
 
 func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      schedule.CronJobName(),
@@ -74,15 +73,13 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 	switch operation {
 	case controllerutil.OperationResultCreated:
 		c.recorder.Eventf(
-			schedule, cronJob,
-			corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason, actionCreateCronJob,
+			schedule, cronJob, corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason, actionCreateCronJob,
 			"Created CronJob %q.", cronJob.Name,
 		)
 
 	case controllerutil.OperationResultUpdated:
 		c.recorder.Eventf(
-			schedule, cronJob,
-			corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason, actionUpdateCronJob,
+			schedule, cronJob, corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason, actionUpdateCronJob,
 			"Updated CronJob %q.", cronJob.Name,
 		)
 
