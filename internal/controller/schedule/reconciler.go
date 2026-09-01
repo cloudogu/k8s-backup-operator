@@ -97,7 +97,7 @@ func (r *defaultReconciler) reconcileDelete(ctx context.Context, schedule *backu
 
 	// only need to remove finalizers, not labels
 	if err := r.metadata.remove(ctx, schedule); err != nil {
-		r.recorder.Eventf(schedule, corev1.EventTypeWarning, backupv1.FinalizerRemovalFailedEventReason,
+		r.recorder.Eventf(schedule, nil, corev1.EventTypeWarning, backupv1.FinalizerRemovalFailedEventReason, "",
 			"Failed to remove finalizer %q from BackupSchedule: %v", backupv1.BackupScheduleFinalizer, err,
 		)
 		return err
@@ -121,9 +121,11 @@ func (r *defaultReconciler) reconcileNormal(ctx context.Context, schedule *backu
 		r.conditions.markInvalid(schedule, err)
 		r.conditions.markNotReady(schedule, backupv1.ReasonInvalidSpec, "BackupSchedule spec is invalid: "+err.Error())
 		r.recorder.Eventf(
-			schedule, corev1.EventTypeWarning, backupv1.InvalidScheduleEventReason,
+			schedule, nil,
+			corev1.EventTypeWarning, backupv1.InvalidScheduleEventReason, "",
 			"BackupSchedule has an invalid schedule: %v", err,
 		)
+
 		logging.Error(ctx, err, "BackupSchedule spec is invalid, skipping CronJob synchronization")
 
 		// invalid spec should not be reconciled again before it is edited

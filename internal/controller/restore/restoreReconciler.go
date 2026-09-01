@@ -235,7 +235,7 @@ func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restor
 // failOnProviderChildConflict reports an existing provider restore that this Restore may not adopt as
 // a terminal failure, before any preparation ran.
 func (r *restoreReconciler) failOnProviderChildConflict(ctx context.Context, restore *k8sv1.Restore, conflictErr error) (*k8sv1.Restore, stageOutcome) {
-	r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, conflictErr.Error())
+	r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, "", conflictErr.Error())
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore,
 		metav1.Condition{
@@ -281,7 +281,7 @@ func (r *restoreReconciler) ensureProviderReady(ctx context.Context, restore *k8
 	// Only record if changed to ready to avoid spam
 	if wasWaitingForProvider(restore) {
 		logging.Info(ctx, "the provider became ready", "reason", readiness.Reason)
-		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonProviderReady, readiness.Message)
+		r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonProviderReady, "", readiness.Message)
 	}
 
 	return restore, next()
@@ -309,7 +309,7 @@ func (r *restoreReconciler) reportUnreadyProvider(ctx context.Context, restore *
 			"reason", readiness.Reason,
 			"message", readiness.Message,
 		)
-		r.recorder.Event(restore, corev1.EventTypeWarning, readiness.Reason, readiness.Message)
+		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, readiness.Reason, "", readiness.Message)
 	}
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider is not ready")
 
@@ -337,7 +337,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 		return restore, next()
 	}
 
-	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparing, "Preparation in progress - scale down and cleanup")
+	r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonPreparing, "", "Preparation in progress - scale down and cleanup")
 
 	if err := r.scaleManager.ScaleDown(ctx); err != nil {
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to scale down workloads before restore: %w", err))
@@ -345,11 +345,11 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	logging.Info(ctx, "scaled down the workloads")
 
 	if err := r.cleanup.Cleanup(ctx); err != nil {
-		r.recorder.Event(restore, corev1.EventTypeWarning, ReasonCleanupFailed, "Cleanup before restore failed")
+		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonCleanupFailed, "", "Cleanup before restore failed")
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to cleanup before restore: %w", err))
 	}
 
-	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonCleanupCompleted, "Cleanup before restore completed")
+	r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonCleanupCompleted, "", "Cleanup before restore completed")
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
 		Type:    k8sv1.ConditionPrepared,
@@ -363,7 +363,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 
 	// retry after defaultDelay is a fallback since the status write triggers an instant requeue anyway
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the restore preparation was persisted")
-	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed")
+	r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonPreparationCompleted, "", "Preparation completed")
 	return updated, retryAfter(r.requeueDelay)
 }
 
@@ -395,7 +395,7 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 		preparationErr = errors.Join(preparationErr, fmt.Errorf("failed to report the failed preparation of restore %s: %w", restore.Name, err))
 	}
 
-	r.recorder.Event(restore, corev1.EventTypeWarning, ReasonPreparationFailed, "The preparation of the ecosystem failed -> retrying")
+	r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonPreparationFailed, "", "The preparation of the ecosystem failed -> retrying")
 
 	return updated, retryOnError(preparationErr)
 }
@@ -417,7 +417,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 		return restore, next()
 	}
 
-	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process")
+	r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, "", "Start provider restore process")
 
 	if _, err := velero.EnsureRestore(ctx, r.k8sClient, restore); err != nil {
 		// A conflict is not transient: another restore's child occupies the expected name, and no
@@ -427,7 +427,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 			return r.failOnProviderChildConflict(ctx, restore, conflictErr)
 		}
 
-		r.recorder.Event(restore, corev1.EventTypeWarning, ReasonProviderRestoreFailed, err.Error())
+		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonProviderRestoreFailed, "", err.Error())
 
 		return restore, retryOnError(fmt.Errorf("failed to start the provider restore of restore %s: %w", restore.Name, err))
 	}
@@ -465,7 +465,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 	message := fmt.Sprintf("The provider restore %q reports the phase %q.", child.Name, child.Status.Phase)
 	if status == metav1.ConditionTrue {
 		message = fmt.Sprintf("The provider restored the backup %q.", restore.Spec.BackupName)
-		r.recorder.Eventf(restore, corev1.EventTypeNormal, k8sv1.CreateEventReason, "Successfully completed the provider restore [%s]", child.Name)
+		r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, k8sv1.CreateEventReason, "", "Successfully completed the provider restore [%s]", child.Name)
 	}
 
 	observation := metav1.Condition{
@@ -508,7 +508,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 // failOnProviderRestore reports a terminally failed provider restore.
 func (r *restoreReconciler) failOnProviderRestore(ctx context.Context, restore *k8sv1.Restore, child *velerov1.Restore, reason string) (*k8sv1.Restore, stageOutcome) {
 	message := fmt.Sprintf("The provider restore %q failed terminally in the phase %q.", child.Name, child.Status.Phase)
-	r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, message)
+	r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, "", message)
 	// Velero failing the restore is an outcome of this stage rather than an operator error.
 	logging.Info(ctx, "the velero restore failed", "phase", child.Status.Phase)
 
@@ -601,10 +601,10 @@ func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, re
 		)
 
 		logging.Info(ctx, message)
-		r.recorder.Event(
-			restore,
+		r.recorder.Eventf(
+			restore, nil,
 			corev1.EventTypeWarning,
-			k8sv1.DeleteEventReason,
+			k8sv1.DeleteEventReason, "",
 			message,
 		)
 
@@ -660,20 +660,20 @@ func (r *restoreReconciler) ensureDeletionFinalized(ctx context.Context, restore
 			err,
 		)
 
-		r.recorder.Event(
-			restore,
+		r.recorder.Eventf(
+			restore, nil,
 			corev1.EventTypeWarning,
-			k8sv1.DeleteEventReason,
+			k8sv1.DeleteEventReason, "",
 			fmt.Sprintf("Delete failed. Reason: %s", wrappedErr),
 		)
 
 		return restore, retryOnError(wrappedErr)
 	}
 
-	r.recorder.Event(
-		restore,
+	r.recorder.Eventf(
+		restore, nil,
 		corev1.EventTypeNormal,
-		k8sv1.DeleteEventReason,
+		k8sv1.DeleteEventReason, "",
 		"Delete successful",
 	)
 
@@ -687,7 +687,7 @@ func (r *restoreReconciler) ensureDeletionFinalized(ctx context.Context, restore
 // reportUnreachedMilestone records a milestone the stage failed to reach as False and retries the
 // stage with the controller-runtime backoff
 func (r *restoreReconciler) reportUnreachedMilestone(ctx context.Context, restore *k8sv1.Restore, conditionType string, reason string, stageErr error) (*k8sv1.Restore, stageOutcome) {
-	r.recorder.Event(restore, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, stageErr.Error())
+	r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, "", stageErr.Error())
 
 	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
 		Type:    conditionType,

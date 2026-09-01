@@ -65,7 +65,7 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 	})
 	if err != nil {
 		c.recorder.Eventf(
-			schedule, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason,
+			schedule, nil, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason, "",
 			"Failed to synchronize CronJob %q: %v", cronJob.Name, err,
 		)
 		return fmt.Errorf("failed to synchronize CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
@@ -74,14 +74,18 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 	switch operation {
 	case controllerutil.OperationResultCreated:
 		c.recorder.Eventf(
-			schedule, corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason,
+			schedule, nil,
+			corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason, "",
 			"Created CronJob %q.", cronJob.Name,
 		)
+
 	case controllerutil.OperationResultUpdated:
 		c.recorder.Eventf(
-			schedule, corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason,
+			schedule, nil,
+			corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason, "",
 			"Updated CronJob %q.", cronJob.Name,
 		)
+
 	case controllerutil.OperationResultNone:
 		logging.Debug(ctx, "CronJob is up to date", "cronJob", cronJob.Name)
 	}
@@ -108,16 +112,18 @@ func (c defaultCronJobManager) delete(ctx context.Context, schedule *backupv1.Ba
 		return nil
 	}
 	if err != nil {
-		c.recorder.Eventf(schedule, corev1.EventTypeWarning, backupv1.CronJobDeletionFailedEventReason,
+		c.recorder.Eventf(schedule, nil, corev1.EventTypeWarning, backupv1.CronJobDeletionFailedEventReason, "",
 			"Failed to delete CronJob %q: %v", cronJob.Name, err,
 		)
 		return fmt.Errorf("failed to delete CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
 	}
 
 	c.recorder.Eventf(
-		schedule, corev1.EventTypeNormal, backupv1.CronJobDeletionRequestedEventReason,
+		schedule, nil,
+		corev1.EventTypeNormal, backupv1.CronJobDeletionRequestedEventReason, "",
 		"Requested deletion of CronJob %q.", cronJob.Name,
 	)
+
 	logging.Info(ctx, "requested CronJob deletion", "cronJob", cronJob.Name)
 	return nil
 }

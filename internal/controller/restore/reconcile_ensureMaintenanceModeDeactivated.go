@@ -19,7 +19,7 @@ func (r *restoreReconciler) ensureMaintenanceModeDeactivated(
 	restore *k8sv1.Restore,
 ) (*k8sv1.Restore, stageOutcome) {
 	if err := r.maintenanceModeSwitch.Deactivate(ctx, false); err != nil {
-		r.recorder.Event(restore, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, "Failed to deactivate maintenance mode after restore")
+		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, "", "Failed to deactivate maintenance mode after restore")
 		return restore, retryOnError(fmt.Errorf(
 			"failed to deactivate maintenance mode after restore %s: %w",
 			restore.Name,
@@ -31,7 +31,7 @@ func (r *restoreReconciler) ensureMaintenanceModeDeactivated(
 	if condition != nil &&
 		condition.Status == metav1.ConditionUnknown &&
 		condition.Reason == ReasonMaintenanceModeDeactivated {
-		r.recorder.Event(restore, corev1.EventTypeNormal, ReasonMaintenanceModeDeactivated, "Maintenance mode deactivated")
+		r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonMaintenanceModeDeactivated, "", "Maintenance mode deactivated")
 		return restore, next()
 
 	}
@@ -43,7 +43,7 @@ func (r *restoreReconciler) ensureMaintenanceModeDeactivated(
 		Message: "The maintenance mode was deactivated after workload recovery.",
 	})
 	if err != nil {
-		r.recorder.Event(restore, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, "Failed to persist maintenance mode deactivation for restore")
+		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, "", "Failed to persist maintenance mode deactivation for restore")
 		return restore, retryOnError(fmt.Errorf(
 			"failed to persist maintenance mode deactivation for restore %s: %w",
 			restore.Name,
