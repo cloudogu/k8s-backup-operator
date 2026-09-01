@@ -20,7 +20,7 @@ func (r *restoreReconciler) ensureScaleUpFinalized(
 	restore *k8sv1.Restore,
 ) (*k8sv1.Restore, stageOutcome) {
 	if err := r.scaleManager.FinalizeScaleUp(ctx); err != nil {
-		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonWorkloadRecoveryFailed, "", "failed to finalize workload scale-up after restore")
+		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonWorkloadRecoveryFailed, actionRecoverWorkloads, "failed to finalize workload scale-up after restore")
 		return r.reportUnreachedMilestone(
 			ctx,
 			restore,

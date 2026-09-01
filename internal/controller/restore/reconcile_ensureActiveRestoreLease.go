@@ -37,7 +37,7 @@ func (r *restoreReconciler) ensureActiveRestoreLease(ctx context.Context, restor
 	case leases.StateAcquired:
 		logging.Info(ctx, "acquired the restore lease", "lease", restoreLeaseName)
 		logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the acquired restore lease must be observed again")
-		r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonRestoreStarted, "", "The restore has started")
+		r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonRestoreStarted, actionStartRestore, "The restore has started")
 		return restore, retryAfter(defaultRequeueDelay)
 	case leases.StateConflict:
 		// An optimistic-lock conflict must be observed in a new reconciliation.
