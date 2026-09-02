@@ -32,7 +32,6 @@ type defaultCronJobManager struct {
 }
 
 func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.BackupSchedule) error {
-
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      schedule.CronJobName(),
@@ -65,7 +64,7 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 	})
 	if err != nil {
 		c.recorder.Eventf(
-			schedule, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason,
+			schedule, nil, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason, actionSynchronizeCronJob,
 			"Failed to synchronize CronJob %q: %v", cronJob.Name, err,
 		)
 		return fmt.Errorf("failed to synchronize CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
@@ -74,14 +73,16 @@ func (c defaultCronJobManager) ensure(ctx context.Context, schedule *backupv1.Ba
 	switch operation {
 	case controllerutil.OperationResultCreated:
 		c.recorder.Eventf(
-			schedule, corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason,
+			schedule, cronJob, corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason, actionCreateCronJob,
 			"Created CronJob %q.", cronJob.Name,
 		)
+
 	case controllerutil.OperationResultUpdated:
 		c.recorder.Eventf(
-			schedule, corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason,
+			schedule, cronJob, corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason, actionUpdateCronJob,
 			"Updated CronJob %q.", cronJob.Name,
 		)
+
 	case controllerutil.OperationResultNone:
 		logging.Debug(ctx, "CronJob is up to date", "cronJob", cronJob.Name)
 	}
@@ -108,16 +109,18 @@ func (c defaultCronJobManager) delete(ctx context.Context, schedule *backupv1.Ba
 		return nil
 	}
 	if err != nil {
-		c.recorder.Eventf(schedule, corev1.EventTypeWarning, backupv1.CronJobDeletionFailedEventReason,
+		c.recorder.Eventf(schedule, nil, corev1.EventTypeWarning, backupv1.CronJobDeletionFailedEventReason, actionDeleteCronJob,
 			"Failed to delete CronJob %q: %v", cronJob.Name, err,
 		)
 		return fmt.Errorf("failed to delete CronJob %s for BackupSchedule %s: %w", cronJob.Name, schedule.Name, err)
 	}
 
 	c.recorder.Eventf(
-		schedule, corev1.EventTypeNormal, backupv1.CronJobDeletionRequestedEventReason,
+		schedule, nil,
+		corev1.EventTypeNormal, backupv1.CronJobDeletionRequestedEventReason, actionDeleteCronJob,
 		"Requested deletion of CronJob %q.", cronJob.Name,
 	)
+
 	logging.Info(ctx, "requested CronJob deletion", "cronJob", cronJob.Name)
 	return nil
 }

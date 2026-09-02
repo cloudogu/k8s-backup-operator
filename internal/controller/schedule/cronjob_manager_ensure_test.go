@@ -33,23 +33,23 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 
 		require.NoError(t, manager.ensure(context.Background(), schedule))
 
-		stored := &batchv1.CronJob{}
+		cronJob := &batchv1.CronJob{}
 		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKey{
 			Name: schedule.CronJobName(), Namespace: schedule.Namespace,
-		}, stored))
+		}, cronJob))
 
-		assert.Equal(t, schedule.Spec.Schedule, stored.Spec.Schedule)
-		require.Len(t, stored.Spec.JobTemplate.Spec.Template.Spec.Containers, 1)
-		container := stored.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+		assert.Equal(t, schedule.Spec.Schedule, cronJob.Spec.Schedule)
+		require.Len(t, cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers, 1)
+		container := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
 		assert.Equal(t, manager.operatorImage, container.Image)
 		assert.Equal(t, manager.pullPolicy, container.ImagePullPolicy)
-		assert.Equal(t, manager.imagePullSecrets, stored.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets)
-		assert.Equal(t, defaultLabels, stored.Labels)
+		assert.Equal(t, manager.imagePullSecrets, cronJob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets)
+		assert.Equal(t, defaultLabels, cronJob.Labels)
 		// owner reference is backup schedule
-		require.Len(t, stored.OwnerReferences, 1)
-		assert.Equal(t, schedule.Name, stored.OwnerReferences[0].Name)
-		assert.True(t, *stored.OwnerReferences[0].Controller)
-		requireRecordedEvent(t, recorder, schedule, corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason, `Created CronJob "backup-schedule-daily".`)
+		require.Len(t, cronJob.OwnerReferences, 1)
+		assert.Equal(t, schedule.Name, cronJob.OwnerReferences[0].Name)
+		assert.True(t, *cronJob.OwnerReferences[0].Controller)
+		requireRecordedEvent(t, recorder, schedule, cronJob, corev1.EventTypeNormal, backupv1.CronJobCreatedEventReason, actionCreateCronJob, `Created CronJob "backup-schedule-daily".`)
 
 		// A converged CronJob must not produce another lifecycle event.
 		require.NoError(t, manager.ensure(context.Background(), schedule))
@@ -78,15 +78,15 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 
 		require.NoError(t, manager.ensure(context.Background(), schedule))
 
-		stored := &batchv1.CronJob{}
-		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(existing), stored))
-		assert.Equal(t, schedule.Spec.Schedule, stored.Spec.Schedule)
-		assert.Equal(t, manager.operatorImage, stored.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image)
-		assert.Equal(t, "preserved", stored.Labels["custom"])
+		cronJob := &batchv1.CronJob{}
+		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(existing), cronJob))
+		assert.Equal(t, schedule.Spec.Schedule, cronJob.Spec.Schedule)
+		assert.Equal(t, manager.operatorImage, cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image)
+		assert.Equal(t, "preserved", cronJob.Labels["custom"])
 		for key, value := range defaultLabels {
-			assert.Equal(t, value, stored.Labels[key])
+			assert.Equal(t, value, cronJob.Labels[key])
 		}
-		requireRecordedEvent(t, recorder, schedule, corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason, `Updated CronJob "backup-schedule-daily".`)
+		requireRecordedEvent(t, recorder, schedule, cronJob, corev1.EventTypeNormal, backupv1.CronJobUpdatedEventReason, actionUpdateCronJob, `Updated CronJob "backup-schedule-daily".`)
 	})
 
 	t.Run("ensure should fail if cronjob can't be created", func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to synchronize CronJob")
-		requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason, `Failed to synchronize CronJob "backup-schedule-daily"`, assert.AnError.Error())
+		requireRecordedEventContains(t, recorder, schedule, nil, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason, actionSynchronizeCronJob, `Failed to synchronize CronJob "backup-schedule-daily"`, assert.AnError.Error())
 	})
 
 	t.Run("ensure should fail if owner reference can't be set", func(t *testing.T) {
@@ -124,7 +124,7 @@ func TestCronJobManagerEnsureCreatesCronJob(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to synchronize CronJob")
 		assert.ErrorContains(t, err, "failed to set BackupSchedule daily as owner")
-		requireRecordedEventContains(t, recorder, schedule, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason, `Failed to synchronize CronJob "backup-schedule-daily"`, "failed to set BackupSchedule daily as owner")
+		requireRecordedEventContains(t, recorder, schedule, nil, corev1.EventTypeWarning, backupv1.CronJobSynchronizationFailedEventReason, actionSynchronizeCronJob, `Failed to synchronize CronJob "backup-schedule-daily"`, "failed to set BackupSchedule daily as owner")
 	})
 }
 

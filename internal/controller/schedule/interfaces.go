@@ -4,7 +4,7 @@ import (
 	"context"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -14,7 +14,7 @@ type OperatorImageGetter interface {
 }
 
 type eventRecorder interface {
-	record.EventRecorder
+	events.EventRecorder
 }
 
 type cronJobManager interface {

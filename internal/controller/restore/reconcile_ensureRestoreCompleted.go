@@ -41,7 +41,7 @@ func (r *restoreReconciler) ensureRestoreCompleted(
 		return restore, retryOnError(fmt.Errorf("failed to persist the completed restore %s: %w", restore.Name, err))
 	}
 
-	r.recorder.Event(restore, corev1.EventTypeNormal, ReasonRestoreCompleted, "Restore successful")
+	r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonRestoreCompleted, actionCompleteRestore, "Restore successful")
 	logging.Info(ctx, "restore completed successfully")
 
 	return updated, abort()

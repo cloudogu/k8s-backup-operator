@@ -7,13 +7,13 @@ import (
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/internal/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 type eventRecorder interface {
-	record.EventRecorder
+	events.EventRecorder
 }
 
 // used for mocks
