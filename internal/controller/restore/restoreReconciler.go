@@ -699,24 +699,6 @@ func (r *restoreReconciler) ensureDeletionFinalized(ctx context.Context, restore
 	return restore, abort()
 }
 
-// reportUnreachedMilestone records a milestone the stage failed to reach as False and retries the
-// stage with the controller-runtime backoff
-func (r *restoreReconciler) reportUnreachedMilestone(ctx context.Context, restore *k8sv1.Restore, conditionType string, reason string, stageErr error) (*k8sv1.Restore, stageOutcome) {
-	r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionRecoverWorkloads, stageErr.Error())
-
-	updated, err := newConditionUpdater(r.k8sClient).setConditions(ctx, restore, metav1.Condition{
-		Type:    conditionType,
-		Status:  metav1.ConditionFalse,
-		Reason:  reason,
-		Message: fmt.Sprintf("The restore workflow did not reach this milestone and is retried: %v", stageErr),
-	})
-	if err != nil {
-		stageErr = errors.Join(stageErr, fmt.Errorf("failed to report the unreached milestone %s of restore %s: %w", conditionType, restore.Name, err))
-	}
-
-	return updated, retryOnError(stageErr)
-}
-
 // SetupWithManager sets up the controller with the Manager.
 //
 // Owns Velero restore resources to get notified when restore finishes or fails.
