@@ -1,0 +1,403 @@
+package backup
+
+import (
+	"context"
+	"errors"
+	"reflect"
+	"testing"
+	"time"
+
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+)
+
+func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
+	t.Run("If the backup is not deleting, set condition and proceed to the next step", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		require.True(t, backup.DeletionTimestamp.IsZero())
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+
+		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
+		assert.NotNil(t, completedCondition)
+		assert.Equal(t, metav1.ConditionFalse, completedCondition.Status)
+		assert.Equal(t, reasonBackupNotDeleting, completedCondition.Reason)
+	})
+
+	t.Run("If the backup is deleted and the velero backup does not exist, remove the finalizer and abort", func(t *testing.T) {
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		var veleroBackupGetCallCount = 0
+		var backupUpdateCallCount = 0
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.Backup]() {
+						veleroBackupGetCallCount++
+					}
+					return client.Get(ctx, key, obj, opts...)
+				},
+				Update: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+					backupUpdateCallCount++
+					return client.Update(ctx, obj, opts...)
+				},
+			}).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Abort, nextAction)
+
+		assert.Empty(t, backup.Finalizers)
+
+		assert.Equal(t, 1, veleroBackupGetCallCount)
+		assert.Equal(t, 1, backupUpdateCallCount)
+	})
+
+	t.Run("If the backup is deleted and the velero backup exists and no deletion request exits, "+
+		"create deletion request, set condition and retry", func(t *testing.T) {
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
+		var patchCallCount = 0
+		var veleroBackupGetCallCount = 0
+		var createDeleteBackupRequestCallCount = 0
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup, veleroBackup).
+			WithStatusSubresource(backup).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.Backup]() {
+						veleroBackupGetCallCount++
+					}
+					return client.Get(ctx, key, obj, opts...)
+				},
+				Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.DeleteBackupRequest]() {
+						createDeleteBackupRequestCallCount++
+					}
+					return client.Create(ctx, obj, opts...)
+				},
+				SubResourcePatch: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					patchCallCount++
+					return client.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+				},
+			}).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+
+		assert.Contains(t, backup.Finalizers, backupv1.BackupFinalizer)
+
+		assert.Equal(t, 1, createDeleteBackupRequestCallCount)
+
+		completedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
+		assert.NotNil(t, completedCondition)
+		assert.Equal(t, metav1.ConditionTrue, completedCondition.Status)
+		assert.Equal(t, reasonBackupDeleting, completedCondition.Reason)
+
+		assert.Equal(t, 1, patchCallCount)
+		assert.Equal(t, 1, veleroBackupGetCallCount)
+	})
+
+	t.Run("If the backup is deleted, the velero backup exists and the deletion request exits, retry", func(t *testing.T) {
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
+		deleteBackupRequest := &velerov1.DeleteBackupRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      backup.Name,
+			},
+		}
+		var patchStatusCallCount = 0
+		var createDeleteBackupRequestCallCount = 0
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup, veleroBackup, deleteBackupRequest).
+			WithStatusSubresource(backup).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.DeleteBackupRequest]() {
+						createDeleteBackupRequestCallCount++
+					}
+					return client.Create(ctx, obj, opts...)
+				},
+				SubResourcePatch: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					patchStatusCallCount++
+					return client.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+				},
+			}).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+
+		// Do not create delete backup request
+		assert.Equal(t, 0, createDeleteBackupRequestCallCount)
+		assert.Equal(t, 1, patchStatusCallCount)
+	})
+
+	t.Run("If the velero backup is in progress, remove an existing deletion request and wait for completion", func(t *testing.T) {
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
+		deleteBackupRequest := &velerov1.DeleteBackupRequest{ObjectMeta: metav1.ObjectMeta{Namespace: backup.Namespace, Name: backup.Name}}
+		var createCallCount int
+		var deleteCallCount int
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup, veleroBackup, deleteBackupRequest).
+			WithStatusSubresource(backup).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.DeleteBackupRequest]() {
+						createCallCount++
+					}
+					return client.Create(ctx, obj, opts...)
+				},
+				Delete: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+					if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.DeleteBackupRequest]() {
+						deleteCallCount++
+					}
+					return client.Delete(ctx, obj, opts...)
+				},
+			}).Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		require.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+		assert.Equal(t, 0, createCallCount)
+		assert.Equal(t, 1, deleteCallCount)
+		deletingCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
+		require.NotNil(t, deletingCondition)
+		assert.Equal(t, metav1.ConditionTrue, deletingCondition.Status)
+		assert.Equal(t, reasonWaitingForProviderBackupCompletion, deletingCondition.Reason)
+		assert.Contains(t, deletingCondition.Message, "InProgress")
+	})
+
+	t.Run("If retrieving the Velero backup resource failed, abort.", func(t *testing.T) {
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(veleroBackup).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					return errors.New("get error")
+				},
+			}).
+			Build()
+
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "get error")
+		assert.Equal(t, Abort, nextAction)
+	})
+
+	t.Run("If retrieving the delete backup request failed, abort.", func(t *testing.T) {
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(veleroBackup).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.DeleteBackupRequest]() {
+						return errors.New("get error")
+					}
+					return client.Get(ctx, key, obj, opts...)
+				},
+			}).
+			Build()
+
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "get error")
+		assert.Equal(t, Abort, nextAction)
+	})
+
+	t.Run("If creating the delete backup request failed, abort.", func(t *testing.T) {
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(veleroBackup).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if reflect.TypeOf(obj) == reflect.TypeFor[*velerov1.DeleteBackupRequest]() {
+						return errors.New("create error")
+					}
+					return client.Create(ctx, obj, opts...)
+				},
+			}).
+			Build()
+
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "create error")
+		assert.Equal(t, Abort, nextAction)
+	})
+
+	t.Run("If patching status the backup failed, abort.", func(t *testing.T) {
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup, veleroBackup).
+			WithStatusSubresource(backup).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					return errors.New("patch status error")
+				},
+			}).
+			Build()
+
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "patch status error")
+		assert.Equal(t, Abort, nextAction)
+	})
+
+}
+
+func TestReconcilerReportsDeletionProgress(t *testing.T) {
+	t.Run("renders the delete request phase and the elapsed deletion time into the condition", func(t *testing.T) {
+		deletionStart := time.Date(2026, 8, 21, 5, 3, 0, 0, time.UTC)
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		// The deletion already started, so the wait is measured from that transition.
+		backup.Status.Conditions = []metav1.Condition{{
+			Type:               backupv1.ConditionDeleting,
+			Status:             metav1.ConditionTrue,
+			Reason:             reasonBackupDeleting,
+			Message:            "Backup is deleting (phase: New, running for less than 1m)",
+			LastTransitionTime: metav1.NewTime(deletionStart),
+		}}
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
+		deleteRequest := &velerov1.DeleteBackupRequest{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "backup"},
+			Status: velerov1.DeleteBackupRequestStatus{
+				Phase:  velerov1.DeleteBackupRequestPhaseInProgress,
+				Errors: []string{"provider error"},
+			},
+		}
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup, veleroBackup, deleteRequest).
+			WithStatusSubresource(backup).
+			Build()
+		clock := NewMockClock(t)
+		clock.EXPECT().Now().Return(deletionStart.Add(2 * time.Minute)).Once()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clock, "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		require.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+
+		deletingCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
+		require.NotNil(t, deletingCondition)
+		assert.Equal(t, "Backup is deleting (phase: InProgress, running for 2m)", deletingCondition.Message)
+	})
+}
+
+func TestReconcilerRetriesProcessedDeletionRequest(t *testing.T) {
+	newProcessedDeleteRequestScenario := func(t *testing.T, phase velerov1.DeleteBackupRequestPhase) (*backupv1.Backup, client.WithWatch) {
+		backup := newDeletedBackupForReconcilerTest("ns", "backup")
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
+		deleteRequest := &velerov1.DeleteBackupRequest{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "backup"},
+			Spec:       velerov1.DeleteBackupRequestSpec{BackupName: "backup"},
+			Status: velerov1.DeleteBackupRequestStatus{
+				Phase:  phase,
+				Errors: []string{"backup not found"},
+			},
+		}
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup, veleroBackup, deleteRequest).
+			WithStatusSubresource(backup).
+			Build()
+		return backup, fakeClient
+	}
+
+	deleteRequestExists := func(t *testing.T, fakeClient client.WithWatch) bool {
+		err := fakeClient.Get(context.Background(), types.NamespacedName{Namespace: "ns", Name: "backup"}, &velerov1.DeleteBackupRequest{})
+		if apierrors.IsNotFound(err) {
+			return false
+		}
+		require.NoError(t, err)
+		return true
+	}
+
+	t.Run("If the delete request was processed but the velero backup still exists, delete the request and retry", func(t *testing.T) {
+		backup, fakeClient := newProcessedDeleteRequestScenario(t, velerov1.DeleteBackupRequestPhaseProcessed)
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+		require.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+		assert.False(t, deleteRequestExists(t, fakeClient), "the processed delete request must be gone so that the next pass recreates it")
+
+		deletingCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
+		require.NotNil(t, deletingCondition)
+		assert.Equal(t, metav1.ConditionTrue, deletingCondition.Status)
+		assert.Equal(t, reasonProviderBackupDeletionRetried, deletingCondition.Reason)
+		assert.Equal(t, "The provider processed the deletion request without deleting the backup (provider errors: backup not found)", deletingCondition.Message)
+	})
+
+	t.Run("If the delete request is not processed yet, keep waiting for it", func(t *testing.T) {
+		for _, phase := range []velerov1.DeleteBackupRequestPhase{"", velerov1.DeleteBackupRequestPhaseNew, velerov1.DeleteBackupRequestPhaseInProgress} {
+			backup, fakeClient := newProcessedDeleteRequestScenario(t, phase)
+			reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+			nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
+
+			require.NoError(t, err, "phase %q", phase)
+			assert.Equal(t, Retry, nextAction, "phase %q", phase)
+			assert.True(t, deleteRequestExists(t, fakeClient), "phase %q: an unfinished delete request must be kept", phase)
+
+			deletingCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionDeleting)
+			require.NotNil(t, deletingCondition, "phase %q", phase)
+			assert.Equal(t, reasonBackupDeleting, deletingCondition.Reason, "phase %q", phase)
+		}
+	})
+}
+
+func newDeletedBackupForReconcilerTest(namespace string, name string) *backupv1.Backup {
+	backup := newBackupForTest(namespace, name)
+	backup.Finalizers = []string{backupv1.BackupFinalizer}
+	deletionTimestamp := metav1.Now()
+	backup.DeletionTimestamp = &deletionTimestamp
+	return backup
+}

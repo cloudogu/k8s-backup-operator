@@ -11,5 +11,6 @@ rules:
     resources:
       - blueprints
     verbs:
-      - list
       - get
+      - list
+      - watch
