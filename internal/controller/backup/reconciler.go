@@ -278,7 +278,7 @@ func (c *defaultReconciler) retryProviderBackupDeletionRequest(
 		Type:    backupv1.ConditionDeleting,
 		Status:  metav1.ConditionTrue,
 		Reason:  reasonProviderBackupDeletionRetried,
-		Message: fmt.Sprintf("Provider processed deletion request without deleting the backup (provider errors: %s)", formatProviderErrors(deleteReq.Status.Errors)),
+		Message: fmt.Sprintf("The provider processed the deletion request without deleting the backup (provider errors: %s)", formatProviderErrors(deleteReq.Status.Errors)),
 	}
 
 	report := conditions.WillChange(backup.Status.Conditions, deleting)
