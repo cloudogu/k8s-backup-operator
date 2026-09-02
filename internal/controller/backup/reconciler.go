@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloudogu/ces-commons-lib/errors"
@@ -37,6 +38,7 @@ const (
 	reasonProviderBackupInProgress               = "ProviderBackupInProgress"
 	reasonProviderBackupFailed                   = "ProviderBackupFailed"
 	reasonProviderBackupDeletionFailed           = "ProviderBackupDeletionFailed"
+	reasonProviderBackupDeletionRetried          = "ProviderBackupDeletionRetried"
 	reasonProviderBackupDeletion                 = "ProviderBackupDeletion"
 	reasonWaitingForProviderBackupCompletion     = "WaitingForProviderBackupCompletion"
 	reasonProviderBackupSucceeded                = "ProviderBackupSucceeded"
@@ -62,7 +64,6 @@ const (
 const (
 	actionStartBackup               = "StartBackup"
 	actionCancelBackup              = "CancelBackup"
-	actionContinueBackup            = "ContinueBackup"
 	actionCompleteBackup            = "CompleteBackup"
 	actionDeleteBackup              = "DeleteBackup"
 	actionAcquireBackupLease        = "AcquireBackupLease"
@@ -225,6 +226,13 @@ func (c *defaultReconciler) ensureProviderBackupDeletionRequested(ctx context.Co
 		c.recorder.Eventf(backup, providerBackup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, actionDeleteProviderBackup, "Failed to create provider delete request")
 		return Abort, err
 	}
+	// A processed delete request whose provider backup still exists did not achieve its goal:
+	// Velero keeps such a request with its errors instead of removing it together with the backup.
+	// Waiting for it would wait forever, so it is dropped here and recreated on the next pass.
+	if deleteReq.Status.Phase == velerov1.DeleteBackupRequestPhaseProcessed {
+		return c.retryProviderBackupDeletionRequest(ctx, backup, providerBackup, deleteReq)
+	}
+
 	waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionDeleting, c.clock.Now())
 	deleting := metav1.Condition{
 		Type:    backupv1.ConditionDeleting,
@@ -251,6 +259,52 @@ func (c *defaultReconciler) ensureProviderBackupDeletionRequested(ctx context.Co
 	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup deletion is still in progress")
 	c.recorder.Eventf(backup, providerBackup, corev1.EventTypeNormal, reasonProviderBackupDeletion, actionDeleteProviderBackup, "The provider backup deletion is still in progress")
 	return Retry, nil
+}
+
+// retryProviderBackupDeletionRequest drops a delete request the provider processed without deleting
+// the backup. The next reconciliation recreates it, so the wait for the deletion stays meaningful.
+func (c *defaultReconciler) retryProviderBackupDeletionRequest(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	providerBackup *velerov1.Backup,
+	deleteReq *velerov1.DeleteBackupRequest,
+) (action, error) {
+	if err := veleroprovider.DeleteVeleroDeleteBackupRequestIfExists(ctx, c.client, backup); err != nil {
+		c.recorder.Eventf(backup, providerBackup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, actionDeleteProviderBackup, "Failed to delete the processed provider delete request")
+		return Abort, err
+	}
+
+	deleting := metav1.Condition{
+		Type:    backupv1.ConditionDeleting,
+		Status:  metav1.ConditionTrue,
+		Reason:  reasonProviderBackupDeletionRetried,
+		Message: fmt.Sprintf("The provider processed the deletion request without deleting the backup (provider errors: %s)", formatProviderErrors(deleteReq.Status.Errors)),
+	}
+
+	report := conditions.WillChange(backup.Status.Conditions, deleting)
+
+	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, deleting)
+	}); err != nil {
+		return Abort, fmt.Errorf("patch conditions to retry the provider backup deletion: %w", err)
+	}
+
+	if report {
+		logging.Info(ctx, "recreating the velero delete backup request",
+			"reason", "the request was processed but the velero backup still exists",
+			"providerErrors", deleteReq.Status.Errors,
+		)
+		c.recorder.Eventf(backup, providerBackup, corev1.EventTypeWarning, reasonProviderBackupDeletionRetried, actionDeleteProviderBackup, deleting.Message)
+	}
+	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the processed provider delete request must be recreated")
+	return Retry, nil
+}
+
+func formatProviderErrors(providerErrors []string) string {
+	if len(providerErrors) == 0 {
+		return "none reported"
+	}
+	return strings.Join(providerErrors, "; ")
 }
 
 // ensureOrphanedBackupDeleted deletes a terminal backup whose provider backup has disappeared.
