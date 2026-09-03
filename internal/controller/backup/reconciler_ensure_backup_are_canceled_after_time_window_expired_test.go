@@ -79,7 +79,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
 
-	t.Run("If the time window has expired and the velero backup is running, set canceled to false and proceed to the next step", func(t *testing.T) {
+	t.Run("If the time window has expired and the velero backup is still running, set canceled to true and requeue for the finalization", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		baseTime := time.Now()
 		backup.CreationTimestamp = metav1.NewTime(baseTime)
@@ -100,11 +100,11 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
 		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
+		assert.Equal(t, Retry, nextAction)
 
 		canceledCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
 		assert.NotNil(t, canceledCondition)
-		assert.Equal(t, metav1.ConditionFalse, canceledCondition.Status)
+		assert.Equal(t, metav1.ConditionTrue, canceledCondition.Status)
 		assert.Equal(t, reasonTimeWindowExpiredBackupInProgress, canceledCondition.Reason)
 
 		assert.Equal(t, 1, counter.configMapGetCount)

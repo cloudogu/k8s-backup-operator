@@ -929,20 +929,27 @@ func (c *defaultReconciler) handleInProgressProviderBackupAfterTimeWindowExpired
 	backup *backupv1.Backup,
 	providerBackup *velerov1.Backup,
 ) (action, error) {
-	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup is running -> Canceled = False, NEXT")
+	// A running provider backup might not be able to be cancelled from the outside (like in Velero's case),
+	// but it must not keep the maintenance mode and the backup lease past the time window: The run is abandoned,
+	// the Provider backup keeps running and is left behind as an orphan.
+	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup is running -> Canceled = True, RETRY")
 
 	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 			Type:    backupv1.ConditionCanceled,
-			Status:  metav1.ConditionFalse,
+			Status:  metav1.ConditionTrue,
 			Reason:  reasonTimeWindowExpiredBackupInProgress,
-			Message: "The backup was running when the time window expired.",
+			Message: "The backup was still running when the time window expired.",
 		})
 	}); err != nil {
 		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'")
 	}
-	c.recorder.Eventf(backup, providerBackup, corev1.EventTypeNormal, reasonTimeWindowExpiredBackupInProgress, actionCancelBackup, "The backup was running when the time window expired -> Continue")
-	return Next, nil
+
+	logging.Info(ctx, "canceled the backup", "reason", "the time window expired while the velero backup was still running", "phase", providerBackup.Status.Phase)
+	c.recorder.Eventf(backup, providerBackup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupInProgress, actionCancelBackup, "Backup is being canceled - provider backup was still running when the time window expired")
+	// Retry with Canceled=true to finalize.
+	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the canceled backup run must be finalized")
+	return Retry, nil
 }
 
 func (c *defaultReconciler) handleFailedProviderBackupAfterTimeWindowExpired(
