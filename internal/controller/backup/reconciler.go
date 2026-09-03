@@ -36,6 +36,7 @@ const (
 	reasonMaintenanceModesDeactivationFailed     = "MaintenanceModesDeactivationFailed"
 	reasonProviderBackupResourceDoesNotExist     = "ProviderBackupResourceDoesNotExist"
 	reasonProviderBackupInProgress               = "ProviderBackupInProgress"
+	reasonOtherProviderBackupInProgress          = "OtherProviderBackupInProgress"
 	reasonProviderBackupFailed                   = "ProviderBackupFailed"
 	reasonProviderBackupDeletionFailed           = "ProviderBackupDeletionFailed"
 	reasonProviderBackupDeletionRetried          = "ProviderBackupDeletionRetried"
@@ -441,6 +442,24 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		return Abort, err
 	}
 
+	if readiness.Ready {
+		// Prevent creating any further velero backups, if there are still any in progress.
+		runningProviderBackup, findErr := c.findRunningProviderBackupOfAnotherRun(ctx, backup)
+		if findErr != nil {
+			return Abort, findErr
+		}
+		if runningProviderBackup != nil {
+			readiness = veleroprovider.Readiness{
+				Ready:  false,
+				Reason: reasonOtherProviderBackupInProgress,
+				Message: fmt.Sprintf(
+					"The velero backup '%s' of another backup run is still running in phase '%s'.",
+					runningProviderBackup.Name, runningProviderBackup.Status.Phase,
+				),
+			}
+		}
+	}
+
 	prepared := metav1.Condition{
 		Type:    backupv1.ConditionPrepared,
 		Status:  metav1.ConditionTrue,
@@ -479,6 +498,25 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		logging.Info(ctx, "backup prepared", "backupStorageLocation", c.backupStorageName)
 	}
 	return Next, nil
+}
+
+func (c *defaultReconciler) findRunningProviderBackupOfAnotherRun(ctx context.Context, backup *backupv1.Backup) (*velerov1.Backup, error) {
+	var providerBackups velerov1.BackupList
+	if err := c.client.List(ctx, &providerBackups, client.InNamespace(backup.Namespace)); err != nil {
+		return nil, fmt.Errorf("list velero backups to look for a running backup of another run: %w", err)
+	}
+
+	for _, providerBackup := range providerBackups.Items {
+		// ignore, if it's our own
+		if providerBackup.Name == backup.Name {
+			continue
+		}
+		if isProviderBackupInProgress(&providerBackup) {
+			return &providerBackup, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (action, error) {

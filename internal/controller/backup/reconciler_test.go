@@ -54,6 +54,8 @@ type callCounter struct {
 	veleroBackupGetCount      int
 	veleroBackupGetCallError  error
 	veleroBackupCreateCount   int
+	veleroBackupListCount     int
+	veleroBackupListCallError error
 	subResourcePatchCount     int
 	subResourcePatchCallError error
 	getCallError              error
@@ -74,6 +76,16 @@ func (c *callCounter) getCall(ctx context.Context, client client.WithWatch, key 
 		c.veleroBackupGetCount++
 	}
 	return client.Get(ctx, key, obj, opts...)
+}
+
+func (c *callCounter) listCall(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+	if reflect.TypeOf(list) == reflect.TypeFor[*velerov1.BackupList]() {
+		if c.veleroBackupListCallError != nil {
+			return c.veleroBackupListCallError
+		}
+		c.veleroBackupListCount++
+	}
+	return client.List(ctx, list, opts...)
 }
 
 func (c *callCounter) subResourcePatchCall(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {

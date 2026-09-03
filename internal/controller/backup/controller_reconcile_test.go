@@ -305,6 +305,7 @@ func newFakeClientBuilderWithCounter(t *testing.T, callCounter *callCounter) *fa
 	return newFakeClientBuilder(t).
 		WithInterceptorFuncs(interceptor.Funcs{
 			Get:              callCounter.getCall,
+			List:             callCounter.listCall,
 			SubResourcePatch: callCounter.subResourcePatchCall,
 			Create:           callCounter.createCall,
 		})
