@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"testing"
+	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
@@ -113,6 +114,27 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		ownVeleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
 		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
 			WithObjects(backup, veleroBackupStorageLocation, ownVeleroBackup).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+
+		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
+		require.NotNil(t, preparedCondition)
+		assert.Equal(t, metav1.ConditionTrue, preparedCondition.Status)
+	})
+
+	t.Run("A running velero backup of another run does not block a backup that already started", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		backup.Status.StartTimestamp = metav1.Time{Time: time.Now()}
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
+		foreignVeleroBackup := newVeleroBackupForReconcilerTest("ns", "foreign-backup", velerov1.BackupPhaseInProgress)
+		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
+			WithObjects(backup, veleroBackupStorageLocation, foreignVeleroBackup).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")

@@ -549,7 +549,8 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		return Abort, err
 	}
 
-	if readiness.Ready {
+	// Only guard runs that have not created their own provider backup yet.
+	if readiness.Ready && backup.Status.StartTimestamp.IsZero() {
 		// Prevent creating any further velero backups, if there are still any in progress.
 		runningProviderBackup, findErr := c.findRunningProviderBackupOfAnotherRun(ctx, backup)
 		if findErr != nil {
