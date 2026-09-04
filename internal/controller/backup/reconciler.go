@@ -37,6 +37,7 @@ const (
 	reasonProviderBackupResourceDoesNotExist     = "ProviderBackupResourceDoesNotExist"
 	reasonProviderBackupInProgress               = "ProviderBackupInProgress"
 	reasonOtherProviderBackupInProgress          = "OtherProviderBackupInProgress"
+	reasonCanceledProviderBackupDeleted          = "CanceledProviderBackupDeleted"
 	reasonProviderBackupFailed                   = "ProviderBackupFailed"
 	reasonProviderBackupDeletionFailed           = "ProviderBackupDeletionFailed"
 	reasonProviderBackupDeletionRetried          = "ProviderBackupDeletionRetried"
@@ -165,6 +166,46 @@ func (c *defaultReconciler) ensureProviderBackupDeleted(ctx context.Context, bac
 	return Next, nil
 }
 
+// deletionScope tells the provider backup deletion whether the backup goes away with its provider
+type deletionScope int
+
+const (
+	scopeBackupAndProviderBackup deletionScope = iota
+	scopeProviderBackupOnly
+)
+
+// getDeletingCondition We have now two ways of deleting, provider and our backup or only provider.
+// Only the former one is a deletion in the sense of the condition.
+func (s deletionScope) getDeletingCondition(reason string, message string) metav1.Condition {
+	status := metav1.ConditionTrue
+	if s == scopeProviderBackupOnly {
+		status = metav1.ConditionFalse
+	}
+
+	return metav1.Condition{
+		Type:    backupv1.ConditionDeleting,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	}
+}
+
+// getWaitAnchor names the relevant condition for determining the waiting time.
+func (s deletionScope) getWaitAnchor() string {
+	if s == scopeProviderBackupOnly {
+		return backupv1.ConditionCanceled
+	}
+	return backupv1.ConditionDeleting
+}
+
+// getDeletionSubject names what is going away, so one message serves both scopes.
+func (s deletionScope) getDeletionSubject() string {
+	if s == scopeProviderBackupOnly {
+		return "Provider backup of canceled backup is deleting"
+	}
+	return "Backup is deleting"
+}
+
 func (c *defaultReconciler) ensureDeletingProviderBackup(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	veleroBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
 	if err != nil {
@@ -174,11 +215,21 @@ func (c *defaultReconciler) ensureDeletingProviderBackup(ctx context.Context, ba
 	if veleroBackup == nil {
 		return c.finalizeProviderBackupDeletion(ctx, backup)
 	}
-	if isProviderBackupInProgress(veleroBackup) {
-		return c.waitForProviderBackupBeforeDeletion(ctx, backup, veleroBackup)
+
+	return c.deleteProviderBackup(ctx, backup, veleroBackup, scopeBackupAndProviderBackup)
+}
+
+func (c *defaultReconciler) deleteProviderBackup(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	providerBackup *velerov1.Backup,
+	scope deletionScope,
+) (action, error) {
+	if isProviderBackupInProgress(providerBackup) {
+		return c.waitForProviderBackupBeforeDeletion(ctx, backup, providerBackup, scope)
 	}
 
-	return c.ensureProviderBackupDeletionRequested(ctx, backup, veleroBackup)
+	return c.ensureProviderBackupDeletionRequested(ctx, backup, providerBackup, scope)
 }
 
 func (c *defaultReconciler) finalizeProviderBackupDeletion(ctx context.Context, backup *backupv1.Backup) (action, error) {
@@ -201,18 +252,18 @@ func (c *defaultReconciler) waitForProviderBackupBeforeDeletion(
 	ctx context.Context,
 	backup *backupv1.Backup,
 	providerBackup *velerov1.Backup,
+	scope deletionScope,
 ) (action, error) {
 	if err := veleroprovider.DeleteVeleroDeleteBackupRequestIfExists(ctx, c.client, backup); err != nil {
 		return Abort, err
 	}
 
+	deleting := scope.getDeletingCondition(
+		reasonWaitingForProviderBackupCompletion,
+		fmt.Sprintf("Waiting for the provider backup to complete before deleting it (phase: %s)", providerBackup.Status.Phase),
+	)
 	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-			Type:    backupv1.ConditionDeleting,
-			Status:  metav1.ConditionTrue,
-			Reason:  reasonWaitingForProviderBackupCompletion,
-			Message: fmt.Sprintf("Waiting for the provider backup to complete before deleting it (phase: %s)", providerBackup.Status.Phase),
-		})
+		meta.SetStatusCondition(&status.Conditions, deleting)
 	})
 	if patchErr != nil {
 		return Abort, fmt.Errorf("patch conditions while waiting for provider backup completion: %w", patchErr)
@@ -221,7 +272,12 @@ func (c *defaultReconciler) waitForProviderBackupBeforeDeletion(
 	return Retry, nil
 }
 
-func (c *defaultReconciler) ensureProviderBackupDeletionRequested(ctx context.Context, backup *backupv1.Backup, providerBackup *velerov1.Backup) (action, error) {
+func (c *defaultReconciler) ensureProviderBackupDeletionRequested(
+	ctx context.Context,
+	backup *backupv1.Backup,
+	providerBackup *velerov1.Backup,
+	scope deletionScope,
+) (action, error) {
 	deleteReq, err := veleroprovider.CreateVeleroDeleteBackupRequestIfNotExists(ctx, c.client, backup)
 	if err != nil {
 		c.recorder.Eventf(backup, providerBackup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, actionDeleteProviderBackup, "Failed to create provider delete request")
@@ -231,16 +287,14 @@ func (c *defaultReconciler) ensureProviderBackupDeletionRequested(ctx context.Co
 	// Velero keeps such a request with its errors instead of removing it together with the backup.
 	// Waiting for it would wait forever, so it is dropped here and recreated on the next pass.
 	if deleteReq.Status.Phase == velerov1.DeleteBackupRequestPhaseProcessed {
-		return c.retryProviderBackupDeletionRequest(ctx, backup, providerBackup, deleteReq)
+		return c.retryProviderBackupDeletionRequest(ctx, backup, providerBackup, deleteReq, scope)
 	}
 
-	waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, backupv1.ConditionDeleting, c.clock.Now())
-	deleting := metav1.Condition{
-		Type:    backupv1.ConditionDeleting,
-		Status:  metav1.ConditionTrue,
-		Reason:  reasonBackupDeleting,
-		Message: fmt.Sprintf("Backup is deleting (phase: %s, running for %s)", deleteReq.Status.Phase, conditions.FormatWaitDuration(waited)),
-	}
+	waited := conditions.ElapsedInCurrentStatus(backup.Status.Conditions, scope.getWaitAnchor(), c.clock.Now())
+	deleting := scope.getDeletingCondition(
+		reasonBackupDeleting,
+		fmt.Sprintf("%s (phase: %s, running for %s)", scope.getDeletionSubject(), deleteReq.Status.Phase, conditions.FormatWaitDuration(waited)),
+	)
 	reportDeleting := conditions.WillChange(backup.Status.Conditions, deleting)
 
 	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
@@ -269,18 +323,17 @@ func (c *defaultReconciler) retryProviderBackupDeletionRequest(
 	backup *backupv1.Backup,
 	providerBackup *velerov1.Backup,
 	deleteReq *velerov1.DeleteBackupRequest,
+	scope deletionScope,
 ) (action, error) {
 	if err := veleroprovider.DeleteVeleroDeleteBackupRequestIfExists(ctx, c.client, backup); err != nil {
 		c.recorder.Eventf(backup, providerBackup, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, actionDeleteProviderBackup, "Failed to delete the processed provider delete request")
 		return Abort, err
 	}
 
-	deleting := metav1.Condition{
-		Type:    backupv1.ConditionDeleting,
-		Status:  metav1.ConditionTrue,
-		Reason:  reasonProviderBackupDeletionRetried,
-		Message: fmt.Sprintf("The provider processed the deletion request without deleting the backup (provider errors: %s)", formatProviderErrors(deleteReq.Status.Errors)),
-	}
+	deleting := scope.getDeletingCondition(
+		reasonProviderBackupDeletionRetried,
+		fmt.Sprintf("The provider processed the deletion request without deleting the backup (provider errors: %s)", formatProviderErrors(deleteReq.Status.Errors)),
+	)
 
 	report := conditions.WillChange(backup.Status.Conditions, deleting)
 
@@ -318,6 +371,13 @@ func (c *defaultReconciler) ensureOrphanedBackupDeleted(ctx context.Context, bac
 		return Next, nil
 	}
 
+	// Canceled runs are kept for the failure history, while their provider backups get deleted. So
+	// they have to be excluded here explicitly.
+	if meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled) {
+		logging.Debug(ctx, "ensureOrphanedBackupDeleted: the backup was canceled -> NEXT")
+		return Next, nil
+	}
+
 	providerBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
 	if err != nil {
 		return Abort, fmt.Errorf("get the velero backup resource to check if it still exists: %w", err)
@@ -339,6 +399,53 @@ func (c *defaultReconciler) ensureOrphanedBackupDeleted(ctx context.Context, bac
 
 	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the deletion of the backup must be finalized")
 	return Retry, nil
+}
+
+// ensureCanceledProviderBackupDeleted deletes the provider backup a canceled run might leave behind.
+// After canceling a backup, the provider backup will terminate itself. It might even complete, but
+// will then be possibly inconsistent (because maintenance mode was already deactivated). So to prevent
+// the restore of canceled backups the provider backups will be deleted after they terminate, while our own
+// backup resources will be kept for failure history.
+func (c *defaultReconciler) ensureCanceledProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
+	if !meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled) ||
+		backup.Status.StartTimestamp.IsZero() {
+		return Next, nil
+	}
+
+	providerBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
+	if err != nil {
+		return Abort, fmt.Errorf("get the velero backup resource of the canceled backup: %w", err)
+	}
+	if providerBackup == nil {
+		return c.completeCanceledProviderBackupDeletion(ctx, backup)
+	}
+
+	return c.deleteProviderBackup(ctx, backup, providerBackup, scopeProviderBackupOnly)
+}
+
+func (c *defaultReconciler) completeCanceledProviderBackupDeletion(ctx context.Context, backup *backupv1.Backup) (action, error) {
+	deleting := scopeProviderBackupOnly.getDeletingCondition(
+		reasonCanceledProviderBackupDeleted,
+		"Provider backup of canceled backup no longer exists.",
+	)
+	// The provider backup stays gone, so this reports the completion once instead of on every pass.
+	if !conditions.WillChange(backup.Status.Conditions, deleting) {
+		logging.Debug(ctx, "ensureCanceledProviderBackupDeleted: the provider backup of the canceled backup is gone -> NEXT")
+		return Next, nil
+	}
+
+	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, deleting)
+	}); err != nil {
+		return Abort, fmt.Errorf("patch conditions to complete the provider backup deletion of the canceled backup: %w", err)
+	}
+
+	logging.Info(ctx, "deleted the provider backup of the canceled backup",
+		"reason", "the canceled run abandoned it while the provider may still have been writing",
+	)
+	c.recorder.Eventf(backup, nil, corev1.EventTypeNormal, reasonCanceledProviderBackupDeleted, actionDeleteProviderBackup, "Provider backup of canceled backup no longer exists")
+	logging.Debug(ctx, "ensureCanceledProviderBackupDeleted: the provider backup deletion is complete -> NEXT")
+	return Next, nil
 }
 
 func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error) {
@@ -778,6 +885,13 @@ func (c *defaultReconciler) ensureBackupRunCompleted(ctx context.Context, backup
 		c.recorder.Eventf(backup, nil, corev1.EventTypeNormal, reasonBackupSucceeded, actionCompleteBackup, "Backup completed")
 	}
 	logging.Info(ctx, "backup finished", "outcome", backupRunOutcome(backup), "duration", backupRunDuration(backup))
+
+	// Retry canceled runs to trigger provider backup deletion
+	if meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled) {
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup of the canceled run must be deleted")
+		return Retry, nil
+	}
+
 	logging.Debug(ctx, "ensureBackupRunCompleted: the backup run is complete -> ABORT")
 	return Abort, nil
 }

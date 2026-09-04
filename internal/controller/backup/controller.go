@@ -26,6 +26,7 @@ type reconciler interface {
 	ensureBackupLeaseReleased(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureOrphanedBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
+	ensureCanceledProviderBackupDeleted(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureVeleroStatusSynced(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureConditionsInitialized(ctx context.Context, backup *backupv1.Backup) (action, error)
 	ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error)
@@ -115,9 +116,11 @@ func (c *Controller) getStagesForOperation(op operation) []ensureFunction {
 		)
 	case operationIgnore:
 		// Succeeded is written only after cleanup, so a terminal backup has no work left but to
-		// verify that the provider backup it mirrors is still there.
+		// verify that the provider backup it mirrors is still there. Only exception are canceled runs,
+		// where velero backups are actively deleted due to possible inconsitencies.
 		return []ensureFunction{
 			c.reconciler.ensureOrphanedBackupDeleted,
+			c.reconciler.ensureCanceledProviderBackupDeleted,
 		}
 	case operationFinalize:
 		return c.finalizeStages()

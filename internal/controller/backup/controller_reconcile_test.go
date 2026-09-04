@@ -48,6 +48,7 @@ func TestControllerReconcileStageOrder(t *testing.T) {
 
 	ignoreStages := []string{
 		"ensureOrphanedBackupDeleted",
+		"ensureCanceledProviderBackupDeleted",
 	}
 
 	deleteStages := []string{
@@ -249,6 +250,7 @@ func recordStages(reconcilerMock *mockReconciler, executed *[]string) {
 	expecter.ensureBackupLeaseReleased(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupLeaseReleased")).Maybe()
 	expecter.ensureProviderBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureProviderBackupDeleted")).Maybe()
 	expecter.ensureOrphanedBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureOrphanedBackupDeleted")).Maybe()
+	expecter.ensureCanceledProviderBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureCanceledProviderBackupDeleted")).Maybe()
 	expecter.ensureVeleroStatusSynced(mock.Anything, mock.Anything).RunAndReturn(record("ensureVeleroStatusSynced")).Maybe()
 	expecter.ensureConditionsInitialized(mock.Anything, mock.Anything).RunAndReturn(record("ensureConditionsInitialized")).Maybe()
 	expecter.ensureBackupSetup(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupSetup")).Maybe()
