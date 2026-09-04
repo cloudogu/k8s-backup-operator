@@ -39,7 +39,7 @@ The `deletionTimestamp` takes precedence over all conditions. Without a deletion
 10. `ensureBackupLeaseReleased`
 11. `ensureBackupRunCompleted`
 
-Once the provider has produced a terminal result or the backup has been canceled, the controller uses the finalize path containing the last three stages. During deletion, `ensureMaintenanceDeactivated`, `ensureBackupLeaseReleased`, and `ensureProviderBackupDeleted` run. An already terminal backup with `Succeeded=True` or `Succeeded=False` uses the ignore path with `ensureOrphanedBackupDeleted`: the stage checks whether the provider backup still exists and removes an orphaned CES backup CR if necessary. `Succeeded` is set by `ensureBackupRunCompleted` only after maintenance-mode deactivation and lease release.
+Once the provider has produced a terminal result or the backup has been canceled, the controller uses the finalize path containing the last three stages. During deletion, `ensureMaintenanceDeactivated`, `ensureBackupLeaseReleased`, and `ensureProviderBackupDeleted` run. An already terminal backup with `Succeeded=True` or `Succeeded=False` uses the ignore path with `ensureOrphanedBackupDeleted`: the stage checks whether the provider backup still exists and removes an orphaned CES backup CR if necessary. Canceled backups are excluded there and handled by `ensureCanceledProviderBackupDeleted` instead (see [Time window and cancellation](#time-window-and-cancellation)). `Succeeded` is set by `ensureBackupRunCompleted` only after maintenance-mode deactivation and lease release.
 
 ## Successful local backup workflow
 
@@ -99,15 +99,25 @@ stateDiagram-v2
     TimeWindowNotExpired --> TimeWindowExpiredBackupSucceeded: Time expired, provider succeeded
     TimeWindowExpiredBackupNotStarted --> [*]: Canceled=True, no provider backup
     TimeWindowExpiredBackupFailed --> [*]: Canceled=True
-    TimeWindowExpiredBackupInProgress --> ProviderObservation: Canceled=False
+    TimeWindowExpiredBackupInProgress --> [*]: Canceled=True, provider backup orphaned
     TimeWindowExpiredBackupSucceeded --> ProviderObservation: Canceled=False
 ```
 
 If the ConfigMap or key is missing, or if the value is not numeric, the reconciliation ends with an error. `StartTimestamp` separates “not started yet” from “already started.”
 
+#### Canceling a running provider backup
+
+Velero provides no way to cancel a running backup from the outside. The run is therefore abandoned rather than stopped: `Canceled=True` routes the next pass into the finalize path, which deactivates maintenance mode, releases the lease, and writes the terminal `Succeeded=False`. The Velero backup keeps running as an orphan. Holding maintenance mode and the lease for hours past the time window is the worse outcome.
+
+`ensureCanceledProviderBackupDeleted` deletes that orphan once it is no longer in a running phase. Maintenance mode was switched off while Velero may still have been reading, so the result is potentially inconsistent and must not be restorable – not even from another cluster that shares the `BackupStorageLocation`. The backup CR itself is kept as failure history, so both `ensureOrphanedBackupDeleted` and the synchronization controller skip canceled backups.
+
+The deletion runs on the already terminal CR: `ensureBackupRunCompleted` returns `Retry` for canceled runs, and the shared deletion helpers write their progress with `Deleting=False`, because only the provider backup is being deleted, not the CR.
+
 ### Preparation
 
 `ensureBackupIsPrepared` reads the configured Velero `BackupStorageLocation`. Only `status.phase=Available` results in `Prepared=True`. A missing or unavailable location results in `Prepared=False` and a controlled retry. Other API errors are returned.
+
+The stage additionally lists the Velero backups of the namespace and blocks with `Prepared=False`/`OtherProviderBackupInProgress` while a Velero backup of another run is still in a running phase. This prevents a new backup from colliding with the orphan of a canceled run. The guard runs before the lease and maintenance mode, so waiting has no user impact – but a backup started shortly after a canceled one can run into its own time window and be canceled as well.
 
 ### Shared backup/restore lease
 
@@ -178,6 +188,9 @@ Local backups and backups imported from the provider use the same five condition
 |---|---|---|
 | `False` | `BackupNotDeleting` | No `deletionTimestamp`; the normal workflow may run. |
 | `True` | `BackupDeleting` | Deletion was requested and the provider backup still exists. |
+| `False` | `CanceledProviderBackupDeleted` | The orphaned provider backup of a canceled run is gone. |
+
+While the provider backup of a canceled run is deleted, the deletion reasons are written with status `False`: the CR is kept.
 
 ### `Canceled`
 
@@ -185,7 +198,7 @@ Local backups and backups imported from the provider use the same five condition
 |---|---|---|
 | `False` | `TimeWindowNotExpired` | The start time window is still open; the backup was not canceled. |
 | `True` | `TimeWindowExpiredBackupNotStarted` | The backup was not started before the window expired. |
-| `False` | `TimeWindowExpiredBackupInProgress` | The backup was already running when the window expired and may continue. |
+| `True` | `TimeWindowExpiredBackupInProgress` | The backup was still running when the window expired; its provider backup is orphaned and gets deleted. |
 | `True` | `TimeWindowExpiredBackupFailed` | The provider had already failed when the window expired. |
 | `False` | `TimeWindowExpiredBackupSucceeded` | The provider had already succeeded when the window expired. |
 
@@ -195,6 +208,7 @@ Local backups and backups imported from the provider use the same five condition
 |---|---|---|
 | `False` | `ProviderBackupStorageLocationNotFound` | The `BackupStorageLocation` is missing. |
 | `False` | `ProviderBackupStorageLocationNotAvailable` | The location exists but is not `Available`. |
+| `False` | `OtherProviderBackupInProgress` | A provider backup of another run is still running. |
 | `True` | `ProviderBackupStorageLocationAvailable` | Provider storage is usable. |
 | `True` | `VeleroStatusSynced` | The imported backup already exists in Velero. |
 
@@ -237,13 +251,15 @@ flowchart TD
     D -- no --> E[Create Backup CR with syncedFromProvider=true]
     D -- yes --> F[Do nothing]
     C -- yes --> G[Ensure DeleteBackupRequest]
-    G --> H[Delete Backup CR]
+    G --> H{Backup CR canceled?}
+    H -- no --> I[Delete Backup CR]
+    H -- yes --> J[Keep Backup CR as failure history]
     B -- no --> G
 ```
 
 An imported backup CR receives provider `velero`, CES standard labels, forwarded annotations, and the backup finalizer. Because Kubernetes does not preserve status from the object during creation, `spec.syncedFromProvider=true` signals the main controller to read the status from Velero afterward.
 
-When a Velero backup is deleted or is already missing, the controller first idempotently ensures a `DeleteBackupRequest` with the same name and then deletes the CES backup CR. The delete request prevents Velero from later reconstructing the CR from backup data that is still present in storage.
+When a Velero backup is deleted or is already missing, the controller first idempotently ensures a `DeleteBackupRequest` with the same name and then deletes the CES backup CR – unless that CR is canceled, which is kept as failure history. The delete request prevents Velero from later reconstructing the CR from backup data that is still present in storage.
 
 ## Delete workflow of a Backup CR
 
