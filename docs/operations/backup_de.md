@@ -33,3 +33,17 @@ obwohl die Sicherung der verfügbaren Daten sinnvoll sein kann. Sie könnte auß
 abgeschlossen wird, wenn aus einem teilweise fehlgeschlagenen Backup nur einige Komponenten wiederhergestellt werden
 können, obwohl auch diese Daten wertvoll sein können. Die Koordination zwischen Backup und Restore garantiert daher,
 dass die Operationen nicht gleichzeitig ausgeführt werden, nicht aber die Betriebsbereitschaft des gesamten EcoSystems.
+
+## Timeout eines Backups
+
+Ein Backup, das nicht innerhalb von `retryTimeLimit` (Schlüssel der ConfigMap `k8s-backup-operator-backup-config`,
+Standard 60 Minuten) fertig wird, wird abgebrochen – auch dann, wenn der Backup-Provider noch läuft. Dieser lässt sich von außen
+nicht stoppen, aber Wartungsmodus wird planmäßig freigegeben statt ihn unnötig aktiv zu halten. Die
+Backup-Ressource bleibt als fehlgeschlagenes Backup erhalten.
+
+Das Provider-Backup eines abgebrochenen Laufs läuft weiter und wird gelöscht, sobald es beendet ist. Der Wartungsmodus
+war zu diesem Zeitpunkt bereits abgeschaltet, die Daten sind daher potenziell inkonsistent und dürfen nicht
+wiederhergestellt werden.
+
+Ein kurz nach einem Abbruch erstelltes Backup wartet, bis das aufgegebene Provider-Backup beendet ist, und kann deshalb
+in sein eigenes Timeout laufen. Laufen Backups wiederholt in ein Timeout, sollte `retryTimeLimit` erhöht werden.

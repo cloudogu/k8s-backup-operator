@@ -54,6 +54,8 @@ type callCounter struct {
 	veleroBackupGetCount      int
 	veleroBackupGetCallError  error
 	veleroBackupCreateCount   int
+	veleroBackupListCount     int
+	veleroBackupListCallError error
 	subResourcePatchCount     int
 	subResourcePatchCallError error
 	getCallError              error
@@ -76,6 +78,16 @@ func (c *callCounter) getCall(ctx context.Context, client client.WithWatch, key 
 	return client.Get(ctx, key, obj, opts...)
 }
 
+func (c *callCounter) listCall(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+	if reflect.TypeOf(list) == reflect.TypeFor[*velerov1.BackupList]() {
+		if c.veleroBackupListCallError != nil {
+			return c.veleroBackupListCallError
+		}
+		c.veleroBackupListCount++
+	}
+	return client.List(ctx, list, opts...)
+}
+
 func (c *callCounter) subResourcePatchCall(ctx context.Context, client client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
 	if c.subResourcePatchCallError != nil {
 		return c.subResourcePatchCallError
@@ -92,6 +104,32 @@ func (c *callCounter) createCall(ctx context.Context, client client.WithWatch, o
 		c.veleroBackupCreateCount++
 	}
 	return client.Create(ctx, obj, opts...)
+}
+
+func TestDeletionScope(t *testing.T) {
+	t.Run("A backup that is deleted with its provider backup reports itself as deleting", func(t *testing.T) {
+		deleting := scopeBackupAndProviderBackup.getDeletingCondition(reasonBackupDeleting, "a message")
+
+		assert.Equal(t, backupv1.ConditionDeleting, deleting.Type)
+		assert.Equal(t, metav1.ConditionTrue, deleting.Status)
+		assert.Equal(t, reasonBackupDeleting, deleting.Reason)
+		assert.Equal(t, "a message", deleting.Message)
+		assert.Equal(t, backupv1.ConditionDeleting, scopeBackupAndProviderBackup.getWaitAnchor())
+	})
+
+	t.Run("A backup that only loses its provider backup does not report itself as deleting", func(t *testing.T) {
+		deleting := scopeProviderBackupOnly.getDeletingCondition(reasonBackupDeleting, "a message")
+
+		assert.Equal(t, backupv1.ConditionDeleting, deleting.Type)
+		assert.Equal(t, metav1.ConditionFalse, deleting.Status,
+			"Deleting outranks the outcome of the run in the deprecated scalar status")
+		assert.Equal(t, backupv1.ConditionCanceled, scopeProviderBackupOnly.getWaitAnchor(),
+			"a kept backup never transitions Deleting, so only its cancellation can measure the wait")
+	})
+
+	t.Run("The subject of the deletion names what goes away", func(t *testing.T) {
+		assert.NotEqual(t, scopeBackupAndProviderBackup.getDeletionSubject(), scopeProviderBackupOnly.getDeletionSubject())
+	})
 }
 
 func TestBackupRunOutcome(t *testing.T) {

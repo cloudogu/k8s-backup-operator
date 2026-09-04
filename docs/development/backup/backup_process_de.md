@@ -39,7 +39,7 @@ Der `deletionTimestamp` hat Vorrang vor allen Conditions. Ohne Löschanforderung
 10. `ensureBackupLeaseReleased`
 11. `ensureBackupRunCompleted`
 
-Hat der Provider bereits ein terminales Ergebnis geliefert oder wurde das Backup abgebrochen, verwendet der Controller den Finalize-Pfad mit den letzten drei Stages. Bei einer Löschung laufen `ensureMaintenanceDeactivated`, `ensureBackupLeaseReleased` und `ensureProviderBackupDeleted`. Ein bereits terminales Backup mit `Succeeded=True` oder `Succeeded=False` verwendet den Ignore-Pfad mit `ensureOrphanedBackupDeleted`: Die Stage prüft, ob der Provider-Backup noch existiert, und entfernt gegebenenfalls einen verwaisten CES-Backup-CR. `Succeeded` wird erst durch `ensureBackupRunCompleted` nach Maintenance-Deaktivierung und Lease-Freigabe gesetzt.
+Hat der Provider bereits ein terminales Ergebnis geliefert oder wurde das Backup abgebrochen, verwendet der Controller den Finalize-Pfad mit den letzten drei Stages. Bei einer Löschung laufen `ensureMaintenanceDeactivated`, `ensureBackupLeaseReleased` und `ensureProviderBackupDeleted`. Ein bereits terminales Backup mit `Succeeded=True` oder `Succeeded=False` verwendet den Ignore-Pfad mit `ensureOrphanedBackupDeleted`: Die Stage prüft, ob der Provider-Backup noch existiert, und entfernt gegebenenfalls einen verwaisten CES-Backup-CR. Abgebrochene Backups sind dort ausgenommen und werden stattdessen von `ensureCanceledProviderBackupDeleted` behandelt (siehe [Zeitfenster und Abbruch](#zeitfenster-und-abbruch)). `Succeeded` wird erst durch `ensureBackupRunCompleted` nach Maintenance-Deaktivierung und Lease-Freigabe gesetzt.
 
 ## Erfolgreicher lokaler Backup-Ablauf
 
@@ -95,19 +95,27 @@ stateDiagram-v2
     [*] --> TimeWindowNotExpired
     TimeWindowNotExpired --> TimeWindowExpiredBackupNotStarted: Zeit abgelaufen, StartTimestamp leer
     TimeWindowNotExpired --> TimeWindowExpiredBackupInProgress: Zeit abgelaufen, Provider läuft
-    TimeWindowNotExpired --> TimeWindowExpiredBackupFailed: Zeit abgelaufen, Provider fehlgeschlagen
-    TimeWindowNotExpired --> TimeWindowExpiredBackupSucceeded: Zeit abgelaufen, Provider erfolgreich
+    TimeWindowNotExpired --> TimeWindowExpiredBackupTerminated: Zeit abgelaufen, Provider terminal
     TimeWindowExpiredBackupNotStarted --> [*]: Canceled=True kein Provider-Backup
-    TimeWindowExpiredBackupFailed --> [*]: Canceled=True
-    TimeWindowExpiredBackupInProgress --> ProviderObservation: Canceled=False
-    TimeWindowExpiredBackupSucceeded --> ProviderObservation: Canceled=False
+    TimeWindowExpiredBackupInProgress --> [*]: Canceled=True, Provider-Backup verwaist
+    TimeWindowExpiredBackupTerminated --> ProviderObservation: Canceled=False
 ```
 
 Fehlt die ConfigMap oder der Schlüssel, oder ist der Wert nicht numerisch, endet der Reconcile mit Fehler. `StartTimestamp` ist die Grenze zwischen „noch nicht gestartet“ und „bereits gestartet“.
 
+#### Abbruch eines laufenden Provider-Backups
+
+Velero bietet keine Möglichkeit, ein laufendes Backup von außen abzubrechen. Der Lauf wird daher nicht gestoppt, sondern aufgegeben: `Canceled=True` leitet den nächsten Durchlauf in den Finalize-Pfad, der den Wartungsmodus deaktiviert, das Lease freigibt und das terminale `Succeeded=False` schreibt. Das Velero-Backup läuft als Waise weiter. Ein bereits terminales Provider-Backup wird nicht abgebrochen, Wartungsmodus und Lease werden im gleichen Reconcile deaktiviert / freigegeben. Erfolg und Fehlschlag werden daher gemeldet wie innerhalb des Zeitfensters. Wartungsmodus und Lease stundenlang über das Zeitfenster hinaus zu halten, ist das schlechtere Ergebnis.
+
+`ensureCanceledProviderBackupDeleted` löscht diese Waise, sobald sie nicht mehr in einer laufenden Phase ist. Der Wartungsmodus wurde abgeschaltet, während Velero möglicherweise noch gelesen hat; das Ergebnis ist daher potenziell inkonsistent und darf nicht wiederherstellbar sein – auch nicht von einem anderen Cluster, das dieselbe `BackupStorageLocation` nutzt. Der Backup-CR selbst bleibt als Fehlerhistorie erhalten, deshalb überspringen sowohl `ensureOrphanedBackupDeleted` als auch der Synchronisations-Controller abgebrochene Backups.
+
+Die Löschung läuft auf dem bereits terminalen CR: `ensureBackupRunCompleted` gibt für abgebrochene Läufe `Retry` zurück, und die gemeinsam genutzten Lösch-Helfer schreiben ihren Fortschritt mit `Deleting=False`, da nur das Provider-Backup gelöscht wird, nicht der CR.
+
 ### Vorbereitung
 
 `ensureBackupIsPrepared` liest die konfigurierte Velero-`BackupStorageLocation`. Nur `status.phase=Available` ergibt `Prepared=True`. Eine fehlende oder nicht verfügbare Location ergibt `Prepared=False` und einen kontrollierten Retry. Andere API-Fehler werden zurückgegeben.
+
+Zusätzlich listet die Stage die Velero-Backups des Namespace und blockiert mit `Prepared=False`/`OtherProviderBackupInProgress`, solange ein Velero-Backup eines anderen Laufs noch in einer laufenden Phase ist. Das verhindert, dass ein neues Backup mit dem Backup eines abgebrochenen Laufs kollidiert. Der Guard läuft vor Lease und Wartungsmodus, das Warten hat also keine Auswirkung auf Benutzer – ein kurz nach einem Abbruch gestartetes Backup kann aber in sein eigenes Timeout laufen und ebenfalls abgebrochen werden.
 
 ### Gemeinsames Backup-/Restore-Lease
 
@@ -178,6 +186,9 @@ Lokale und aus dem Provider importierte Backups verwenden dieselben fünf Condit
 |---|---|---|
 | `False` | `BackupNotDeleting` | Kein `deletionTimestamp`; normaler Workflow darf laufen. |
 | `True` | `BackupDeleting` | Löschen wurde angefordert und der Provider-Backup existiert noch. |
+| `False` | `CanceledProviderBackupDeleted` | Das verwaiste Provider-Backup eines abgebrochenen Laufs ist weg. |
+
+Während das Provider-Backup eines abgebrochenen Laufs gelöscht wird, werden die Lösch-Reasons mit Status `False` geschrieben: Der CR bleibt erhalten.
 
 ### `Canceled`
 
@@ -185,9 +196,8 @@ Lokale und aus dem Provider importierte Backups verwenden dieselben fünf Condit
 |---|---|---|
 | `False` | `TimeWindowNotExpired` | Startzeitfenster ist noch offen; der Backup wurde nicht abgebrochen. |
 | `True` | `TimeWindowExpiredBackupNotStarted` | Backup wurde vor Ablauf nicht gestartet. |
-| `False` | `TimeWindowExpiredBackupInProgress` | Backup lief beim Ablauf bereits und darf fortfahren. |
-| `True` | `TimeWindowExpiredBackupFailed` | Provider war beim Ablauf bereits fehlgeschlagen. |
-| `False` | `TimeWindowExpiredBackupSucceeded` | Provider war beim Ablauf bereits erfolgreich. |
+| `True` | `TimeWindowExpiredBackupInProgress` | Backup lief beim Ablauf noch; sein Provider-Backup verwaist und wird gelöscht. |
+| `False` | `TimeWindowExpiredBackupTerminated` | Das Provider-Backup war beim Ablauf bereits terminal; sein Ergebnis meldet `ensureProviderBackupCompleted`. |
 
 ### `Prepared`
 
@@ -195,6 +205,7 @@ Lokale und aus dem Provider importierte Backups verwenden dieselben fünf Condit
 |---|---|---|
 | `False` | `ProviderBackupStorageLocationNotFound` | BackupStorageLocation fehlt. |
 | `False` | `ProviderBackupStorageLocationNotAvailable` | Location existiert, ist aber nicht `Available`. |
+| `False` | `OtherProviderBackupInProgress` | Ein Provider-Backup eines anderen Laufs läuft noch. |
 | `True` | `ProviderBackupStorageLocationAvailable` | Provider-Speicher ist verwendbar. |
 | `True` | `VeleroStatusSynced` | Importierter Backup existiert bereits bei Velero. |
 
@@ -237,13 +248,15 @@ flowchart TD
     D -- nein --> E[Backup-CR mit syncedFromProvider=true anlegen]
     D -- ja --> F[Nichts ändern]
     C -- ja --> G[DeleteBackupRequest sicherstellen]
-    G --> H[Backup-CR löschen]
+    G --> H{Backup-CR abgebrochen?}
+    H -- nein --> I[Backup-CR löschen]
+    H -- ja --> J[Backup-CR als Fehlerhistorie behalten]
     B -- nein --> G
 ```
 
 Ein importierter Backup-CR erhält Provider `velero`, CES-Standardlabels, weitergereichte Annotationen und den Backup-Finalizer. Da Kubernetes beim Create keinen Status aus dem Objekt übernimmt, signalisiert `spec.syncedFromProvider=true` dem Hauptcontroller, den Status anschließend aus Velero zu lesen.
 
-Wenn ein Velero-Backup gelöscht wird oder bereits fehlt, stellt der Controller zuerst idempotent einen gleichnamigen `DeleteBackupRequest` sicher und löscht danach den CES-Backup-CR. Der DeleteRequest verhindert, dass Velero die CR später aus noch vorhandenen Storage-Daten erneut rekonstruiert.
+Wenn ein Velero-Backup gelöscht wird oder bereits fehlt, stellt der Controller zuerst idempotent einen gleichnamigen `DeleteBackupRequest` sicher und löscht danach den CES-Backup-CR – es sei denn, dieser ist abgebrochen, dann bleibt er als Fehlerhistorie erhalten. Der DeleteRequest verhindert, dass Velero die CR später aus noch vorhandenen Storage-Daten erneut rekonstruiert.
 
 ## Delete-Workflow eines Backup-CR
 

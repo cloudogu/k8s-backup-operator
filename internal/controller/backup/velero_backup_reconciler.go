@@ -8,6 +8,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/annotations"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -62,6 +63,11 @@ func (r *defaultVeleroBackupReconciler) deleteBackupIfExists(ctx context.Context
 
 	if err := r.ensureDeleteBackupRequestExists(ctx, key); err != nil {
 		return err
+	}
+
+	// Do not delete canceled backups, they stay for failure history, whereas it's provider backup is always deleted.
+	if meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled) {
+		return nil
 	}
 
 	if err := r.client.Delete(ctx, backup); err != nil && !apierrors.IsNotFound(err) {
