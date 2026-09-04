@@ -95,19 +95,17 @@ stateDiagram-v2
     [*] --> TimeWindowNotExpired
     TimeWindowNotExpired --> TimeWindowExpiredBackupNotStarted: Zeit abgelaufen, StartTimestamp leer
     TimeWindowNotExpired --> TimeWindowExpiredBackupInProgress: Zeit abgelaufen, Provider läuft
-    TimeWindowNotExpired --> TimeWindowExpiredBackupFailed: Zeit abgelaufen, Provider fehlgeschlagen
-    TimeWindowNotExpired --> TimeWindowExpiredBackupSucceeded: Zeit abgelaufen, Provider erfolgreich
+    TimeWindowNotExpired --> TimeWindowExpiredBackupTerminated: Zeit abgelaufen, Provider terminal
     TimeWindowExpiredBackupNotStarted --> [*]: Canceled=True kein Provider-Backup
-    TimeWindowExpiredBackupFailed --> [*]: Canceled=True
     TimeWindowExpiredBackupInProgress --> [*]: Canceled=True, Provider-Backup verwaist
-    TimeWindowExpiredBackupSucceeded --> ProviderObservation: Canceled=False
+    TimeWindowExpiredBackupTerminated --> ProviderObservation: Canceled=False
 ```
 
 Fehlt die ConfigMap oder der Schlüssel, oder ist der Wert nicht numerisch, endet der Reconcile mit Fehler. `StartTimestamp` ist die Grenze zwischen „noch nicht gestartet“ und „bereits gestartet“.
 
 #### Abbruch eines laufenden Provider-Backups
 
-Velero bietet keine Möglichkeit, ein laufendes Backup von außen abzubrechen. Der Lauf wird daher nicht gestoppt, sondern aufgegeben: `Canceled=True` leitet den nächsten Durchlauf in den Finalize-Pfad, der den Wartungsmodus deaktiviert, das Lease freigibt und das terminale `Succeeded=False` schreibt. Das Velero-Backup läuft als Waise weiter. Wartungsmodus und Lease stundenlang über das Zeitfenster hinaus zu halten, ist das schlechtere Ergebnis.
+Velero bietet keine Möglichkeit, ein laufendes Backup von außen abzubrechen. Der Lauf wird daher nicht gestoppt, sondern aufgegeben: `Canceled=True` leitet den nächsten Durchlauf in den Finalize-Pfad, der den Wartungsmodus deaktiviert, das Lease freigibt und das terminale `Succeeded=False` schreibt. Das Velero-Backup läuft als Waise weiter. Ein bereits terminales Provider-Backup wird nicht abgebrochen, Wartungsmodus und Lease werden im gleichen Reconcile deaktiviert / freigegeben. Erfolg und Fehlschlag werden daher gemeldet wie innerhalb des Zeitfensters. Wartungsmodus und Lease stundenlang über das Zeitfenster hinaus zu halten, ist das schlechtere Ergebnis.
 
 `ensureCanceledProviderBackupDeleted` löscht diese Waise, sobald sie nicht mehr in einer laufenden Phase ist. Der Wartungsmodus wurde abgeschaltet, während Velero möglicherweise noch gelesen hat; das Ergebnis ist daher potenziell inkonsistent und darf nicht wiederherstellbar sein – auch nicht von einem anderen Cluster, das dieselbe `BackupStorageLocation` nutzt. Der Backup-CR selbst bleibt als Fehlerhistorie erhalten, deshalb überspringen sowohl `ensureOrphanedBackupDeleted` als auch der Synchronisations-Controller abgebrochene Backups.
 
@@ -199,8 +197,7 @@ Während das Provider-Backup eines abgebrochenen Laufs gelöscht wird, werden di
 | `False` | `TimeWindowNotExpired` | Startzeitfenster ist noch offen; der Backup wurde nicht abgebrochen. |
 | `True` | `TimeWindowExpiredBackupNotStarted` | Backup wurde vor Ablauf nicht gestartet. |
 | `True` | `TimeWindowExpiredBackupInProgress` | Backup lief beim Ablauf noch; sein Provider-Backup verwaist und wird gelöscht. |
-| `True` | `TimeWindowExpiredBackupFailed` | Provider war beim Ablauf bereits fehlgeschlagen. |
-| `False` | `TimeWindowExpiredBackupSucceeded` | Provider war beim Ablauf bereits erfolgreich. |
+| `False` | `TimeWindowExpiredBackupTerminated` | Das Provider-Backup war beim Ablauf bereits terminal; sein Ergebnis meldet `ensureProviderBackupCompleted`. |
 
 ### `Prepared`
 

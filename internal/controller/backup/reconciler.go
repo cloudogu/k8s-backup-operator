@@ -53,9 +53,8 @@ const (
 	reasonTimeWindowNotExpired                   = "TimeWindowNotExpired"
 	reasonTimeWindowExpiredBackupNotStarted      = "TimeWindowExpiredBackupNotStarted"
 	reasonTimeWindowExpiredBackupInProgress      = "TimeWindowExpiredBackupInProgress"
-	reasonTimeWindowExpiredBackupFailed          = "TimeWindowExpiredBackupFailed"
 	reasonTimeWindowExpiredProviderBackupMissing = "TimeWindowExpiredProviderBackupMissing"
-	reasonTimeWindowExpiredBackupSucceeded       = "TimeWindowExpiredBackupSucceeded"
+	reasonTimeWindowExpiredBackupTerminated      = "TimeWindowExpiredBackupTerminated"
 	reasonVeleroStatusSynced                     = "VeleroStatusSynced"
 	reasonVeleroBackupRunning                    = "VeleroBackupRunning"
 	reasonVeleroBackupFailed                     = "VeleroBackupFailed"
@@ -1045,11 +1044,8 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Con
 	if isProviderBackupInProgress(veleroBackup) {
 		return c.handleInProgressProviderBackupAfterTimeWindowExpired(ctx, backup, veleroBackup)
 	}
-	if hasProviderBackupFailed(veleroBackup) {
-		return c.handleFailedProviderBackupAfterTimeWindowExpired(ctx, backup, veleroBackup)
-	}
 
-	return c.handleSucceededProviderBackupAfterTimeWindowExpired(ctx, backup)
+	return c.handleTerminatedProviderBackupAfterTimeWindowExpired(ctx, backup)
 }
 
 func (c *defaultReconciler) handleMissingProviderBackupAfterTimeWindowExpired(
@@ -1105,46 +1101,23 @@ func (c *defaultReconciler) handleInProgressProviderBackupAfterTimeWindowExpired
 	return Retry, nil
 }
 
-func (c *defaultReconciler) handleFailedProviderBackupAfterTimeWindowExpired(
-	ctx context.Context,
-	backup *backupv1.Backup,
-	veleroBackup *velerov1.Backup,
-) (action, error) {
-	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup failed -> Canceled = True, RETRY")
-
-	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-			Type:    backupv1.ConditionCanceled,
-			Status:  metav1.ConditionTrue,
-			Reason:  reasonTimeWindowExpiredBackupFailed,
-			Message: "The backup had failed when the time window expired.",
-		})
-	}); err != nil {
-		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup has failed'")
-	}
-
-	logging.Info(ctx, "canceled the backup", "reason", "the time window expired and the velero backup had failed", "phase", veleroBackup.Status.Phase)
-	c.recorder.Eventf(backup, veleroBackup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupFailed, actionCancelBackup, "The backup had failed when the time window expired")
-	// This backup may still hold the lease and the maintenance mode. Canceled = True routes the
-	// next pass to operationFinalize, which deactivates the maintenance mode, releases the lease
-	// and writes the terminal Succeeded condition. -> Retry
-	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the canceled backup run must be finalized")
-	return Retry, nil
-}
-
-func (c *defaultReconciler) handleSucceededProviderBackupAfterTimeWindowExpired(
+// handleTerminatedProviderBackupAfterTimeWindowExpired lets a provider backup that already reached a
+// terminal phase finish its regular run.
+func (c *defaultReconciler) handleTerminatedProviderBackupAfterTimeWindowExpired(
 	ctx context.Context,
 	backup *backupv1.Backup,
 ) (action, error) {
+	logging.Debug(ctx, "ensureBackupIsCanceledAfterTimeWindowExpired: time window has expired, Backup has terminated -> Canceled = False, NEXT")
+
 	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 			Type:    backupv1.ConditionCanceled,
 			Status:  metav1.ConditionFalse,
-			Reason:  reasonTimeWindowExpiredBackupSucceeded,
-			Message: "The backup has succeeded when the time window expired.",
+			Reason:  reasonTimeWindowExpiredBackupTerminated,
+			Message: "The backup had terminated when the time window expired.",
 		})
 	}); err != nil {
-		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup has succeeded'")
+		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup has terminated'")
 	}
 
 	return Next, nil

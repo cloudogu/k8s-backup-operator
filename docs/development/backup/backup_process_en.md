@@ -95,19 +95,17 @@ stateDiagram-v2
     [*] --> TimeWindowNotExpired
     TimeWindowNotExpired --> TimeWindowExpiredBackupNotStarted: Time expired, StartTimestamp empty
     TimeWindowNotExpired --> TimeWindowExpiredBackupInProgress: Time expired, provider running
-    TimeWindowNotExpired --> TimeWindowExpiredBackupFailed: Time expired, provider failed
-    TimeWindowNotExpired --> TimeWindowExpiredBackupSucceeded: Time expired, provider succeeded
+    TimeWindowNotExpired --> TimeWindowExpiredBackupTerminated: Time expired, provider terminal
     TimeWindowExpiredBackupNotStarted --> [*]: Canceled=True, no provider backup
-    TimeWindowExpiredBackupFailed --> [*]: Canceled=True
     TimeWindowExpiredBackupInProgress --> [*]: Canceled=True, provider backup orphaned
-    TimeWindowExpiredBackupSucceeded --> ProviderObservation: Canceled=False
+    TimeWindowExpiredBackupTerminated --> ProviderObservation: Canceled=False
 ```
 
 If the ConfigMap or key is missing, or if the value is not numeric, the reconciliation ends with an error. `StartTimestamp` separates “not started yet” from “already started.”
 
 #### Canceling a running provider backup
 
-Velero provides no way to cancel a running backup from the outside. The run is therefore abandoned rather than stopped: `Canceled=True` routes the next pass into the finalize path, which deactivates maintenance mode, releases the lease, and writes the terminal `Succeeded=False`. The Velero backup keeps running as an orphan. Holding maintenance mode and the lease for hours past the time window is the worse outcome.
+Velero provides no way to cancel a running backup from the outside. The run is therefore abandoned rather than stopped: `Canceled=True` routes the next pass into the finalize path, which deactivates maintenance mode, releases the lease, and writes the terminal `Succeeded=False`. The Velero backup keeps running as an orphan. A provider backup that has already terminated is not canceled: maintenance mode and the lease will be deactivated / released this same reconcile. Succeeded and failed results are therefore reported as they would be within the time window. Holding maintenance mode and the lease for hours past the time window is the worse outcome.
 
 `ensureCanceledProviderBackupDeleted` deletes that orphan once it is no longer in a running phase. Maintenance mode was switched off while Velero may still have been reading, so the result is potentially inconsistent and must not be restorable – not even from another cluster that shares the `BackupStorageLocation`. The backup CR itself is kept as failure history, so both `ensureOrphanedBackupDeleted` and the synchronization controller skip canceled backups.
 
@@ -199,8 +197,7 @@ While the provider backup of a canceled run is deleted, the deletion reasons are
 | `False` | `TimeWindowNotExpired` | The start time window is still open; the backup was not canceled. |
 | `True` | `TimeWindowExpiredBackupNotStarted` | The backup was not started before the window expired. |
 | `True` | `TimeWindowExpiredBackupInProgress` | The backup was still running when the window expired; its provider backup is orphaned and gets deleted. |
-| `True` | `TimeWindowExpiredBackupFailed` | The provider had already failed when the window expired. |
-| `False` | `TimeWindowExpiredBackupSucceeded` | The provider had already succeeded when the window expired. |
+| `False` | `TimeWindowExpiredBackupTerminated` | The provider backup had already terminated when the window expired; its result is reported by `ensureProviderBackupCompleted`. |
 
 ### `Prepared`
 
