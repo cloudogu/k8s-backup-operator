@@ -65,7 +65,7 @@ func (r *defaultVeleroBackupReconciler) deleteBackupIfExists(ctx context.Context
 		return err
 	}
 
-	// Do not delete canceled backups, they stay for failure history, whereas it's provider backup is always deleted.
+	// Do not delete canceled backups, they stay for failure history, whereas its provider backup is always deleted.
 	if meta.IsStatusConditionTrue(backup.Status.Conditions, backupv1.ConditionCanceled) {
 		return nil
 	}

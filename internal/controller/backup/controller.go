@@ -117,7 +117,7 @@ func (c *Controller) getStagesForOperation(op operation) []ensureFunction {
 	case operationIgnore:
 		// Succeeded is written only after cleanup, so a terminal backup has no work left but to
 		// verify that the provider backup it mirrors is still there. Only exception are canceled runs,
-		// where velero backups are actively deleted due to possible inconsitencies.
+		// where velero backups are actively deleted due to possible inconsistencies.
 		return []ensureFunction{
 			c.reconciler.ensureOrphanedBackupDeleted,
 			c.reconciler.ensureCanceledProviderBackupDeleted,

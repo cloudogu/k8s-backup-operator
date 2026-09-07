@@ -36,10 +36,10 @@ dass die Operationen nicht gleichzeitig ausgeführt werden, nicht aber die Betri
 
 ## Timeout eines Backups
 
-Ein Backup, das nicht innerhalb von `retryTimeLimit` (Schlüssel der ConfigMap `k8s-backup-operator-backup-config`,
-Standard 60 Minuten) fertig wird, wird abgebrochen – auch dann, wenn der Backup-Provider noch läuft. Dieser lässt sich von außen
-nicht stoppen, aber Wartungsmodus wird planmäßig freigegeben statt ihn unnötig aktiv zu halten. Die
-Backup-Ressource bleibt als fehlgeschlagenes Backup erhalten.
+Ein Backup, das in gänze nicht innerhalb von `retryTimeLimit` (Schlüssel der ConfigMap `k8s-backup-operator-backup-config`,
+Standard 60 Minuten) fertig wird, wird abgebrochen – auch dann, wenn das Provider-Backup noch läuft. Dieses lässt sich von außen
+nicht stoppen, aber der Wartungsmodus wird planmäßig freigegeben statt ihn unnötig aktiv zu halten. Die
+Backup-Ressource bleibt als fehlgeschlagenes Backup erhalten. 
 
 Das Provider-Backup eines abgebrochenen Laufs läuft weiter und wird gelöscht, sobald es beendet ist. Der Wartungsmodus
 war zu diesem Zeitpunkt bereits abgeschaltet, die Daten sind daher potenziell inkonsistent und dürfen nicht

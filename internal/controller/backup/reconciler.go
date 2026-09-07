@@ -1094,7 +1094,7 @@ func (c *defaultReconciler) handleInProgressProviderBackupAfterTimeWindowExpired
 		return Abort, fmt.Errorf("patch status to mark the canceled condition as 'time window expired and backup is running'")
 	}
 
-	logging.Info(ctx, "canceled the backup", "reason", "the time window expired while the velero backup was still running", "phase", providerBackup.Status.Phase)
+	logging.Info(ctx, "canceled the backup", "reason", "the time window expired while the provider backup was still running", "phase", providerBackup.Status.Phase)
 	c.recorder.Eventf(backup, providerBackup, corev1.EventTypeWarning, reasonTimeWindowExpiredBackupInProgress, actionCancelBackup, "Backup is being canceled - provider backup was still running when the time window expired")
 	// Retry with Canceled=true to finalize.
 	logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the canceled backup run must be finalized")

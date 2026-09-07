@@ -33,7 +33,7 @@ that the operations do not run at the same time, but not that the entire EcoSyst
 
 ## Backup timeout
 
-A backup that is not finished within `retryTimeLimit` (key of the `k8s-backup-operator-backup-config` ConfigMap,
+A backup that is not finished in its entirety within `retryTimeLimit` (key of the `k8s-backup-operator-backup-config` ConfigMap,
 default 60 minutes) is canceled – even while the provider backup is still running. These cannot be stopped from the outside, but the
 maintenance mode is released on schedule instead of being held unnecessarily. The backup resource remains
 as a failed backup.
