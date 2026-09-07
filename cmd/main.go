@@ -20,6 +20,7 @@ import (
 	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -236,8 +237,10 @@ func getK8sManagerOptions(flags *flag.FlagSet, args []string, operatorConfig *op
 		Metrics:          server.Options{BindAddress: ":8080"},
 		Client: client.Options{
 			Cache: &client.CacheOptions{
+				// Read live: these drive irreversible decisions.
 				DisableFor: []client.Object{
 					&velerov1.BackupStorageLocation{},
+					&appsv1.Deployment{},
 				},
 			},
 		},
@@ -298,7 +301,7 @@ func configureBackupReconcilers(k8sManager controllerManager, recorder eventReco
 	k8sClient := k8sManager.GetClient()
 	maintenanceModeAdapter := repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, operatorConfig.Namespace)
 	maintenanceGateway := backupcontroller.NewMaintenanceGateway(maintenanceModeAdapter)
-	backupReconciler := backupcontroller.NewReconciler(k8sClient, recorder, maintenanceGateway, &operatortime.Clock{}, operatorConfig.BackupStorageName)
+	backupReconciler := backupcontroller.NewReconciler(k8sClient, recorder, maintenanceGateway, &operatortime.Clock{}, operatorConfig.BackupStorageName, operatorConfig.ProviderDeploymentName)
 
 	requeueAfter := time.Duration(operatorConfig.RequeueTimeSeconds) * time.Second
 	backupController := backupcontroller.NewController(k8sClient, backupReconciler, requeueAfter)
@@ -340,6 +343,7 @@ func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.W
 		scaleManager,
 		requeueAfter,
 		operatorConfig.BackupStorageName,
+		operatorConfig.ProviderDeploymentName,
 	)
 	if err := restoreReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("unable to create restore controller: %w", err)

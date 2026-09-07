@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- [#166] Add the environment variable `PROVIDER_DEPLOYMENT_NAME` (chart value `provider.deploymentName`,
+  default `velero`) naming the backup provider's deployment in the operator's namespace.
 - [#119, #125, #129] Add detailed status conditions and Kubernetes events for `Backup`, `Restore`, and
   `BackupSchedule` resources, as well as condition transition metrics for backups and restores. The legacy backup and
   restore status fields continue to be updated for compatibility.
@@ -13,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subsequent operations wait instead of modifying the EcoSystem at the same time.
 
 ### Changed
+- [#166] Restrict the operator's cleanup permissions to the resources it actually deletes (dogus, configmaps,
+  secrets, persistentvolumeclaims) and move them from a cluster-wide `ClusterRole`/`ClusterRoleBinding` to a
+  namespaced `Role`/`RoleBinding`. Workload scaling permissions moved into a dedicated
+  `workload-scale-role`. Because the binding changes kind, Helm deletes and recreates it during the upgrade;
+  the operator retries any request that fails in that brief window.
 - [#119, #129] Rework backup and restore handling into non-blocking, idempotent reconciliation workflows.
   - Progress is persisted on the custom resources and the actual cluster and provider state is verified before each
     step.

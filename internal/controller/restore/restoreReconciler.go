@@ -58,29 +58,32 @@ func NewRestoreReconciler(
 	scaleManager scaleManager,
 	requeueDelay time.Duration,
 	backupStorageName string,
+	providerDeploymentName string,
 ) *restoreReconciler {
 	return &restoreReconciler{
-		k8sClient:             k8sClient,
-		recorder:              recorder,
-		namespace:             namespace,
-		cleanup:               cleanup,
-		scaleManager:          scaleManager,
-		maintenanceModeSwitch: repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace),
-		requeueDelay:          requeueDelay,
-		backupStorageName:     backupStorageName,
+		k8sClient:              k8sClient,
+		recorder:               recorder,
+		namespace:              namespace,
+		cleanup:                cleanup,
+		scaleManager:           scaleManager,
+		maintenanceModeSwitch:  repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace),
+		requeueDelay:           requeueDelay,
+		backupStorageName:      backupStorageName,
+		providerDeploymentName: providerDeploymentName,
 	}
 }
 
 // restoreReconciler reconciles a Restore object
 type restoreReconciler struct {
-	k8sClient             k8sClient
-	recorder              eventRecorder
-	namespace             string
-	cleanup               cleanupManager
-	scaleManager          scaleManager
-	maintenanceModeSwitch maintenanceModeSwitch
-	requeueDelay          time.Duration
-	backupStorageName     string
+	k8sClient              k8sClient
+	recorder               eventRecorder
+	namespace              string
+	cleanup                cleanupManager
+	scaleManager           scaleManager
+	maintenanceModeSwitch  maintenanceModeSwitch
+	requeueDelay           time.Duration
+	backupStorageName      string
+	providerDeploymentName string
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

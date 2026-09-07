@@ -20,9 +20,10 @@ import (
 )
 
 const (
-	testRestoreUID    = types.UID("11111111-1111-1111-1111-111111111111")
-	testBackup        = "test-backup"
-	testBackupStorage = "test-backup-storage"
+	testRestoreUID         = types.UID("11111111-1111-1111-1111-111111111111")
+	testBackup             = "test-backup"
+	testBackupStorage      = "test-backup-storage"
+	testProviderDeployment = "test-velero"
 )
 
 // recoverableRestore is a Restore whose provider restore succeeded, so workload recovery can start.

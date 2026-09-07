@@ -126,20 +126,22 @@ type eventRecorder interface {
 }
 
 type defaultReconciler struct {
-	client             client.Client
-	recorder           eventRecorder
-	maintenanceGateway maintenanceGateway
-	clock              Clock
-	backupStorageName  string
+	client                 client.Client
+	recorder               eventRecorder
+	maintenanceGateway     maintenanceGateway
+	clock                  Clock
+	backupStorageName      string
+	providerDeploymentName string
 }
 
-func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGateway maintenanceGateway, clock Clock, backupStorageName string) *defaultReconciler {
+func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGateway maintenanceGateway, clock Clock, backupStorageName string, providerDeploymentName string) *defaultReconciler {
 	return &defaultReconciler{
-		client:             client,
-		recorder:           recorder,
-		maintenanceGateway: maintenanceGateway,
-		clock:              clock,
-		backupStorageName:  backupStorageName,
+		client:                 client,
+		recorder:               recorder,
+		maintenanceGateway:     maintenanceGateway,
+		clock:                  clock,
+		backupStorageName:      backupStorageName,
+		providerDeploymentName: providerDeploymentName,
 	}
 }
 
