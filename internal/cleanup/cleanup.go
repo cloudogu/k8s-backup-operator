@@ -10,7 +10,7 @@ import (
 )
 
 const defaultWaitTime = time.Second * 3
-const defaultCleanupTimeout = time.Minute * 15
+const defaultCleanupTimeout = time.Minute * 30
 
 var cleanupTimeout = defaultCleanupTimeout
 

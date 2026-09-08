@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subsequent operations wait instead of modifying the EcoSystem at the same time.
 
 ### Changed
+- [#119] Cancel a backup once `retryTimeLimit` has expired, even while the provider backup is still running, so that
+  maintenance mode and the backup lease are released on schedule. The abandoned provider backup is deleted as soon as
+  it terminates, because its data may be inconsistent; the `Backup` resource is kept as failure history. A backup
+  started shortly after a canceled one waits for the abandoned provider backup and may therefore time out as well.
 - [#119, #129] Rework backup and restore handling into non-blocking, idempotent reconciliation workflows.
   - Progress is persisted on the custom resources and the actual cluster and provider state is verified before each
     step.
