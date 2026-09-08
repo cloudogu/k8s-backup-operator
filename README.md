@@ -2,7 +2,6 @@
 Cloudogu EcoSystem backup operator for Kubernetes
 
 ---
-
 ## What is the Cloudogu EcoSystem?
 The Cloudogu EcoSystem is an open platform, which lets you choose how and where your team creates great software. Each service or tool is delivered as a Dogu, a Docker container. Each Dogu can easily be integrated in your environment just by pulling it from our registry.
 

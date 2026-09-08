@@ -1,0 +1,37 @@
+package schedule
+
+import (
+	"context"
+
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+type Controller struct {
+	client     client.Client
+	reconciler reconciler
+}
+
+// NewController creates a BackupSchedule controller backed by the default reconciler.
+func NewController(client client.Client, recorder eventRecorder, operatorImage string, imagePullSecrets []corev1.LocalObjectReference) *Controller {
+	return &Controller{
+		client:     client,
+		reconciler: newReconciler(client, recorder, operatorImage, imagePullSecrets),
+	}
+}
+
+// Reconcile delegates a BackupSchedule reconciliation request to the configured reconciler.
+func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	return c.reconciler.reconcile(ctx, req)
+}
+
+// SetupWithManager registers the BackupSchedule controller and its owned CronJob watcher with the manager.
+func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&backupv1.BackupSchedule{}).
+		Owns(&batchv1.CronJob{}). // Watch CronJobs owned by BackupSchedule
+		Complete(c)
+}

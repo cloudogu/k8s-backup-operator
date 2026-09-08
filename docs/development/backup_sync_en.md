@@ -14,3 +14,7 @@ This leads to a Backup CR inside the cluster which refers to a Velero backup tha
 The solution to this is the synchronization of the Velero backups with the Backup CRs after a restore has been applied.
 This process will create Backup CRs for Velero backups which are missing in the cluster. It will also delete Backup CRs,
 which have no corresponding Velero backup.
+
+The Velero Backup controller also observes manually initiated deletions. Before deleting the equally named Backup CR,
+it idempotently creates a Velero `DeleteBackupRequest`. This also removes the data from backup storage and prevents Velero
+from recreating the deleted Backup resource from storage.
