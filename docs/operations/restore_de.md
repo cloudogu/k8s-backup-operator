@@ -15,3 +15,11 @@ Bevor die Wiederherstellung ausgeführt wird,
 werden Ressourcen in diesem Namensraum, die für den Sicherungsprozess irrelevant sind, entfernt, um einen sauberen Zustand herzustellen.
 Dies ist besonders notwendig
 da installierte Dogus, die nicht in der Sicherung enthalten sind, nicht mehr funktionieren würden, weil die Sicherung ihre Datenbank nicht enthält.
+
+## Backup nach einem Restore starten
+
+Ein während dieses Restores erstelltes Backup wartet und startet erst, nachdem der Restore-Vorgang abgeschlossen ist.
+Dies garantiert jedoch nicht, dass das gesamte Cloudogu EcoSystem und alle PVCs bereit sind. Ein unmittelbar danach
+gestartetes Backup kann daher teilweise fehlschlagen. Unter
+[Backup unmittelbar nach einem Restore starten](./backup_de.md#backup-unmittelbar-nach-einem-restore-starten) sind das
+empfohlene Vorgehen und die Begründung für dieses Verhalten beschrieben.

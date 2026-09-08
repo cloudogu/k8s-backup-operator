@@ -33,6 +33,9 @@ IMAGE_IMPORT_TARGET=image-import
 
 include build/make/k8s-controller.mk
 
+# Build uses cmd/main.go as entrypoint (repo has no main package in project root).
+GO_BUILD_FLAGS=-mod=vendor -a -o $(BINARY) ./cmd/
+
 .PHONY: build-boot
 build-boot: helm-apply kill-operator-pod ## Builds a new version of the operator and deploys it into the K8s-EcoSystem.
 
@@ -81,3 +84,26 @@ kill-operator-pod:
 print-debug-info: ## Generates indo and the list of environment variables required to start the operator in debug mode.
 	@echo "The target generates a list of env variables required to start the operator in debug mode. These can be pasted directly into the 'go build' run configuration in IntelliJ to run and debug the operator on-demand."
 	@echo "STAGE=$(STAGE);LOG_LEVEL=$(LOG_LEVEL);KUBECONFIG=$(KUBECONFIG);NAMESPACE=$(NAMESPACE);DOGU_REGISTRY_ENDPOINT=$(DOGU_REGISTRY_ENDPOINT);DOGU_REGISTRY_USERNAME=$(DOGU_REGISTRY_USERNAME);DOGU_REGISTRY_PASSWORD=$(DOGU_REGISTRY_PASSWORD);DOCKER_REGISTRY={\"auths\":{\"$(docker_registry_server)\":{\"username\":\"$(docker_registry_username)\",\"password\":\"$(docker_registry_password)\",\"email\":\"ignore@me.com\",\"auth\":\"ignoreMe\"}}}"
+
+# Optional Ginkgo filters, e.g. GINKGO_LABEL_FILTER=restore or GINKGO_FOCUS='Creating a Restore'
+GINKGO_LABEL_FILTER?=
+GINKGO_FOCUS?=
+GINKGO_SPEC_ARGS=-p -r -v --tags=acceptance $(if $(GINKGO_LABEL_FILTER),--label-filter="$(GINKGO_LABEL_FILTER)") $(if $(GINKGO_FOCUS),--focus="$(GINKGO_FOCUS)")
+
+.PHONY: acceptance-test
+acceptance-test: ## Run the cluster acceptance specs. DESTRUCTIVE - disposable clusters only.
+	@echo "WARNING: the restore specs delete all dogus and all backup-scope labeled"
+	@echo "ConfigMaps/Secrets/PVCs in the target namespace. Use a disposable cluster."
+	go run github.com/onsi/ginkgo/v2/ginkgo $(GINKGO_SPEC_ARGS) ./acceptance-tests/...
+
+.PHONY: acceptance-test-restore
+acceptance-test-restore: ## Run only the Restore acceptance specs. DESTRUCTIVE - disposable clusters only.
+	@$(MAKE) --no-print-directory acceptance-test GINKGO_LABEL_FILTER=restore
+
+.PHONY: acceptance-test-backup
+acceptance-test-backup: ## Run only the Restore acceptance specs. DESTRUCTIVE - disposable clusters only.
+	@$(MAKE) --no-print-directory acceptance-test GINKGO_LABEL_FILTER=backup
+
+.PHONY: acceptance-test-backupschedule
+acceptance-test-backupschedule: ## Run only the BackupSchedule acceptance specs.
+	@$(MAKE) --no-print-directory acceptance-test GINKGO_LABEL_FILTER=backupschedule
