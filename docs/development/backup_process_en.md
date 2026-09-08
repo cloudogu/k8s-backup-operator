@@ -312,7 +312,7 @@ Status and conditions are updated only when they actually differ.
 
 ## Acceptance tests
 
-The cluster tests are located in `acceptance-tests/backup_test.go` and use the Ginkgo label `backup`:
+The cluster tests are located in `../../acceptance-tests/backup_test.go` and use the Ginkgo label `backup`:
 
 ```bash
 K8S_TEST_CLUSTER_KUBECONFIG=/absolute/path/to/kubeconfig \
