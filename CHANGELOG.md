@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v3.4.0] - 2026-09-08
 ### Added
 - [#119, #125, #129] Add detailed status conditions and Kubernetes events for `Backup`, `Restore`, and
   `BackupSchedule` resources, as well as condition transition metrics for backups and restores. The legacy backup and
