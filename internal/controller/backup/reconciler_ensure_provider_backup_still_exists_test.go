@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -61,6 +62,24 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 		assert.Equal(t, Next, nextAction)
 		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), &backupv1.Backup{}),
 			"a canceled backup that never reached the provider must survive")
+	})
+
+	t.Run("Keep a canceled backup whose provider backup was deleted on purpose", func(t *testing.T) {
+		backup := backupWithStartedProviderBackup("ns", "backup")
+		meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+			Type:   backupv1.ConditionCanceled,
+			Status: metav1.ConditionTrue,
+			Reason: reasonTimeWindowExpiredBackupInProgress,
+		})
+		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+
+		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), &backupv1.Backup{}),
+			"a canceled backup is the failure history of its run and must survive the deletion of its provider backup")
 	})
 
 	t.Run("Reconcile with backoff without deleting when the provider backup cannot be read", func(t *testing.T) {

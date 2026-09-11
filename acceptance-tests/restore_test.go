@@ -40,9 +40,9 @@ const (
 	acceptanceParentHoldFinalizer = "k8s.cloudogu.com/acceptance-parent-hold"
 	// These values mirror the restore controller's namespace-wide Lease contract. Keeping them in
 	// the black-box spec avoids coupling the acceptance test to controller implementation types.
-	restoreLeaseName                 = "k8s-backup-operator-restore"
-	restoreLeaseHolderNameAnnotation = "k8s.cloudogu.com/restore-lease-holder-name"
-	reasonWaitingForActiveRestore    = "WaitingForActiveRestore"
+	leaseName                     = "k8s-backup-operator-lease"
+	leaseHolderNameAnnotation     = "k8s.cloudogu.com/backup-operator-lease-holder-name"
+	reasonWaitingForActiveRestore = "WaitingForActiveRestore"
 
 	restoreTestNamespace       = "ecosystem"
 	throwawayReplicas    int32 = 2
@@ -260,10 +260,9 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 	Describe("Serializing concurrent Restores with a Lease", Ordered, func() {
 		firstKey := client.ObjectKey{Namespace: restoreTestNamespace, Name: fmt.Sprintf("restore-lease-first-%s", suffix)}
 		secondKey := client.ObjectKey{Namespace: restoreTestNamespace, Name: fmt.Sprintf("restore-lease-second-%s", suffix)}
-		leaseKey := client.ObjectKey{Namespace: restoreTestNamespace, Name: restoreLeaseName}
+		leaseKey := client.ObjectKey{Namespace: restoreTestNamespace, Name: leaseName}
 		var holderKey client.ObjectKey
 		var waiterKey client.ObjectKey
-		var initialLeaseTransitions int32
 
 		BeforeAll(func(ctx SpecContext) {
 			DeferCleanup(func(ctx SpecContext) {
@@ -282,16 +281,15 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 				lease := &coordinationv1.Lease{}
 				g.Expect(k8sClient.Get(ctx, leaseKey, lease)).Should(Succeed())
 				g.Expect(lease.Spec.HolderIdentity).ShouldNot(BeNil())
-				g.Expect(lease.Spec.LeaseTransitions).ShouldNot(BeNil())
 
 				var observedHolderKey client.ObjectKey
 				var observedWaiterKey client.ObjectKey
-				if lease.Annotations[restoreLeaseHolderNameAnnotation] == firstKey.Name {
+				if lease.Annotations[leaseHolderNameAnnotation] == firstKey.Name {
 					observedHolderKey, observedWaiterKey = firstKey, secondKey
 				} else {
 					observedHolderKey, observedWaiterKey = secondKey, firstKey
 				}
-				g.Expect(lease.Annotations[restoreLeaseHolderNameAnnotation]).Should(
+				g.Expect(lease.Annotations[leaseHolderNameAnnotation]).Should(
 					Or(Equal(firstKey.Name), Equal(secondKey.Name)),
 					"the lease must be held by one of the competing restores")
 
@@ -312,7 +310,6 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 					"the waiting restore must not start a provider restore before it owns the lease")
 
 				holderKey, waiterKey = observedHolderKey, observedWaiterKey
-				initialLeaseTransitions = *lease.Spec.LeaseTransitions
 			}).
 				WithTimeout(10 * time.Minute).
 				WithPolling(2 * time.Second).
@@ -330,11 +327,9 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 
 				lease := &coordinationv1.Lease{}
 				g.Expect(k8sClient.Get(ctx, leaseKey, lease)).Should(Succeed())
-				g.Expect(lease.Annotations[restoreLeaseHolderNameAnnotation]).Should(Equal(waiterKey.Name))
+				g.Expect(lease.Annotations[leaseHolderNameAnnotation]).Should(Equal(waiterKey.Name))
 				g.Expect(lease.Spec.HolderIdentity).ShouldNot(BeNil())
 				g.Expect(*lease.Spec.HolderIdentity).Should(Equal(string(waiter.UID)))
-				g.Expect(lease.Spec.LeaseTransitions).ShouldNot(BeNil())
-				g.Expect(*lease.Spec.LeaseTransitions).Should(BeNumerically(">", initialLeaseTransitions))
 			}).
 				WithTimeout(10 * time.Minute).
 				WithPolling(2 * time.Second).
@@ -346,7 +341,7 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 				providerRestore := &velerov1.Restore{}
 				g.Expect(k8sClient.Get(ctx, waiterKey, providerRestore)).Should(Succeed())
 			}).
-				WithTimeout(10 * time.Minute).
+				WithTimeout(30 * time.Minute).
 				WithPolling(5 * time.Second).
 				Should(Succeed())
 

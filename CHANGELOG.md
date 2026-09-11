@@ -10,11 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   starts. Backups and restores wait with `Prepared=False` while Velero is not running.
 - [#166] Add the environment variable `PROVIDER_DEPLOYMENT_NAME` (chart value `provider.deploymentName`,
   default `velero`) naming the backup provider's deployment in the operator's namespace.
-- [#119, #125, #129] Add detailed status conditions and Kubernetes events for `Backup`, `Restore`, and
-  `BackupSchedule` resources, as well as condition transition metrics for backups and restores. The legacy backup and
-  restore status fields continue to be updated for compatibility.
-- [#119, #129] Coordinate backup and restore operations within a namespace. If another operation is already running,
-  subsequent operations wait instead of modifying the EcoSystem at the same time.
 
 ### Changed
 - [#166] Restrict the operator's cleanup permissions to the resources it actually deletes (dogus, configmaps,
@@ -22,6 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   namespaced `Role`/`RoleBinding`. Workload scaling permissions moved into a dedicated
   `workload-scale-role`. Because the binding changes kind, Helm deletes and recreates it during the upgrade;
   the operator retries any request that fails in that brief window.
+
+## [v3.4.0] - 2026-09-08
+### Added
+- [#119, #125, #129] Add detailed status conditions and Kubernetes events for `Backup`, `Restore`, and
+  `BackupSchedule` resources, as well as condition transition metrics for backups and restores. The legacy backup and
+  restore status fields continue to be updated for compatibility.
+- [#119, #129] Coordinate backup and restore operations within a namespace. If another operation is already running,
+  subsequent operations wait instead of modifying the EcoSystem at the same time.
+
+### Changed
+- [#119] Cancel a backup once `retryTimeLimit` has expired, even while the provider backup is still running, so that
+  maintenance mode and the backup lease are released on schedule. The abandoned provider backup is deleted as soon as
+  it terminates, because its data may be inconsistent; the `Backup` resource is kept as failure history. A backup
+  started shortly after a canceled one waits for the abandoned provider backup and may therefore time out as well.
 - [#119, #129] Rework backup and restore handling into non-blocking, idempotent reconciliation workflows.
   - Progress is persisted on the custom resources and the actual cluster and provider state is verified before each
     step.

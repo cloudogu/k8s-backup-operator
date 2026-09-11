@@ -21,7 +21,7 @@ flowchart TD
 
 Der Controller beobachtet sowohl Parent-`Restore`-Ressourcen als auch owned Velero-`Restore`-Children. Es gibt bewusst weder einen controllerweiten Event-Filter noch eine `GenerationChangedPredicate`: Provider-Phasenwechsel sowie Status-, Finalizer- und Löschereignisse des Parents müssen einen Reconcile auslösen können. Das geht, weil ein Restore sein Child immer selbst erzeugt; der Backup-Controller kann das nicht und wartet deshalb per Requeue.
 
-Das Logging verwendet den vom `controller-runtime` im `context.Context` bereitgestellten `logr.Logger`. Restore-Stages und aufgerufene Manager reichen deshalb den vorhandenen Context weiter und greifen über `internal/logging` auf den Logger zu; ein zusätzlicher Logger-Parameter oder eine erneute Initialisierung pro Methode ist nicht erforderlich. Ein neuer `context.Background()` innerhalb des Workflows würde neben Abbruch und Deadline auch den Request-Logger verlieren und ist deshalb zu vermeiden.
+Das Logging verwendet den vom `controller-runtime` im `context.Context` bereitgestellten `logr.Logger`. Restore-Stages und aufgerufene Manager reichen deshalb den vorhandenen Context weiter und greifen über `../../internal/logging` auf den Logger zu; ein zusätzlicher Logger-Parameter oder eine erneute Initialisierung pro Methode ist nicht erforderlich. Ein neuer `context.Background()` innerhalb des Workflows würde neben Abbruch und Deadline auch den Request-Logger verlieren und ist deshalb zu vermeiden.
 
 ### Stage-Ergebnisse
 
@@ -209,7 +209,7 @@ Die Delete-Anforderung an den Provider-Child wird nicht mit dessen tatsächliche
 
 ## Acceptance-Tests
 
-Die Cluster-Acceptance-Tests liegen in `acceptance-tests/restore_test.go`. Sie sind mit dem Build-Tag `acceptance` von normalen Unit-Test-Läufen ausgeschlossen und verwenden Ginkgo/Gomega.
+Die Cluster-Acceptance-Tests liegen in `../../acceptance-tests/restore_test.go`. Sie sind mit dem Build-Tag `acceptance` von normalen Unit-Test-Läufen ausgeschlossen und verwenden Ginkgo/Gomega.
 
 ### Sicherheitsvoraussetzungen
 

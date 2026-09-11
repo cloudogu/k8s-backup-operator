@@ -54,6 +54,8 @@ func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGrou
 }
 
 func (c *defaultDoguManager) waitForDoguDeletion(ctx context.Context, dogu *doguv2.Dogu) {
+	var lastReportedError string
+
 	for {
 		logging.Debug(ctx, "waiting for dogu to be deleted", "ns", dogu.GetNamespace(), "Name", dogu.GetName())
 		_, err := c.doguClient.Get(ctx, dogu.GetName(), metav1.GetOptions{})
@@ -63,6 +65,13 @@ func (c *defaultDoguManager) waitForDoguDeletion(ctx context.Context, dogu *dogu
 				"ns", dogu.GetNamespace(), "Name", dogu.GetName())
 			break
 		} else if exists := !k8sErr.IsNotFound(err); exists {
+			// The same error repeats every few seconds, so only a new one is reported.
+			if err != nil && err.Error() != lastReportedError {
+				lastReportedError = err.Error()
+				logging.Error(ctx, err, "cannot observe whether the dogu was deleted, still waiting",
+					"ns", dogu.GetNamespace(), "Name", dogu.GetName())
+			}
+
 			// wait for 3 seconds and try again
 			time.Sleep(doguDeleteWaitTime)
 		} else {
