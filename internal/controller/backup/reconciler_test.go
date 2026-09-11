@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -210,4 +211,16 @@ func assertBackupLeaseReleased(t *testing.T, k8sClient client.Client, backup *ba
 	lease := &coordinationv1.Lease{}
 	err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: leases.DefaultName}, lease)
 	assert.True(t, apierrors.IsNotFound(err), "expected the lease to be released, got %v", err)
+}
+
+func newVeleroDeploymentForReconcilerTest(readyReplicas int32) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns",
+			Name:      "velero",
+		},
+		Status: appsv1.DeploymentStatus{
+			ReadyReplicas: readyReplicas,
+		},
+	}
 }

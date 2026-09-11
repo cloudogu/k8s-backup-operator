@@ -438,7 +438,7 @@ func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx con
 }
 
 func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	readiness, err := veleroprovider.CheckReady(ctx, c.client, backup.Namespace, c.backupStorageName)
+	readiness, err := veleroprovider.CheckReady(ctx, c.client, backup.Namespace, c.backupStorageName, c.providerDeploymentName)
 	if err != nil {
 		return Abort, err
 	}

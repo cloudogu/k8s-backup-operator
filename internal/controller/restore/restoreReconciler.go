@@ -287,7 +287,7 @@ func (r *restoreReconciler) ensureProviderReady(ctx context.Context, restore *k8
 		return restore, next()
 	}
 
-	readiness, err := velero.CheckReady(ctx, r.k8sClient, restore.Namespace, r.backupStorageName)
+	readiness, err := velero.CheckReady(ctx, r.k8sClient, restore.Namespace, r.backupStorageName, r.providerDeploymentName)
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to check whether the provider of restore %s is ready: %w", restore.Name, err))
 	}

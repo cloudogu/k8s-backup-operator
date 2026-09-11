@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -96,6 +97,18 @@ func backupStorageLocation(phase velerov1.BackupStorageLocationPhase) *velerov1.
 	return &velerov1.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{Name: testBackupStorage, Namespace: testNamespace},
 		Status:     velerov1.BackupStorageLocationStatus{Phase: phase},
+	}
+}
+
+// readyProviderDeployment is the velero deployment the provider readiness gate expects to be running.
+func readyProviderDeployment() *appsv1.Deployment {
+	return providerDeployment(1)
+}
+
+func providerDeployment(readyReplicas int32) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: testProviderDeployment, Namespace: testNamespace},
+		Status:     appsv1.DeploymentStatus{ReadyReplicas: readyReplicas},
 	}
 }
 
