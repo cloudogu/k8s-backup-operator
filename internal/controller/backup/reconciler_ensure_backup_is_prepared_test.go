@@ -78,7 +78,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionTrue, preparedCondition.Status)
-		assert.Equal(t, veleroprovider.ReasonVeleroBackupStorageLocationAvailable, preparedCondition.Reason)
+		assert.Equal(t, veleroprovider.ReasonVeleroProviderReady, preparedCondition.Reason)
 
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})

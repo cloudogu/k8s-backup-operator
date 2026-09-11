@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	// ReasonVeleroBackupStorageLocationAvailable reports a provider that can serve backup and restore requests.
-	ReasonVeleroBackupStorageLocationAvailable = "VeleroBackupStorageLocationAvailable"
+	// ReasonVeleroProviderReady reports a provider that can serve backup and restore requests
+	ReasonVeleroProviderReady = "VeleroProviderReady"
 	// ReasonVeleroBackupStorageLocationNotFound reports a missing backup storage location, which usually
 	// means that Velero is not installed or not configured yet.
 	ReasonVeleroBackupStorageLocationNotFound = "VeleroBackupStorageLocationNotFound"
@@ -85,7 +85,7 @@ func checkDeploymentReady(ctx context.Context, k8sClient client.Client, namespac
 
 	return Readiness{
 		Ready:   true,
-		Reason:  ReasonVeleroBackupStorageLocationAvailable,
+		Reason:  ReasonVeleroProviderReady,
 		Message: fmt.Sprintf("The velero backup storage location 'name=%s' is available and the velero deployment 'name=%s' is ready.", backupStorageName, deploymentName),
 	}, nil
 }

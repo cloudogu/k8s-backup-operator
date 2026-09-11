@@ -43,7 +43,7 @@ func TestCheckReadyReportsAnAvailableBackupStorageLocation(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, readiness.Ready)
-	assert.Equal(t, ReasonVeleroBackupStorageLocationAvailable, readiness.Reason)
+	assert.Equal(t, ReasonVeleroProviderReady, readiness.Reason)
 	assert.Contains(t, readiness.Message, testBackupStorage)
 }
 
