@@ -112,6 +112,18 @@ func providerDeployment(readyReplicas int32) *appsv1.Deployment {
 	}
 }
 
+// usableSourceBackup is the velero backup the restore gate expects to be restorable.
+func usableSourceBackup() *velerov1.Backup {
+	return sourceBackup(velerov1.BackupPhaseCompleted)
+}
+
+func sourceBackup(phase velerov1.BackupPhase) *velerov1.Backup {
+	return &velerov1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: testBackup, Namespace: testNamespace},
+		Status:     velerov1.BackupStatus{Phase: phase},
+	}
+}
+
 func deletedRestore() *k8sv1.Restore {
 	return &k8sv1.Restore{ObjectMeta: metav1.ObjectMeta{
 		Name:              testRestore,

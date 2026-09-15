@@ -67,7 +67,7 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, recordProviderCheck, factory, restore, readyStorageLocation(), readyProviderDeployment())
+	fixture := newMultiReconcileFixture(t, recordProviderCheck, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -95,7 +95,7 @@ func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testi
 
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -154,7 +154,7 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -180,7 +180,7 @@ func TestAFailedScaleDownReportsPreparedFalseAndRetriesWithoutCleaningUp(t *test
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -213,7 +213,7 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -241,7 +241,7 @@ func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, readyStorageLocation(), readyProviderDeployment())
+	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -336,6 +336,9 @@ func TestAnUnreadyProviderIsReportedOnceAndTheRecoveryIsReportedOnce(t *testing.
 
 	fixture.simulateExternalWrite(t, func(testClient client.WithWatch) error {
 		if err := testClient.Create(testCtx, readyProviderDeployment()); err != nil {
+			return err
+		}
+		if err := testClient.Create(testCtx, usableSourceBackup()); err != nil {
 			return err
 		}
 

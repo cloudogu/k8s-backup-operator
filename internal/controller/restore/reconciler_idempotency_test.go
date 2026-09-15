@@ -121,7 +121,7 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 	request := newRestoreRequest(testRestore)
 
 	// One reconciliation per stage: conditions, metadata, preparation, start, and the first observation
@@ -219,7 +219,7 @@ func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheP
 
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 	request := newRestoreRequest(testRestore)
 
 	repeated, repeatedErrs := fixture.reconcileTimes(testCtx, request, 1)

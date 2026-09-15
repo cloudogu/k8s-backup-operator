@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - [#166] Check that the backup provider's deployment has at least one ready replica before a backup or a restore
   starts. Backups and restores wait with `Prepared=False` while Velero is not running.
+- [#166] Check the backup to be restored before a restore scales down and cleans up the ecosystem. A restore fails
+  without touching the ecosystem when the named backup is missing or not finished.
 - [#166] Add the environment variable `PROVIDER_DEPLOYMENT_NAME` (chart value `provider.deploymentName`,
   default `velero`) naming the backup provider's deployment in the operator's namespace.
 

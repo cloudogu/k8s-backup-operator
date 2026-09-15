@@ -41,6 +41,7 @@ const (
 	actionCompleteRestore           = "CompleteRestore"
 	actionDeleteRestore             = "DeleteRestore"
 	actionCheckProviderReadiness    = "CheckProviderReadiness"
+	actionCheckSourceBackup         = "CheckSourceBackup"
 	actionCreateProviderRestore     = "CreateProviderRestore"
 	actionCompleteProviderRestore   = "CompleteProviderRestore"
 	actionDeleteProviderRestore     = "DeleteProviderRestore"
@@ -140,6 +141,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.ensureProviderChildState,
 			r.ensureActiveRestoreLease,
 			r.ensureProviderReady,
+			r.ensureSourceBackupUsable,
 			r.ensureMaintenanceModeActivated,
 			r.ensurePreparation,
 			r.ensureProviderRestore,
