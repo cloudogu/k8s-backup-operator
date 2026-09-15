@@ -89,3 +89,16 @@ func checkDeploymentReady(ctx context.Context, k8sClient client.Client, namespac
 		Message: fmt.Sprintf("The velero backup storage location 'name=%s' is available and the velero deployment 'name=%s' is ready.", backupStorageName, deploymentName),
 	}, nil
 }
+
+// IsWaitingReason reports whether the run is currently waiting for the provider based on the condition reason.
+func IsWaitingReason(reason string) bool {
+	switch reason {
+	case ReasonVeleroBackupStorageLocationNotFound,
+		ReasonVeleroBackupStorageLocationNotAvailable,
+		ReasonVeleroDeploymentNotFound,
+		ReasonVeleroDeploymentNotReady:
+		return true
+	default:
+		return false
+	}
+}

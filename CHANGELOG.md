@@ -12,13 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without touching the ecosystem when the named backup is missing or not finished.
 - [#166] Add the environment variable `PROVIDER_DEPLOYMENT_NAME` (chart value `provider.deploymentName`,
   default `velero`) naming the backup provider's deployment in the operator's namespace.
-
+  
 ### Changed
 - [#166] Restrict the operator's cleanup permissions to the resources it actually deletes (dogus, configmaps,
   secrets, persistentvolumeclaims) and move them from a cluster-wide `ClusterRole`/`ClusterRoleBinding` to a
   namespaced `Role`/`RoleBinding`. Workload scaling permissions moved into a dedicated
-  `workload-scale-role`. Because the binding changes kind, Helm deletes and recreates it during the upgrade;
-  the operator retries any request that fails in that brief window.
+  `workload-scale-role`. 
 
 ## [v3.4.0] - 2026-09-08
 ### Added

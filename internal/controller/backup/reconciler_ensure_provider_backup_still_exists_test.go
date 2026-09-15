@@ -72,7 +72,7 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 			Reason: reasonTimeWindowExpiredBackupInProgress,
 		})
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
 

@@ -343,8 +343,7 @@ func wasWaitingForProvider(restore *k8sv1.Restore) bool {
 		return false
 	}
 
-	return condition.Reason == velero.ReasonVeleroBackupStorageLocationNotFound ||
-		condition.Reason == velero.ReasonVeleroBackupStorageLocationNotAvailable
+	return velero.IsWaitingReason(condition.Reason)
 }
 
 // ensurePreparation runs the destructive preparation of the ecosystem: scale-down and cleanup.
