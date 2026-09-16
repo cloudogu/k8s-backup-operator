@@ -11,7 +11,9 @@ import (
 )
 
 const (
-	ReasonVeleroSourceBackupUsable    = "VeleroSourceBackupUsable"
+	// ReasonVeleroSourceBackupUsable reports a backup that can be restored.
+	ReasonVeleroSourceBackupUsable = "VeleroSourceBackupUsable"
+	// ReasonVeleroSourceBackupNotUsable reports a backup that is missing or in a phase that cannot be restored.
 	ReasonVeleroSourceBackupNotUsable = "VeleroSourceBackupNotUsable"
 )
 
@@ -24,6 +26,8 @@ type SourceBackupCheck struct {
 	Message string
 }
 
+// CheckSourceBackup reports whether the named velero backup can be restored. API server errors are
+// returned as an error.
 func CheckSourceBackup(ctx context.Context, k8sClient client.Client, namespace string, backupName string) (SourceBackupCheck, error) {
 	backup := &velerov1.Backup{}
 	err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: backupName}, backup)

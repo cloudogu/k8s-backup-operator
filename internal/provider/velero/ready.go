@@ -58,11 +58,11 @@ func CheckReady(ctx context.Context, k8sClient client.Client, namespace string, 
 		}, nil
 	}
 
-	return checkDeploymentReady(ctx, k8sClient, namespace, backupStorageName, deploymentName)
+	return checkDeploymentReady(ctx, k8sClient, namespace, deploymentName)
 }
 
 // checkDeploymentReady reports whether the velero deployment has at least one ready replica.
-func checkDeploymentReady(ctx context.Context, k8sClient client.Client, namespace string, backupStorageName string, deploymentName string) (Readiness, error) {
+func checkDeploymentReady(ctx context.Context, k8sClient client.Client, namespace string, deploymentName string) (Readiness, error) {
 	deployment := &appsv1.Deployment{}
 	err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: deploymentName}, deployment)
 	if apierrors.IsNotFound(err) {
@@ -86,12 +86,12 @@ func checkDeploymentReady(ctx context.Context, k8sClient client.Client, namespac
 	return Readiness{
 		Ready:   true,
 		Reason:  ReasonVeleroProviderReady,
-		Message: fmt.Sprintf("The velero backup storage location 'name=%s' is available and the velero deployment 'name=%s' is ready.", backupStorageName, deploymentName),
+		Message: fmt.Sprint("The velero backup storage location is available and the velero deployment is ready."),
 	}, nil
 }
 
-// IsWaitingReason reports whether the run is currently waiting for the provider based on the condition reason.
-func IsWaitingReason(reason string) bool {
+// IsWaitingForProviderReason reports whether the run is currently waiting for the provider based on the condition reason.
+func IsWaitingForProviderReason(reason string) bool {
 	switch reason {
 	case ReasonVeleroBackupStorageLocationNotFound,
 		ReasonVeleroBackupStorageLocationNotAvailable,

@@ -251,7 +251,7 @@ func assertBackupLeaseReleased(t *testing.T, k8sClient client.Client, backup *ba
 	assert.True(t, apierrors.IsNotFound(err), "expected the lease to be released, got %v", err)
 }
 
-func newVeleroDeploymentForReconcilerTest(readyReplicas int32) *appsv1.Deployment {
+func providerDeployment(readyReplicas int32) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns",

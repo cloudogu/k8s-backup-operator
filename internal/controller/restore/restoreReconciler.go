@@ -343,7 +343,7 @@ func wasWaitingForProvider(restore *k8sv1.Restore) bool {
 		return false
 	}
 
-	return velero.IsWaitingReason(condition.Reason)
+	return velero.IsWaitingForProviderReason(condition.Reason)
 }
 
 // ensurePreparation runs the destructive preparation of the ecosystem: scale-down and cleanup.

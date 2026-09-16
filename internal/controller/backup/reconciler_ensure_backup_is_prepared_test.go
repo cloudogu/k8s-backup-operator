@@ -43,7 +43,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseUnavailable)
 		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation, newVeleroDeploymentForReconcilerTest(1)).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
@@ -66,7 +66,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation, newVeleroDeploymentForReconcilerTest(1)).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
@@ -90,7 +90,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		orphanedVeleroBackup := newVeleroBackupForReconcilerTest("ns", "previous-backup", velerov1.BackupPhaseWaitingForPluginOperations)
 		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation, newVeleroDeploymentForReconcilerTest(1), orphanedVeleroBackup).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1), orphanedVeleroBackup).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
@@ -159,7 +159,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		foreignVeleroBackup := newVeleroBackupForReconcilerTest("ns", "foreign-backup", velerov1.BackupPhaseInProgress)
 		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
-			WithObjects(backup, veleroBackupStorageLocation, newVeleroDeploymentForReconcilerTest(1), foreignVeleroBackup).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1), foreignVeleroBackup).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
@@ -180,7 +180,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		previousVeleroBackup := newVeleroBackupForReconcilerTest("ns", "previous-backup", velerov1.BackupPhaseCompleted)
 		failedVeleroBackup := newVeleroBackupForReconcilerTest("ns", "failed-backup", velerov1.BackupPhasePartiallyFailed)
 		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
-			WithObjects(backup, veleroBackupStorageLocation, newVeleroDeploymentForReconcilerTest(1), previousVeleroBackup, failedVeleroBackup).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1), previousVeleroBackup, failedVeleroBackup).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
@@ -200,7 +200,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		foreignVeleroBackup := newVeleroBackupForReconcilerTest("other-ns", "previous-backup", velerov1.BackupPhaseInProgress)
 		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
-			WithObjects(backup, veleroBackupStorageLocation, newVeleroDeploymentForReconcilerTest(1), foreignVeleroBackup).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1), foreignVeleroBackup).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
@@ -218,7 +218,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			veleroBackupListCallError: assert.AnError,
 		}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation, newVeleroDeploymentForReconcilerTest(1)).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
@@ -274,7 +274,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			subResourcePatchCallError: assert.AnError,
 		}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation, newVeleroDeploymentForReconcilerTest(1)).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
@@ -292,7 +292,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			subResourcePatchCallError: assert.AnError,
 		}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation, newVeleroDeploymentForReconcilerTest(1)).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
@@ -326,7 +326,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation, newVeleroDeploymentForReconcilerTest(0)).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(0)).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")

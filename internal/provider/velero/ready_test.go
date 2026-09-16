@@ -44,7 +44,6 @@ func TestCheckReadyReportsAnAvailableBackupStorageLocation(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, readiness.Ready)
 	assert.Equal(t, ReasonVeleroProviderReady, readiness.Reason)
-	assert.Contains(t, readiness.Message, testBackupStorage)
 }
 
 func TestCheckReadyReportsAMissingBackupStorageLocationWithoutAnError(t *testing.T) {
@@ -155,7 +154,7 @@ func TestCheckReadyChecksTheBackupStorageLocationBeforeTheDeployment(t *testing.
 	assert.Equal(t, ReasonVeleroBackupStorageLocationNotFound, readiness.Reason)
 }
 
-func TestIsWaitingReason(t *testing.T) {
+func TestIsWaitingForProviderReason(t *testing.T) {
 	t.Run("every reason the readiness gate writes while unready is a waiting reason", func(t *testing.T) {
 		for _, reason := range []string{
 			ReasonVeleroBackupStorageLocationNotFound,
@@ -163,7 +162,7 @@ func TestIsWaitingReason(t *testing.T) {
 			ReasonVeleroDeploymentNotFound,
 			ReasonVeleroDeploymentNotReady,
 		} {
-			assert.True(t, IsWaitingReason(reason), reason)
+			assert.True(t, IsWaitingForProviderReason(reason), reason)
 		}
 	})
 
@@ -175,7 +174,7 @@ func TestIsWaitingReason(t *testing.T) {
 			"",
 			"SomeOtherReason",
 		} {
-			assert.False(t, IsWaitingReason(reason), reason)
+			assert.False(t, IsWaitingForProviderReason(reason), reason)
 		}
 	})
 }
