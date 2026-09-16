@@ -90,8 +90,9 @@ func checkDeploymentReady(ctx context.Context, k8sClient client.Client, namespac
 	}, nil
 }
 
-// IsWaitingForProviderReason reports whether the run is currently waiting for the provider based on the condition reason.
-func IsWaitingForProviderReason(reason string) bool {
+// IsProviderNotReadyReason reports whether the reason is a provider not (yet) ready reason.
+// Note: Extend this whenever CheckReady gains another not-ready reason.
+func IsProviderNotReadyReason(reason string) bool {
 	switch reason {
 	case ReasonVeleroBackupStorageLocationNotFound,
 		ReasonVeleroBackupStorageLocationNotAvailable,
