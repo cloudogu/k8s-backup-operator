@@ -18,7 +18,7 @@ func TestReconcilerEnsureBackupRunCompleted(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupRunCompleted(context.Background(), backup)
 
@@ -43,7 +43,7 @@ func TestReconcilerEnsureBackupRunCompleted(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupRunCompleted(context.Background(), backup)
 
@@ -58,7 +58,7 @@ func TestReconcilerEnsureBackupRunCompleted(t *testing.T) {
 	t.Run("A run that is not finished yet is retried", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).WithStatusSubresource(backup).Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupRunCompleted(context.Background(), backup)
 

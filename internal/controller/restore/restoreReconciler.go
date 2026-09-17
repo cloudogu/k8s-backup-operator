@@ -41,6 +41,7 @@ const (
 	actionCompleteRestore           = "CompleteRestore"
 	actionDeleteRestore             = "DeleteRestore"
 	actionCheckProviderReadiness    = "CheckProviderReadiness"
+	actionCheckSourceBackup         = "CheckSourceBackup"
 	actionCreateProviderRestore     = "CreateProviderRestore"
 	actionCompleteProviderRestore   = "CompleteProviderRestore"
 	actionDeleteProviderRestore     = "DeleteProviderRestore"
@@ -58,29 +59,32 @@ func NewRestoreReconciler(
 	scaleManager scaleManager,
 	requeueDelay time.Duration,
 	backupStorageName string,
+	providerDeploymentName string,
 ) *restoreReconciler {
 	return &restoreReconciler{
-		k8sClient:             k8sClient,
-		recorder:              recorder,
-		namespace:             namespace,
-		cleanup:               cleanup,
-		scaleManager:          scaleManager,
-		maintenanceModeSwitch: repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace),
-		requeueDelay:          requeueDelay,
-		backupStorageName:     backupStorageName,
+		k8sClient:              k8sClient,
+		recorder:               recorder,
+		namespace:              namespace,
+		cleanup:                cleanup,
+		scaleManager:           scaleManager,
+		maintenanceModeSwitch:  repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace),
+		requeueDelay:           requeueDelay,
+		backupStorageName:      backupStorageName,
+		providerDeploymentName: providerDeploymentName,
 	}
 }
 
 // restoreReconciler reconciles a Restore object
 type restoreReconciler struct {
-	k8sClient             k8sClient
-	recorder              eventRecorder
-	namespace             string
-	cleanup               cleanupManager
-	scaleManager          scaleManager
-	maintenanceModeSwitch maintenanceModeSwitch
-	requeueDelay          time.Duration
-	backupStorageName     string
+	k8sClient              k8sClient
+	recorder               eventRecorder
+	namespace              string
+	cleanup                cleanupManager
+	scaleManager           scaleManager
+	maintenanceModeSwitch  maintenanceModeSwitch
+	requeueDelay           time.Duration
+	backupStorageName      string
+	providerDeploymentName string
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -137,6 +141,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.ensureProviderChildState,
 			r.ensureActiveRestoreLease,
 			r.ensureProviderReady,
+			r.ensureSourceBackupUsable,
 			r.ensureMaintenanceModeActivated,
 			r.ensurePreparation,
 			r.ensureProviderRestore,
@@ -284,7 +289,7 @@ func (r *restoreReconciler) ensureProviderReady(ctx context.Context, restore *k8
 		return restore, next()
 	}
 
-	readiness, err := velero.CheckReady(ctx, r.k8sClient, restore.Namespace, r.backupStorageName)
+	readiness, err := velero.CheckReady(ctx, r.k8sClient, restore.Namespace, r.backupStorageName, r.providerDeploymentName)
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to check whether the provider of restore %s is ready: %w", restore.Name, err))
 	}
@@ -338,8 +343,7 @@ func wasWaitingForProvider(restore *k8sv1.Restore) bool {
 		return false
 	}
 
-	return condition.Reason == velero.ReasonVeleroBackupStorageLocationNotFound ||
-		condition.Reason == velero.ReasonVeleroBackupStorageLocationNotAvailable
+	return velero.IsProviderNotReadyReason(condition.Reason)
 }
 
 // ensurePreparation runs the destructive preparation of the ecosystem: scale-down and cleanup.

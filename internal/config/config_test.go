@@ -76,6 +76,7 @@ func TestNewOperatorConfig(t *testing.T) {
 		logMock.EXPECT().Info(0, "Using image pull secrets: [{ces-container-registries} {other}]").Return()
 		logMock.EXPECT().Info(0, "Using backup requeue time: 5").Return()
 		logMock.EXPECT().Info(0, "Using backup storage name: default").Return()
+		logMock.EXPECT().Info(0, "Using provider deployment name: velero").Return()
 		log = logr.New(logMock)
 
 		// when
@@ -90,8 +91,9 @@ func TestNewOperatorConfig(t *testing.T) {
 				{Name: "ces-container-registries"},
 				{Name: "other"},
 			},
-			RequeueTimeSeconds: 5,
-			BackupStorageName:  "default",
+			RequeueTimeSeconds:     5,
+			BackupStorageName:      "default",
+			ProviderDeploymentName: "velero",
 		}
 		assert.Equal(t, expected, actual)
 	})

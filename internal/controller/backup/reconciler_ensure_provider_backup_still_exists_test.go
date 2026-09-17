@@ -26,7 +26,7 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 	t.Run("Delete the backup when its provider backup is gone", func(t *testing.T) {
 		backup := backupWithStartedProviderBackup("ns", "backup")
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
 
@@ -41,7 +41,7 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 		backup := backupWithStartedProviderBackup("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
 
@@ -54,7 +54,7 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		require.True(t, backup.Status.StartTimestamp.IsZero())
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
 
@@ -72,7 +72,7 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 			Reason: reasonTimeWindowExpiredBackupInProgress,
 		})
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
 
@@ -86,7 +86,7 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 		backup := backupWithStartedProviderBackup("ns", "backup")
 		counter := &callCounter{getCallError: assert.AnError}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).WithObjects(backup).Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
 

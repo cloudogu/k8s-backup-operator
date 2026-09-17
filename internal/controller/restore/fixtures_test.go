@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,9 +21,10 @@ import (
 )
 
 const (
-	testRestoreUID    = types.UID("11111111-1111-1111-1111-111111111111")
-	testBackup        = "test-backup"
-	testBackupStorage = "test-backup-storage"
+	testRestoreUID         = types.UID("11111111-1111-1111-1111-111111111111")
+	testBackup             = "test-backup"
+	testBackupStorage      = "test-backup-storage"
+	testProviderDeployment = "test-velero"
 )
 
 // recoverableRestore is a Restore whose provider restore succeeded, so workload recovery can start.
@@ -95,6 +97,30 @@ func backupStorageLocation(phase velerov1.BackupStorageLocationPhase) *velerov1.
 	return &velerov1.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{Name: testBackupStorage, Namespace: testNamespace},
 		Status:     velerov1.BackupStorageLocationStatus{Phase: phase},
+	}
+}
+
+// readyProviderDeployment is the velero deployment the provider readiness gate expects to be running.
+func readyProviderDeployment() *appsv1.Deployment {
+	return providerDeployment(1)
+}
+
+func providerDeployment(readyReplicas int32) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: testProviderDeployment, Namespace: testNamespace},
+		Status:     appsv1.DeploymentStatus{ReadyReplicas: readyReplicas},
+	}
+}
+
+// usableSourceBackup is the velero backup the restore gate expects to be restorable.
+func usableSourceBackup() *velerov1.Backup {
+	return sourceBackup(velerov1.BackupPhaseCompleted)
+}
+
+func sourceBackup(phase velerov1.BackupPhase) *velerov1.Backup {
+	return &velerov1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: testBackup, Namespace: testNamespace},
+		Status:     velerov1.BackupStatus{Phase: phase},
 	}
 }
 

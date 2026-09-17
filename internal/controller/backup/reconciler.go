@@ -127,20 +127,22 @@ type eventRecorder interface {
 }
 
 type defaultReconciler struct {
-	client             client.Client
-	recorder           eventRecorder
-	maintenanceGateway maintenanceGateway
-	clock              Clock
-	backupStorageName  string
+	client                 client.Client
+	recorder               eventRecorder
+	maintenanceGateway     maintenanceGateway
+	clock                  Clock
+	backupStorageName      string
+	providerDeploymentName string
 }
 
-func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGateway maintenanceGateway, clock Clock, backupStorageName string) *defaultReconciler {
+func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGateway maintenanceGateway, clock Clock, backupStorageName string, providerDeploymentName string) *defaultReconciler {
 	return &defaultReconciler{
-		client:             client,
-		recorder:           recorder,
-		maintenanceGateway: maintenanceGateway,
-		clock:              clock,
-		backupStorageName:  backupStorageName,
+		client:                 client,
+		recorder:               recorder,
+		maintenanceGateway:     maintenanceGateway,
+		clock:                  clock,
+		backupStorageName:      backupStorageName,
+		providerDeploymentName: providerDeploymentName,
 	}
 }
 
@@ -543,7 +545,17 @@ func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx con
 }
 
 func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	readiness, err := veleroprovider.CheckReady(ctx, c.client, backup.Namespace, c.backupStorageName)
+	// If the provider backup already exists we can and should skip the check
+	ownProviderBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
+	if err != nil {
+		return Abort, fmt.Errorf("get the velero backup resource to check whether backup has already started: %w", err)
+	}
+	if ownProviderBackup != nil {
+		logging.Debug(ctx, "ensureBackupIsPrepared: the provider backup already exists -> skip provider check, NEXT")
+		return Next, nil
+	}
+
+	readiness, err := veleroprovider.CheckReady(ctx, c.client, backup.Namespace, c.backupStorageName, c.providerDeploymentName)
 	if err != nil {
 		return Abort, err
 	}

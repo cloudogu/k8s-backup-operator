@@ -4,6 +4,7 @@ kind: Role
 metadata:
   name: {{ include "k8s-backup-operator.name" . }}-blueprint-list-role
   labels:
+    app.kubernetes.io/component: rbac
   {{- include "k8s-backup-operator.labels" . | nindent 4 }}
 rules:
   - apiGroups:

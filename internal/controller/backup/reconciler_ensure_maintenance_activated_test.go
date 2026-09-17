@@ -18,7 +18,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(true, nil)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
@@ -40,7 +40,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			activateMaintenanceMode(context.Background(), maintenanceModeTitle, maintenanceModeText).
 			Return(nil)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
@@ -63,7 +63,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, assert.AnError)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 
@@ -81,7 +81,7 @@ func TestReconcilerEnsureMaintenanceActivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			activateMaintenanceMode(context.Background(), maintenanceModeTitle, maintenanceModeText).
 			Return(assert.AnError)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceActivated(context.Background(), backup)
 

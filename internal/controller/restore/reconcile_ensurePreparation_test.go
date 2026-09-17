@@ -62,12 +62,12 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 	}).Return(repository.MaintenanceModeDescription{}, true, nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, recordProviderCheck, factory, restore, readyStorageLocation())
+	fixture := newMultiReconcileFixture(t, recordProviderCheck, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -90,12 +90,12 @@ func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testi
 
 	// The cleanup, scale and maintenance mocks carry no expectations, so any preparation step would fail.
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), newMockScaleManager(t), requeueAfterTest, testBackupStorage)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), newMockScaleManager(t), requeueAfterTest, testBackupStorage, testProviderDeployment)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -150,11 +150,11 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -176,11 +176,11 @@ func TestAFailedScaleDownReportsPreparedFalseAndRetriesWithoutCleaningUp(t *test
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(assert.AnError).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), scaleMock, requeueAfterTest, testBackupStorage)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -209,11 +209,11 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(assert.AnError).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -237,11 +237,11 @@ func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, readyStorageLocation())
+	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -259,7 +259,7 @@ func TestAnUnreadyProviderPreventsMaintenanceAndPreparationWithoutTouchingTheEco
 		"The velero backup storage location 'name=test-backup-storage' is not available (phase: Unavailable).").Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), newMockScaleManager(t), requeueAfterTest, testBackupStorage)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), newMockScaleManager(t), requeueAfterTest, testBackupStorage, testProviderDeployment)
 		reconciler.maintenanceModeSwitch = newMockMaintenanceModeSwitch(t)
 
 		return reconciler.Reconcile
@@ -274,6 +274,30 @@ func TestAnUnreadyProviderPreventsMaintenanceAndPreparationWithoutTouchingTheEco
 	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
 		"an unready provider must only be reported, the ecosystem must stay untouched")
 	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, velero.ReasonVeleroBackupStorageLocationNotAvailable)
+}
+
+func TestAVeleroDeploymentWithoutReadyReplicasPreventsMaintenanceAndPreparation(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning,
+		velero.ReasonVeleroDeploymentNotReady, mock.Anything).Once()
+
+	factory := func(fakeClient client.WithWatch) reconcileFunction {
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), newMockScaleManager(t), requeueAfterTest, testBackupStorage, testProviderDeployment)
+		reconciler.maintenanceModeSwitch = newMockMaintenanceModeSwitch(t)
+
+		return reconciler.Reconcile
+	}
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), providerDeployment(0))
+
+	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+
+	require.NoError(t, errs[0], "a velero that is not running yet is an expected wait, not an error")
+	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0])
+	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
+		"an unready velero must only be reported, the ecosystem must stay untouched")
+	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, velero.ReasonVeleroDeploymentNotReady)
 }
 
 // The gate reports the provider once and then keeps quiet until the provider comes back.
@@ -297,7 +321,7 @@ func TestAnUnreadyProviderIsReportedOnceAndTheRecoveryIsReportedOnce(t *testing.
 	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage)
+		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 		reconciler.maintenanceModeSwitch = maintenanceMock
 
 		return reconciler.Reconcile
@@ -311,6 +335,13 @@ func TestAnUnreadyProviderIsReportedOnceAndTheRecoveryIsReportedOnce(t *testing.
 	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, velero.ReasonVeleroBackupStorageLocationNotFound)
 
 	fixture.simulateExternalWrite(t, func(testClient client.WithWatch) error {
+		if err := testClient.Create(testCtx, readyProviderDeployment()); err != nil {
+			return err
+		}
+		if err := testClient.Create(testCtx, usableSourceBackup()); err != nil {
+			return err
+		}
+
 		return testClient.Create(testCtx, readyStorageLocation())
 	})
 
