@@ -86,7 +86,7 @@ func checkDeploymentReady(ctx context.Context, k8sClient client.Client, namespac
 	return Readiness{
 		Ready:   true,
 		Reason:  ReasonVeleroProviderReady,
-		Message: fmt.Sprint("The velero backup storage location is available and the velero deployment is ready."),
+		Message: "The velero backup storage location is available and the velero deployment is ready.",
 	}, nil
 }
 
