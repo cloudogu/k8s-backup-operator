@@ -12,14 +12,15 @@ import (
 )
 
 const (
-	StageDevelopment        = "development"
-	StageProduction         = "production"
-	StageEnvVar             = "STAGE"
-	namespaceEnvVar         = "NAMESPACE"
-	logLevelEnvVar          = "LOG_LEVEL"
-	imagePullSecretsEnvVar  = "IMAGE_PULL_SECRETS"
-	backupRequeueTimeEnvVar = "BACKUP_REQUEUE_TIME"
-	backupStorageNameEnvVar = "BACKUP_STORAGE_NAME"
+	StageDevelopment             = "development"
+	StageProduction              = "production"
+	StageEnvVar                  = "STAGE"
+	namespaceEnvVar              = "NAMESPACE"
+	logLevelEnvVar               = "LOG_LEVEL"
+	imagePullSecretsEnvVar       = "IMAGE_PULL_SECRETS"
+	backupRequeueTimeEnvVar      = "BACKUP_REQUEUE_TIME"
+	backupStorageNameEnvVar      = "BACKUP_STORAGE_NAME"
+	providerDeploymentNameEnvVar = "PROVIDER_DEPLOYMENT_NAME"
 )
 
 const (
@@ -33,6 +34,7 @@ const (
 const (
 	defaultBackupRequeueTimeSeconds = 5
 	defaultBackupStorageName        = "default"
+	defaultProviderDeploymentName   = "velero"
 )
 
 var log = ctrl.Log.WithName("config")
@@ -50,6 +52,8 @@ type OperatorConfig struct {
 	RequeueTimeSeconds int
 	// Name for provider backup storage name (default: 'default')
 	BackupStorageName string
+	// Name of the provider deployment in the operator's namespace (default: 'velero')
+	ProviderDeploymentName string
 }
 
 var Stage = StageProduction
@@ -97,12 +101,16 @@ func NewOperatorConfig(version string) (*OperatorConfig, error) {
 	backupStorageName := getBackupStorageName()
 	log.Info(fmt.Sprintf("Using backup storage name: %v", backupStorageName))
 
+	providerDeploymentName := getProviderDeploymentName()
+	log.Info(fmt.Sprintf("Using provider deployment name: %v", providerDeploymentName))
+
 	return &OperatorConfig{
-		Version:            parsedVersion,
-		Namespace:          namespace,
-		ImagePullSecrets:   imagePullSecrets,
-		RequeueTimeSeconds: backupRequeueTime,
-		BackupStorageName:  backupStorageName,
+		Version:                parsedVersion,
+		Namespace:              namespace,
+		ImagePullSecrets:       imagePullSecrets,
+		RequeueTimeSeconds:     backupRequeueTime,
+		BackupStorageName:      backupStorageName,
+		ProviderDeploymentName: providerDeploymentName,
 	}, nil
 }
 
@@ -183,6 +191,15 @@ func getBackupRequeueTimeSeconds() (int, error) {
 	}
 
 	return seconds, nil
+}
+
+func getProviderDeploymentName() string {
+	value, found := os.LookupEnv(providerDeploymentNameEnvVar)
+	if !found || value == "" {
+		return defaultProviderDeploymentName
+	}
+
+	return value
 }
 
 func getBackupStorageName() string {

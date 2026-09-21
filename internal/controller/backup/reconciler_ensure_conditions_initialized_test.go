@@ -20,7 +20,7 @@ func TestEnsureConditionsInitialized(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		patches := 0
 		fakeClient := newFakeClientForEnsureConditionsInitializedTest(t, backup, &patches, nil)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureConditionsInitialized(context.Background(), backup)
 
@@ -42,7 +42,7 @@ func TestEnsureConditionsInitialized(t *testing.T) {
 	t.Run("It should not reset a condition a stage already resolved", func(t *testing.T) {
 		backup := withCondition(newBackupForTest("ns", "backup"), backupv1.ConditionPrepared, metav1.ConditionTrue)
 		fakeClient := newFakeClientForEnsureConditionsInitializedTest(t, backup, new(int), nil)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureConditionsInitialized(context.Background(), backup)
 
@@ -66,7 +66,7 @@ func TestEnsureConditionsInitialized(t *testing.T) {
 		}
 		patches := 0
 		fakeClient := newFakeClientForEnsureConditionsInitializedTest(t, backup, &patches, nil)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureConditionsInitialized(context.Background(), backup)
 
@@ -79,7 +79,7 @@ func TestEnsureConditionsInitialized(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		patchErr := errors.NewInternalError(assert.AnError)
 		fakeClient := newFakeClientForEnsureConditionsInitializedTest(t, backup, new(int), patchErr)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureConditionsInitialized(context.Background(), backup)
 

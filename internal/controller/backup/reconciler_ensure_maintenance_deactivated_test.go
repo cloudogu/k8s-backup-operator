@@ -14,7 +14,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionUnknown)
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
@@ -34,7 +34,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			deactivateMaintenanceMode(context.Background()).
 			Return(nil)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
@@ -49,7 +49,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 			WithObjects(backup, otherBackup, newHeldBackupLeaseForTest(otherBackup)).
 			Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
@@ -65,7 +65,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		lease := newHeldBackupLeaseForTest(otherBackup)
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, otherBackup, lease).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
@@ -77,7 +77,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionTrue)
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup).Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
@@ -92,7 +92,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, nil)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
@@ -129,7 +129,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 			maintenanceGatewayMock.EXPECT().
 				deactivateMaintenanceMode(context.Background()).
 				Return(nil)
-			reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+			reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 			nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), test.backup)
 
@@ -145,7 +145,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			isMaintenanceModeActive(context.Background()).
 			Return(false, assert.AnError)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 
@@ -163,7 +163,7 @@ func TestReconcilerEnsureMaintenanceDeactivated(t *testing.T) {
 		maintenanceGatewayMock.EXPECT().
 			deactivateMaintenanceMode(context.Background()).
 			Return(assert.AnError)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureMaintenanceDeactivated(context.Background(), backup)
 

@@ -23,7 +23,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -43,10 +43,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseUnavailable)
 		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -66,10 +66,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -79,7 +79,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		assert.NotNil(t, preparedCondition)
 		assert.Equal(t, metav1.ConditionTrue, preparedCondition.Status)
-		assert.Equal(t, veleroprovider.ReasonVeleroBackupStorageLocationAvailable, preparedCondition.Reason)
+		assert.Equal(t, veleroprovider.ReasonVeleroProviderReady, preparedCondition.Reason)
 
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
@@ -90,10 +90,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		orphanedVeleroBackup := newVeleroBackupForReconcilerTest("ns", "previous-backup", velerov1.BackupPhaseWaitingForPluginOperations)
 		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation, orphanedVeleroBackup).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1), orphanedVeleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -108,15 +108,22 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Contains(t, preparedCondition.Message, velerov1.BackupPhaseWaitingForPluginOperations)
 	})
 
-	t.Run("The own velero backup does not block the preparation", func(t *testing.T) {
+	t.Run("An existing own velero backup skips the check", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
-		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
+		meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+			Type:    backupv1.ConditionPrepared,
+			Status:  metav1.ConditionTrue,
+			Reason:  veleroprovider.ReasonVeleroProviderReady,
+			Message: "prepared in an earlier pass",
+		})
 		ownVeleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
-		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
-			WithObjects(backup, veleroBackupStorageLocation, ownVeleroBackup).
+		// no backup storage location and no velero deployment: the provider is unready
+		counter := &callCounter{}
+		fakeClient := newFakeClientBuilderWithCounter(t, counter).
+			WithObjects(backup, ownVeleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -125,7 +132,25 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 
 		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
 		require.NotNil(t, preparedCondition)
-		assert.Equal(t, metav1.ConditionTrue, preparedCondition.Status)
+		assert.Equal(t, metav1.ConditionTrue, preparedCondition.Status, "the gate must not flip an already running backup back to false")
+		assert.Equal(t, 0, counter.subResourcePatchCount)
+	})
+
+	t.Run("If reading the own velero backup failed then retry with error", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		counter := &callCounter{
+			veleroBackupGetCallError: assert.AnError,
+		}
+		fakeClient := newFakeClientBuilderWithCounter(t, counter).
+			WithObjects(backup).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.Error(t, err)
+		assert.Equal(t, Abort, nextAction)
 	})
 
 	t.Run("A running velero backup of another run does not block a backup that already started", func(t *testing.T) {
@@ -134,10 +159,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		foreignVeleroBackup := newVeleroBackupForReconcilerTest("ns", "foreign-backup", velerov1.BackupPhaseInProgress)
 		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
-			WithObjects(backup, veleroBackupStorageLocation, foreignVeleroBackup).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1), foreignVeleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -155,10 +180,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		previousVeleroBackup := newVeleroBackupForReconcilerTest("ns", "previous-backup", velerov1.BackupPhaseCompleted)
 		failedVeleroBackup := newVeleroBackupForReconcilerTest("ns", "failed-backup", velerov1.BackupPhasePartiallyFailed)
 		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
-			WithObjects(backup, veleroBackupStorageLocation, previousVeleroBackup, failedVeleroBackup).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1), previousVeleroBackup, failedVeleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -175,10 +200,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
 		foreignVeleroBackup := newVeleroBackupForReconcilerTest("other-ns", "previous-backup", velerov1.BackupPhaseInProgress)
 		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
-			WithObjects(backup, veleroBackupStorageLocation, foreignVeleroBackup).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1), foreignVeleroBackup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -193,10 +218,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			veleroBackupListCallError: assert.AnError,
 		}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -211,7 +236,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithStatusSubresource(backup).
 			Build()
 		recorder := events.NewFakeRecorder(100)
-		reconciler := NewReconciler(fakeClient, recorder, nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, recorder, nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 		assert.NoError(t, err)
@@ -234,7 +259,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -249,10 +274,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			subResourcePatchCallError: assert.AnError,
 		}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -267,10 +292,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			subResourcePatchCallError: assert.AnError,
 		}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup, veleroBackupStorageLocation).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
@@ -287,12 +312,56 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
 		assert.Error(t, err)
 		assert.Equal(t, Abort, nextAction)
 
+	})
+
+	t.Run("If the velero deployment has no ready replica set prepared to false and retry", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
+		counter := &callCounter{}
+		fakeClient := newFakeClientBuilderWithCounter(t, counter).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(0)).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+
+		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
+		require.NotNil(t, preparedCondition)
+		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
+		assert.Equal(t, veleroprovider.ReasonVeleroDeploymentNotReady, preparedCondition.Reason)
+
+		assert.Equal(t, 1, counter.subResourcePatchCount)
+	})
+
+	t.Run("If the velero deployment was not found set prepared to false and retry", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
+		counter := &callCounter{}
+		fakeClient := newFakeClientBuilderWithCounter(t, counter).
+			WithObjects(backup, veleroBackupStorageLocation).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+
+		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
+		require.NotNil(t, preparedCondition)
+		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
+		assert.Equal(t, veleroprovider.ReasonVeleroDeploymentNotFound, preparedCondition.Reason)
 	})
 }

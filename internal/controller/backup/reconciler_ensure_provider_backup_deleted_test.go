@@ -26,7 +26,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			WithObjects(backup).
 			WithStatusSubresource(backup).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		require.True(t, backup.DeletionTimestamp.IsZero())
 
@@ -60,7 +60,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
@@ -102,7 +102,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
@@ -149,7 +149,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 				},
 			}).
 			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
@@ -184,7 +184,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 					return client.Delete(ctx, obj, opts...)
 				},
 			}).Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
@@ -211,7 +211,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
@@ -235,7 +235,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
@@ -259,7 +259,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
@@ -281,7 +281,7 @@ func TestReconcilerEnsureProviderBackupDeleted(t *testing.T) {
 			}).
 			Build()
 
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
@@ -318,7 +318,7 @@ func TestReconcilerReportsDeletionProgress(t *testing.T) {
 			Build()
 		clock := NewMockClock(t)
 		clock.EXPECT().Now().Return(deletionStart.Add(2 * time.Minute)).Once()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clock, "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clock, "default", "velero")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
@@ -361,7 +361,7 @@ func TestReconcilerRetriesProcessedDeletionRequest(t *testing.T) {
 
 	t.Run("If the delete request was processed but the velero backup still exists, delete the request and retry", func(t *testing.T) {
 		backup, fakeClient := newProcessedDeleteRequestScenario(t, velerov1.DeleteBackupRequestPhaseProcessed)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 
@@ -379,7 +379,7 @@ func TestReconcilerRetriesProcessedDeletionRequest(t *testing.T) {
 	t.Run("If the delete request is not processed yet, keep waiting for it", func(t *testing.T) {
 		for _, phase := range []velerov1.DeleteBackupRequestPhase{"", velerov1.DeleteBackupRequestPhaseNew, velerov1.DeleteBackupRequestPhaseInProgress} {
 			backup, fakeClient := newProcessedDeleteRequestScenario(t, phase)
-			reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default")
+			reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 			nextAction, err := reconciler.ensureProviderBackupDeleted(context.Background(), backup)
 

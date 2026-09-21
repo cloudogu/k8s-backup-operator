@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -33,7 +34,7 @@ const requeueAfterTest = time.Duration(5) * time.Second
 func TestNewRestoreReconciler(t *testing.T) {
 	t.Run("should create restore reconciler", func(t *testing.T) {
 		// when
-		actual := NewRestoreReconciler(nil, nil, "default", nil, nil, requeueAfterTest, testBackupStorage)
+		actual := NewRestoreReconciler(nil, nil, "default", nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
 		// then
 		assert.NotNil(t, actual)
@@ -232,4 +233,36 @@ func Test_requiredOperation(t *testing.T) {
 			assert.Equal(t, testCase.expected, requiredOperation(testCase.restore), testCase.reasonWhy)
 		})
 	}
+}
+
+func TestWasWaitingForProvider(t *testing.T) {
+	restoreWithPrepared := func(status metav1.ConditionStatus, reason string) *v1.Restore {
+		restore := newParentRestore()
+		restore.Status.Conditions = []metav1.Condition{{
+			Type:   v1.ConditionPrepared,
+			Status: status,
+			Reason: reason,
+		}}
+		return restore
+	}
+
+	t.Run("a restore without the prepared condition never waited for the provider", func(t *testing.T) {
+		assert.False(t, wasWaitingForProvider(newParentRestore()))
+	})
+
+	t.Run("every reason of the provider gate counts as waiting", func(t *testing.T) {
+		for _, reason := range []string{
+			velero.ReasonVeleroBackupStorageLocationNotFound,
+			velero.ReasonVeleroBackupStorageLocationNotAvailable,
+			velero.ReasonVeleroDeploymentNotFound,
+			velero.ReasonVeleroDeploymentNotReady,
+		} {
+			assert.True(t, wasWaitingForProvider(restoreWithPrepared(metav1.ConditionFalse, reason)), reason)
+		}
+	})
+
+	t.Run("a prepared restore and other reasons do not count as waiting", func(t *testing.T) {
+		assert.False(t, wasWaitingForProvider(restoreWithPrepared(metav1.ConditionTrue, velero.ReasonVeleroProviderReady)))
+		assert.False(t, wasWaitingForProvider(restoreWithPrepared(metav1.ConditionFalse, velero.ReasonVeleroSourceBackupNotUsable)))
+	})
 }

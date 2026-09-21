@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -299,6 +300,7 @@ func newFakeClientBuilder(t *testing.T) *fake.ClientBuilder {
 	require.NoError(t, velerov1.AddToScheme(scheme))
 	require.NoError(t, coordinationv1.AddToScheme(scheme))
 	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
 
 	return fake.NewClientBuilder().WithScheme(scheme)
 }
@@ -382,7 +384,7 @@ func TestControllerReconcileDoesNotStealTheMaintenanceMode(t *testing.T) {
 			WithStatusSubresource(completedBackup).
 			Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 		controller := NewController(fakeClient, reconciler, requeueAfterTest)
 
 		result, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "completed-backup"))
@@ -400,7 +402,7 @@ func TestControllerReconcileDoesNotStealTheMaintenanceMode(t *testing.T) {
 			WithStatusSubresource(canceledBackup).
 			Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 		controller := NewController(fakeClient, reconciler, requeueAfterTest)
 
 		_, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "canceled-backup"))
@@ -433,7 +435,7 @@ func TestControllerReconcileDoesNotStealTheMaintenanceMode(t *testing.T) {
 			assertBackupLeaseStillHeldBy(t, fakeClient, deletedBackup)
 			return nil
 		})
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 		controller := NewController(fakeClient, reconciler, requeueAfterTest)
 
 		_, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "deleted-backup"))
@@ -455,7 +457,7 @@ func TestControllerReconcileDoesNotStealTheMaintenanceMode(t *testing.T) {
 			WithStatusSubresource(deletedBackup).
 			Build()
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 		controller := NewController(fakeClient, reconciler, requeueAfterTest)
 
 		_, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "deleted-backup"))
@@ -478,7 +480,7 @@ func TestControllerReconcileDoesNotStealTheMaintenanceMode(t *testing.T) {
 		maintenanceGatewayMock := newMockMaintenanceGateway(t)
 		maintenanceGatewayMock.EXPECT().isMaintenanceModeActive(ctx).Return(true, nil)
 		maintenanceGatewayMock.EXPECT().deactivateMaintenanceMode(ctx).Return(nil)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), maintenanceGatewayMock, newRealClock(), "default", "velero")
 		controller := NewController(fakeClient, reconciler, requeueAfterTest)
 
 		_, err := controller.Reconcile(ctx, newReconcilerRequest("ns", "finished-backup"))

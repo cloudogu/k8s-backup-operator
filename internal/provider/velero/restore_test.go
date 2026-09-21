@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,6 +72,7 @@ func newTestClient(t *testing.T, writes *writeCounter, objects ...client.Object)
 	testScheme := runtime.NewScheme()
 	require.NoError(t, k8sv1.AddToScheme(testScheme))
 	require.NoError(t, velerov1.AddToScheme(testScheme))
+	require.NoError(t, appsv1.AddToScheme(testScheme))
 
 	return fake.NewClientBuilder().
 		WithScheme(testScheme).
