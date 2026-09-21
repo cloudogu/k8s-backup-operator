@@ -5,19 +5,25 @@ import (
 	"fmt"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	// ReasonVeleroBackupStorageLocationAvailable reports a provider that can serve backup and restore requests.
-	ReasonVeleroBackupStorageLocationAvailable = "VeleroBackupStorageLocationAvailable"
+	// ReasonVeleroProviderReady reports a provider that can serve backup and restore requests
+	ReasonVeleroProviderReady = "VeleroProviderReady"
 	// ReasonVeleroBackupStorageLocationNotFound reports a missing backup storage location, which usually
 	// means that Velero is not installed or not configured yet.
 	ReasonVeleroBackupStorageLocationNotFound = "VeleroBackupStorageLocationNotFound"
 	// ReasonVeleroBackupStorageLocationNotAvailable reports a backup storage location that Velero cannot reach.
 	ReasonVeleroBackupStorageLocationNotAvailable = "VeleroBackupStorageLocationNotAvailable"
+	// ReasonVeleroDeploymentNotFound reports a missing velero deployment, which usually means that Velero is
+	// not installed or that it is deployed under a different name than configured.
+	ReasonVeleroDeploymentNotFound = "VeleroDeploymentNotFound"
+	// ReasonVeleroDeploymentNotReady reports a velero deployment without a single ready replica
+	ReasonVeleroDeploymentNotReady = "VeleroDeploymentNotReady"
 )
 
 // Readiness reports whether the provider can serve backup and restore requests. Reason and Message
@@ -31,7 +37,7 @@ type Readiness struct {
 
 // CheckReady reports whether the provider is ready to serve backup and restore requests. A provider
 // that is not ready yet is reported through the Readiness, API server errors are returned as an error.
-func CheckReady(ctx context.Context, k8sClient client.Client, namespace string, backupStorageName string) (Readiness, error) {
+func CheckReady(ctx context.Context, k8sClient client.Client, namespace string, backupStorageName string, deploymentName string) (Readiness, error) {
 	backupStorageLocation := &velerov1.BackupStorageLocation{}
 	err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: backupStorageName}, backupStorageLocation)
 	if apierrors.IsNotFound(err) {
@@ -52,9 +58,48 @@ func CheckReady(ctx context.Context, k8sClient client.Client, namespace string, 
 		}, nil
 	}
 
+	return checkDeploymentReady(ctx, k8sClient, namespace, deploymentName)
+}
+
+// checkDeploymentReady reports whether the velero deployment has at least one ready replica.
+func checkDeploymentReady(ctx context.Context, k8sClient client.Client, namespace string, deploymentName string) (Readiness, error) {
+	deployment := &appsv1.Deployment{}
+	err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: deploymentName}, deployment)
+	if apierrors.IsNotFound(err) {
+		return Readiness{
+			Reason:  ReasonVeleroDeploymentNotFound,
+			Message: fmt.Sprintf("The velero deployment 'name=%s' was not found in namespace '%s'.", deploymentName, namespace),
+		}, nil
+	}
+	if err != nil {
+		return Readiness{}, fmt.Errorf("get velero deployment 'name=%s': %w", deploymentName, err)
+	}
+
+	if deployment.Status.ReadyReplicas < 1 {
+		return Readiness{
+			Reason: ReasonVeleroDeploymentNotReady,
+			Message: fmt.Sprintf("The velero deployment 'name=%s' has no ready replica (readyReplicas: %d).",
+				deploymentName, deployment.Status.ReadyReplicas),
+		}, nil
+	}
+
 	return Readiness{
 		Ready:   true,
-		Reason:  ReasonVeleroBackupStorageLocationAvailable,
-		Message: fmt.Sprintf("The velero backup storage location 'name=%s' is available.", backupStorageName),
+		Reason:  ReasonVeleroProviderReady,
+		Message: "The velero backup storage location is available and the velero deployment is ready.",
 	}, nil
+}
+
+// IsProviderNotReadyReason reports whether the reason is a provider not (yet) ready reason.
+// Note: Extend this whenever CheckReady gains another not-ready reason.
+func IsProviderNotReadyReason(reason string) bool {
+	switch reason {
+	case ReasonVeleroBackupStorageLocationNotFound,
+		ReasonVeleroBackupStorageLocationNotAvailable,
+		ReasonVeleroDeploymentNotFound,
+		ReasonVeleroDeploymentNotReady:
+		return true
+	default:
+		return false
+	}
 }

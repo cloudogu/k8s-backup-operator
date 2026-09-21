@@ -5,4 +5,4 @@ metadata:
   labels:
     {{- include "k8s-backup-operator.labels" . | nindent 4 }}
 data:
-  retryTimeLimit: "{{ .Values.backup.retryTimeLimit }}"
+  retryTimeLimit: "{{ (.Values.backup).retryTimeLimit | default 60 }}"

@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v3.5.0] - 2026-09-21
+### Added
+- [#166] Check that the backup provider's deployment has at least one ready replica before a backup or a restore
+  starts. Backups and restores wait with `Prepared=False` while Velero is not running.
+- [#166] Check the backup to be restored before a restore scales down and cleans up the ecosystem. A restore fails
+  without touching the ecosystem when the named backup is missing or not finished.
+- [#166] Add the environment variable `PROVIDER_DEPLOYMENT_NAME` (chart value `provider.deploymentName`,
+  default `velero`) naming the backup provider's deployment in the operator's namespace.
+  
+### Changed
+- [#166] Restrict the operator's cleanup permissions to the resources it actually deletes (dogus, configmaps,
+  secrets, persistentvolumeclaims) and move them from a cluster-wide `ClusterRole`/`ClusterRoleBinding` to a
+  namespaced `Role`/`RoleBinding`. Workload scaling permissions moved into a dedicated
+  `workload-scale-role`. 
+
 ## [v3.4.0] - 2026-09-08
 ### Added
 - [#119, #125, #129] Add detailed status conditions and Kubernetes events for `Backup`, `Restore`, and

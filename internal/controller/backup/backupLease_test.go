@@ -24,7 +24,7 @@ func TestBackupLease(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		backup.UID = types.UID("backup-uid")
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup).Build()
-		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 		require.NoError(t, err)
@@ -50,7 +50,7 @@ func TestBackupLease(t *testing.T) {
 		}}
 		lease := leases.NewLease("ns", leases.DefaultName, restoreHolder, "Restore")
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup, lease).Build()
-		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 		require.NoError(t, err)
@@ -69,7 +69,7 @@ func TestBackupLease(t *testing.T) {
 		waitingBackup.UID = types.UID("waiting-backup-uid")
 		lease := leases.NewLease("ns", leases.DefaultName, canceledBackup, backupLeaseHolderKind)
 		k8sClient := newFakeClientBuilder(t).WithObjects(canceledBackup, waitingBackup, lease).Build()
-		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureActiveBackupLease(ctx, waitingBackup)
 
@@ -85,7 +85,7 @@ func TestBackupLease(t *testing.T) {
 		backup.UID = types.UID("backup-uid")
 		lease := &coordinationv1.Lease{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: leases.DefaultName}}
 		k8sClient := newFakeClientBuilder(t).WithObjects(backup, lease).Build()
-		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 
@@ -100,7 +100,7 @@ func TestBackupLease(t *testing.T) {
 				return errors.New("get failed")
 			},
 		}).Build()
-		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureActiveBackupLease(ctx, backup)
 
@@ -110,7 +110,7 @@ func TestBackupLease(t *testing.T) {
 
 	t.Run("rejects an unknown acquisition state", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
-		reconciler := NewReconciler(nil, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(nil, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.backupLeaseAction(ctx, backup, leases.Result{State: leases.State(99)}, nil)
 
@@ -124,7 +124,7 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 
 	t.Run("keeps the lease and requeues while the backup is running", func(t *testing.T) {
 		backup := newBackupWithProviderSucceededStatusForReconcilerTest("ns", "backup", metav1.ConditionUnknown)
-		reconciler := NewReconciler(nil, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(nil, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup)
 
@@ -146,7 +146,7 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 			tt.backup.UID = types.UID("backup-uid")
 			lease := leases.NewLease("ns", leases.DefaultName, tt.backup, backupLeaseHolderKind)
 			k8sClient := newFakeClientBuilder(t).WithObjects(lease).Build()
-			reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
+			reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 			nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, tt.backup)
 
@@ -164,7 +164,7 @@ func TestEnsureBackupLeaseReleased(t *testing.T) {
 				return errors.New("get failed")
 			},
 		}).Build()
-		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default")
+		reconciler := NewReconciler(k8sClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupLeaseReleased(ctx, backup)
 

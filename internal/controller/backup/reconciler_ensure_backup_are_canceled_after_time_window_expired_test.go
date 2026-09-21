@@ -31,7 +31,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(time.Duration(timeLimitInMinutes)*time.Minute - time.Millisecond))
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
@@ -61,7 +61,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(10*time.Minute + time.Millisecond))
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default", "velero")
 
 		require.True(t, backup.Status.StartTimestamp.IsZero())
 
@@ -95,7 +95,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
@@ -128,7 +128,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
@@ -160,7 +160,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 
@@ -193,7 +193,7 @@ func TestReconcilerEnsureBackupAreCanceledAfterTimeWindowExpired(t *testing.T) {
 		clockMock.EXPECT().
 			Now().
 			Return(baseTime.Add(10*time.Minute + 5*time.Minute))
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default")
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, clockMock, "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsCanceledAfterTimeWindowExpired(context.Background(), backup)
 

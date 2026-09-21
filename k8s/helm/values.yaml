@@ -13,7 +13,7 @@ manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-backup-operator
-    tag: 3.4.0
+    tag: 3.5.0
   imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -35,6 +35,8 @@ metrics:
     enabled: false
     additionalLabels:
       release: prometheus
+provider:
+  deploymentName: "velero"
 backup:
   retryTimeLimit: "60"
   requeueTime: "5"

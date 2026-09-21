@@ -1,0 +1,22 @@
+# This is necessary to lock backups and restores, so that only one backup or restore can run at a time
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "k8s-backup-operator.name" . }}-lease-editor-role
+  labels:
+    app.kubernetes.io/component: rbac
+  {{- include "k8s-backup-operator.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - watch
+      - list
+      - create
+      - update
+      - patch
+      - delete
+
