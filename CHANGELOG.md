@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v3.5.0] - 2026-09-21
 ### Added
 - [#166] Check that the backup provider's deployment has at least one ready replica before a backup or a restore
   starts. Backups and restores wait with `Prepared=False` while Velero is not running.
