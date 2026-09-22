@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v3.5.1] - 2026-09-22
+### Changed
+- [#168] Update kubectl to fix CVE-2026-31789
+
 ## [v3.5.0] - 2026-09-21
 ### Added
 - [#166] Check that the backup provider's deployment has at least one ready replica before a backup or a restore
