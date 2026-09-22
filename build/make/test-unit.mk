@@ -1,7 +1,3 @@
-ifeq (${TEST_COMMON_MK_INCLUDE_MARKER}, )
-	include ${BUILD_DIR}/make/test-common.mk
-endif
-
 ##@ Unit testing
 
 UNIT_TEST_DIR=$(TARGET_DIR)/unit-tests
