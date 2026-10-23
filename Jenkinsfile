@@ -107,7 +107,8 @@ node('docker') {
             }
 
             stage('Deploy Manager') {
-                k3d.helm("install ${repositoryName} ${helmChartDir}")
+                k3d.helm("dependency build ${helmChartDir}")
+                k3d.helm("install ${repositoryName} ${helmChartDir} --set metrics.serviceMonitor.enabled=false")
             }
 
             stage('Wait for Ready Rollout') {
