@@ -55,6 +55,10 @@ node('docker') {
                                 junit allowEmptyResults: true, testResults: 'target/unit-tests/*-tests.xml'
                             }
 
+                            stage('Go vulnerability scan') {
+                                make 'govulncheck'
+                            }
+
                             stage("Review dog analysis") {
                                 stageStaticAnalysisReviewDog()
                             }
@@ -95,6 +99,12 @@ node('docker') {
             def imageName = ""
             stage('Build & Push Image') {
                 imageName = k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", controllerVersion)
+            }
+
+            stage('Container vulnerability scan') {
+                // The returned imageName is the cluster's registry address;
+                // scan the original tag retained in the host Docker daemon.
+                scanContainerImage("cloudogu/${repositoryName}:${controllerVersion}", 'container')
             }
 
             stage('Update development resources') {
@@ -192,6 +202,7 @@ void stageAutomaticRelease(Makefile makefile) {
             }
             def dockerImage = docker.build("cloudogu/${repositoryName}:${controllerVersion}")
             sh "rm ~/.netrc"
+            scanContainerImage("cloudogu/${repositoryName}:${controllerVersion}", 'release-container')
             docker.withRegistry('https://registry.hub.docker.com/', 'dockerHubCredentials') {
                 dockerImage.push("${controllerVersion}")
             }
@@ -226,6 +237,17 @@ void stageAutomaticRelease(Makefile makefile) {
 
         stage('Add Github-Release') {
             releaseId = github.createReleaseWithChangelog(releaseVersion, changelog, productionReleaseBranch)
+        }
+    }
+}
+
+void scanContainerImage(String imageName, String reportName) {
+    def report = "target/vulnerability-scans/${reportName}.json"
+    withEnv(["SCAN_IMAGE=${imageName}", "SCAN_REPORT=${report}"]) {
+        try {
+            make 'container-vulnerability-scan'
+        } finally {
+            archiveArtifacts artifacts: report, allowEmptyArchive: true
         }
     }
 }
