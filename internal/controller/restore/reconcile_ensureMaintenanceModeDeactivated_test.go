@@ -36,7 +36,7 @@ func TestMaintenanceModeDeactivationPersistsItsProgressAndRequeues(t *testing.T)
 func TestMaintenanceModeDeactivationIsEnsuredAgainBeforeProceeding(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonMaintenanceModeDeactivated)
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(restore, corev1.EventTypeNormal, ReasonMaintenanceModeDeactivated, "Maintenance mode deactivated").Once()
+	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeNormal, ReasonMaintenanceModeDeactivated, actionDeactivateMaintenanceMode, "Maintenance mode deactivated").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
@@ -56,7 +56,7 @@ func TestMaintenanceModeDeactivationIsEnsuredAgainBeforeProceeding(t *testing.T)
 func TestFailedMaintenanceModeDeactivationUsesBackoffWithoutChangingProgress(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonScaleUpFinalized)
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, "Failed to deactivate maintenance mode after restore").Once()
+	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, actionDeactivateMaintenanceMode, "Failed to deactivate maintenance mode after restore").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(assert.AnError).Once()
@@ -78,7 +78,7 @@ func TestFailedMaintenanceModeDeactivationUsesBackoffWithoutChangingProgress(t *
 func TestUnpersistableMaintenanceModeDeactivationIsRetried(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonScaleUpFinalized)
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(restore, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, "Failed to persist maintenance mode deactivation for restore").Once()
+	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, actionDeactivateMaintenanceMode, "Failed to persist maintenance mode deactivation for restore").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()

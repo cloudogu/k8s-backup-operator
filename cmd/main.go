@@ -38,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	// +kubebuilder:scaffold:imports
 )
@@ -129,20 +128,15 @@ func startScheduledBackup(ctx context.Context, cmd *flag.FlagSet, args []string)
 		return fmt.Errorf("unable to get current namespace: %w", err)
 	}
 
-	k8sClientSet, err := kubernetes.NewForConfig(restConfig)
+	k8sClient, err := client.NewWithWatch(restConfig, client.Options{Scheme: scheme})
 	if err != nil {
-		return fmt.Errorf("unable to create k8s clientset: %w", err)
-	}
-
-	ecosystemClientSet, err := ecosystem.NewClientSet(restConfig, k8sClientSet)
-	if err != nil {
-		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
+		return fmt.Errorf("unable to create k8s client: %w", err)
 	}
 
 	options := parseScheduledBackupOptions(cmd, args)
 	options.Namespace = namespace
 
-	manager := newScheduledBackupManager(ecosystemClientSet, options)
+	manager := newScheduledBackupManager(k8sClient, options)
 	return manager.ScheduleBackup(ctx)
 }
 
@@ -163,19 +157,14 @@ func startGarbageCollector(ctx context.Context, flags *flag.FlagSet, args []stri
 		return fmt.Errorf("unable to get current namespace: %w", err)
 	}
 
-	k8sClientSet, err := kubernetes.NewForConfig(restConfig)
+	k8sClient, err := client.NewWithWatch(restConfig, client.Options{Scheme: scheme})
 	if err != nil {
-		return fmt.Errorf("unable to create k8s clientset: %w", err)
-	}
-
-	ecosystemClientSet, err := ecosystem.NewClientSet(restConfig, k8sClientSet)
-	if err != nil {
-		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
+		return fmt.Errorf("unable to create k8s client: %w", err)
 	}
 
 	retentionStrategy := parseStrategyName(flags, args)
 
-	gcManager := newGarbageCollectionManager(ecosystemClientSet, namespace, retentionStrategy)
+	gcManager := newGarbageCollectionManager(k8sClient, namespace, retentionStrategy)
 	return gcManager.CollectGarbage(ctx)
 }
 

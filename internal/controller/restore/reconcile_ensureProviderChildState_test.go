@@ -70,7 +70,7 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 	conflicting := foreignChild(restore)
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason,
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore,
 		"velero restore [test-restore] conflicts with the expected child: it is not controlled by restore [test-restore] and must not be adopted").Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
@@ -103,7 +103,7 @@ func TestAnUnreportableProviderChildConflictIsRetried(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore, mock.Anything).Return()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment).Reconcile

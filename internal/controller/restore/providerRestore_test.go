@@ -2,8 +2,9 @@ package restore
 
 import (
 	"context"
-	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"testing"
+
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
@@ -30,7 +31,7 @@ func TestProviderRestoreStageCreatesOwnedChildWithoutWaiting(t *testing.T) {
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process").Once()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
@@ -62,7 +63,7 @@ func TestARepeatedReconciliationNeverStartsASecondProviderRestore(t *testing.T) 
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process").Once()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
@@ -98,8 +99,8 @@ func TestAProviderRestoreThatCannotBeStartedIsReportedAndRetried(t *testing.T) {
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process").Once()
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, ReasonProviderRestoreFailed, mock.Anything).Once()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, ReasonProviderRestoreFailed, mock.Anything, mock.Anything).Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
@@ -126,8 +127,8 @@ func TestAConflictingChildFoundWhenStartingTheRestoreIsTerminal(t *testing.T) {
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonProviderRestoreRunning, "Start provider restore process").Once()
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), (*velerov1.Restore)(nil), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore, mock.Anything).Return()
 
 	reconciler := &restoreReconciler{
 		namespace: testNamespace,

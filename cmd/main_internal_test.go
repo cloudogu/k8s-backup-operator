@@ -5,7 +5,6 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/internal/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
@@ -16,6 +15,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -480,7 +480,7 @@ func Test_startGarbageCollector(t *testing.T) {
 
 		gcManagerMock := newMockGcManager(t)
 		gcManagerMock.EXPECT().CollectGarbage(testCtx).Return(assert.AnError)
-		newGarbageCollectionManager = func(clientSet ecosystem.Interface, namespace string, strategyName string) garbagecollection.Manager {
+		newGarbageCollectionManager = func(client client.Client, namespace string, strategyName string) garbagecollection.Manager {
 			return gcManagerMock
 		}
 
@@ -512,7 +512,7 @@ func Test_startGarbageCollector(t *testing.T) {
 
 		gcManagerMock := newMockGcManager(t)
 		gcManagerMock.EXPECT().CollectGarbage(testCtx).Return(nil)
-		newGarbageCollectionManager = func(clientSet ecosystem.Interface, namespace string, strategyName string) garbagecollection.Manager {
+		newGarbageCollectionManager = func(client client.Client, namespace string, strategyName string) garbagecollection.Manager {
 			return gcManagerMock
 		}
 
@@ -546,7 +546,7 @@ func Test_startScheduledBackup(t *testing.T) {
 
 		scheduledBackupManagerMock := newMockScheduledBackupManager(t)
 		scheduledBackupManagerMock.EXPECT().ScheduleBackup(testCtx).Return(assert.AnError)
-		newScheduledBackupManager = func(clientSet ecosystem.Interface, options scheduledbackup.Options) scheduledbackup.Manager {
+		newScheduledBackupManager = func(client client.Client, options scheduledbackup.Options) scheduledbackup.Manager {
 			return scheduledBackupManagerMock
 		}
 
@@ -578,7 +578,7 @@ func Test_startScheduledBackup(t *testing.T) {
 
 		scheduledBackupManagerMock := newMockScheduledBackupManager(t)
 		scheduledBackupManagerMock.EXPECT().ScheduleBackup(testCtx).Return(nil)
-		newScheduledBackupManager = func(clientSet ecosystem.Interface, options scheduledbackup.Options) scheduledbackup.Manager {
+		newScheduledBackupManager = func(client client.Client, options scheduledbackup.Options) scheduledbackup.Manager {
 			return scheduledBackupManagerMock
 		}
 

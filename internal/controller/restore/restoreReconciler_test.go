@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -44,7 +42,7 @@ func TestNewRestoreReconciler(t *testing.T) {
 func Test_restoreReconciler_Reconcile(t *testing.T) {
 	t.Run("should fail on getting restore", func(t *testing.T) {
 		// given
-		request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
+		request := ctrl.Request{Name: testRestore}
 		failingGet := interceptor.Funcs{
 			Get: func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
 				return assert.AnError
@@ -67,11 +65,10 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 	t.Run("ignore tests", func(t *testing.T) {
 		t.Run("should migrate the legacy status of a failed restore once and then ignore it", func(t *testing.T) {
 			// given
-			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
+			request := ctrl.Request{Name: testRestore}
+			restore := &v1.Restore{
 				Name:      testRestore,
-				Namespace: testNamespace,
-			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusFailed}}
+				Namespace: testNamespace, Status: v1.RestoreStatus{Status: v1.RestoreStatusFailed}}
 
 			writes := &clientWrites{}
 			testClient := newTestClient(t, writes.interceptor(), restore)
@@ -92,16 +89,15 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		})
 		t.Run("should ignore a completed restore without writing", func(t *testing.T) {
 			// given
-			request := ctrl.Request{NamespacedName: types.NamespacedName{Name: testRestore}}
-			restore := &v1.Restore{ObjectMeta: metav1.ObjectMeta{
+			request := ctrl.Request{Name: testRestore}
+			restore := &v1.Restore{
 				Name:      testRestore,
-				Namespace: testNamespace,
-			}, Status: v1.RestoreStatus{Status: v1.RestoreStatusCompleted, Conditions: []metav1.Condition{{
-				Type:               v1.ConditionSucceeded,
-				Status:             metav1.ConditionTrue,
-				Reason:             ReasonRestoreCompleted,
-				LastTransitionTime: metav1.Now(),
-			}}}}
+				Namespace: testNamespace, Status: v1.RestoreStatus{Status: v1.RestoreStatusCompleted, Conditions: []metav1.Condition{{
+					Type:               v1.ConditionSucceeded,
+					Status:             metav1.ConditionTrue,
+					Reason:             ReasonRestoreCompleted,
+					LastTransitionTime: metav1.Now(),
+				}}}}
 
 			writes := &clientWrites{}
 			sut := &restoreReconciler{
@@ -182,13 +178,13 @@ func Test_requiredOperation(t *testing.T) {
 	}{
 		{
 			name:      "delete a restore that is being deleted",
-			restore:   &v1.Restore{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
+			restore:   &v1.Restore{DeletionTimestamp: &metav1.Time{Time: time.Now()}},
 			expected:  operationDelete,
 			reasonWhy: "deletion wins over any outcome, including a terminal one",
 		},
 		{
 			name:      "delete a completed restore that is being deleted",
-			restore:   &v1.Restore{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: time.Now()}}, Status: v1.RestoreStatus{Conditions: successful(metav1.ConditionTrue)}},
+			restore:   &v1.Restore{DeletionTimestamp: &metav1.Time{Time: time.Now()}, Status: v1.RestoreStatus{Conditions: successful(metav1.ConditionTrue)}},
 			expected:  operationDelete,
 			reasonWhy: "deleting a finished restore is the normal case",
 		},

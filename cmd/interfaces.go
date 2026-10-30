@@ -7,13 +7,14 @@ import (
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/internal/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
-	"k8s.io/client-go/tools/events"
+	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/recorder"
 )
 
 type eventRecorder interface {
-	events.EventRecorder
+	recorder.EventRecorder
 }
 
 // used for mocks
@@ -59,4 +60,10 @@ type k8sClient interface {
 type cleanupManager interface {
 	// Cleanup deletes all resources that need to be deleted before restoring the backup.
 	Cleanup(ctx context.Context) error
+}
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type logSink interface {
+	logr.LogSink
 }

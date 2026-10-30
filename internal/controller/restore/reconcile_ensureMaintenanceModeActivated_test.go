@@ -27,7 +27,7 @@ func TestMaintenanceModeActivationSkipsAnAlreadyActiveMode(t *testing.T) {
 func TestMaintenanceModeActivationActivatesAnInactiveMode(t *testing.T) {
 	restore := newParentRestore()
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
+	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, actionActivateMaintenanceMode, "Maintenance mode activated").Once()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
 	maintenanceMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{
@@ -56,11 +56,13 @@ func TestMaintenanceModeActivationStillActivatesWhenStatusCheckFailsAndReportsIn
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(
 		restore,
+		nil,
 		corev1.EventTypeNormal,
 		ReasonMaintenanceModeActivated,
+		actionCheckMaintenanceMode,
 		"Could not get maintenance mode status; continuing restore.",
 	).Once()
-	recorderMock.EXPECT().Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
+	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, actionActivateMaintenanceMode, "Maintenance mode activated").Once()
 
 	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
 	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
@@ -80,8 +82,10 @@ func TestMaintenanceModeActivationSkipsActivationWhenStatusCheckReportsActiveWit
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(
 		restore,
+		nil,
 		corev1.EventTypeNormal,
 		ReasonMaintenanceModeActivated,
+		actionCheckMaintenanceMode,
 		"Could not get maintenance mode status; continuing restore.",
 	).Once()
 
@@ -104,8 +108,10 @@ func TestMaintenanceModeActivationFailureIsReportedButDoesNotStopTheRestore(t *t
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(
 		restore,
+		nil,
 		corev1.EventTypeNormal,
 		ReasonMaintenanceModeActivated,
+		actionActivateMaintenanceMode,
 		"Could not activate maintenance mode; continuing restore.",
 	).Once()
 
@@ -147,7 +153,7 @@ func TestMaintenanceModeActivationSkipsAfterTheWorkflowDeactivatedIt(t *testing.
 func TestMaintenanceModeActivationStillActivatesWhileTheRestoreIsRunning(t *testing.T) {
 	restore := newParentRestore()
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Eventf(restore, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
+	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, actionActivateMaintenanceMode, "Maintenance mode activated").Once()
 	restore.Status.Conditions = []metav1.Condition{{
 		Type:               k8sv1.ConditionWorkloadsRecovered,
 		Status:             metav1.ConditionUnknown,

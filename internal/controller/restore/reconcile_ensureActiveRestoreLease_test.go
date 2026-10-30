@@ -23,8 +23,8 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 	t.Run("should create a lease for a restore when none exists", func(t *testing.T) {
 		restore := newParentRestore()
 		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Event(
-			matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonRestoreStarted, "The restore has started",
+		recorderMock.EXPECT().Eventf(
+			matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonRestoreStarted, actionStartRestore, "The restore has started",
 		).Return()
 		clientMock := newMockK8sClient(t)
 		clientMock.EXPECT().Get(testCtx, leaseKey(), mock.Anything).Return(leaseNotFound())
@@ -274,8 +274,8 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			lease := newRestoreLease(holder)
 			lease.ResourceVersion = "7"
 			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(
-				matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonRestoreStarted, "The restore has started",
+			recorderMock.EXPECT().Eventf(
+				matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonRestoreStarted, actionStartRestore, "The restore has started",
 			).Return()
 			clientMock := newMockK8sClient(t)
 			expectLeaseRead(t, clientMock, lease)

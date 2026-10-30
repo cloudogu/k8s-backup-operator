@@ -3,8 +3,8 @@ package garbagecollection
 import (
 	"context"
 
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	"github.com/cloudogu/k8s-backup-operator/internal/retention"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Manager interface {
@@ -12,8 +12,8 @@ type Manager interface {
 	CollectGarbage(ctx context.Context) error
 }
 
-type ecosystemClientSet interface {
-	ecosystem.Interface
+type k8sClient interface {
+	client.Client
 }
 
 type strategyGetter interface {
@@ -23,18 +23,4 @@ type strategyGetter interface {
 
 type strategy interface {
 	retention.Strategy
-}
-
-// The following interfaces are here to generate mocks.
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type ecosystemV1Alpha1 interface {
-	ecosystem.V1Alpha1Interface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type backupClient interface {
-	ecosystem.BackupInterface
 }
