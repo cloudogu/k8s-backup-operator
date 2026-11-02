@@ -6,15 +6,14 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
 // restoreLabels are the labels every Restore this operator works on carries.
 func restoreLabels() map[string]string {
 	return map[string]string{
-		ecosystem.AppLabelKey:    ecosystem.AppLabelValueCes,
-		ecosystem.PartOfLabelKey: ecosystem.PartOfLabelValueBackup,
+		k8sv1.AppLabelKey:    k8sv1.AppLabelValueCes,
+		k8sv1.PartOfLabelKey: k8sv1.PartOfLabelValueBackup,
 	}
 }
 

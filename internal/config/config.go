@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -38,6 +39,12 @@ const (
 )
 
 var log = ctrl.Log.WithName("config")
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type logSink interface {
+	logr.LogSink
+}
 
 // OperatorConfig contains all configurable values for the dogu operator.
 type OperatorConfig struct {

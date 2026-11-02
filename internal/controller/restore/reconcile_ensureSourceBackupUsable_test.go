@@ -37,8 +37,8 @@ func TestAMissingSourceBackupFailsTheRestoreBeforeMaintenanceAndPreparation(t *t
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning,
-		velero.ReasonVeleroSourceBackupNotUsable,
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning,
+		velero.ReasonVeleroSourceBackupNotUsable, actionCheckSourceBackup,
 		"The velero backup 'name=test-backup' to be restored was not found.").Once()
 
 	// no backup in client
@@ -73,7 +73,7 @@ func TestASourceBackupThatIsNotRestorableFailsTheRestore(t *testing.T) {
 			restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, velero.ReasonVeleroSourceBackupNotUsable, mock.Anything).Once()
+			recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, velero.ReasonVeleroSourceBackupNotUsable, mock.Anything, mock.Anything).Once()
 
 			fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, newSourceBackupGateFactory(t, recorderMock),
 				restore, readyStorageLocation(), readyProviderDeployment(), sourceBackup(phase))
@@ -96,7 +96,7 @@ func TestARestorableSourceBackupLetsThePreparationRun(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, mock.Anything, mock.Anything).Times(3)
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, mock.Anything, mock.Anything, mock.Anything).Times(3)
 
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
@@ -125,7 +125,7 @@ func TestAnAlreadyPreparedRestoreIsNotFailedByAMissingSourceBackup(t *testing.T)
 	restore := withPreparation(withInitializedConditions(withMetadata(newParentRestore())))
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, mock.Anything, mock.Anything).Maybe()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, mock.Anything, mock.Anything, mock.Anything).Maybe()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)

@@ -8,7 +8,10 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 const testNamespace = "my-namespace"
@@ -29,16 +32,14 @@ func TestDefaultManager_ScheduleBackup(t *testing.T) {
 		// given
 		expectedBackupName := "banana-2023-11-30t10.30.00"
 		expectedBackup := &v1.Backup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      expectedBackupName,
-				Namespace: testNamespace,
-				Labels: map[string]string{
-					"app":                          "ces",
-					"k8s.cloudogu.com/part-of":     "backup",
-					"app.kubernetes.io/name":       "backup",
-					"app.kubernetes.io/part-of":    "k8s-backup-operator",
-					"app.kubernetes.io/created-by": "k8s-backup-operator",
-				},
+			Name:      expectedBackupName,
+			Namespace: testNamespace,
+			Labels: map[string]string{
+				"app":                          "ces",
+				"k8s.cloudogu.com/part-of":     "backup",
+				"app.kubernetes.io/name":       "backup",
+				"app.kubernetes.io/part-of":    "k8s-backup-operator",
+				"app.kubernetes.io/created-by": "k8s-backup-operator",
 			},
 			Spec: v1.BackupSpec{
 				Provider: v1.Provider("velero"),
@@ -48,16 +49,14 @@ func TestDefaultManager_ScheduleBackup(t *testing.T) {
 		clockMock := newMockTimeProvider(t)
 		clockMock.EXPECT().Now().Return(time.Date(2023, time.November, 30, 10, 30, 00, 00, time.Local))
 
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().Create(testCtx, expectedBackup, metav1.CreateOptions{}).Return(nil, assert.AnError)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		clientSetMock := newMockEcosystemClientSet(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		k8sClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+			assert.Equal(t, expectedBackup, obj)
+			return assert.AnError
+		}}).Build()
 
 		options := Options{Name: "banana", Namespace: testNamespace, Provider: "velero"}
 
-		sut := &DefaultManager{clientSet: clientSetMock, options: options, clock: clockMock}
+		sut := &DefaultManager{client: k8sClient, options: options, clock: clockMock}
 
 		// when
 		err := sut.ScheduleBackup(testCtx)
@@ -71,16 +70,14 @@ func TestDefaultManager_ScheduleBackup(t *testing.T) {
 		// given
 		expectedBackupName := "banana-2023-11-30t10.30.00"
 		expectedBackup := &v1.Backup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      expectedBackupName,
-				Namespace: testNamespace,
-				Labels: map[string]string{
-					"app":                          "ces",
-					"k8s.cloudogu.com/part-of":     "backup",
-					"app.kubernetes.io/name":       "backup",
-					"app.kubernetes.io/part-of":    "k8s-backup-operator",
-					"app.kubernetes.io/created-by": "k8s-backup-operator",
-				},
+			Name:      expectedBackupName,
+			Namespace: testNamespace,
+			Labels: map[string]string{
+				"app":                          "ces",
+				"k8s.cloudogu.com/part-of":     "backup",
+				"app.kubernetes.io/name":       "backup",
+				"app.kubernetes.io/part-of":    "k8s-backup-operator",
+				"app.kubernetes.io/created-by": "k8s-backup-operator",
 			},
 			Spec: v1.BackupSpec{
 				Provider: v1.Provider("velero"),
@@ -90,16 +87,16 @@ func TestDefaultManager_ScheduleBackup(t *testing.T) {
 		clockMock := newMockTimeProvider(t)
 		clockMock.EXPECT().Now().Return(time.Date(2023, time.November, 30, 10, 30, 00, 00, time.Local))
 
-		backupClientMock := newMockEcosystemBackupInterface(t)
-		backupClientMock.EXPECT().Create(testCtx, expectedBackup, metav1.CreateOptions{}).Return(expectedBackup, nil)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		clientSetMock := newMockEcosystemClientSet(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		k8sClient := fake.NewClientBuilder().
+			WithScheme(testScheme(t)).
+			WithInterceptorFuncs(interceptor.Funcs{Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+				assert.Equal(t, expectedBackup, obj)
+				return client.Create(ctx, obj, opts...)
+			}}).Build()
 
 		options := Options{Name: "banana", Namespace: testNamespace, Provider: "velero"}
 
-		sut := &DefaultManager{clientSet: clientSetMock, options: options, clock: clockMock}
+		sut := &DefaultManager{client: k8sClient, options: options, clock: clockMock}
 
 		// when
 		err := sut.ScheduleBackup(testCtx)
@@ -107,4 +104,12 @@ func TestDefaultManager_ScheduleBackup(t *testing.T) {
 		// then
 		require.NoError(t, err)
 	})
+}
+
+func testScheme(t *testing.T) *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	builder := runtime.NewSchemeBuilder(v1.AddToScheme)
+	err := builder.AddToScheme(scheme)
+	assert.NoError(t, err)
+	return scheme
 }

@@ -55,16 +55,20 @@ func TestFailedScaleUpFinalizationReportsRecoveryFalseAndRetries(t *testing.T) {
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().FinalizeScaleUp(testCtx).Return(assert.AnError).Once()
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(
-		matchesRestoreNamed(testRestore),
+	recorderMock.EXPECT().Eventf(
+		matchesCloudoguRestoreNamed(testRestore),
+		nil,
 		corev1.EventTypeWarning,
 		ReasonWorkloadRecoveryFailed,
+		actionRecoverWorkloads,
 		"failed to finalize workload scale-up after restore",
 	).Return()
-	recorderMock.EXPECT().Event(
-		matchesRestoreNamed(testRestore),
+	recorderMock.EXPECT().Eventf(
+		matchesCloudoguRestoreNamed(testRestore),
+		nil,
 		corev1.EventTypeWarning,
 		k8sv1.ErrorOnCreateEventReason,
+		actionRecoverWorkloads,
 		"failed to finalize workload scale-up after restore: assert.AnError general error for testing",
 	).Return()
 	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)

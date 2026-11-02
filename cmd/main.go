@@ -17,7 +17,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
 	operatortime "github.com/cloudogu/k8s-backup-operator/internal/time"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
-	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
+	doguv3Client "github.com/cloudogu/k8s-dogu-lib/v3/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	// +kubebuilder:scaffold:imports
 )
@@ -129,20 +128,15 @@ func startScheduledBackup(ctx context.Context, cmd *flag.FlagSet, args []string)
 		return fmt.Errorf("unable to get current namespace: %w", err)
 	}
 
-	k8sClientSet, err := kubernetes.NewForConfig(restConfig)
+	k8sClient, err := client.NewWithWatch(restConfig, client.Options{Scheme: scheme})
 	if err != nil {
-		return fmt.Errorf("unable to create k8s clientset: %w", err)
-	}
-
-	ecosystemClientSet, err := ecosystem.NewClientSet(restConfig, k8sClientSet)
-	if err != nil {
-		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
+		return fmt.Errorf("unable to create k8s client: %w", err)
 	}
 
 	options := parseScheduledBackupOptions(cmd, args)
 	options.Namespace = namespace
 
-	manager := newScheduledBackupManager(ecosystemClientSet, options)
+	manager := newScheduledBackupManager(k8sClient, options)
 	return manager.ScheduleBackup(ctx)
 }
 
@@ -163,19 +157,14 @@ func startGarbageCollector(ctx context.Context, flags *flag.FlagSet, args []stri
 		return fmt.Errorf("unable to get current namespace: %w", err)
 	}
 
-	k8sClientSet, err := kubernetes.NewForConfig(restConfig)
+	k8sClient, err := client.NewWithWatch(restConfig, client.Options{Scheme: scheme})
 	if err != nil {
-		return fmt.Errorf("unable to create k8s clientset: %w", err)
-	}
-
-	ecosystemClientSet, err := ecosystem.NewClientSet(restConfig, k8sClientSet)
-	if err != nil {
-		return fmt.Errorf("unable to create ecosystem clientset: %w", err)
+		return fmt.Errorf("unable to create k8s client: %w", err)
 	}
 
 	retentionStrategy := parseStrategyName(flags, args)
 
-	gcManager := newGarbageCollectionManager(ecosystemClientSet, namespace, retentionStrategy)
+	gcManager := newGarbageCollectionManager(k8sClient, namespace, retentionStrategy)
 	return gcManager.CollectGarbage(ctx)
 }
 
@@ -321,7 +310,7 @@ func configureBackupReconcilers(k8sManager controllerManager, recorder eventReco
 }
 
 func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.WithWatch, recorder eventRecorder, operatorConfig *operatorconfig.OperatorConfig) error {
-	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
+	doguClient, err := doguv3Client.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create dogu client: %w", err)
 	}
@@ -331,7 +320,7 @@ func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.W
 		return fmt.Errorf("unable to create dynamic client: %w", err)
 	}
 
-	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
+	cleanupManager := cleanup.NewManager(doguClient.DoguV2().Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
 	scaleManager := restorecontroller.NewScaleManager(k8sClient, operatorConfig.Namespace)
 
 	requeueAfter := time.Duration(operatorConfig.RequeueTimeSeconds) * time.Second

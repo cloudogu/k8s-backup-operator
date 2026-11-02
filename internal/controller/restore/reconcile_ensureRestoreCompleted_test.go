@@ -18,9 +18,8 @@ func TestRestoreCompletionPersistsTerminalConditionsWithoutExternalRecoveryActio
 	restore := completableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(
-		matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonRestoreCompleted, "Restore successful",
-	).Return()
+	recorderMock.EXPECT().Eventf(
+		matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonRestoreCompleted, actionCompleteRestore, "Restore successful").Return()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)

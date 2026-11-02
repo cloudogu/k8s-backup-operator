@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
-	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v3/api/v2"
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

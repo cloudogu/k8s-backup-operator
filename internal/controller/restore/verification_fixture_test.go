@@ -125,7 +125,7 @@ func (f *multiReconcileFixture) reconcileTimes(
 }
 
 func newRestoreRequest(name string) ctrl.Request {
-	return ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: name}}
+	return ctrl.Request{Namespace: testNamespace, Name: name}
 }
 
 // recordClientActions records every mutating call and then hands it to next, or to the fake client
