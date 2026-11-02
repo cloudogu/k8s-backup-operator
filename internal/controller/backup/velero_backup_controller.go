@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -11,10 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
-
-// unitBackupLabelKey marks Velero backups that belong to a unit of a cloudogu backup.
-// TODO: Replace with backupv1.BackupLabelKey once it is released in k8s-backup-lib.
-const unitBackupLabelKey = "k8s.cloudogu.com/backup"
 
 type veleroBackupReconciler interface {
 	ensureBackupExists(ctx context.Context, veleroBackup *velerov1.Backup) error
@@ -75,6 +72,6 @@ func (c *VeleroBackupController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func isLegacyBackup(obj client.Object) bool {
-	_, isUnitBackup := obj.GetLabels()[unitBackupLabelKey]
+	_, isUnitBackup := obj.GetLabels()[backupv1.BackupLabelKey]
 	return !isUnitBackup
 }
