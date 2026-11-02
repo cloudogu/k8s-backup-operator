@@ -102,3 +102,31 @@ func TestVeleroBackupController(t *testing.T) {
 		assert.Zero(t, result)
 	})
 }
+
+func TestIsLegacyBackup(t *testing.T) {
+	t.Run("returns true for velero backup without labels", func(t *testing.T) {
+		veleroBackup := &velerov1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns"}}
+
+		assert.True(t, isLegacyBackup(veleroBackup))
+	})
+
+	t.Run("returns true for velero backup without unit label", func(t *testing.T) {
+		veleroBackup := &velerov1.Backup{ObjectMeta: metav1.ObjectMeta{
+			Name:      "backup",
+			Namespace: "ns",
+			Labels:    map[string]string{"app": "ces"},
+		}}
+
+		assert.True(t, isLegacyBackup(veleroBackup))
+	})
+
+	t.Run("returns false for unit backup", func(t *testing.T) {
+		veleroBackup := &velerov1.Backup{ObjectMeta: metav1.ObjectMeta{
+			Name:      "backup",
+			Namespace: "ns",
+			Labels:    map[string]string{unitBackupLabelKey: "backup"},
+		}}
+
+		assert.False(t, isLegacyBackup(veleroBackup))
+	})
+}
