@@ -56,7 +56,7 @@ node('docker') {
                             }
 
                             stage('Go vulnerability scan') {
-                                make 'govulncheck'
+                                make 'govulncheck-report'
                             }
 
                             stage("Review dog analysis") {
