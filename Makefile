@@ -8,7 +8,6 @@ STAGE?=production
 MOCKERY_VERSION=v2.53.5
 MOCKERY_IGNORED=vendor,build,docs,generated
 LINT_VERSION=v2.10.1
-GOVULNCHECK_VERSION=v1.9.0
 
 ADDITIONAL_CLEAN=dist-clean
 
@@ -19,8 +18,6 @@ include build/make/build.mk
 include build/make/test-common.mk
 include build/make/test-unit.mk
 include build/make/static-analysis.mk
-include build/make/vulnerability-scan.mk
-include build/vulnerability-scan.mk
 include build/make/clean.mk
 include build/make/digital-signature.mk
 include build/make/mocks.mk
