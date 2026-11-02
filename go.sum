@@ -18,8 +18,8 @@ github.com/cloudogu/ces-commons-lib v0.3.0 h1:HPf18pTLHGmAZpJb/H6pBrqxKcAUH6KhFr
 github.com/cloudogu/ces-commons-lib v0.3.0/go.mod h1:4rvR2RTDDaz5a6OZ1fW27G0MOnl5I3ackeiHxt4gn3o=
 github.com/cloudogu/cesapp-lib v0.18.3 h1:zgLTgQnPeuH2MmjMLsgIhlM+BTt2TFU3lXYTsUvBi70=
 github.com/cloudogu/cesapp-lib v0.18.3/go.mod h1:13LIL9xFBvjUpOK4+t5WPEu3kKNOEwbQnmYtKa3L0e8=
-github.com/cloudogu/k8s-backup-lib v1.6.1-0.20261030122742-e5d99a1a0076 h1:gsnxSH0u6v0onnTElGIZS64xrVXiGzQ/y6aqSX1mFDg=
-github.com/cloudogu/k8s-backup-lib v1.6.1-0.20261030122742-e5d99a1a0076/go.mod h1:Q0E9dN+bNExCIRrq6PFnedY7wnPbw3mGNoHnryzec0o=
+github.com/cloudogu/k8s-backup-lib v1.10.0 h1:V0nmN+4AjOmr9qAL7dkqRmJwyScH+QI7ETxL1QYaYCk=
+github.com/cloudogu/k8s-backup-lib v1.10.0/go.mod h1:Q0E9dN+bNExCIRrq6PFnedY7wnPbw3mGNoHnryzec0o=
 github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0 h1:7J/1X+qjrMi2bVOl6Hcl3Vja/RWUcJZrBruFSG7mNLY=
 github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0/go.mod h1:3E1iLra8//8+kCwBjuDi6b0iwtNoArYfOIYnzNXSFMQ=
 github.com/cloudogu/k8s-dogu-lib/v3 v3.3.0 h1:SCg/rqgmETBoOdt7Dba0zmWvlPJkkUocxNrn8nOcnk0=
