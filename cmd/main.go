@@ -17,7 +17,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
 	operatortime "github.com/cloudogu/k8s-backup-operator/internal/time"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
-	doguv2Client "github.com/cloudogu/k8s-dogu-lib/v2/client"
+	doguv3Client "github.com/cloudogu/k8s-dogu-lib/v3/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -310,7 +310,7 @@ func configureBackupReconcilers(k8sManager controllerManager, recorder eventReco
 }
 
 func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.WithWatch, recorder eventRecorder, operatorConfig *operatorconfig.OperatorConfig) error {
-	doguClient, err := doguv2Client.NewForConfig(k8sManager.GetConfig())
+	doguClient, err := doguv3Client.NewForConfig(k8sManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("unable to create dogu client: %w", err)
 	}
@@ -320,7 +320,7 @@ func configureRestoreReconciler(k8sManager controllerManager, k8sClient client.W
 		return fmt.Errorf("unable to create dynamic client: %w", err)
 	}
 
-	cleanupManager := cleanup.NewManager(doguClient.Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
+	cleanupManager := cleanup.NewManager(doguClient.DoguV2().Dogus(operatorConfig.Namespace), dynamicClient, operatorConfig.Namespace)
 	scaleManager := restorecontroller.NewScaleManager(k8sClient, operatorConfig.Namespace)
 
 	requeueAfter := time.Duration(operatorConfig.RequeueTimeSeconds) * time.Second

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v3/api/v2"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +31,7 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 			ctxFn: func(t *testing.T) context.Context {
 				return t.Context()
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i) &&
 					assert.ErrorContains(t, err, "failed to list dogus", i)
 			},
@@ -42,7 +42,7 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 				m := newMockDoguClient(t)
 				m.EXPECT().List(t.Context(), metav1.ListOptions{}).Return(&doguv2.DoguList{
 					Items: []doguv2.Dogu{
-						{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
+						{Name: "test"},
 					},
 				}, nil)
 				propagationPolicyForeground := metav1.DeletePropagationForeground
@@ -52,7 +52,7 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 			ctxFn: func(t *testing.T) context.Context {
 				return t.Context()
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i) &&
 					assert.ErrorContains(t, err, "failed to delete dogu \"test\"", i)
 			},
@@ -63,7 +63,7 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 				m := newMockDoguClient(t)
 				m.EXPECT().List(t.Context(), metav1.ListOptions{}).Return(&doguv2.DoguList{
 					Items: []doguv2.Dogu{
-						{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
+						{Name: "test"},
 					},
 				}, nil)
 				propagationPolicyForeground := metav1.DeletePropagationForeground
@@ -83,7 +83,7 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 				m := newMockDoguClient(t)
 				m.EXPECT().List(t.Context(), metav1.ListOptions{}).Return(&doguv2.DoguList{
 					Items: []doguv2.Dogu{
-						{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
+						{Name: "test"},
 					},
 				}, nil)
 				propagationPolicyForeground := metav1.DeletePropagationForeground
@@ -103,7 +103,7 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 				m := newMockDoguClient(t)
 				m.EXPECT().List(cancelCtx, metav1.ListOptions{}).Return(&doguv2.DoguList{
 					Items: []doguv2.Dogu{
-						{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
+						{Name: "test"},
 					},
 				}, nil)
 				propagationPolicyForeground := metav1.DeletePropagationForeground
@@ -127,7 +127,7 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 				m := newMockDoguClient(t)
 				m.EXPECT().List(t.Context(), metav1.ListOptions{}).Return(&doguv2.DoguList{
 					Items: []doguv2.Dogu{
-						{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
+						{Name: "test"},
 					},
 				}, nil)
 				propagationPolicyForeground := metav1.DeletePropagationForeground
