@@ -34,8 +34,8 @@ func recoverableRestore() *k8sv1.Restore {
 
 func newParentRestore() *k8sv1.Restore {
 	return &k8sv1.Restore{
-		ObjectMeta: metav1.ObjectMeta{Name: testRestore, Namespace: testNamespace, UID: testRestoreUID},
-		Spec:       k8sv1.RestoreSpec{BackupName: testBackup, Provider: k8sv1.ProviderVelero},
+		Name: testRestore, Namespace: testNamespace, UID: testRestoreUID,
+		Spec: k8sv1.RestoreSpec{BackupName: testBackup, Provider: k8sv1.ProviderVelero},
 	}
 }
 
@@ -95,8 +95,8 @@ func readyStorageLocation() *velerov1.BackupStorageLocation {
 
 func backupStorageLocation(phase velerov1.BackupStorageLocationPhase) *velerov1.BackupStorageLocation {
 	return &velerov1.BackupStorageLocation{
-		ObjectMeta: metav1.ObjectMeta{Name: testBackupStorage, Namespace: testNamespace},
-		Status:     velerov1.BackupStorageLocationStatus{Phase: phase},
+		Name: testBackupStorage, Namespace: testNamespace,
+		Status: velerov1.BackupStorageLocationStatus{Phase: phase},
 	}
 }
 
@@ -107,8 +107,8 @@ func readyProviderDeployment() *appsv1.Deployment {
 
 func providerDeployment(readyReplicas int32) *appsv1.Deployment {
 	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: testProviderDeployment, Namespace: testNamespace},
-		Status:     appsv1.DeploymentStatus{ReadyReplicas: readyReplicas},
+		Name: testProviderDeployment, Namespace: testNamespace,
+		Status: appsv1.DeploymentStatus{ReadyReplicas: readyReplicas},
 	}
 }
 
@@ -119,21 +119,20 @@ func usableSourceBackup() *velerov1.Backup {
 
 func sourceBackup(phase velerov1.BackupPhase) *velerov1.Backup {
 	return &velerov1.Backup{
-		ObjectMeta: metav1.ObjectMeta{Name: testBackup, Namespace: testNamespace},
-		Status:     velerov1.BackupStatus{Phase: phase},
+		Name: testBackup, Namespace: testNamespace,
+		Status: velerov1.BackupStatus{Phase: phase},
 	}
 }
 
 func deletedRestore() *k8sv1.Restore {
-	return &k8sv1.Restore{ObjectMeta: metav1.ObjectMeta{
+	return &k8sv1.Restore{
 		Name:              testRestore,
 		Namespace:         testNamespace,
 		DeletionTimestamp: &metav1.Time{Time: time.Now()},
-		Finalizers:        []string{k8sv1.RestoreFinalizer},
-	}}
+		Finalizers:        []string{k8sv1.RestoreFinalizer}}
 }
 
-// assertPersistedMetadata asserts the finalizer and the labels the create flow has to apply.
+// assertPersistedMetadata asserts the finalizer and the labels the creation flow has to apply.
 func assertPersistedMetadata(t *testing.T, testClient client.Client, name string) {
 	t.Helper()
 
@@ -173,10 +172,18 @@ func assertSuccessfulCondition(t *testing.T, testClient client.Client, name stri
 	require.Equal(t, reason, condition.Reason)
 }
 
-// matchesRestoreNamed matches a Restore by name, for mocks that see the object as the client returned
+// matchesCloudoguRestoreNamed matches a cloudogu Restore by name, for mocks that see the object as the client returned
 // it rather than the exact pointer the test built.
-func matchesRestoreNamed(name string) any {
+func matchesCloudoguRestoreNamed(name string) any {
 	return mock.MatchedBy(func(restore *k8sv1.Restore) bool {
+		return restore != nil && restore.Name == name
+	})
+}
+
+// matchesVeleroRestoreNamed matches a velero Restore by name, for mocks that see the object as the client returned
+// it rather than the exact pointer the test built.
+func matchesVeleroRestoreNamed(name string) any {
+	return mock.MatchedBy(func(restore *velerov1.Restore) bool {
 		return restore != nil && restore.Name == name
 	})
 }

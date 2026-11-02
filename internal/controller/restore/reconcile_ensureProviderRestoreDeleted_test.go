@@ -75,7 +75,7 @@ func TestEnsureProviderRestoreDeletedLeavesAForeignChildUntouched(t *testing.T) 
 	child.OwnerReferences = nil
 	writes := &clientWrites{}
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.DeleteEventReason,
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.DeleteEventReason, actionDeleteProviderRestore,
 		mock.MatchedBy(func(message string) bool {
 			return strings.Contains(message, "not owned by this restore")
 		})).Return()

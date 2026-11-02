@@ -43,8 +43,7 @@ func TestAnUndecidedProviderRestoreEndsTheReconciliationWithoutAnOutcome(t *test
 			restore := startableRestore()
 
 			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
-			recorderMock.EXPECT().Eventf(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+			recorderMock.EXPECT().Eventf(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 
 			factory := func(fakeClient client.WithWatch) reconcileFunction {
 				return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment).Reconcile
@@ -69,8 +68,8 @@ func TestACompletedProviderRestoreResolvesItsMilestoneAndThenContinuesTheWorkflo
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason,
-		"Successfully completed the provider restore [%s]", testRestore).Return()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason,
+		actionCompleteProviderRestore, "Successfully completed the provider restore [%s]", []any{testRestore}).Return()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 	scaleMock := newMockScaleManager(t)
@@ -106,7 +105,7 @@ func TestAFailedProviderRestoreIsTerminalWithoutRecoveringTheWorkloads(t *testin
 			restore := startableRestore()
 
 			recorderMock := newMockEventRecorder(t)
-			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
+			recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCompleteProviderRestore, mock.Anything).Return()
 			maintenanceMock := newMockMaintenanceModeSwitch(t)
 			maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 			maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
@@ -140,7 +139,7 @@ func TestAFailedProviderRestoreIsReportedEvenWhenTheMaintenanceModeStaysOn(t *te
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCompleteProviderRestore, mock.Anything).Return()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(assert.AnError).Once()
@@ -164,7 +163,7 @@ func TestAFailedProviderRestoreIsReportedEvenWhenTheMaintenanceModeStaysOn(t *te
 func TestAnUnpersistableProviderRestoreStateIsRetried(t *testing.T) {
 	restore := startableRestore()
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Eventf(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonMaintenanceModeActivated, "Maintenance mode activated").Once()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, actionActivateMaintenanceMode, "Maintenance mode activated").Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment).Reconcile
@@ -183,7 +182,7 @@ func TestAnUnreportableProviderRestoreFailureIsRetried(t *testing.T) {
 	restore := startableRestore()
 
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, mock.Anything).Return()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCompleteProviderRestore, mock.Anything).Return()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil)

@@ -31,8 +31,8 @@ func TestEnsureDeletionFinalizedRemovesTheFinalizerAndLetsKubernetesDeleteTheRes
 	restore := deletedRestore()
 	writes := &clientWrites{}
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal,
-		k8sv1.DeleteEventReason, "Delete successful").Return()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal,
+		k8sv1.DeleteEventReason, actionDeleteRestore, "Delete successful").Return()
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := &restoreReconciler{k8sClient: testClient, recorder: recorderMock}
 
@@ -52,8 +52,8 @@ func TestEnsureDeletionFinalizedOnlyRemovesItsOwnFinalizer(t *testing.T) {
 	restore := deletedRestore()
 	restore.Finalizers = append(restore.Finalizers, "example.com/another-finalizer")
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal,
-		k8sv1.DeleteEventReason, "Delete successful").Return()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal,
+		k8sv1.DeleteEventReason, actionDeleteRestore, "Delete successful").Return()
 	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
 	reconciler := &restoreReconciler{k8sClient: testClient, recorder: recorderMock}
 
@@ -76,8 +76,8 @@ func TestEnsureDeletionFinalizedRetriesAFailedFinalizerRemoval(t *testing.T) {
 		},
 	}
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeWarning,
-		k8sv1.DeleteEventReason, mock.MatchedBy(func(message string) bool {
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning,
+		k8sv1.DeleteEventReason, actionDeleteRestore, mock.MatchedBy(func(message string) bool {
 			return assert.Contains(t, message, "Delete failed. Reason: failed to remove finalizer") &&
 				assert.Contains(t, message, "assert.AnError")
 		})).Return()

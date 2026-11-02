@@ -1,8 +1,9 @@
 package restore
 
 import (
-	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"testing"
+
+	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 
@@ -84,16 +85,20 @@ func TestFailedScaleUpInitiationReportsRecoveryFalseAndRetries(t *testing.T) {
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleUp(testCtx).Return(assert.AnError).Once()
 	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(
-		matchesRestoreNamed(testRestore),
+	recorderMock.EXPECT().Eventf(
+		matchesCloudoguRestoreNamed(testRestore),
+		nil,
 		corev1.EventTypeWarning,
 		ReasonWorkloadRecoveryFailed,
+		actionRecoverWorkloads,
 		"failed to initiate workload scale-up after restore",
 	).Return()
-	recorderMock.EXPECT().Event(
-		matchesRestoreNamed(testRestore),
+	recorderMock.EXPECT().Eventf(
+		matchesCloudoguRestoreNamed(testRestore),
+		nil,
 		corev1.EventTypeWarning,
 		k8sv1.ErrorOnCreateEventReason,
+		actionRecoverWorkloads,
 		"failed to initiate workload scale-up after restore: assert.AnError general error for testing",
 	).Return()
 	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)

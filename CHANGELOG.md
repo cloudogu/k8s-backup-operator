@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- [#175] Update dogu-lib to v3.3.0
+- [#175] Update backup-lib to v1.10.0
+  - Switch to controller-runtime client
+- [#175] Use go 1.27.3 and update go dependencies
+- Transition to mockery v3
 
 ## [v3.5.1] - 2026-09-22
 ### Changed
