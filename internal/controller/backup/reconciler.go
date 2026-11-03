@@ -380,7 +380,7 @@ func (c *defaultReconciler) ensureOrphanedBackupDeleted(ctx context.Context, bac
 	}
 
 	providerBackups := &velerov1.BackupList{}
-	err := c.client.List(ctx, providerBackups)
+	err := c.client.List(ctx, providerBackups, client.InNamespace(backup.Namespace))
 	if err != nil {
 		return Abort, fmt.Errorf("failed to list the velero unit backups to check if they still exists for cloudogu backup: %w", err)
 	}
