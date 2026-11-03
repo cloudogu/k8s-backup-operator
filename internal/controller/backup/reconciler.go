@@ -385,15 +385,11 @@ func (c *defaultReconciler) ensureOrphanedBackupDeleted(ctx context.Context, bac
 		return Abort, fmt.Errorf("failed to list the velero unit backups to check if they still exists for cloudogu backup: %w", err)
 	}
 
-	providerBackupsExists := false
 	for _, providerBackup := range providerBackups.Items {
-		if backupName, ok := providerBackup.Labels[backupv1.BackupLabelKey]; ok && backupName == backup.Name {
-			providerBackupsExists = true
+		if isOwnProviderBackup(backup, &providerBackup) {
+			logging.Debug(ctx, "ensureOrphanedBackupDeleted: the provider backup still exists -> NEXT")
+			return Next, nil
 		}
-	}
-	if providerBackupsExists {
-		logging.Debug(ctx, "ensureOrphanedBackupDeleted: the provider backup still exists -> NEXT")
-		return Next, nil
 	}
 
 	logging.Debug(ctx, "ensureOrphanedBackupDeleted: the provider backup is gone -> delete the backup, ABORT")
