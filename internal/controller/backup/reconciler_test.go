@@ -28,10 +28,8 @@ func newTestEventRecorder() eventRecorder {
 
 func newVeleroBackupForReconcilerTest(namespace string, name string, phase velerov1.BackupPhase) *velerov1.Backup {
 	return &velerov1.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
+		Name:      name,
+		Namespace: namespace,
 		Status: velerov1.BackupStatus{
 			Phase: phase,
 		},
@@ -40,10 +38,8 @@ func newVeleroBackupForReconcilerTest(namespace string, name string, phase veler
 
 func newVeleroBackupStorageLocationForReconcilerTest(phase velerov1.BackupStorageLocationPhase) *velerov1.BackupStorageLocation {
 	return &velerov1.BackupStorageLocation{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "ns",
-			Name:      "default",
-		},
+		Namespace: "ns",
+		Name:      "default",
 		Status: velerov1.BackupStorageLocationStatus{
 			Phase: phase,
 		},
@@ -187,10 +183,8 @@ func newRealClock() Clock {
 
 func newBackupWithSucceededStatusForReconcilerTest(namespace string, name string, conditionStatus metav1.ConditionStatus) *backupv1.Backup {
 	return &backupv1.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
+		Namespace: namespace,
+		Name:      name,
 		Spec: backupv1.BackupSpec{
 			Provider: "velero",
 		},
@@ -208,10 +202,8 @@ func newBackupWithSucceededStatusForReconcilerTest(namespace string, name string
 
 func newBackupWithNoConditionsForReconcilerTest(namespace string, name string) *backupv1.Backup {
 	return &backupv1.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
+		Namespace: namespace,
+		Name:      name,
 		Spec: backupv1.BackupSpec{
 			Provider: "velero",
 		},
@@ -253,10 +245,8 @@ func assertBackupLeaseReleased(t *testing.T, k8sClient client.Client, backup *ba
 
 func providerDeployment(readyReplicas int32) *appsv1.Deployment {
 	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "ns",
-			Name:      "velero",
-		},
+		Namespace: "ns",
+		Name:      "velero",
 		Status: appsv1.DeploymentStatus{
 			ReadyReplicas: readyReplicas,
 		},
