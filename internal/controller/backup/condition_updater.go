@@ -12,7 +12,7 @@ import (
 
 type statusUpdate func(status *backupv1.BackupStatus)
 
-type conditionsUpdater struct {
+type conditionUpdater struct {
 	client client.Client
 }
 
@@ -22,13 +22,13 @@ type backupConditionTransition struct {
 	to            metav1.ConditionStatus
 }
 
-func newConditionsUpdater(k8sClient client.Client) *conditionsUpdater {
-	return &conditionsUpdater{client: k8sClient}
+func newConditionUpdater(k8sClient client.Client) *conditionUpdater {
+	return &conditionUpdater{client: k8sClient}
 }
 
 // updateStatus applies a status mutation, synchronizes the legacy scalar phase, and records status
 // transitions only after the resulting patch was persisted successfully.
-func (u *conditionsUpdater) updateStatus(
+func (u *conditionUpdater) updateStatus(
 	ctx context.Context,
 	backup *backupv1.Backup,
 	updateFn statusUpdate,
