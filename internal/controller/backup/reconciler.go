@@ -386,7 +386,7 @@ func (c *defaultReconciler) ensureOrphanedBackupDeleted(ctx context.Context, bac
 	}
 
 	for _, providerBackup := range providerBackups.Items {
-		if isOwnProviderBackup(backup, &providerBackup) {
+		if isOwnProviderBackup(backup, &providerBackup) || isLegacyProviderBackup(backup, &providerBackup) {
 			logging.Debug(ctx, "ensureOrphanedBackupDeleted: the provider backup still exists -> NEXT")
 			return Next, nil
 		}
@@ -639,6 +639,11 @@ func findRunningProviderBackupOfAnotherRun(backup *backupv1.Backup, providerBack
 
 func isOwnProviderBackup(backup *backupv1.Backup, providerBackup *velerov1.Backup) bool {
 	return backup.Name == providerBackup.Labels[backupv1.BackupLabelKey]
+}
+
+func isLegacyProviderBackup(backup *backupv1.Backup, providerBackup *velerov1.Backup) bool {
+	_, isUnit := providerBackup.Labels[backupv1.BackupLabelKey]
+	return !isUnit && providerBackup.Name == backup.Name
 }
 
 func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (action, error) {

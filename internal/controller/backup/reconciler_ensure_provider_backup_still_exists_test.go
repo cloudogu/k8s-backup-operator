@@ -37,7 +37,7 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 		assert.True(t, apierrors.IsNotFound(err), "the backup of a missing provider backup must be deleted")
 	})
 
-	t.Run("Keep the backup when its provider backup still exists", func(t *testing.T) {
+	t.Run("Keep the backup when its legacy provider backup still exists", func(t *testing.T) {
 		backup := backupWithStartedProviderBackup("ns", "backup")
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).Build()
@@ -48,6 +48,54 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), &backupv1.Backup{}))
+	})
+
+	t.Run("Keep the backup when at least one provider unit backup still exists", func(t *testing.T) {
+		backup := backupWithStartedProviderBackup("ns", "backup")
+		veleroBackup := newUnitVeleroBackupForReconcilerTest("ns", "backup-dogux", "backup", velerov1.BackupPhaseCompleted)
+		fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+
+		nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), &backupv1.Backup{}))
+	})
+
+	t.Run("Delete the backup when only provider backups that do not belong to it exist", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			veleroBackup *velerov1.Backup
+		}{
+			{
+				name:         "unit backup of another backup",
+				veleroBackup: newUnitVeleroBackupForReconcilerTest("ns", "other-backup-dogux", "other-backup", velerov1.BackupPhaseCompleted),
+			},
+			{
+				name:         "own unit backup in another namespace",
+				veleroBackup: newUnitVeleroBackupForReconcilerTest("other-ns", "backup-dogux", "backup", velerov1.BackupPhaseCompleted),
+			},
+			{
+				name:         "provider backup with the same name but the unit label of another backup",
+				veleroBackup: newUnitVeleroBackupForReconcilerTest("ns", "backup", "other-backup", velerov1.BackupPhaseCompleted),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				backup := backupWithStartedProviderBackup("ns", "backup")
+				fakeClient := newFakeClientBuilder(t).WithObjects(backup, tt.veleroBackup).Build()
+				reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+
+				nextAction, err := reconciler.ensureOrphanedBackupDeleted(context.Background(), backup)
+
+				assert.NoError(t, err)
+				assert.Equal(t, Retry, nextAction)
+
+				err = fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), &backupv1.Backup{})
+				assert.True(t, apierrors.IsNotFound(err), "a provider backup of another backup must not keep the backup")
+			})
+		}
 	})
 
 	t.Run("Keep a backup that never started, it mirrors no provider backup", func(t *testing.T) {
@@ -82,9 +130,9 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 			"a canceled backup is the failure history of its run and must survive the deletion of its provider backup")
 	})
 
-	t.Run("Reconcile with backoff without deleting when the provider backup cannot be read", func(t *testing.T) {
+	t.Run("Reconcile with backoff without deleting the backup when the provider backups cannot be read", func(t *testing.T) {
 		backup := backupWithStartedProviderBackup("ns", "backup")
-		counter := &callCounter{getCallError: assert.AnError}
+		counter := &callCounter{veleroBackupListCount: 1, veleroBackupListCallError: assert.AnError}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).WithObjects(backup).Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
@@ -92,5 +140,6 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Equal(t, Abort, nextAction)
+		require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKeyFromObject(backup), &backupv1.Backup{}))
 	})
 }
