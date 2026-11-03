@@ -545,14 +545,17 @@ func (c *defaultReconciler) ensureBackupIsCanceledAfterTimeWindowExpired(ctx con
 }
 
 func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	// If the provider backup already exists we can and should skip the check
-	ownProviderBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
-	if err != nil {
-		return Abort, fmt.Errorf("get the velero backup resource to check whether backup has already started: %w", err)
+	providerBackups := &velerov1.BackupList{}
+	if err := c.client.List(ctx, providerBackups, client.InNamespace(backup.Namespace)); err != nil {
+		return Abort, fmt.Errorf("list velero backups to look for a running backup unit of another run: %w", err)
 	}
-	if ownProviderBackup != nil {
-		logging.Debug(ctx, "ensureBackupIsPrepared: the provider backup already exists -> skip provider check, NEXT")
-		return Next, nil
+
+	// If any provider backup for this backup already exists we can and should skip the check
+	for _, providerBackup := range providerBackups.Items {
+		if isOwnProviderBackup(backup, &providerBackup) {
+			logging.Debug(ctx, "ensureBackupIsPrepared: a provider backup of this backup already exists -> skip provider check, NEXT")
+			return Next, nil
+		}
 	}
 
 	readiness, err := veleroprovider.CheckReady(ctx, c.client, backup.Namespace, c.backupStorageName, c.providerDeploymentName)
@@ -563,16 +566,13 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 	// Only guard runs that have not created their own provider backup yet.
 	if readiness.Ready && backup.Status.StartTimestamp.IsZero() {
 		// Prevent creating any further velero backups, if there are still any in progress.
-		runningProviderBackup, findErr := c.findRunningProviderBackupOfAnotherRun(ctx, backup)
-		if findErr != nil {
-			return Abort, findErr
-		}
+		runningProviderBackup := findRunningProviderBackupOfAnotherRun(backup, providerBackups)
 		if runningProviderBackup != nil {
 			readiness = veleroprovider.Readiness{
 				Ready:  false,
 				Reason: reasonOtherProviderBackupInProgress,
 				Message: fmt.Sprintf(
-					"The velero backup '%s' of another backup run is still running in phase '%s'.",
+					"The velero unit backup '%s' of another backup run is still running in phase '%s'.",
 					runningProviderBackup.Name, runningProviderBackup.Status.Phase,
 				),
 			}
@@ -619,23 +619,23 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 	return Next, nil
 }
 
-func (c *defaultReconciler) findRunningProviderBackupOfAnotherRun(ctx context.Context, backup *backupv1.Backup) (*velerov1.Backup, error) {
-	var providerBackups velerov1.BackupList
-	if err := c.client.List(ctx, &providerBackups, client.InNamespace(backup.Namespace)); err != nil {
-		return nil, fmt.Errorf("list velero backups to look for a running backup of another run: %w", err)
-	}
-
+func findRunningProviderBackupOfAnotherRun(backup *backupv1.Backup, providerBackups *velerov1.BackupList) *velerov1.Backup {
 	for _, providerBackup := range providerBackups.Items {
 		// ignore, if it's our own
-		if providerBackup.Name == backup.Name {
+		if isOwnProviderBackup(backup, &providerBackup) {
 			continue
 		}
+
 		if isProviderBackupInProgress(&providerBackup) {
-			return &providerBackup, nil
+			return &providerBackup
 		}
 	}
 
-	return nil, nil
+	return nil
+}
+
+func isOwnProviderBackup(backup *backupv1.Backup, providerBackup *velerov1.Backup) bool {
+	return backup.Name == providerBackup.Labels[backupv1.BackupLabelKey]
 }
 
 func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (action, error) {

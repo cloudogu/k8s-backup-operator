@@ -108,7 +108,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Contains(t, preparedCondition.Message, velerov1.BackupPhaseWaitingForPluginOperations)
 	})
 
-	t.Run("An existing own velero backup skips the check", func(t *testing.T) {
+	t.Run("An existing own unit backup skips the check", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
 			Type:    backupv1.ConditionPrepared,
@@ -116,7 +116,8 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 			Reason:  veleroprovider.ReasonVeleroProviderReady,
 			Message: "prepared in an earlier pass",
 		})
-		ownVeleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
+		// the unit is assigned by its label, not by its name
+		ownVeleroBackup := newUnitVeleroBackupForReconcilerTest("ns", "backup-dogux", "backup", velerov1.BackupPhaseInProgress)
 		// no backup storage location and no velero deployment: the provider is unready
 		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
@@ -136,21 +137,27 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Equal(t, 0, counter.subResourcePatchCount)
 	})
 
-	t.Run("If reading the own velero backup failed then retry with error", func(t *testing.T) {
+	t.Run("A running unit backup of another backup sets prepared to false and retries", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
-		counter := &callCounter{
-			veleroBackupGetCallError: assert.AnError,
-		}
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
+		foreignUnitBackup := newUnitVeleroBackupForReconcilerTest("ns", "other-backup-dogux", "other-backup", velerov1.BackupPhaseInProgress)
+		counter := &callCounter{}
 		fakeClient := newFakeClientBuilderWithCounter(t, counter).
-			WithObjects(backup).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1), foreignUnitBackup).
 			WithStatusSubresource(backup).
 			Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
 
-		assert.Error(t, err)
-		assert.Equal(t, Abort, nextAction)
+		assert.NoError(t, err)
+		assert.Equal(t, Retry, nextAction)
+
+		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
+		require.NotNil(t, preparedCondition)
+		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
+		assert.Equal(t, reasonOtherProviderBackupInProgress, preparedCondition.Reason)
+		assert.Contains(t, preparedCondition.Message, "other-backup-dogux")
 	})
 
 	t.Run("A running velero backup of another run does not block a backup that already started", func(t *testing.T) {
@@ -364,4 +371,10 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
 		assert.Equal(t, veleroprovider.ReasonVeleroDeploymentNotFound, preparedCondition.Reason)
 	})
+}
+
+func newUnitVeleroBackupForReconcilerTest(namespace string, name string, backupName string, phase velerov1.BackupPhase) *velerov1.Backup {
+	veleroBackup := newVeleroBackupForReconcilerTest(namespace, name, phase)
+	veleroBackup.Labels = map[string]string{backupv1.BackupLabelKey: backupName}
+	return veleroBackup
 }
