@@ -909,7 +909,7 @@ func (c *defaultReconciler) ensureBackupRunCompleted(ctx context.Context, backup
 }
 
 func (c *defaultReconciler) patchStatus(ctx context.Context, backup *backupv1.Backup, updateFn statusUpdate) error {
-	return newConditionsUpdater(c.client).updateStatus(ctx, backup, updateFn)
+	return newConditionUpdater(c.client).updateStatus(ctx, backup, updateFn)
 }
 
 // ensureConditionsInitialized makes a backup that is about to run observable: every condition of the

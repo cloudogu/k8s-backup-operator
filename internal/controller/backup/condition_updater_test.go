@@ -24,7 +24,7 @@ func TestConditionsUpdaterRecordsPersistedConditionStatusTransitions(t *testing.
 	metrics.BackupConditionTransitionsTotal.Reset()
 	metrics.BackupStatusTransitionsTotal.Reset()
 
-	err := newConditionsUpdater(fakeClient).updateStatus(context.Background(), backup, func(status *backupv1.BackupStatus) {
+	err := newConditionUpdater(fakeClient).updateStatus(context.Background(), backup, func(status *backupv1.BackupStatus) {
 		status.Conditions[0].Status = metav1.ConditionTrue
 	})
 
@@ -52,7 +52,7 @@ func TestConditionsUpdaterDoesNotRecordNewOrUnchangedConditions(t *testing.T) {
 	metrics.BackupConditionTransitionsTotal.Reset()
 	metrics.BackupStatusTransitionsTotal.Reset()
 
-	err := newConditionsUpdater(fakeClient).updateStatus(context.Background(), backup, func(status *backupv1.BackupStatus) {
+	err := newConditionUpdater(fakeClient).updateStatus(context.Background(), backup, func(status *backupv1.BackupStatus) {
 		status.Conditions[0].Reason = "StillPrepared"
 		status.Conditions = append(status.Conditions, metav1.Condition{
 			Type:   backupv1.ConditionSucceeded,
@@ -92,7 +92,7 @@ func TestConditionsUpdaterDoesNotRecordFailedPatches(t *testing.T) {
 	metrics.BackupConditionTransitionsTotal.Reset()
 	metrics.BackupStatusTransitionsTotal.Reset()
 
-	err := newConditionsUpdater(fakeClient).updateStatus(context.Background(), backup, func(status *backupv1.BackupStatus) {
+	err := newConditionUpdater(fakeClient).updateStatus(context.Background(), backup, func(status *backupv1.BackupStatus) {
 		status.Conditions[0].Status = metav1.ConditionFalse
 	})
 
@@ -134,7 +134,7 @@ func TestConditionsUpdaterPersistsAndRecordsLegacyStatusTransitions(t *testing.T
 	backup := newBackupForTest("ns", "backup")
 	fakeClient := newFakeClientBuilder(t).WithStatusSubresource(backup).WithObjects(backup).Build()
 	metrics.BackupStatusTransitionsTotal.Reset()
-	updater := newConditionsUpdater(fakeClient)
+	updater := newConditionUpdater(fakeClient)
 
 	err := updater.updateStatus(context.Background(), backup, func(status *backupv1.BackupStatus) {
 		status.Conditions = append(status.Conditions, metav1.Condition{

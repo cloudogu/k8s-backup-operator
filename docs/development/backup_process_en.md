@@ -234,7 +234,7 @@ While the provider backup of a canceled run is deleted, the deletion reasons are
 
 `Succeeded=True` and `Succeeded=False` are classified as terminal by `requiredOperation` and routed to the ignore path. The name `MaintenanceModesIsNotActive` historically describes the state before successful activation.
 
-For `spec.syncedFromProvider=true`, `ensureVeleroStatusSynced` also writes the observed state to `Succeeded`. `WaitingForPluginOperationsPartiallyFailed` and `FinalizingPartiallyFailed` remain non-terminal because Velero is still performing plugin or finalization work; only the later terminal `PartiallyFailed` phase sets `Succeeded=False`. Velero timestamps are mirrored as well. As with local backups, the legacy `status.status` field is derived centrally from the conditions by the `conditionsUpdater`.
+For `spec.syncedFromProvider=true`, `ensureVeleroStatusSynced` also writes the observed state to `Succeeded`. `WaitingForPluginOperationsPartiallyFailed` and `FinalizingPartiallyFailed` remain non-terminal because Velero is still performing plugin or finalization work; only the later terminal `PartiallyFailed` phase sets `Succeeded=False`. Velero timestamps are mirrored as well. As with local backups, the legacy `status.status` field is derived centrally from the conditions by the `conditionUpdater`.
 
 ## Velero backup synchronization
 
@@ -295,7 +295,7 @@ The controller does not wait for the status of the delete request. Instead, it c
 
 ## Status persistence and idempotency
 
-Condition changes are written centrally by the `conditionsUpdater` using a status `MergeFrom` patch. The legacy `status.status` field used by external systems is synchronized for local and imported backups as well:
+Condition changes are written centrally by the `conditionUpdater` using a status `MergeFrom` patch. The legacy `status.status` field used by external systems is synchronized for local and imported backups as well:
 
 | Condition state | `status.status` |
 |---|---|

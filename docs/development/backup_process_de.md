@@ -234,7 +234,7 @@ Während das Provider-Backup eines abgebrochenen Laufs gelöscht wird, werden di
 
 `Succeeded=True` und `Succeeded=False` werden von `requiredOperation` als terminal eingestuft und in den Ignore-Pfad geleitet. Der Name `MaintenanceModesIsNotActive` beschreibt historisch den Zustand vor der erfolgreichen Aktivierung.
 
-Für `spec.syncedFromProvider=true` schreibt `ensureVeleroStatusSynced` den beobachteten Zustand ebenfalls in `Succeeded`. `WaitingForPluginOperationsPartiallyFailed` und `FinalizingPartiallyFailed` bleiben dabei nicht-terminal, weil Velero noch Plugin- beziehungsweise Finalisierungsarbeiten ausführt; erst die spätere terminale Phase `PartiallyFailed` setzt `Succeeded=False`. Zusätzlich werden Velero-Zeitstempel gespiegelt. Das Legacy-Feld `status.status` wird wie bei lokalen Backups zentral vom `conditionsUpdater` aus den Conditions abgeleitet.
+Für `spec.syncedFromProvider=true` schreibt `ensureVeleroStatusSynced` den beobachteten Zustand ebenfalls in `Succeeded`. `WaitingForPluginOperationsPartiallyFailed` und `FinalizingPartiallyFailed` bleiben dabei nicht-terminal, weil Velero noch Plugin- beziehungsweise Finalisierungsarbeiten ausführt; erst die spätere terminale Phase `PartiallyFailed` setzt `Succeeded=False`. Zusätzlich werden Velero-Zeitstempel gespiegelt. Das Legacy-Feld `status.status` wird wie bei lokalen Backups zentral vom `conditionUpdater` aus den Conditions abgeleitet.
 
 ## Velero-Backup-Synchronisierung
 
@@ -295,7 +295,7 @@ Der Controller wartet nicht auf den Status des DeleteRequests, sondern prüft be
 
 ## Status-Persistenz und Idempotenz
 
-Condition-Änderungen werden zentral über den `conditionsUpdater` mit einem Status-`MergeFrom`-Patch geschrieben. Dabei wird auch das von externen Systemen verwendete Legacy-Feld `status.status` bei lokalen und importierten Backups synchronisiert:
+Condition-Änderungen werden zentral über den `conditionUpdater` mit einem Status-`MergeFrom`-Patch geschrieben. Dabei wird auch das von externen Systemen verwendete Legacy-Feld `status.status` bei lokalen und importierten Backups synchronisiert:
 
 | Condition-Zustand | `status.status` |
 |---|---|
