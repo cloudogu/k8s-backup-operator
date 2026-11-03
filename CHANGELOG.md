@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
-- [#172] Update Go to 1.26.10 to fix Go vulnerabilities.
+- [#172] Update Go to 1.27.3 to fix Go vulnerabilities.
 
 ## [v3.5.1] - 2026-09-22
 ### Changed
