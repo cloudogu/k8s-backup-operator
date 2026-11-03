@@ -16,14 +16,12 @@ import (
 func TestVeleroBackupController(t *testing.T) {
 	t.Run("creates the corresponding cloudogu backup", func(t *testing.T) {
 		veleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "backup",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					annotations.BlueprintIdAnnotation: "blueprint",
-					annotations.DogusAnnotation:       "dogus",
-					"unrelated":                       "ignored",
-				},
+			Name:      "backup",
+			Namespace: "ns",
+			Annotations: map[string]string{
+				annotations.BlueprintIdAnnotation: "blueprint",
+				annotations.DogusAnnotation:       "dogus",
+				"unrelated":                       "ignored",
 			},
 		}
 		fakeClient := newFakeClientBuilder(t).WithObjects(veleroBackup).Build()
@@ -69,12 +67,10 @@ func TestVeleroBackupController(t *testing.T) {
 	t.Run("creates a delete request when the Velero backup starts deleting", func(t *testing.T) {
 		deletionTimestamp := metav1.Now()
 		veleroBackup := &velerov1.Backup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "backup",
-				Namespace:         "ns",
-				DeletionTimestamp: &deletionTimestamp,
-				Finalizers:        []string{"velero.io/test-finalizer"},
-			},
+			Name:              "backup",
+			Namespace:         "ns",
+			DeletionTimestamp: &deletionTimestamp,
+			Finalizers:        []string{"velero.io/test-finalizer"},
 		}
 		backup := newBackupForTest("ns", "backup")
 		backup.Finalizers = []string{backupv1.BackupFinalizer}
@@ -100,5 +96,31 @@ func TestVeleroBackupController(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Zero(t, result)
+	})
+}
+
+func TestIsLegacyBackup(t *testing.T) {
+	t.Run("returns true for velero backup without labels", func(t *testing.T) {
+		veleroBackup := &velerov1.Backup{Name: "backup", Namespace: "ns"}
+
+		assert.True(t, isLegacyBackup(veleroBackup))
+	})
+
+	t.Run("returns true for velero backup without unit label", func(t *testing.T) {
+		veleroBackup := &velerov1.Backup{
+			Name:      "backup",
+			Namespace: "ns",
+			Labels:    map[string]string{"app": "ces"}}
+
+		assert.True(t, isLegacyBackup(veleroBackup))
+	})
+
+	t.Run("returns false for unit backup", func(t *testing.T) {
+		veleroBackup := &velerov1.Backup{
+			Name:      "backup",
+			Namespace: "ns",
+			Labels:    map[string]string{backupv1.BackupLabelKey: "backup"}}
+
+		assert.False(t, isLegacyBackup(veleroBackup))
 	})
 }

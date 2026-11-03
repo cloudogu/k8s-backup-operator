@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 type veleroBackupReconciler interface {
@@ -56,9 +59,19 @@ func (c *VeleroBackupController) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager sets up the controller with the Manager.
+//
+// Unit backups are filtered out until their sync is implemented, so only legacy Velero backups
+// without unit label are synced. Filtering on events instead of in Reconcile also skips deletions
+// of unit backups, whose labels are no longer readable once the Velero backup is gone.
 func (c *VeleroBackupController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("velero-backup-sync").
-		For(&velerov1.Backup{}).
+		For(&velerov1.Backup{}, builder.WithPredicates(predicate.NewPredicateFuncs(isLegacyBackup))).
 		Complete(c)
+}
+
+func isLegacyBackup(obj client.Object) bool {
+	_, isUnitBackup := obj.GetLabels()[backupv1.BackupLabelKey]
+	return !isUnitBackup
 }

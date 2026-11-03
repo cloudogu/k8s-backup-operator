@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Switch to controller-runtime client
 - [#175] Use go 1.27.3 and update go dependencies
 - Transition to mockery v3
+- [#177] Do not sync unit backups with label `k8s.cloudogu.com/backup` to avoid errors during backup unit implementation.
 
 ## [v3.5.1] - 2026-09-22
 ### Changed
