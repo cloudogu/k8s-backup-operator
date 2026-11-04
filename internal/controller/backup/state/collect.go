@@ -10,6 +10,7 @@ import (
 	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 	"go.yaml.in/yaml/v3"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -135,7 +136,7 @@ func (b *BackupStateCollector) getComponents(ctx context.Context, backup *backup
 		return nil, fmt.Errorf("collect backupable items: %w", err)
 	}
 
-	components, err := b.componentsFromItems(backupableItems, backup)
+	components, err := b.componentsFromItems(ctx, backupableItems, backup)
 	if err != nil {
 		return nil, fmt.Errorf("get components from items: %w", err)
 	}
@@ -175,11 +176,14 @@ func (b *BackupStateCollector) collectBackupableComponentItems(ctx context.Conte
 	return backupableItems, nil
 }
 
-func (b *BackupStateCollector) componentsFromItems(backupableItems []unstructured.Unstructured, backup *backupv1.Backup) (components []backupv1.ComponentStatus, err error) {
+func (b *BackupStateCollector) componentsFromItems(ctx context.Context, backupableItems []unstructured.Unstructured, backup *backupv1.Backup) (components []backupv1.ComponentStatus, err error) {
+	logger := log.FromContext(ctx).
+		WithName("BackupStateCollector.componentsFromItems").
+		WithValues("backup", backup.Name, "namespace", backup.Namespace)
+
 	componentSet := make(map[string]struct{})
 outer:
 	for _, item := range backupableItems {
-		item.GetLabels()
 		componentName, exists := item.GetLabels()[componentv1.ComponentNameLabelKey]
 		if !exists {
 			return nil, fmt.Errorf("%s %s does not have %s label, despite being selected", item.GetKind(), item.GetName(), componentv1.ComponentNameLabelKey)
@@ -191,16 +195,20 @@ outer:
 			}
 		}
 
-		componentVersion, exists := item.GetLabels()[componentv1.ComponentVersionLabelKey]
-		if !exists {
-			return nil, fmt.Errorf("%s %s does not have %s label, despite being selected", item.GetKind(), item.GetName(), componentv1.ComponentVersionLabelKey)
+		component := &componentv1.Component{}
+		err := b.k8sClient.Get(ctx, types.NamespacedName{Name: componentName, Namespace: backup.Namespace}, component)
+		if errors.IsNotFound(err) {
+			logger.Info("Found orphaned resources for component, ignoring...", "component", componentName)
+			continue
+		} else if err != nil {
+			return nil, fmt.Errorf("get component %s: %w", componentName, err)
 		}
 
 		if _, exists := componentSet[componentName]; exists {
 			continue
 		}
 		componentSet[componentName] = struct{}{}
-		components = append(components, backupv1.ComponentStatus{Name: componentName, Version: componentVersion})
+		components = append(components, backupv1.ComponentStatus{Name: componentName, Version: component.Status.InstalledVersion})
 	}
 	return components, nil
 }

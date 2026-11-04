@@ -150,27 +150,24 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 			},
 		},
 		{
-			name: "fail because component version label is missing",
+			name: "fail to get component",
 			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
-				return builder.WithInterceptorFuncs(interceptor.Funcs{
-					List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-						err := client.List(ctx, list, opts...)
-						if unstructuredList, ok := list.(*unstructured.UnstructuredList); ok {
-							missingLabelItem := unstructured.Unstructured{}
-							missingLabelItem.SetKind("PersistentVolumeClaim")
-							missingLabelItem.SetLabels(map[string]string{"k8s.cloudogu.com/component.name": "lop-idp"})
-							unstructuredList.Items = []unstructured.Unstructured{missingLabelItem}
+				return builder.WithObjects(
+					&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", backupScopeLabelKey: "lop-idp"}},
+				).
+					WithInterceptorFuncs(interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if key.Name == "lop-idp" {
+							return assert.AnError
 						}
-						return err
-					},
-				})
+						return client.Get(ctx, key, obj, opts...)
+					}})
 			},
 			backup: &backupv1.Backup{
 				Name: testBackupName, Namespace: testNamespace,
 			},
 			want: BackupState{},
 			wantErr: func(t assert.TestingT, err error, i ...any) bool {
-				return assert.ErrorContains(t, err, "get components: get components from items: PersistentVolumeClaim  does not have k8s.cloudogu.com/component.version label, despite being selected")
+				return assert.ErrorContains(t, err, "get components: get components from items: get component lop-idp")
 			},
 		},
 		{
@@ -238,9 +235,11 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 					&blueprintv3.Blueprint{Name: "blueprint", Namespace: testNamespace, Spec: blueprintv3.BlueprintSpec{DisplayName: "test-blueprint"}},
 					&doguv3.Dogu{Name: "cockpit", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cockpit", Version: "1.3.3", DoguNamespace: "official", DoguApiVersion: "v2"}, Status: doguv3.DoguStatus{InstalledVersion: "1.2.3"}},
 					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.3.1", DoguNamespace: "official", DoguApiVersion: "v3"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
+					&componentv1.Component{Name: "lop-idp", Namespace: testNamespace, Status: componentv1.ComponentStatus{InstalledVersion: "1.0.0"}},
 					&corev1.ConfigMap{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.Secret{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
-					&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
+					&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", backupScopeLabelKey: "lop-idp"}},
+					&corev1.PersistentVolumeClaim{Name: "orphaned-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "orphaned", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "orphaned"}},
 					&corev1.ConfigMap{Name: "global-config", Namespace: testNamespace, Data: map[string]string{"config.yaml": `{"fqdn": "fqdn.example.com","domain": "domain.example.com"}`}},
 				)
 			},
@@ -275,9 +274,11 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.3.1", DoguNamespace: "official", DoguApiVersion: "v3"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
 					&doguv3.Dogu{Name: "excluded", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v3"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
 					&doguv3.Dogu{Name: "unknown-version", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v4"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
+					&componentv1.Component{Name: "lop-idp", Namespace: testNamespace, Status: componentv1.ComponentStatus{InstalledVersion: "1.0.0"}},
 					&corev1.ConfigMap{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.Secret{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "other"}},
+					&corev1.PersistentVolumeClaim{Name: "orphaned-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "orphaned", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "orphaned"}},
 					&corev1.ConfigMap{Name: "excluded-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "excluded", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "excluded"}},
 					&corev1.Secret{Name: "excluded-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "excluded", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "excluded"}},
 					&corev1.PersistentVolumeClaim{Name: "excluded-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "excluded", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "excluded"}},
@@ -317,9 +318,11 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 					&doguv3.Dogu{Name: "cockpit", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cockpit", Version: "1.3.3", DoguNamespace: "official", DoguApiVersion: "v2"}, Status: doguv3.DoguStatus{InstalledVersion: "1.2.3"}},
 					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.3.1", DoguNamespace: "official", DoguApiVersion: "v3"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
 					&doguv3.Dogu{Name: "unknown-version", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v4"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
+					&componentv1.Component{Name: "lop-idp", Namespace: testNamespace, Status: componentv1.ComponentStatus{InstalledVersion: "1.0.0"}},
 					&corev1.ConfigMap{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.Secret{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
+					&corev1.PersistentVolumeClaim{Name: "orphaned-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "orphaned", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "orphaned"}},
 					&corev1.ConfigMap{Name: "global-config", Namespace: testNamespace, Data: map[string]string{"config.yaml": `{"fqdn": "fqdn.example.com","domain": "domain.example.com"}`}},
 				)
 			},
@@ -364,6 +367,8 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	err = blueprintv3.AddToScheme(scheme)
 	assert.NoError(t, err)
 	err = doguv3.AddToScheme(scheme)
+	assert.NoError(t, err)
+	err = componentv1.AddToScheme(scheme)
 	assert.NoError(t, err)
 	err = corev1.AddToScheme(scheme)
 	assert.NoError(t, err)
