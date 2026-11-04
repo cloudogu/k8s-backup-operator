@@ -99,7 +99,7 @@ outer:
 		if dogu.Spec.DoguApiVersion == doguv3.DoguApiVersionV2 && !backup.Spec.Options.IgnoreV2Dogus {
 			v2DoguVersions = append(v2DoguVersions, backupv1.DoguVersion{
 				Name:    dogu.Spec.Name,
-				Version: dogu.Spec.Version,
+				Version: dogu.Status.InstalledVersion,
 			})
 			continue
 		} else if dogu.Spec.DoguApiVersion != doguv3.DoguApiVersionV3 {
@@ -114,7 +114,7 @@ outer:
 
 		v3DoguVersions = append(v3DoguVersions, backupv1.DoguVersion{
 			Name:    dogu.Spec.Name,
-			Version: dogu.Spec.Version,
+			Version: dogu.Status.InstalledVersion,
 		})
 	}
 	return v2DoguVersions, v3DoguVersions, nil

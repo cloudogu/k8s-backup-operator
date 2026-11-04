@@ -236,8 +236,8 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
 				return builder.WithObjects(
 					&blueprintv3.Blueprint{Name: "blueprint", Namespace: testNamespace, Spec: blueprintv3.BlueprintSpec{DisplayName: "test-blueprint"}},
-					&doguv3.Dogu{Name: "cockpit", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cockpit", Version: "1.2.3", DoguNamespace: "official", DoguApiVersion: "v2"}},
-					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v3"}},
+					&doguv3.Dogu{Name: "cockpit", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cockpit", Version: "1.3.3", DoguNamespace: "official", DoguApiVersion: "v2"}, Status: doguv3.DoguStatus{InstalledVersion: "1.2.3"}},
+					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.3.1", DoguNamespace: "official", DoguApiVersion: "v3"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
 					&corev1.ConfigMap{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.Secret{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
@@ -271,10 +271,10 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
 				return builder.WithObjects(
 					&blueprintv3.Blueprint{Name: "blueprint", Namespace: testNamespace, Spec: blueprintv3.BlueprintSpec{DisplayName: "test-blueprint"}},
-					&doguv3.Dogu{Name: "cockpit", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cockpit", Version: "1.2.3", DoguNamespace: "official", DoguApiVersion: "v2"}},
-					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v3"}},
-					&doguv3.Dogu{Name: "excluded", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v3"}},
-					&doguv3.Dogu{Name: "unknown-version", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v4"}},
+					&doguv3.Dogu{Name: "cockpit", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cockpit", Version: "1.3.3", DoguNamespace: "official", DoguApiVersion: "v2"}, Status: doguv3.DoguStatus{InstalledVersion: "1.2.3"}},
+					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.3.1", DoguNamespace: "official", DoguApiVersion: "v3"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
+					&doguv3.Dogu{Name: "excluded", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v3"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
+					&doguv3.Dogu{Name: "unknown-version", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v4"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
 					&corev1.ConfigMap{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.Secret{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "other"}},
@@ -314,9 +314,9 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
 				return builder.WithObjects(
 					&blueprintv3.Blueprint{Name: "blueprint", Namespace: testNamespace, Spec: blueprintv3.BlueprintSpec{DisplayName: "test-blueprint"}},
-					&doguv3.Dogu{Name: "cockpit", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cockpit", Version: "1.2.3", DoguNamespace: "official", DoguApiVersion: "v2"}},
-					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v3"}},
-					&doguv3.Dogu{Name: "unknown-version", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v4"}},
+					&doguv3.Dogu{Name: "cockpit", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cockpit", Version: "1.3.3", DoguNamespace: "official", DoguApiVersion: "v2"}, Status: doguv3.DoguStatus{InstalledVersion: "1.2.3"}},
+					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.3.1", DoguNamespace: "official", DoguApiVersion: "v3"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
+					&doguv3.Dogu{Name: "unknown-version", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v4"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
 					&corev1.ConfigMap{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.Secret{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
 					&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0", backupScopeLabelKey: "lop-idp"}},
