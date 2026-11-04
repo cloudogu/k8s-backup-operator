@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudogu/ces-commons-lib/errors"
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
@@ -454,9 +453,9 @@ func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backu
 
 	var blueprintList = blueprintv3.BlueprintList{}
 	err := c.client.List(ctx, &blueprintList, client.InNamespace(backup.Namespace))
-	// no blueprint or no clueprint crd
 	if err != nil {
-		if !errors.IsNotFoundError(err) && !meta.IsNoMatchError(err) {
+		// no match means no blueprint crd
+		if !meta.IsNoMatchError(err) {
 			return Abort, fmt.Errorf("list blueprints: %w", err)
 		}
 		blueprintList.Items = nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudogu/ces-commons-lib/errors"
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
@@ -71,12 +70,12 @@ func (b *BackupStateCollector) Collect(ctx context.Context, backup *backupv1.Bac
 func (b *BackupStateCollector) getBlueprintId(ctx context.Context, namespace string) (string, error) {
 	var blueprintList = blueprintv3.BlueprintList{}
 	err := b.k8sClient.List(ctx, &blueprintList, client.InNamespace(namespace))
-	// no blueprint or no blueprint crd
 	if err != nil {
-		if !errors.IsNotFoundError(err) && !meta.IsNoMatchError(err) {
+		// no match means no blueprint crd
+		if !meta.IsNoMatchError(err) {
 			return "", fmt.Errorf("list blueprints: %w", err)
 		}
-		blueprintList.Items = nil
+		return "", nil
 	}
 
 	// only take first blueprint
