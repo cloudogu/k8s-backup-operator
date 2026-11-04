@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const configKeyName = "config.yaml"
@@ -88,6 +89,8 @@ func (b *BackupStateCollector) getBlueprintId(ctx context.Context, namespace str
 }
 
 func (b *BackupStateCollector) getDogus(ctx context.Context, backup *backupv1.Backup) (v2DoguVersions, v3DoguVersions []backupv1.DoguVersion, err error) {
+	logger := log.FromContext(ctx).WithName("BackupStateCollector.getDogus").WithValues("backup", backup.Name, "namespace", backup.Namespace)
+
 	doguList := doguv3.DoguList{}
 	err = b.k8sClient.List(ctx, &doguList, client.InNamespace(backup.Namespace))
 	if err != nil {
@@ -96,13 +99,16 @@ func (b *BackupStateCollector) getDogus(ctx context.Context, backup *backupv1.Ba
 
 outer:
 	for _, dogu := range doguList.Items {
-		if dogu.Spec.DoguApiVersion == doguv3.DoguApiVersionV2 && !backup.Spec.Options.IgnoreV2Dogus {
-			v2DoguVersions = append(v2DoguVersions, backupv1.DoguVersion{
-				Name:    dogu.Spec.Name,
-				Version: dogu.Status.InstalledVersion,
-			})
+		if dogu.Spec.DoguApiVersion == doguv3.DoguApiVersionV2 {
+			if !backup.Spec.Options.IgnoreV2Dogus {
+				v2DoguVersions = append(v2DoguVersions, backupv1.DoguVersion{
+					Name:    dogu.Spec.Name,
+					Version: dogu.Status.InstalledVersion,
+				})
+			}
 			continue
 		} else if dogu.Spec.DoguApiVersion != doguv3.DoguApiVersionV3 {
+			logger.Info("unknown api version for dogu", "name", dogu.Spec.Name, "apiVersion", dogu.Spec.DoguApiVersion)
 			continue
 		}
 
