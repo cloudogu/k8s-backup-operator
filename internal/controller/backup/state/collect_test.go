@@ -165,6 +165,8 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 					}},
 			},
 			want: BackupState{
+				Name:             testBackupName,
+				Coverage:         backupv1.BackupCoveragePartial,
 				BlueprintId:      "test-blueprint",
 				Units:            []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeDogu, Name: "baseline"}},
 				InstalledDogusV2: nil,
@@ -197,6 +199,41 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 				},
 			},
 			want: BackupState{
+				Name:        testBackupName,
+				Coverage:    backupv1.BackupCoveragePartial,
+				BlueprintId: "test-blueprint",
+				Units: []backupv1.UnitIdentifier{
+					{Type: "doguv2"},
+					{Type: "dogu", Name: "baseline"},
+					{Type: "global-config"},
+					{Type: "misc"},
+				},
+				InstalledDogusV2: []backupv1.DoguVersion{{Name: "cockpit", Version: "1.2.3"}},
+				InstalledDogusV3: []backupv1.DoguVersion{{Name: "baseline", Version: "3.2.1"}},
+				Components:       []backupv1.ComponentStatus{{Name: "lop-idp", Version: "1.0.0"}},
+				Fqdn:             "fqdn.example.com",
+				Domain:           "domain.example.com",
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "success with full coverage",
+			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
+				return builder.WithObjects(
+					&blueprintv3.Blueprint{Name: "blueprint", Namespace: testNamespace, Spec: blueprintv3.BlueprintSpec{DisplayName: "test-blueprint"}},
+					&doguv3.Dogu{Name: "cockpit", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cockpit", Version: "1.2.3", DoguNamespace: "official", DoguApiVersion: "v2"}},
+					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v3"}},
+					&doguv3.Dogu{Name: "unknown-version", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v4"}},
+					&componentv1.Component{Name: "lop-idp", Namespace: testNamespace, Spec: componentv1.ComponentSpec{Name: "lop-idp", Version: "1.0.0"}},
+					&corev1.ConfigMap{Name: "global-config", Namespace: testNamespace, Data: map[string]string{"config.yaml": `{"fqdn": "fqdn.example.com","domain": "domain.example.com"}`}},
+				)
+			},
+			backup: &backupv1.Backup{
+				Name: testBackupName, Namespace: testNamespace,
+			},
+			want: BackupState{
+				Name:        testBackupName,
+				Coverage:    backupv1.BackupCoverageFull,
 				BlueprintId: "test-blueprint",
 				Units: []backupv1.UnitIdentifier{
 					{Type: "doguv2"},

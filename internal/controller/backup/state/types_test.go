@@ -123,3 +123,15 @@ func TestBackupState_CommonUnitAnnotations(t *testing.T) {
 		})
 	}
 }
+
+func TestBackupState_CommonLabels(t *testing.T) {
+	want := map[string]string{
+		"k8s.cloudogu.com/backup":          testBackupName,
+		"k8s.cloudogu.com/backup-coverage": "full",
+	}
+	s := BackupState{
+		Name:     testBackupName,
+		Coverage: backupv1.BackupCoverageFull,
+	}
+	assert.Equalf(t, want, s.CommonLabels(), "CommonLabels()")
+}

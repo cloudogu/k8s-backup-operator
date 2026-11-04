@@ -8,6 +8,8 @@ import (
 )
 
 type BackupState struct {
+	Name             string
+	Coverage         backupv1.BackupCoverage
 	BlueprintId      string
 	Units            []backupv1.UnitIdentifier
 	InstalledDogusV2 []backupv1.DoguVersion
@@ -15,6 +17,13 @@ type BackupState struct {
 	Components       []backupv1.ComponentStatus
 	Fqdn             string
 	Domain           string
+}
+
+func (s BackupState) CommonLabels() map[string]string {
+	return map[string]string{
+		backupv1.BackupLabelKey:         s.Name,
+		backupv1.BackupCoverageLabelKey: string(s.Coverage),
+	}
 }
 
 func (s BackupState) CommonUnitAnnotations() (map[string]string, error) {

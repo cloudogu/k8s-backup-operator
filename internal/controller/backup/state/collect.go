@@ -52,6 +52,8 @@ func (b *BackupStateCollector) Collect(ctx context.Context, backup *backupv1.Bac
 	}
 
 	return BackupState{
+		Name:             backup.Name,
+		Coverage:         b.getCoverage(backup),
 		BlueprintId:      blueprintId,
 		Units:            b.getUnits(backup, v2Dogus, v3Dogus),
 		InstalledDogusV2: v2Dogus,
@@ -204,6 +206,17 @@ func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backu
 		})
 	}
 	return units
+}
+
+func (b *BackupStateCollector) getCoverage(backup *backupv1.Backup) backupv1.BackupCoverage {
+	if len(backup.Spec.ExcludedDogus) == 0 &&
+		len(backup.Spec.ExcludedComponents) == 0 &&
+		!backup.Spec.Options.IgnoreMisc &&
+		!backup.Spec.Options.IgnoreGlobalConfig &&
+		!backup.Spec.Options.IgnoreV2Dogus {
+		return backupv1.BackupCoverageFull
+	}
+	return backupv1.BackupCoveragePartial
 }
 
 func getStringKey(m map[string]any, key string) (string, error) {
