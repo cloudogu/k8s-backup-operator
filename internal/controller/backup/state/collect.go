@@ -9,7 +9,7 @@ import (
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
 	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
