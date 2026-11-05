@@ -230,6 +230,8 @@ func getK8sManagerOptions(flags *flag.FlagSet, args []string, operatorConfig *op
 				DisableFor: []client.Object{
 					&velerov1.BackupStorageLocation{},
 					&appsv1.Deployment{},
+					// Blueprints are optional. If we cache them, we'll get an error if the CRD does not exist.
+					&blueprintv3.Blueprint{},
 				},
 			},
 		},
