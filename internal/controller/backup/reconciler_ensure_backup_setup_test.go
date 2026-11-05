@@ -4,15 +4,11 @@ import (
 	"context"
 	"maps"
 	"reflect"
-	"slices"
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	"github.com/stretchr/testify/assert"
-	apiMeta "k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
@@ -25,7 +21,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		nextAction, err := reconciler.ensureBackupMetadata(context.Background(), backup)
 
 		expectedLabels := map[string]string{}
 		maps.Copy(expectedLabels, defaultLabels)
@@ -47,7 +43,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		nextAction, err := reconciler.ensureBackupMetadata(context.Background(), backup)
 
 		expectedLabels := map[string]string{}
 		maps.Copy(expectedLabels, backup.Labels)
@@ -66,7 +62,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		nextAction, err := reconciler.ensureBackupMetadata(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
@@ -86,67 +82,13 @@ func TestEnsureBackupSetup(t *testing.T) {
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		nextAction, err := reconciler.ensureBackupMetadata(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 
 		expectedFinalizers := []string{backupv1.BackupFinalizer, "finalizer01", "finalizer02"}
 		assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
-		assert.True(t, updateCalled)
-	})
-
-	t.Run("should add an annotation with the blueprint's display name and dogus", func(t *testing.T) {
-		backup := newBackupForTest("ns", "backup")
-		blueprintList := newBlueprintListForEnsureBackupSetupTest(
-			"ns",
-			"blueprint",
-			"blueprint-display-name",
-			[]blueprintv3.Dogu{
-				{Name: "dogu01"},
-				{Name: "dogu02"},
-			},
-		)
-		var updateCalled = false
-		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
-
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
-
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
-		assert.Equal(t, "blueprint-display-name", backup.Annotations[blueprintIdAnnotation])
-		assert.JSONEq(t, `[{"name": "dogu01"}, {"name": "dogu02"}]`, backup.Annotations[blueprintDogusAnnotation])
-		assert.True(t, updateCalled)
-	})
-
-	t.Run("should keep existing annotations while adding the annotations for the blueprint infos", func(t *testing.T) {
-		backup := newBackupForTest("ns", "backup")
-		backup.Annotations = map[string]string{
-			"example.com/anno1": "annoVal1",
-			"example.com/anno2": "annoVal2",
-		}
-		blueprintList := newBlueprintListForEnsureBackupSetupTest(
-			"ns",
-			"blueprint",
-			"blueprint-display-name",
-			[]blueprintv3.Dogu{
-				{Name: "dogu01"},
-				{Name: "dogu02"},
-			},
-		)
-		var updateCalled = false
-		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
-
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
-
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
-		assert.ElementsMatch(t,
-			[]string{"example.com/anno1", "example.com/anno2", blueprintIdAnnotation, blueprintDogusAnnotation},
-			slices.Collect(maps.Keys(backup.Annotations)),
-		)
 		assert.True(t, updateCalled)
 	})
 
@@ -159,77 +101,16 @@ func TestEnsureBackupSetup(t *testing.T) {
 		)
 		backup := newBackupForTest("ns", "backup")
 		backup.Labels = maps.Clone(defaultLabels)
-		backup.Annotations = map[string]string{
-			blueprintIdAnnotation:    "blueprint-display-name",
-			blueprintDogusAnnotation: `[{"name":"dogu01"},{"name":"dogu02"}]`,
-		}
 		backup.Finalizers = []string{backupv1.BackupFinalizer}
 		updateCalled := false
 		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
+		nextAction, err := reconciler.ensureBackupMetadata(context.Background(), backup)
 
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 		assert.False(t, updateCalled)
-	})
-
-	t.Run("should update changed managed metadata", func(t *testing.T) {
-		blueprintList := newBlueprintListForEnsureBackupSetupTest(
-			"ns",
-			"blueprint",
-			"blueprint-display-name",
-			[]blueprintv3.Dogu{{Name: "dogu01"}},
-		)
-		backup := newBackupForTest("ns", "backup")
-		backup.Labels = maps.Clone(defaultLabels)
-		backup.Labels["app"] = "outdated"
-		backup.Annotations = map[string]string{
-			blueprintIdAnnotation:    "outdated",
-			blueprintDogusAnnotation: `[{"name":"outdated"}]`,
-		}
-		backup.Finalizers = []string{backupv1.BackupFinalizer}
-		updateCalled := false
-		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
-
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
-
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
-		assert.True(t, updateCalled)
-		assert.Equal(t, defaultLabels["app"], backup.Labels["app"])
-		assert.Equal(t, "blueprint-display-name", backup.Annotations[blueprintIdAnnotation])
-		assert.JSONEq(t, `[{"name":"dogu01"}]`, backup.Annotations[blueprintDogusAnnotation])
-	})
-
-	t.Run("should ignore a missing blueprint CRD", func(t *testing.T) {
-		backup := newBackupForTest("ns", "backup")
-		updateCalled := false
-		fakeClient := newFakeClientBuilder(t).
-			WithObjects(backup).
-			WithInterceptorFuncs(interceptor.Funcs{
-				List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
-					return &apiMeta.NoKindMatchError{
-						GroupKind:        schema.GroupKind{Group: "k8s.cloudogu.com", Kind: "Blueprint"},
-						SearchedVersions: []string{"v3"},
-					}
-				},
-				Update: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
-					updateCalled = true
-					return client.Update(ctx, obj, opts...)
-				},
-			}).
-			Build()
-		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
-
-		nextAction, err := reconciler.ensureBackupSetup(context.Background(), backup)
-
-		assert.NoError(t, err)
-		assert.Equal(t, Next, nextAction)
-		assert.True(t, updateCalled)
-		assert.Contains(t, backup.Finalizers, backupv1.BackupFinalizer)
 	})
 }
 
@@ -253,10 +134,8 @@ func newBlueprintListForEnsureBackupSetupTest(
 	dogus []blueprintv3.Dogu,
 ) *blueprintv3.BlueprintList {
 	blueprint := blueprintv3.Blueprint{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
+		Namespace: namespace,
+		Name:      name,
 		Spec: blueprintv3.BlueprintSpec{
 			DisplayName: displayName,
 			Blueprint: blueprintv3.BlueprintManifest{

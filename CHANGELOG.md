@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - [#175] Use go 1.27.3 and update go dependencies
   - Transition to mockery v3
   - [#177] Do not sync unit backups with label `k8s.cloudogu.com/backup` to avoid errors during backup unit implementation.
+  - [#182] Rename `ensureBackupSetup` to `ensureBackupMetada` and only write labels and the finalizer to the Cloudogu Backup resource with it.
+      - Other information like the Dogu versions or the Blueprint-ID will be gathered by later steps.
+
 
 ## [v3.5.1] - 2026-09-22
 ### Changed

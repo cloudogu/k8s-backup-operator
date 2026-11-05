@@ -30,7 +30,7 @@ func TestControllerReconcileStageOrder(t *testing.T) {
 	createStages := []string{
 		"ensureVeleroStatusSynced",
 		"ensureConditionsInitialized",
-		"ensureBackupSetup",
+		"ensureBackupMetadata",
 		"ensureBackupIsCanceledAfterTimeWindowExpired",
 		"ensureBackupIsPrepared",
 		"ensureActiveBackupLease",
@@ -254,7 +254,7 @@ func recordStages(reconcilerMock *mockReconciler, executed *[]string) {
 	expecter.ensureCanceledProviderBackupDeleted(mock.Anything, mock.Anything).RunAndReturn(record("ensureCanceledProviderBackupDeleted")).Maybe()
 	expecter.ensureVeleroStatusSynced(mock.Anything, mock.Anything).RunAndReturn(record("ensureVeleroStatusSynced")).Maybe()
 	expecter.ensureConditionsInitialized(mock.Anything, mock.Anything).RunAndReturn(record("ensureConditionsInitialized")).Maybe()
-	expecter.ensureBackupSetup(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupSetup")).Maybe()
+	expecter.ensureBackupMetadata(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupMetadata")).Maybe()
 	expecter.ensureBackupIsCanceledAfterTimeWindowExpired(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupIsCanceledAfterTimeWindowExpired")).Maybe()
 	expecter.ensureBackupIsPrepared(mock.Anything, mock.Anything).RunAndReturn(record("ensureBackupIsPrepared")).Maybe()
 	expecter.ensureActiveBackupLease(mock.Anything, mock.Anything).RunAndReturn(record("ensureActiveBackupLease")).Maybe()
@@ -283,10 +283,8 @@ func withDeletionTimestamp(backup *backupv1.Backup) *backupv1.Backup {
 
 func newBackupForTest(namespace string, name string) *backupv1.Backup {
 	return &backupv1.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
+		Namespace: namespace,
+		Name:      name,
 		Spec: backupv1.BackupSpec{
 			Provider: "velero",
 		},
