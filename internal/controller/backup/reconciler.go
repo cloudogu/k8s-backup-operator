@@ -371,14 +371,17 @@ func (c *defaultReconciler) ensureOrphanedBackupDeleted(ctx context.Context, bac
 		return Next, nil
 	}
 
-	providerBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
+	providerBackups := &velerov1.BackupList{}
+	err := c.client.List(ctx, providerBackups, client.InNamespace(backup.Namespace))
 	if err != nil {
-		return Abort, fmt.Errorf("get the velero backup resource to check if it still exists: %w", err)
+		return Abort, fmt.Errorf("failed to list the velero unit backups to check if they still exists for cloudogu backup: %w", err)
 	}
 
-	if providerBackup != nil {
-		logging.Debug(ctx, "ensureOrphanedBackupDeleted: the provider backup still exists -> NEXT")
-		return Next, nil
+	for _, providerBackup := range providerBackups.Items {
+		if isOwnProviderBackup(backup, &providerBackup) || isLegacyProviderBackup(backup, &providerBackup) {
+			logging.Debug(ctx, "ensureOrphanedBackupDeleted: the provider backup still exists -> NEXT")
+			return Next, nil
+		}
 	}
 
 	logging.Debug(ctx, "ensureOrphanedBackupDeleted: the provider backup is gone -> delete the backup, ABORT")
@@ -602,6 +605,11 @@ func findRunningProviderBackupOfAnotherRun(backup *backupv1.Backup, providerBack
 
 func isOwnProviderBackup(backup *backupv1.Backup, providerBackup *velerov1.Backup) bool {
 	return backup.Name == providerBackup.Labels[backupv1.BackupLabelKey]
+}
+
+func isLegacyProviderBackup(backup *backupv1.Backup, providerBackup *velerov1.Backup) bool {
+	_, isUnit := providerBackup.Labels[backupv1.BackupLabelKey]
+	return !isUnit && providerBackup.Name == backup.Name
 }
 
 func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, backup *backupv1.Backup) (action, error) {
