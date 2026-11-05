@@ -118,6 +118,10 @@ type eventRecorder interface {
 	events.EventRecorder
 }
 
+type backupStateCollector interface {
+	Collect(ctx context.Context, backup *backupv1.Backup) (state.BackupState, error)
+}
+
 type defaultReconciler struct {
 	client                 client.Client
 	recorder               eventRecorder
@@ -125,6 +129,7 @@ type defaultReconciler struct {
 	clock                  Clock
 	backupStorageName      string
 	providerDeploymentName string
+	stateCollector         backupStateCollector
 }
 
 func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGateway maintenanceGateway, clock Clock, backupStorageName string, providerDeploymentName string) *defaultReconciler {
@@ -135,6 +140,7 @@ func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGate
 		clock:                  clock,
 		backupStorageName:      backupStorageName,
 		providerDeploymentName: providerDeploymentName,
+		stateCollector:         state.NewCollector(client),
 	}
 }
 
