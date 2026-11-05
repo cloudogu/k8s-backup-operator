@@ -2,7 +2,6 @@ package backup
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"slices"
@@ -10,12 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudogu/ces-commons-lib/errors"
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
-	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -106,11 +103,6 @@ var veleroBackupFailedPhases = []velerov1.BackupPhase{
 	velerov1.BackupPhasePartiallyFailed,
 	velerov1.BackupPhaseFailed,
 }
-
-const (
-	blueprintIdAnnotation    = "backup.cloudogu.com/blueprintId"
-	blueprintDogusAnnotation = "backup.cloudogu.com/dogus"
-)
 
 type maintenanceGateway interface {
 	isMaintenanceModeActive(ctx context.Context) (bool, error)
@@ -449,34 +441,8 @@ func (c *defaultReconciler) completeCanceledProviderBackupDeletion(ctx context.C
 	return Next, nil
 }
 
-func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backupv1.Backup) (action, error) {
+func (c *defaultReconciler) ensureBackupMetadata(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	metadataChanged := mergeMissingOrChangedValues(&backup.Labels, defaultLabels)
-
-	var blueprintList = blueprintv3.BlueprintList{}
-	err := c.client.List(ctx, &blueprintList, client.InNamespace(backup.Namespace))
-	// no blueprint or no clueprint crd
-	if err != nil {
-		if !errors.IsNotFoundError(err) && !meta.IsNoMatchError(err) {
-			return Abort, fmt.Errorf("list blueprints: %w", err)
-		}
-		blueprintList.Items = nil
-	}
-
-	// only take first blueprint
-	if len(blueprintList.Items) > 0 {
-		blueprint := blueprintList.Items[0]
-
-		dogusAsJson, jsonerr := json.Marshal(blueprint.Spec.Blueprint.Dogus)
-		if jsonerr != nil {
-			return Abort, fmt.Errorf("marshal blueprint dogus to json: %w", jsonerr)
-		}
-
-		annotation := map[string]string{
-			blueprintIdAnnotation:    blueprint.Spec.DisplayName,
-			blueprintDogusAnnotation: string(dogusAsJson),
-		}
-		metadataChanged = mergeMissingOrChangedValues(&backup.Annotations, annotation) || metadataChanged
-	}
 
 	// finalizer
 	metadataChanged = controllerutil.AddFinalizer(backup, backupv1.BackupFinalizer) || metadataChanged
@@ -486,12 +452,12 @@ func (c *defaultReconciler) ensureBackupSetup(ctx context.Context, backup *backu
 	}
 
 	// write backup
-	err = c.client.Update(ctx, backup)
+	err := c.client.Update(ctx, backup)
 	if err != nil {
 		return Abort, fmt.Errorf("update backup to set labels, annotations and finalizer: %w", err)
 	}
 
-	logging.Info(ctx, "persisted backup labels, annotations and finalizer")
+	logging.Info(ctx, "persisted default labels and finalizer")
 	return Next, nil
 }
 

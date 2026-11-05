@@ -316,6 +316,72 @@ func (_c *mockReconciler_ensureBackupLeaseReleased_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// ensureBackupMetadata provides a mock function for the type mockReconciler
+func (_mock *mockReconciler) ensureBackupMetadata(ctx context.Context, backup *v1.Backup) (action, error) {
+	ret := _mock.Called(ctx, backup)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ensureBackupMetadata")
+	}
+
+	var r0 action
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.Backup) (action, error)); ok {
+		return returnFunc(ctx, backup)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.Backup) action); ok {
+		r0 = returnFunc(ctx, backup)
+	} else {
+		r0 = ret.Get(0).(action)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
+		r1 = returnFunc(ctx, backup)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// mockReconciler_ensureBackupMetadata_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ensureBackupMetadata'
+type mockReconciler_ensureBackupMetadata_Call struct {
+	*mock.Call
+}
+
+// ensureBackupMetadata is a helper method to define mock.On call
+//   - ctx context.Context
+//   - backup *v1.Backup
+func (_e *mockReconciler_Expecter) ensureBackupMetadata(ctx any, backup any) *mockReconciler_ensureBackupMetadata_Call {
+	return &mockReconciler_ensureBackupMetadata_Call{Call: _e.mock.On("ensureBackupMetadata", ctx, backup)}
+}
+
+func (_c *mockReconciler_ensureBackupMetadata_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockReconciler_ensureBackupMetadata_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1.Backup
+		if args[1] != nil {
+			arg1 = args[1].(*v1.Backup)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *mockReconciler_ensureBackupMetadata_Call) Return(actionMoqParam action, err error) *mockReconciler_ensureBackupMetadata_Call {
+	_c.Call.Return(actionMoqParam, err)
+	return _c
+}
+
+func (_c *mockReconciler_ensureBackupMetadata_Call) RunAndReturn(run func(ctx context.Context, backup *v1.Backup) (action, error)) *mockReconciler_ensureBackupMetadata_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ensureBackupRunCompleted provides a mock function for the type mockReconciler
 func (_mock *mockReconciler) ensureBackupRunCompleted(ctx context.Context, backup *v1.Backup) (action, error) {
 	ret := _mock.Called(ctx, backup)
@@ -378,72 +444,6 @@ func (_c *mockReconciler_ensureBackupRunCompleted_Call) Return(actionMoqParam ac
 }
 
 func (_c *mockReconciler_ensureBackupRunCompleted_Call) RunAndReturn(run func(ctx context.Context, backup *v1.Backup) (action, error)) *mockReconciler_ensureBackupRunCompleted_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ensureBackupSetup provides a mock function for the type mockReconciler
-func (_mock *mockReconciler) ensureBackupSetup(ctx context.Context, backup *v1.Backup) (action, error) {
-	ret := _mock.Called(ctx, backup)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ensureBackupSetup")
-	}
-
-	var r0 action
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.Backup) (action, error)); ok {
-		return returnFunc(ctx, backup)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.Backup) action); ok {
-		r0 = returnFunc(ctx, backup)
-	} else {
-		r0 = ret.Get(0).(action)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
-		r1 = returnFunc(ctx, backup)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// mockReconciler_ensureBackupSetup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ensureBackupSetup'
-type mockReconciler_ensureBackupSetup_Call struct {
-	*mock.Call
-}
-
-// ensureBackupSetup is a helper method to define mock.On call
-//   - ctx context.Context
-//   - backup *v1.Backup
-func (_e *mockReconciler_Expecter) ensureBackupSetup(ctx any, backup any) *mockReconciler_ensureBackupSetup_Call {
-	return &mockReconciler_ensureBackupSetup_Call{Call: _e.mock.On("ensureBackupSetup", ctx, backup)}
-}
-
-func (_c *mockReconciler_ensureBackupSetup_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockReconciler_ensureBackupSetup_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *v1.Backup
-		if args[1] != nil {
-			arg1 = args[1].(*v1.Backup)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *mockReconciler_ensureBackupSetup_Call) Return(actionMoqParam action, err error) *mockReconciler_ensureBackupSetup_Call {
-	_c.Call.Return(actionMoqParam, err)
-	return _c
-}
-
-func (_c *mockReconciler_ensureBackupSetup_Call) RunAndReturn(run func(ctx context.Context, backup *v1.Backup) (action, error)) *mockReconciler_ensureBackupSetup_Call {
 	_c.Call.Return(run)
 	return _c
 }
