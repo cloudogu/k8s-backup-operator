@@ -7,6 +7,7 @@ require (
 	github.com/cloudogu/ces-commons-lib v0.3.0
 	github.com/cloudogu/k8s-backup-lib v1.10.0
 	github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0
+	github.com/cloudogu/k8s-component-lib v1.15.0
 	github.com/cloudogu/k8s-dogu-lib/v3 v3.3.0
 	github.com/cloudogu/k8s-registry-lib v1.0.0
 	github.com/dlclark/regexp2 v1.12.0
@@ -20,6 +21,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/vmware-tanzu/velero v1.18.4
 	go.uber.org/zap v1.28.0
+	go.yaml.in/yaml/v3 v3.0.6
 	k8s.io/api v0.37.2
 	k8s.io/apimachinery v0.37.2
 	k8s.io/client-go v0.37.2
@@ -78,7 +80,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
