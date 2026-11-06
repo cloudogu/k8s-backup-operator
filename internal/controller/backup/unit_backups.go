@@ -93,11 +93,8 @@ func unitLabels(backupState state.BackupState, unit backupv1.UnitIdentifier) map
 
 	if unit.Type == backupv1.UnitTypeDogu {
 		labels[backupv1.DoguNameLabelKey] = unit.Name
-		for _, dogu := range backupState.InstalledDogusV3 {
-			if dogu.Name == unit.Name {
-				labels[backupv1.DoguVersionLabelKey] = dogu.Version
-				break
-			}
+		if version := installedDoguVersion(backupState.InstalledDogusV3, unit.Name); version != "" {
+			labels[backupv1.DoguVersionLabelKey] = version
 		}
 	}
 
