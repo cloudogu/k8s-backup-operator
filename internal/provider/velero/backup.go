@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudogu/k8s-backup-operator/internal/annotations"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -19,36 +18,27 @@ import (
 // defaultBackupTTL is ten years, basically infinity in backup standards.
 const defaultBackupTTL = 87660 * time.Hour
 
-// CreateVeleroBackupResource creates the Velero resource representation of the given backup.
-func CreateVeleroBackupResource(backup *k8sv1.Backup, backupStorageName string, labels map[string]string) *velerov1.Backup {
-	selectors := []*metav1.LabelSelector{
-		{MatchLabels: map[string]string{"k8s.cloudogu.com/type": "global-config"}},
-		{MatchExpressions: []metav1.LabelSelectorRequirement{
-			{Key: "dogu.name", Operator: metav1.LabelSelectorOpExists},
-		}},
-		// everything besides dogu-specific config that should be included in the backup, e.g., PVCs of components etc.
-		{MatchExpressions: []metav1.LabelSelectorRequirement{
-			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
-		}},
-	}
+// CreateVeleroUnitBackupResource creates the Velero resource representation of a single backup unit.
+// The selector restricts the backup to the resources of the unit.
+func CreateVeleroUnitBackupResource(
+	namespace string,
+	name string,
+	backupStorageName string,
+	labels map[string]string,
+	annotations map[string]string,
+	selector *metav1.LabelSelector,
+	includedResources []string,
+) *velerov1.Backup {
 	volumeFsBackup := false
 	return &velerov1.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        backup.Name,
-			Namespace:   backup.Namespace,
-			Labels:      labels,
-			Annotations: annotations.GetBackupAnnotations(backup.ObjectMeta),
-		},
+		Name:        name,
+		Namespace:   namespace,
+		Labels:      labels,
+		Annotations: annotations,
 		Spec: velerov1.BackupSpec{
-			IncludedNamespaces: []string{backup.Namespace},
-			IncludedResources: []string{
-				"configmaps",
-				"secrets",
-				"persistentvolumeclaims",
-				"persistentvolumes",
-				"dogus.k8s.cloudogu.com",
-			},
-			OrLabelSelectors:         selectors,
+			IncludedNamespaces:       []string{namespace},
+			IncludedResources:        includedResources,
+			LabelSelector:            selector,
 			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
 			StorageLocation:          backupStorageName,
 			DefaultVolumesToFsBackup: &volumeFsBackup,
@@ -64,8 +54,8 @@ func CreateVeleroDeleteBackupRequestIfNotExists(ctx context.Context, k8sClient c
 	if apierrors.IsNotFound(err) {
 		logging.Info(ctx, "velero delete backup request not found: create one")
 		deleteBackupRequest = &velerov1.DeleteBackupRequest{
-			ObjectMeta: metav1.ObjectMeta{Namespace: backup.Namespace, Name: backup.Name},
-			Spec:       velerov1.DeleteBackupRequestSpec{BackupName: backup.Name},
+			Namespace: backup.Namespace, Name: backup.Name,
+			Spec: velerov1.DeleteBackupRequestSpec{BackupName: backup.Name},
 		}
 		if err = k8sClient.Create(ctx, deleteBackupRequest); err != nil {
 			return nil, fmt.Errorf("create velero delete backup request: %w", err)

@@ -20,10 +20,10 @@ const (
 	// unitNameHashLength is the number of hex characters of the hash which makes truncated unit names unique.
 	unitNameHashLength = 8
 
-	doguNameLabelKey    = "k8s.cloudogu.com/dogu.name"
-	backupScopeLabelKey = "k8s.cloudogu.com/backup-scope"
-	typeLabelKey        = "k8s.cloudogu.com/type"
-	globalConfigType    = "global-config"
+	doguNameLabelKey           = "k8s.cloudogu.com/dogu.name"
+	backupScopeLabelKey        = "k8s.cloudogu.com/backup-scope"
+	typeLabelKey               = "k8s.cloudogu.com/type"
+	globalConfigTypeLabelValue = "global-config"
 )
 
 // desiredUnitBackups returns a provider backup for each unit of the backup state.
@@ -49,6 +49,11 @@ func desiredUnitBackups(backup *backupv1.Backup, backupState state.BackupState, 
 			return nil, selectorErr
 		}
 
+		resources, resourcesErr := includedResources(unit)
+		if resourcesErr != nil {
+			return nil, resourcesErr
+		}
+
 		unitBackups = append(unitBackups, veleroprovider.CreateVeleroUnitBackupResource(
 			backup.Namespace,
 			unitBackupName(backup.Name, unit),
@@ -56,6 +61,7 @@ func desiredUnitBackups(backup *backupv1.Backup, backupState state.BackupState, 
 			labels,
 			annotations,
 			selector,
+			resources,
 		))
 	}
 
@@ -122,7 +128,7 @@ func unitSelector(backup *backupv1.Backup, backupState state.BackupState, unit b
 			{Key: doguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: names},
 		}}, nil
 	case backupv1.UnitTypeGlobalConfig:
-		return &metav1.LabelSelector{MatchLabels: map[string]string{typeLabelKey: globalConfigType}}, nil
+		return &metav1.LabelSelector{MatchLabels: map[string]string{typeLabelKey: globalConfigTypeLabelValue}}, nil
 	case backupv1.UnitTypeMisc:
 		// Resources with the backup-scope label belong to a dogu unit if they are labeled with a dogu.
 		requirements := []metav1.LabelSelectorRequirement{
@@ -137,5 +143,23 @@ func unitSelector(backup *backupv1.Backup, backupState state.BackupState, unit b
 		return &metav1.LabelSelector{MatchExpressions: requirements}, nil
 	default:
 		return nil, fmt.Errorf("unknown unit type %q", unit.Type)
+	}
+}
+
+// includedResources returns the resources which are backed up for the unit.
+// Persistent volumes and CSI snapshot resources (volumesnapshots, volumesnapshotcontents, volumesnapshotclasses) are
+// not listed on purpose: Velero adds them as additional items of the persistent volume claims. Cluster-scoped
+// additional items are only skipped if they are excluded explicitly, and the CSI actions mark their additional items
+// with "backup.velero.io/must-include-additional-items", which bypasses the resource filter.
+func includedResources(unit backupv1.UnitIdentifier) ([]string, error) {
+	switch unit.Type {
+	case backupv1.UnitTypeGlobalConfig:
+		return []string{"configmaps"}, nil
+	case backupv1.UnitTypeDogu, backupv1.UnitTypeDoguV2:
+		return []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}, nil
+	case backupv1.UnitTypeMisc:
+		return []string{"configmaps", "secrets", "persistentvolumeclaims"}, nil
+	default:
+		return nil, fmt.Errorf("failed to determine included resources for unit type %q", unit.Type)
 	}
 }
