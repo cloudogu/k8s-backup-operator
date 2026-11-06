@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -10,7 +11,9 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	backupApply "github.com/cloudogu/k8s-backup-lib/applyconfiguration/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
+	"github.com/cloudogu/k8s-backup-operator/internal/controller/backup/state"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -461,9 +464,10 @@ func (c *defaultReconciler) ensureBackupMetadata(ctx context.Context, backup *ba
 	}
 
 	// write backup
-	err := c.client.Update(ctx, backup)
+	backupApplyConfiguration := backupApply.Backup(backup.Name, backup.Namespace).WithLabels(backup.Labels).WithFinalizers(backupv1.BackupFinalizer)
+	err := c.client.Apply(ctx, backupApplyConfiguration, client.FieldOwner("k8s-backup-operator"))
 	if err != nil {
-		return Abort, fmt.Errorf("update backup to set labels, annotations and finalizer: %w", err)
+		return Abort, fmt.Errorf("failed to apply default labels and finalizer: %w", err)
 	}
 
 	logging.Info(ctx, "persisted default labels and finalizer")
@@ -656,43 +660,94 @@ func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, back
 }
 
 func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	var veleroBackup, err = c.getProviderBackup(ctx, backup.GetNamespacedName())
+	// The state is collected on every run. The maintenance mode is active, so the state does not change between
+	// two runs and all units get the same metadata.
+	backupState, err := c.stateCollector.Collect(ctx, backup)
 	if err != nil {
-		return Abort, fmt.Errorf("get velero backup resource: %w", err)
+		return Abort, fmt.Errorf("collect backup state for creating backup units: %w", err)
 	}
 
-	if veleroBackup == nil {
-		logging.Debug(ctx, "ensureProviderBackupCreated: provider backup not found -> Succeeded = Unknown, RETRY")
+	desiredUnits, err := desiredUnitBackups(backup, backupState, c.backupStorageName)
+	if err != nil {
+		return Abort, fmt.Errorf("build backup units: %w", err)
+	}
 
-		providerBackupCr := veleroprovider.CreateVeleroBackupResource(backup, c.backupStorageName, defaultLabels)
-		createErr := c.client.Create(ctx, providerBackupCr)
-		if createErr != nil {
-			return Abort, fmt.Errorf("create velero backup resource: %w", createErr)
+	existingUnits, err := c.listOwnProviderBackupNames(ctx, backup)
+	if err != nil {
+		return Abort, err
+	}
+
+	// Existing units are not checked for changed metadata. The system state cannot change during the
+	// backup because of the maintenance mode.
+	var createdUnits []*velerov1.Backup
+	var createErr error
+	for _, unit := range desiredUnits {
+		if _, exists := existingUnits[unit.Name]; exists {
+			continue
 		}
-		logging.Info(ctx, "created the velero backup", "backupStorageLocation", c.backupStorageName)
 
+		err = c.client.Create(ctx, unit)
+		if apierrors.IsAlreadyExists(err) {
+			// Cache lag
+			logging.Debug(ctx, "ensureProviderBackupCreated: velero unit backup already exists", "unit", unit.Name)
+			continue
+		}
+		if err != nil {
+			createErr = fmt.Errorf("create velero unit backup %s: %w", unit.Name, err)
+			break
+		}
+
+		createdUnits = append(createdUnits, unit)
+		logging.Info(ctx, "created the velero unit backup", "unit", unit.Name, "backupStorageLocation", c.backupStorageName)
+	}
+
+	if len(createdUnits) > 0 {
+		// The status is patched even if a later unit failed. The start timestamp guards
+		// ensureBackupIsPrepared as soon as the first unit exists.
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 				Type:    backupv1.ConditionSucceeded,
 				Status:  metav1.ConditionUnknown,
 				Reason:  reasonProviderBackupResourceDoesNotExist,
-				Message: "Provider backup resource does not exist.",
+				Message: "Provider backup resources of all units do not exist yet.",
 			})
 			if status.StartTimestamp.IsZero() {
 				status.StartTimestamp = metav1.NewTime(c.clock.Now())
 			}
 		})
 		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
+			return Abort, errors.Join(createErr, fmt.Errorf("patch status of backup resource: %w", patchErr))
 		}
 
-		c.recorder.Eventf(backup, providerBackupCr, corev1.EventTypeNormal, reasonProviderBackupInProgress, actionCreateProviderBackup, "Provider backup started")
-		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup was created")
+		for _, unit := range createdUnits {
+			c.recorder.Eventf(backup, unit, corev1.EventTypeNormal, reasonProviderBackupInProgress, actionCreateProviderBackup, "Provider backup of unit %s started", unit.Name)
+		}
+	}
+
+	if createErr != nil {
+		return Abort, createErr
+	}
+
+	if len(createdUnits) > 0 {
+		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "provider backups of units were created")
 		return Retry, nil
 	}
 
-	logging.Debug(ctx, "ensureProviderBackupCreated: provider backup resource found -> NEXT")
+	logging.Debug(ctx, "ensureProviderBackupCreated: provider backups of all units exist -> NEXT")
 	return Next, nil
+}
+
+func (c *defaultReconciler) listOwnProviderBackupNames(ctx context.Context, backup *backupv1.Backup) (map[string]struct{}, error) {
+	providerBackups := &velerov1.BackupList{}
+	if err := c.client.List(ctx, providerBackups, client.InNamespace(backup.Namespace), client.MatchingLabels{backupv1.BackupLabelKey: backup.Name}); err != nil {
+		return nil, fmt.Errorf("list velero unit backups of backup: %w", err)
+	}
+
+	names := make(map[string]struct{}, len(providerBackups.Items))
+	for _, providerBackup := range providerBackups.Items {
+		names[providerBackup.Name] = struct{}{}
+	}
+	return names, nil
 }
 
 func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
