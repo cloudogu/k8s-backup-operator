@@ -13,25 +13,8 @@ import (
 
 type UnitCompletionState int
 
-func (u UnitCompletionState) String() string {
-	switch u {
-	case UnitsMissing:
-		return "some units are missing and might not have been created yet"
-	case UnitsInProgress:
-		return "some units are still in progress"
-	case UnitsFailed:
-		return "some units have failed"
-	case UnitsSucceeded:
-		return "all units have succeeded"
-	case UnknownStatus:
-		return "some units have an unknown provider status phase"
-	}
-	return fmt.Sprintf("unknown completion state: %d", u)
-}
-
 const (
-	UnitsMissing UnitCompletionState = iota
-	UnitsInProgress
+	UnitsInProgress UnitCompletionState = iota
 	UnitsFailed
 	UnitsSucceeded
 	UnknownStatus
@@ -81,15 +64,17 @@ func determineUnitCompletion(
 	}, nil
 }
 
-func sortUnitTypes(ctx context.Context, backup *backupv1.Backup, actualUnits []velerov1.Backup) (map[string]*velerov1.Backup, *velerov1.Backup, *velerov1.Backup, *velerov1.Backup) {
+func sortUnitTypes(ctx context.Context, backup *backupv1.Backup, actualUnits []velerov1.Backup) (
+	doguUnitMap map[string]*velerov1.Backup,
+	v2DogusBackup *velerov1.Backup,
+	globalConfigBackup *velerov1.Backup,
+	miscBackup *velerov1.Backup,
+) {
 	logger := log.FromContext(ctx).
 		WithName("sortUnitTypes").
 		WithValues("backup", backup.Name)
 
-	doguUnitMap := make(map[string]*velerov1.Backup)
-	var v2DogusBackup *velerov1.Backup
-	var globalConfigBackup *velerov1.Backup
-	var miscBackup *velerov1.Backup
+	doguUnitMap = make(map[string]*velerov1.Backup)
 	for _, unit := range actualUnits {
 		switch backupv1.UnitType(unit.Labels[backupv1.BackupTypeLabelKey]) {
 		case backupv1.UnitTypeDogu:
@@ -111,7 +96,8 @@ func sortUnitTypes(ctx context.Context, backup *backupv1.Backup, actualUnits []v
 
 func unitStatusFromProviderBackup(backup *velerov1.Backup) (unitStatus backupv1.UnitStatus, completionState UnitCompletionState) {
 	if backup == nil {
-		completionState = UnitsMissing
+		// treat missing same as in progress
+		completionState = UnitsInProgress
 		unitStatus.State = backupv1.UnitStateMissing
 		unitStatus.Reason = reasonProviderBackupMissing
 		unitStatus.Message = "the provider backup for this unit is missing or might not have been created yet"
