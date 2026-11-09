@@ -38,6 +38,8 @@ const (
 	reasonProviderBackupResourceDoesNotExist     = "ProviderBackupResourceDoesNotExist"
 	reasonProviderBackupCreationFailed           = "ProviderBackupCreationFailed"
 	reasonProviderBackupInProgress               = "ProviderBackupInProgress"
+	reasonProviderBackupMissing                  = "ProviderBackupMissing"
+	reasonProviderBackupUnknownStatus            = "ProviderBackupUnknownStatus"
 	reasonOtherProviderBackupInProgress          = "OtherProviderBackupInProgress"
 	reasonCanceledProviderBackupDeleted          = "CanceledProviderBackupDeleted"
 	reasonProviderBackupFailed                   = "ProviderBackupFailed"
@@ -831,29 +833,40 @@ func (c *defaultReconciler) listOwnProviderBackupNames(ctx context.Context, back
 }
 
 func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	providerBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
-	if err != nil || providerBackup == nil {
-		return Abort, fmt.Errorf("checking velero backup resource for completion: %w", err)
+	var unitBackups velerov1.BackupList
+	err := c.client.List(ctx, &unitBackups, client.InNamespace(backup.Namespace), client.MatchingLabels{backupv1.BackupLabelKey: backup.Name})
+	if err != nil {
+		return Abort, fmt.Errorf("listing unit backups: %w", err)
 	}
 
-	if isProviderBackupInProgress(providerBackup) {
-		return c.handleProviderBackupInProgress(ctx, backup, providerBackup)
-	}
-	if hasProviderBackupFailed(providerBackup) {
-		return c.handleProviderBackupFailed(ctx, backup, providerBackup)
-	}
-	if hasProviderBackupSucceeded(providerBackup) {
-		return c.handleProviderBackupSucceeded(ctx, backup, providerBackup)
+	backupState, err := c.stateCollector.Collect(ctx, backup)
+	if err != nil {
+		return Abort, fmt.Errorf("collecting backup state: %w", err)
 	}
 
-	return Abort, fmt.Errorf("provider backup with status='%s' should not occur here", providerBackup.Status.Phase)
+	completionState, statusPatch, err := determineUnitCompletion(ctx, backup, unitBackups.Items, backupState)
+	if err != nil {
+		return Abort, fmt.Errorf("determining unit completion: %w", err)
+	}
+
+	switch completionState {
+	case UnitsMissing:
+		fallthrough
+	case UnitsInProgress:
+		return c.handleProviderBackupInProgress(ctx, backup, statusPatch, completionState.String())
+	case UnitsFailed:
+		return c.handleProviderBackupFailed(ctx, backup, statusPatch, completionState.String())
+	case UnitsSucceeded:
+		return c.handleProviderBackupSucceeded(ctx, backup, statusPatch)
+	case UnknownStatus:
+		// unless we know otherwise, we assume the backup is in progress
+		_, err := c.handleProviderBackupInProgress(ctx, backup, statusPatch, completionState.String())
+		return Abort, fmt.Errorf("provider backup is in unknown status: %w", err)
+	}
+	return Abort, fmt.Errorf("invalid completionState='%s' should not occur here", completionState)
 }
 
-func (c *defaultReconciler) handleProviderBackupInProgress(
-	ctx context.Context,
-	backup *backupv1.Backup,
-	providerBackup *velerov1.Backup,
-) (action, error) {
+func (c *defaultReconciler) handleProviderBackupInProgress(ctx context.Context, backup *backupv1.Backup, patch statusUpdate, message string) (action, error) {
 	logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup is in progress -> RETRY")
 
 	// The elapsed time is part of the message, so the message changes once per minute and the
@@ -868,13 +881,14 @@ func (c *defaultReconciler) handleProviderBackupInProgress(
 	reportProgress := conditions.WillChange(backup.Status.Conditions, inProgress)
 
 	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		patch(status)
 		meta.SetStatusCondition(&status.Conditions, inProgress)
 	}); err != nil {
 		return Abort, fmt.Errorf("patch status of backup resource: %w", err)
 	}
 	if reportProgress {
-		logging.Info(ctx, "waiting for the velero backup to complete",
-			"phase", providerBackup.Status.Phase,
+		logging.Info(ctx, "waiting for one or more backup units to complete",
+			"detail", message,
 			"running for", conditions.FormatWaitDuration(waited),
 		)
 	}
@@ -882,43 +896,34 @@ func (c *defaultReconciler) handleProviderBackupInProgress(
 	return Retry, nil
 }
 
-func (c *defaultReconciler) handleProviderBackupFailed(
-	ctx context.Context,
-	backup *backupv1.Backup,
-	providerBackup *velerov1.Backup,
-) (action, error) {
+func (c *defaultReconciler) handleProviderBackupFailed(ctx context.Context, backup *backupv1.Backup, patch statusUpdate, message string) (action, error) {
 	logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup has failed -> ABORT")
-	if err := c.patchProviderBackupCompletedStatus(ctx, backup, metav1.ConditionFalse, reasonProviderBackupFailed, "Provider backup has failed."); err != nil {
+	if err := c.patchProviderBackupCompletedStatus(ctx, backup, metav1.ConditionFalse, reasonProviderBackupFailed, "Provider backup has failed.", patch); err != nil {
 		return Abort, err
 	}
 	// Velero rejecting or failing a backup is an expected outcome of this stage rather than an
 	// operator error, so it is reported without an error.
-	logging.Info(ctx, "the velero backup failed", "phase", providerBackup.Status.Phase)
+	logging.Info(ctx, "the one or more backup units failed", "detail", message)
 	return Next, nil
 }
 
 func (c *defaultReconciler) handleProviderBackupSucceeded(
 	ctx context.Context,
 	backup *backupv1.Backup,
-	providerBackup *velerov1.Backup,
+	patch statusUpdate,
 ) (action, error) {
 	logging.Debug(ctx, "ensureProviderBackupCompleted: provider backup has succeeded -> NEXT")
-	if err := c.patchProviderBackupCompletedStatus(ctx, backup, metav1.ConditionTrue, reasonProviderBackupSucceeded, "Provider backup has succeeded."); err != nil {
+	if err := c.patchProviderBackupCompletedStatus(ctx, backup, metav1.ConditionTrue, reasonProviderBackupSucceeded, "Provider backup has succeeded.", patch); err != nil {
 		return Abort, err
 	}
-	logging.Info(ctx, "the velero backup succeeded", "phase", providerBackup.Status.Phase)
-	c.recorder.Eventf(backup, providerBackup, corev1.EventTypeNormal, reasonProviderBackupSucceeded, actionCompleteProviderBackup, "Provider Backup completed")
+	logging.Info(ctx, "all backup units succeeded")
+	c.recorder.Eventf(backup, nil, corev1.EventTypeNormal, reasonProviderBackupSucceeded, actionCompleteProviderBackup, "Provider Backup completed")
 	return Next, nil
 }
 
-func (c *defaultReconciler) patchProviderBackupCompletedStatus(
-	ctx context.Context,
-	backup *backupv1.Backup,
-	conditionStatus metav1.ConditionStatus,
-	reason string,
-	message string,
-) error {
+func (c *defaultReconciler) patchProviderBackupCompletedStatus(ctx context.Context, backup *backupv1.Backup, conditionStatus metav1.ConditionStatus, reason string, message string, patch statusUpdate) error {
 	if err := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		patch(status)
 		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 			Type:    backupv1.ConditionProviderSucceeded,
 			Status:  conditionStatus,
