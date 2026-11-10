@@ -6,6 +6,7 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	backupac "github.com/cloudogu/k8s-backup-lib/applyconfiguration"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -17,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
+	clientgoac "k8s.io/client-go/applyconfigurations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -300,7 +301,7 @@ func newFakeClientBuilder(t *testing.T) *fake.ClientBuilder {
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, appsv1.AddToScheme(scheme))
 
-	return fake.NewClientBuilder().WithScheme(scheme)
+	return fake.NewClientBuilder().WithScheme(scheme).WithTypeConverters(clientgoac.NewTypeConverter(scheme), backupac.NewTypeConverter(scheme))
 }
 
 func newFakeClientBuilderWithCounter(t *testing.T, callCounter *callCounter) *fake.ClientBuilder {
@@ -314,10 +315,9 @@ func newFakeClientBuilderWithCounter(t *testing.T, callCounter *callCounter) *fa
 }
 
 func newReconcilerRequest(namespace string, name string) ctrl.Request {
-	return ctrl.Request{NamespacedName: types.NamespacedName{
+	return ctrl.Request{
 		Namespace: namespace,
-		Name:      name,
-	}}
+		Name:      name}
 }
 
 func newTestFixtureForControllerTest(t *testing.T) (*mockReconciler, *Controller) {
