@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	clientgoac "k8s.io/client-go/applyconfigurations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -301,7 +302,7 @@ func newFakeClientBuilder(t *testing.T) *fake.ClientBuilder {
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, appsv1.AddToScheme(scheme))
 
-	return fake.NewClientBuilder().WithScheme(scheme).WithTypeConverters(clientgoac.NewTypeConverter(scheme), backupac.NewTypeConverter(scheme))
+	return fake.NewClientBuilder().WithScheme(scheme).WithTypeConverters(clientgoac.NewTypeConverter(scheme), backupac.NewTypeConverter(scheme), managedfields.NewDeducedTypeConverter())
 }
 
 func newFakeClientBuilderWithCounter(t *testing.T, callCounter *callCounter) *fake.ClientBuilder {
