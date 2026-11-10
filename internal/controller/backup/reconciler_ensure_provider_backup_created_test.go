@@ -50,7 +50,7 @@ func newReconcilerForProviderBackupCreatedTest(t *testing.T, counter *callCounte
 }
 
 func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
-	t.Run("If no unit exists, create all units, set succeeded to unknown, set start time and retry", func(t *testing.T) {
+	t.Run("If no unit exists, create all units, set succeeded to unknown, set start time and proceed to the next step", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		counter := &callCounter{}
 		collector := newMockBackupStateCollector(t)
@@ -62,7 +62,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.Equal(t, Next, nextAction)
 
 		succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		require.NotNil(t, succeeded)
@@ -110,7 +110,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.Equal(t, Next, nextAction)
 		assert.WithinDuration(t, baseTime.Time, backup.Status.StartTimestamp.Time, time.Second)
 	})
 
@@ -159,13 +159,11 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 	t.Run("Keep the state of units which are already finished", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		backup.Status.Dogus = []backupv1.DoguUnitStatus{{
-			DoguVersion: backupv1.DoguVersion{Name: "ldap", Version: "2.6.8-1"},
-			UnitStatus: backupv1.UnitStatus{
-				State:       backupv1.UnitStateSucceeded,
-				Reason:      "ProviderBackupSucceeded",
-				Message:     "done",
-				ProviderRef: &backupv1.ProviderRef{Name: "backup-dogu-ldap"},
-			},
+			Name: "ldap", Version: "2.6.8-1",
+			State:       backupv1.UnitStateSucceeded,
+			Reason:      "ProviderBackupSucceeded",
+			Message:     "done",
+			ProviderRef: &backupv1.ProviderRef{Name: "backup-dogu-ldap"},
 		}}
 		expectedDogus := backup.DeepCopy().Status.Dogus
 		counter := &callCounter{}
@@ -179,7 +177,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.Equal(t, Next, nextAction)
 		assert.Equal(t, 3, counter.veleroBackupCreateCount)
 		assert.Equal(t, expectedDogus, backup.Status.Dogus)
 		require.NotNil(t, backup.Status.Misc)
@@ -201,7 +199,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.Equal(t, Next, nextAction)
 		assert.Equal(t, 2, counter.veleroBackupCreateCount)
 	})
 
@@ -221,7 +219,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.Equal(t, Next, nextAction)
 		assert.Equal(t, 1, counter.veleroBackupCreateCount)
 	})
 
@@ -302,7 +300,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		assert.Nil(t, backup.Status.Dogus[0].ProviderRef)
 	})
 
-	t.Run("If creating a unit fails, create the remaining units, set the start time and retry", func(t *testing.T) {
+	t.Run("If creating a unit fails, create the remaining units, set the start time and proceed to the next step", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		counter := &callCounter{}
 		collector := newMockBackupStateCollector(t)
@@ -320,7 +318,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.Equal(t, Next, nextAction)
 		assert.Equal(t, 3, counter.veleroBackupCreateCount)
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 		assert.False(t, backup.Status.StartTimestamp.IsZero())
@@ -352,7 +350,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.Equal(t, Next, nextAction)
 		assert.Equal(t, 2, counter.veleroBackupCreateCount)
 		assertEventRecorded(t, reconciler, "Warning ProviderBackupCreationFailed Failed to create the provider backup of unit backup-dogu-ldap: create error 2")
 		assertEventRecorded(t, reconciler, "Warning ProviderBackupCreationFailed Failed to create the provider backup of unit backup-misc: create error 4")
@@ -410,7 +408,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		nextAction, err := reconciler.ensureProviderBackupCreated(context.Background(), backup)
 
 		require.NoError(t, err)
-		assert.Equal(t, Retry, nextAction)
+		assert.Equal(t, Next, nextAction)
 		assert.Equal(t, 4, counter.veleroBackupCreateCount)
 		require.NotNil(t, backup.Status.V2Dogus)
 		assert.Equal(t, &backupv1.ProviderRef{Name: "backup-doguv2"}, backup.Status.V2Dogus.ProviderRef)

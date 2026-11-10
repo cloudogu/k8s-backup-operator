@@ -745,20 +745,15 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 		}
 	}
 
-	if len(createdUnits) > 0 {
-		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "provider backups of units were created")
-		return Retry, nil
-	}
-
 	if createErr != nil {
 		// Units which cannot be created do not block the backup of the other units. The failed units are retried
 		// on every reconciliation, because all steps run again. The completion step waits for all desired units
 		// until they are finished or the time window expires.
 		logging.Error(ctx, createErr, "ensureProviderBackupCreated: failed to create provider backups of some units -> NEXT")
-		return Next, nil
+	} else {
+		logging.Debug(ctx, "ensureProviderBackupCreated: provider backups of all units exist -> NEXT")
 	}
 
-	logging.Debug(ctx, "ensureProviderBackupCreated: provider backups of all units exist -> NEXT")
 	return Next, nil
 }
 
