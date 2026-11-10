@@ -11,17 +11,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type UnitCompletionState int
+type unitCompletionState int
 
+// completion states are sorted by priority, see setCompletionState
 const (
-	UnitsInProgress UnitCompletionState = iota
-	UnitsFailed
-	UnitsSucceeded
-	UnknownStatus
+	unitsInProgress unitCompletionState = iota
+	unknownStatus
+	unitsFailed
+	unitsSucceeded
 )
 
-func setCompletionState(completionState *UnitCompletionState, value UnitCompletionState) {
-	if *completionState == UnitsSucceeded {
+func setCompletionState(completionState *unitCompletionState, value unitCompletionState) {
+	// completion states are sorted by priority
+	// smaller is higher priority
+	if *completionState > value {
 		*completionState = value
 	}
 }
@@ -32,13 +35,13 @@ func determineUnitCompletion(
 	actualUnits []velerov1.Backup,
 	expectedState state.BackupState,
 ) (
-	completionState UnitCompletionState,
+	completionState unitCompletionState,
 	backupStatusPatch statusUpdate,
 	err error,
 ) {
 	doguUnitMap, v2DogusBackup, globalConfigBackup, miscBackup := sortUnitTypes(ctx, backup, actualUnits)
 
-	completionState = UnitsSucceeded
+	completionState = unitsSucceeded
 
 	globalConfigStatus, configCompletionState := determineGlobalConfigUnitStatus(expectedState, globalConfigBackup)
 	setCompletionState(&completionState, configCompletionState)
@@ -94,10 +97,10 @@ func sortUnitTypes(ctx context.Context, backup *backupv1.Backup, actualUnits []v
 	return doguUnitMap, v2DogusBackup, globalConfigBackup, miscBackup
 }
 
-func unitStatusFromProviderBackup(backup *velerov1.Backup) (unitStatus backupv1.UnitStatus, completionState UnitCompletionState) {
+func unitStatusFromProviderBackup(backup *velerov1.Backup) (unitStatus backupv1.UnitStatus, completionState unitCompletionState) {
 	if backup == nil {
 		// treat missing same as in progress
-		completionState = UnitsInProgress
+		completionState = unitsInProgress
 		unitStatus.State = backupv1.UnitStateMissing
 		unitStatus.Reason = reasonProviderBackupMissing
 		unitStatus.Message = "the provider backup for this unit is missing or might not have been created yet"
@@ -105,47 +108,50 @@ func unitStatusFromProviderBackup(backup *velerov1.Backup) (unitStatus backupv1.
 	}
 
 	if isProviderBackupInProgress(backup) {
-		completionState = UnitsInProgress
+		completionState = unitsInProgress
 		unitStatus.State = ""
 		unitStatus.Reason = reasonProviderBackupInProgress
 		unitStatus.Message = fmt.Sprintf("provider backup is in progress with status phase: %s", backup.Status.Phase)
 	} else if hasProviderBackupFailed(backup) {
-		completionState = UnitsFailed
+		completionState = unitsFailed
 		unitStatus.State = backupv1.UnitStateFailed
 		unitStatus.Reason = reasonProviderBackupFailed
 		unitStatus.Message = fmt.Sprintf("provider backup failed with status phase: %s", backup.Status.Phase)
 	} else if hasProviderBackupSucceeded(backup) {
-		completionState = UnitsSucceeded
+		completionState = unitsSucceeded
 		unitStatus.State = backupv1.UnitStateSucceeded
 		unitStatus.Reason = reasonProviderBackupSucceeded
 		unitStatus.Message = ""
+	} else {
+		completionState = unknownStatus
+		unitStatus.State = ""
+		unitStatus.Reason = reasonProviderBackupUnknownStatus
+		unitStatus.Message = fmt.Sprintf("provider backup has unknown status phase %s", backup.Status.Phase)
 	}
-
-	completionState = UnknownStatus
-	unitStatus.State = ""
-	unitStatus.Reason = reasonProviderBackupUnknownStatus
-	unitStatus.Message = fmt.Sprintf("provider backup has unknown status phase %s", backup.Status.Phase)
 
 	unitStatus.ProviderRef = &backupv1.ProviderRef{Name: backup.Name}
 	return
 }
 
-func determineMiscUnitStatus(expectedState state.BackupState, miscBackup *velerov1.Backup) (*backupv1.UnitStatus, UnitCompletionState) {
+func determineMiscUnitStatus(expectedState state.BackupState, miscBackup *velerov1.Backup) (*backupv1.UnitStatus, unitCompletionState) {
 	if expectedState.ContainsUnitType(backupv1.UnitTypeMisc) {
 		unitStatus, unitCompletionState := unitStatusFromProviderBackup(miscBackup)
 		return &unitStatus, unitCompletionState
 	}
-	return nil, UnitsSucceeded
+	return nil, unitsSucceeded
 }
 
-func determineV2DoguUnitStatus(expectedState state.BackupState, v2DogusBackup *velerov1.Backup) (*backupv1.V2DogusUnitStatus, UnitCompletionState, error) {
+func determineV2DoguUnitStatus(expectedState state.BackupState, v2DogusBackup *velerov1.Backup) (*backupv1.V2DogusUnitStatus, unitCompletionState, error) {
 	if expectedState.ContainsUnitType(backupv1.UnitTypeDoguV2) {
 		unitStatus, unitCompletionState := unitStatusFromProviderBackup(v2DogusBackup)
-		installedDogusV2String := v2DogusBackup.Annotations[backupv1.InstalledDogusV2AnnotationKey]
+
 		var installedDogusV2 []backupv1.DoguVersion
-		err := json.Unmarshal([]byte(installedDogusV2String), &installedDogusV2)
-		if err != nil {
-			return nil, 0, fmt.Errorf("unmarshal installed dogus v2 from unit: %w", err)
+		if v2DogusBackup != nil && v2DogusBackup.Annotations != nil {
+			installedDogusV2String := v2DogusBackup.Annotations[backupv1.InstalledDogusV2AnnotationKey]
+			err := json.Unmarshal([]byte(installedDogusV2String), &installedDogusV2)
+			if err != nil {
+				return nil, 0, fmt.Errorf("unmarshal installed dogus v2 from unit: %w", err)
+			}
 		}
 
 		return &backupv1.V2DogusUnitStatus{
@@ -153,36 +159,47 @@ func determineV2DoguUnitStatus(expectedState state.BackupState, v2DogusBackup *v
 			Dogus:      installedDogusV2,
 		}, unitCompletionState, nil
 	}
-	return nil, UnitsSucceeded, nil
+	return nil, unitsSucceeded, nil
 }
 
-func determineGlobalConfigUnitStatus(expectedState state.BackupState, globalConfigBackup *velerov1.Backup) (*backupv1.GlobalConfigStatus, UnitCompletionState) {
+func determineGlobalConfigUnitStatus(expectedState state.BackupState, globalConfigBackup *velerov1.Backup) (*backupv1.GlobalConfigStatus, unitCompletionState) {
 	if expectedState.ContainsUnitType(backupv1.UnitTypeGlobalConfig) {
 		unitStatus, unitCompletionState := unitStatusFromProviderBackup(globalConfigBackup)
-		globalConfigStatus := &backupv1.GlobalConfigStatus{
-			UnitStatus: unitStatus,
-			FQDN:       globalConfigBackup.Annotations[backupv1.FQDNAnnotationKey],
-			Domain:     globalConfigBackup.Annotations[backupv1.DomainAnnotationKey],
+
+		var fqdn, domain string
+		if globalConfigBackup != nil && globalConfigBackup.Annotations != nil {
+			fqdn = globalConfigBackup.Annotations[backupv1.FQDNAnnotationKey]
+			domain = globalConfigBackup.Annotations[backupv1.DomainAnnotationKey]
 		}
-		return globalConfigStatus, unitCompletionState
+
+		return &backupv1.GlobalConfigStatus{
+			UnitStatus: unitStatus,
+			FQDN:       fqdn,
+			Domain:     domain,
+		}, unitCompletionState
 	}
-	return nil, UnitsSucceeded
+	return nil, unitsSucceeded
 }
 
-func determineV3DoguUnitStatus(expectedState state.BackupState, doguUnitMap map[string]*velerov1.Backup) ([]backupv1.DoguUnitStatus, UnitCompletionState) {
+func determineV3DoguUnitStatus(expectedState state.BackupState, doguUnitMap map[string]*velerov1.Backup) ([]backupv1.DoguUnitStatus, unitCompletionState) {
 	doguUnitsStatus := make([]backupv1.DoguUnitStatus, 0, len(expectedState.InstalledDogusV3))
-	completionState := UnitsSucceeded
+	completionState := unitsSucceeded
 	for _, expectedDogu := range expectedState.InstalledDogusV3 {
 		doguUnit := doguUnitMap[expectedDogu.Name]
 		unitStatus, unitCompletionState := unitStatusFromProviderBackup(doguUnit)
 		setCompletionState(&completionState, unitCompletionState)
 
-		version := doguUnit.Labels[backupv1.DoguVersionLabelKey]
+		var version string
+		if doguUnit != nil && doguUnit.Labels != nil {
+			version = doguUnit.Labels[backupv1.DoguVersionLabelKey]
+		}
+
 		doguUnitsStatus = append(doguUnitsStatus, backupv1.DoguUnitStatus{
 			Name:       expectedDogu.Name,
 			Version:    version,
 			UnitStatus: unitStatus,
 		})
 	}
+
 	return doguUnitsStatus, completionState
 }

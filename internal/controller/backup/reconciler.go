@@ -850,16 +850,17 @@ func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, b
 	}
 
 	switch completionState {
-	case UnitsInProgress:
+	case unitsInProgress:
 		return c.handleProviderBackupInProgress(ctx, backup, statusPatch)
-	case UnitsFailed:
+	case unitsFailed:
 		return c.handleProviderBackupFailed(ctx, backup, statusPatch)
-	case UnitsSucceeded:
+	case unitsSucceeded:
 		return c.handleProviderBackupSucceeded(ctx, backup, statusPatch)
-	case UnknownStatus:
-		return Abort, fmt.Errorf("provider backup is in unknown status")
+	case unknownStatus:
+		_, err = c.handleProviderBackupInProgress(ctx, backup, statusPatch)
+		return Abort, errors.Join(fmt.Errorf("provider backup is in unknown status"), err)
 	}
-	return Abort, fmt.Errorf("invalid completionState='%s' should not occur here", completionState)
+	return Abort, fmt.Errorf("invalid completionState='%d' should not occur here", completionState)
 }
 
 func (c *defaultReconciler) handleProviderBackupInProgress(ctx context.Context, backup *backupv1.Backup, patch statusUpdate) (action, error) {
