@@ -671,12 +671,10 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 
 	creationResult := c.createMissingUnits(ctx, desiredUnits, existingUnits)
 
-	var createErrs []error
 	for _, failure := range creationResult.failed {
-		createErrs = append(createErrs, fmt.Errorf("create velero unit backup %s: %w", failure.unit.Name, failure.err))
 		c.recorder.Eventf(backup, failure.unit, corev1.EventTypeWarning, reasonProviderBackupCreationFailed, actionCreateProviderBackup, "Failed to create the provider backup of unit %s: %v", failure.unit.Name, failure.err)
 	}
-	createErr := errors.Join(createErrs...)
+	createErr := creationResult.err()
 
 	// The status is patched even if a unit failed. The start timestamp guards
 	// ensureBackupIsPrepared as soon as the first unit exists.
@@ -727,6 +725,15 @@ type unitCreationResult struct {
 	failed []unitCreateFailure
 	// started contains the names of all existing provider backups, including the ones created in this run.
 	started map[string]struct{}
+}
+
+// err joins the failures of all units which could not be created. It returns nil if no unit failed.
+func (r unitCreationResult) err() error {
+	errs := make([]error, 0, len(r.failed))
+	for _, failure := range r.failed {
+		errs = append(errs, failure)
+	}
+	return errors.Join(errs...)
 }
 
 // createMissingUnits creates the provider backups of all desired units which do not exist yet.
@@ -797,6 +804,14 @@ func (c *defaultReconciler) patchStatusIfChanged(ctx context.Context, backup *ba
 type unitCreateFailure struct {
 	unit *velerov1.Backup
 	err  error
+}
+
+func (f unitCreateFailure) Error() string {
+	return fmt.Sprintf("create velero unit backup %s: %v", f.unit.Name, f.err)
+}
+
+func (f unitCreateFailure) Unwrap() error {
+	return f.err
 }
 
 // providerBackupCreationProgress returns the succeeded condition which shows how many units exist and which units
