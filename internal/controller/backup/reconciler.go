@@ -664,75 +664,38 @@ func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, back
 func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	// The state is collected on every run. The maintenance mode is active, so the state does not change between
 	// two runs and all units get the same metadata.
-	backupState, err := c.stateCollector.Collect(ctx, backup)
-	if err != nil {
-		return Abort, fmt.Errorf("collect backup state for creating backup units: %w", err)
-	}
-
-	desiredUnits, err := desiredUnitBackups(backup, backupState, c.backupStorageName)
-	if err != nil {
-		return Abort, fmt.Errorf("build backup units: %w", err)
-	}
-
-	existingUnits, err := c.listOwnProviderBackupNames(ctx, backup)
+	backupState, desiredUnits, existingUnits, err := c.getBackupCreationPlan(ctx, backup)
 	if err != nil {
 		return Abort, err
 	}
 
-	// Existing units are not checked for changed metadata. The system state cannot change during the
-	// backup because of the maintenance mode.
-	startedUnits := maps.Clone(existingUnits)
-	// A failing unit does not stop the creation of the remaining units, so that a single blocked unit does not
-	// prevent the backup of all other units.
-	var createdUnits []*velerov1.Backup
-	var failedUnits []unitCreateFailure
-	for _, unit := range desiredUnits {
-		if _, exists := existingUnits[unit.Name]; exists {
-			continue
-		}
-
-		err = c.client.Create(ctx, unit)
-		if apierrors.IsAlreadyExists(err) {
-			// Cache lag
-			logging.Debug(ctx, "ensureProviderBackupCreated: velero unit backup already exists", "unit", unit.Name)
-			startedUnits[unit.Name] = struct{}{}
-			continue
-		}
-		if err != nil {
-			failedUnits = append(failedUnits, unitCreateFailure{unit: unit, err: err})
-			continue
-		}
-
-		createdUnits = append(createdUnits, unit)
-		startedUnits[unit.Name] = struct{}{}
-		logging.Info(ctx, "created the velero unit backup", "unit", unit.Name, "backupStorageLocation", c.backupStorageName)
-	}
+	creationResult := c.createMissingUnits(ctx, desiredUnits, existingUnits)
 
 	// The unit status is populated on every run, so that a failed status patch of a previous run is repaired.
 	// Only missing fields are added, so the results of later steps are kept.
 	populatedStatus := backup.Status.DeepCopy()
-	populateUnitStatus(populatedStatus, backup.Name, backupState, startedUnits)
+	populateUnitStatus(populatedStatus, backup.Name, backupState, creationResult.started)
 	unitStatusChanged := !reflect.DeepEqual(*populatedStatus, backup.Status)
 
 	var createErrs []error
-	for _, failure := range failedUnits {
+	for _, failure := range creationResult.failed {
 		createErrs = append(createErrs, fmt.Errorf("create velero unit backup %s: %w", failure.unit.Name, failure.err))
 		c.recorder.Eventf(backup, failure.unit, corev1.EventTypeWarning, reasonProviderBackupCreationFailed, actionCreateProviderBackup, "Failed to create the provider backup of unit %s: %v", failure.unit.Name, failure.err)
 	}
 	createErr := errors.Join(createErrs...)
 
-	conditionWithProgress := providerBackupCreationProgress(backup, desiredUnits, startedUnits, len(createdUnits) > 0, failedUnits)
+	conditionWithProgress := providerBackupCreationProgress(backup, desiredUnits, creationResult.started, len(creationResult.created) > 0, creationResult.failed)
 	progressChanged := conditionWithProgress != nil && conditions.WillChange(backup.Status.Conditions, *conditionWithProgress)
 
-	if len(createdUnits) > 0 || unitStatusChanged || progressChanged {
+	if len(creationResult.created) > 0 || unitStatusChanged || progressChanged {
 		// The status is patched even if a unit failed. The start timestamp guards
 		// ensureBackupIsPrepared as soon as the first unit exists.
 		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			populateUnitStatus(status, backup.Name, backupState, startedUnits)
+			populateUnitStatus(status, backup.Name, backupState, creationResult.started)
 			if conditionWithProgress != nil {
 				meta.SetStatusCondition(&status.Conditions, *conditionWithProgress)
 			}
-			if len(createdUnits) > 0 && status.StartTimestamp.IsZero() {
+			if len(creationResult.created) > 0 && status.StartTimestamp.IsZero() {
 				status.StartTimestamp = metav1.NewTime(c.clock.Now())
 			}
 		})
@@ -740,7 +703,7 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 			return Abort, errors.Join(createErr, fmt.Errorf("patch status of backup resource: %w", patchErr))
 		}
 
-		for _, unit := range createdUnits {
+		for _, unit := range creationResult.created {
 			c.recorder.Eventf(backup, unit, corev1.EventTypeNormal, reasonProviderBackupInProgress, actionCreateProviderBackup, "Provider backup of unit %s started", unit.Name)
 		}
 	}
@@ -755,6 +718,66 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 	}
 
 	return Next, nil
+}
+
+func (c *defaultReconciler) getBackupCreationPlan(ctx context.Context, backup *backupv1.Backup) (state.BackupState, []*velerov1.Backup, map[string]struct{}, error) {
+	backupState, err := c.stateCollector.Collect(ctx, backup)
+	if err != nil {
+		return state.BackupState{}, nil, nil, fmt.Errorf("collect backup state for creating backup units: %w", err)
+	}
+
+	desiredUnits, err := desiredUnitBackups(backup, backupState, c.backupStorageName)
+	if err != nil {
+		return state.BackupState{}, nil, nil, fmt.Errorf("build backup units: %w", err)
+	}
+
+	existingUnits, err := c.listOwnProviderBackupNames(ctx, backup)
+	if err != nil {
+		return state.BackupState{}, nil, nil, err
+	}
+
+	return backupState, desiredUnits, existingUnits, nil
+}
+
+// unitCreationResult describes the outcome of creating the missing provider backups of the units.
+type unitCreationResult struct {
+	// created contains the units which were created in this run.
+	created []*velerov1.Backup
+	// failed contains the units which could not be created in this run.
+	failed []unitCreateFailure
+	// started contains the names of all existing provider backups, including the ones created in this run.
+	started map[string]struct{}
+}
+
+// createMissingUnits creates the provider backups of all desired units which do not exist yet.
+// Existing units are not checked for changed metadata. The system state cannot change during the
+// backup because of the maintenance mode.
+// A failing unit does not stop the creation of the remaining units, so that a single blocked unit does not
+// prevent the backup of all other units.
+func (c *defaultReconciler) createMissingUnits(ctx context.Context, desiredUnits []*velerov1.Backup, existingUnits map[string]struct{}) unitCreationResult {
+	result := unitCreationResult{started: maps.Clone(existingUnits)}
+	for _, unit := range desiredUnits {
+		if _, exists := existingUnits[unit.Name]; exists {
+			continue
+		}
+
+		err := c.client.Create(ctx, unit)
+		if apierrors.IsAlreadyExists(err) {
+			// Cache lag
+			logging.Debug(ctx, "ensureProviderBackupCreated: velero unit backup already exists", "unit", unit.Name)
+			result.started[unit.Name] = struct{}{}
+			continue
+		}
+		if err != nil {
+			result.failed = append(result.failed, unitCreateFailure{unit: unit, err: err})
+			continue
+		}
+
+		result.created = append(result.created, unit)
+		result.started[unit.Name] = struct{}{}
+		logging.Info(ctx, "created the velero unit backup", "unit", unit.Name, "backupStorageLocation", c.backupStorageName)
+	}
+	return result
 }
 
 // unitCreateFailure describes a unit whose provider backup could not be created.
