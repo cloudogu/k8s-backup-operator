@@ -671,12 +671,6 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 
 	creationResult := c.createMissingUnits(ctx, desiredUnits, existingUnits)
 
-	// The unit status is populated on every run, so that a failed status patch of a previous run is repaired.
-	// Only missing fields are added, so the results of later steps are kept.
-	populatedStatus := backup.Status.DeepCopy()
-	populateUnitStatus(populatedStatus, backup.Name, backupState, creationResult.started)
-	unitStatusChanged := !reflect.DeepEqual(*populatedStatus, backup.Status)
-
 	var createErrs []error
 	for _, failure := range creationResult.failed {
 		createErrs = append(createErrs, fmt.Errorf("create velero unit backup %s: %w", failure.unit.Name, failure.err))
@@ -684,28 +678,14 @@ func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, bac
 	}
 	createErr := errors.Join(createErrs...)
 
-	conditionWithProgress := providerBackupCreationProgress(backup, desiredUnits, creationResult.started, len(creationResult.created) > 0, creationResult.failed)
-	progressChanged := conditionWithProgress != nil && conditions.WillChange(backup.Status.Conditions, *conditionWithProgress)
+	// The status is patched even if a unit failed. The start timestamp guards
+	// ensureBackupIsPrepared as soon as the first unit exists.
+	if err = c.patchStatusIfChanged(ctx, backup, c.unitCreationStatusUpdate(backup, backupState, desiredUnits, creationResult)); err != nil {
+		return Abort, errors.Join(createErr, fmt.Errorf("patch status of backup resource: %w", err))
+	}
 
-	if len(creationResult.created) > 0 || unitStatusChanged || progressChanged {
-		// The status is patched even if a unit failed. The start timestamp guards
-		// ensureBackupIsPrepared as soon as the first unit exists.
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			populateUnitStatus(status, backup.Name, backupState, creationResult.started)
-			if conditionWithProgress != nil {
-				meta.SetStatusCondition(&status.Conditions, *conditionWithProgress)
-			}
-			if len(creationResult.created) > 0 && status.StartTimestamp.IsZero() {
-				status.StartTimestamp = metav1.NewTime(c.clock.Now())
-			}
-		})
-		if patchErr != nil {
-			return Abort, errors.Join(createErr, fmt.Errorf("patch status of backup resource: %w", patchErr))
-		}
-
-		for _, unit := range creationResult.created {
-			c.recorder.Eventf(backup, unit, corev1.EventTypeNormal, reasonProviderBackupInProgress, actionCreateProviderBackup, "Provider backup of unit %s started", unit.Name)
-		}
+	for _, unit := range creationResult.created {
+		c.recorder.Eventf(backup, unit, corev1.EventTypeNormal, reasonProviderBackupInProgress, actionCreateProviderBackup, "Provider backup of unit %s started", unit.Name)
 	}
 
 	if createErr != nil {
@@ -778,6 +758,39 @@ func (c *defaultReconciler) createMissingUnits(ctx context.Context, desiredUnits
 		logging.Info(ctx, "created the velero unit backup", "unit", unit.Name, "backupStorageLocation", c.backupStorageName)
 	}
 	return result
+}
+
+// unitCreationStatusUpdate returns the status update for the creation of the units. It populates the unit status, sets the
+// creation progress condition and sets the start timestamp once the first unit was created.
+// The unit status is populated on every run, so that a failed status patch of a previous run is repaired.
+// Only missing fields are added, so the results of later steps are kept.
+func (c *defaultReconciler) unitCreationStatusUpdate(
+	backup *backupv1.Backup,
+	backupState state.BackupState,
+	desiredUnits []*velerov1.Backup,
+	creationResult unitCreationResult,
+) statusUpdate {
+	progress := providerBackupCreationProgress(backup, desiredUnits, creationResult.started, len(creationResult.created) > 0, creationResult.failed)
+	return func(status *backupv1.BackupStatus) {
+		populateUnitStatus(status, backup.Name, backupState, creationResult.started)
+		if progress != nil {
+			meta.SetStatusCondition(&status.Conditions, *progress)
+		}
+		if len(creationResult.created) > 0 && status.StartTimestamp.IsZero() {
+			status.StartTimestamp = metav1.NewTime(c.clock.Now())
+		}
+	}
+}
+
+// patchStatusIfChanged applies the update to a copy of the current status and patches the status only if the
+// update changes it.
+func (c *defaultReconciler) patchStatusIfChanged(ctx context.Context, backup *backupv1.Backup, update statusUpdate) error {
+	desired := backup.Status.DeepCopy()
+	update(desired)
+	if reflect.DeepEqual(*desired, backup.Status) {
+		return nil
+	}
+	return c.patchStatus(ctx, backup, update)
 }
 
 // unitCreateFailure describes a unit whose provider backup could not be created.
