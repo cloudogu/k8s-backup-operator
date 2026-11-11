@@ -1,9 +1,8 @@
 package backup
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
+	"hash/fnv"
 	"maps"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -81,8 +80,10 @@ func unitBackupName(backupName string, unit backupv1.UnitIdentifier) string {
 		return name
 	}
 
-	hash := sha256.Sum256([]byte(name))
-	suffix := hex.EncodeToString(hash[:])[:unitNameHashLength]
+	hasher := fnv.New64a()
+	_, _ = hasher.Write([]byte(name)) // hash.Hash.Write never returns an error
+	suffix := fmt.Sprintf("%016x", hasher.Sum64())[:unitNameHashLength]
+
 	return fmt.Sprintf("%s-%s", name[:maxObjectNameLength-unitNameHashLength-1], suffix)
 }
 
