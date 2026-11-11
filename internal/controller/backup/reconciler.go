@@ -793,7 +793,7 @@ func providerBackupCreationProgress(
 			Type:    backupv1.ConditionSucceeded,
 			Status:  metav1.ConditionUnknown,
 			Reason:  reasonProviderBackupCreationFailed,
-			Message: fmt.Sprintf("Failed to create the provider backups of units %s. Provider backups of %d of %d units exist.", strings.Join(failures, ", "), existingCount, len(desiredUnits)),
+			Message: fmt.Sprintf("Failed to create the provider backups of units %s. Provider backups for %d out of %d units exist.", strings.Join(failures, ", "), existingCount, len(desiredUnits)),
 		}
 	}
 
