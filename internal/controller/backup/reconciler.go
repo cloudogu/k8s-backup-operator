@@ -722,7 +722,7 @@ type unitCreationResult struct {
 	// created contains the units which were created in this run.
 	created []*velerov1.Backup
 	// failed contains the units which could not be created in this run.
-	failed []unitCreateFailure
+	failed []unitCreationError
 	// started contains the names of all existing provider backups, including the ones created in this run.
 	started map[string]struct{}
 }
@@ -756,7 +756,7 @@ func (c *defaultReconciler) createMissingUnits(ctx context.Context, desiredUnits
 			continue
 		}
 		if err != nil {
-			result.failed = append(result.failed, unitCreateFailure{unit: unit, err: err})
+			result.failed = append(result.failed, unitCreationError{unit: unit, err: err})
 			continue
 		}
 
@@ -800,17 +800,17 @@ func (c *defaultReconciler) patchStatusIfChanged(ctx context.Context, backup *ba
 	return c.patchStatus(ctx, backup, update)
 }
 
-// unitCreateFailure describes a unit whose provider backup could not be created.
-type unitCreateFailure struct {
+// unitCreationError describes a unit whose provider backup could not be created.
+type unitCreationError struct {
 	unit *velerov1.Backup
 	err  error
 }
 
-func (f unitCreateFailure) Error() string {
+func (f unitCreationError) Error() string {
 	return fmt.Sprintf("create velero unit backup %s: %v", f.unit.Name, f.err)
 }
 
-func (f unitCreateFailure) Unwrap() error {
+func (f unitCreationError) Unwrap() error {
 	return f.err
 }
 
@@ -823,7 +823,7 @@ func providerBackupCreationProgress(
 	desiredUnits []*velerov1.Backup,
 	startedUnits map[string]struct{},
 	unitsCreated bool,
-	failedUnits []unitCreateFailure,
+	failedUnits []unitCreationError,
 ) *metav1.Condition {
 	if len(failedUnits) > 0 {
 		// Only on a failure some units may be missing. startedUnits can contain provider backups with the label of
