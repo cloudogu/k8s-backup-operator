@@ -290,7 +290,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		require.NotNil(t, succeeded)
 		assert.Equal(t, metav1.ConditionUnknown, succeeded.Status)
 		assert.Equal(t, reasonProviderBackupCreationFailed, succeeded.Reason)
-		assert.Equal(t, "Failed to create the provider backups of units backup-doguv2 (create error), backup-dogu-ldap (create error), backup-global-config (create error), backup-misc (create error). Provider backups of 0 of 4 units exist.", succeeded.Message)
+		assert.Equal(t, "Failed to create the provider backups of units backup-doguv2 (create error), backup-dogu-ldap (create error), backup-global-config (create error), backup-misc (create error). Provider backups for 0 out of 4 units exist.", succeeded.Message)
 		assertEventRecorded(t, reconciler, "Warning ProviderBackupCreationFailed Failed to create the provider backup of unit backup-doguv2: create error")
 		assertEventRecorded(t, reconciler, "Warning ProviderBackupCreationFailed Failed to create the provider backup of unit backup-misc: create error")
 		assert.True(t, backup.Status.StartTimestamp.IsZero())
@@ -325,7 +325,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		require.NotNil(t, succeeded)
 		assert.Equal(t, reasonProviderBackupCreationFailed, succeeded.Reason)
-		assert.Equal(t, "Failed to create the provider backups of units backup-doguv2 (create error). Provider backups of 3 of 4 units exist.", succeeded.Message)
+		assert.Equal(t, "Failed to create the provider backups of units backup-doguv2 (create error). Provider backups for 3 out of 4 units exist.", succeeded.Message)
 		require.NotNil(t, backup.Status.V2Dogus)
 		assert.Nil(t, backup.Status.V2Dogus.ProviderRef)
 		require.NotNil(t, backup.Status.Misc)
@@ -356,7 +356,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		assertEventRecorded(t, reconciler, "Warning ProviderBackupCreationFailed Failed to create the provider backup of unit backup-misc: create error 4")
 		succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		require.NotNil(t, succeeded)
-		assert.Equal(t, "Failed to create the provider backups of units backup-dogu-ldap (create error 2), backup-misc (create error 4). Provider backups of 2 of 4 units exist.", succeeded.Message)
+		assert.Equal(t, "Failed to create the provider backups of units backup-dogu-ldap (create error 2), backup-misc (create error 4). Provider backups for 2 out of 4 units exist.", succeeded.Message)
 	})
 
 	t.Run("Replace the creation failure of a previous run once all units exist", func(t *testing.T) {
