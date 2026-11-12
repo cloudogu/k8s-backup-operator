@@ -43,7 +43,7 @@ func desiredUnitBackups(backup *backupv1.Backup, backupState state.BackupState, 
 		}
 		maps.Copy(annotations, typeAnnotations)
 
-		selector, selectorErr := unitSelector(backup, backupState, unit)
+		selector, selectorErr := unitSelector(backupState, unit)
 		if selectorErr != nil {
 			return nil, selectorErr
 		}
@@ -113,7 +113,7 @@ func unitTypeAnnotations(backupState state.BackupState, unit backupv1.UnitIdenti
 	}
 }
 
-func unitSelector(backup *backupv1.Backup, backupState state.BackupState, unit backupv1.UnitIdentifier) (*metav1.LabelSelector, error) {
+func unitSelector(backupState state.BackupState, unit backupv1.UnitIdentifier) (*metav1.LabelSelector, error) {
 	switch unit.Type {
 	case backupv1.UnitTypeDogu:
 		return &metav1.LabelSelector{MatchLabels: map[string]string{doguNameLabelKey: unit.Name}}, nil
@@ -128,17 +128,18 @@ func unitSelector(backup *backupv1.Backup, backupState state.BackupState, unit b
 	case backupv1.UnitTypeGlobalConfig:
 		return &metav1.LabelSelector{MatchLabels: map[string]string{typeLabelKey: globalConfigTypeLabelValue}}, nil
 	case backupv1.UnitTypeMisc:
-		// Resources with the backup-scope label belong to a dogu unit if they are labeled with a dogu.
-		requirements := []metav1.LabelSelectorRequirement{
+		// The misc unit only contains resources of components labeled with the backup-scope label.
+		if len(backupState.Components) == 0 {
+			return nil, fmt.Errorf("misc unit requires at least one component")
+		}
+		names := make([]string, 0, len(backupState.Components))
+		for _, component := range backupState.Components {
+			names = append(names, component.Name)
+		}
+		return &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: backupScopeLabelKey, Operator: metav1.LabelSelectorOpExists},
-			{Key: doguNameLabelKey, Operator: metav1.LabelSelectorOpDoesNotExist},
-		}
-		if len(backup.Spec.ExcludedComponents) > 0 {
-			requirements = append(requirements, metav1.LabelSelectorRequirement{
-				Key: componentv1.ComponentNameLabelKey, Operator: metav1.LabelSelectorOpNotIn, Values: backup.Spec.ExcludedComponents,
-			})
-		}
-		return &metav1.LabelSelector{MatchExpressions: requirements}, nil
+			{Key: componentv1.ComponentNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: names},
+		}}, nil
 	default:
 		return nil, fmt.Errorf("unknown unit type %q", unit.Type)
 	}

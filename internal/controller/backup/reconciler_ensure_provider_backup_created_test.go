@@ -34,6 +34,7 @@ func newBackupStateForTest(backupName string) state.BackupState {
 		},
 		InstalledDogusV2: []backupv1.DoguVersion{{Name: "cas", Version: "7.0.0-1"}},
 		InstalledDogusV3: []backupv1.DoguVersion{{Name: "ldap", Version: "2.6.8-1"}},
+		Components:       []backupv1.ComponentStatus{{Name: "k8s-lop-idp", Version: "1.0.0"}},
 		Fqdn:             "ces.example.com",
 		Domain:           "example.com",
 	}
@@ -208,8 +209,9 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		counter := &callCounter{}
 		collector := newMockBackupStateCollector(t)
 		collector.EXPECT().Collect(mock.Anything, backup).Return(state.BackupState{
-			Name:  backup.Name,
-			Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeMisc}},
+			Name:       backup.Name,
+			Units:      []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeMisc}},
+			Components: []backupv1.ComponentStatus{{Name: "k8s-lop-idp", Version: "1.0.0"}},
 		}, nil)
 		reconciler, _ := newReconcilerForProviderBackupCreatedTest(t, counter, collector,
 			backup,
@@ -230,8 +232,9 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		}
 		collector := newMockBackupStateCollector(t)
 		collector.EXPECT().Collect(mock.Anything, backup).Return(state.BackupState{
-			Name:  backup.Name,
-			Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeMisc}},
+			Name:       backup.Name,
+			Units:      []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeMisc}},
+			Components: []backupv1.ComponentStatus{{Name: "k8s-lop-idp", Version: "1.0.0"}},
 		}, nil)
 		reconciler, _ := newReconcilerForProviderBackupCreatedTest(t, counter, collector, backup)
 

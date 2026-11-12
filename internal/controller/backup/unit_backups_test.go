@@ -99,20 +99,39 @@ func TestDesiredUnitBackups(t *testing.T) {
 		assert.Contains(t, unit.Annotations, backupv1.ComponentsAnnotationKey)
 		assert.Equal(t, &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
-			{Key: "k8s.cloudogu.com/dogu.name", Operator: metav1.LabelSelectorOpDoesNotExist},
-			{Key: "k8s.cloudogu.com/component.name", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"k8s-loki"}},
+			{Key: "k8s.cloudogu.com/component.name", Operator: metav1.LabelSelectorOpIn, Values: []string{"k8s-lop-idp"}},
 		}}, unit.Spec.LabelSelector)
 		assert.Equal(t, []string{"configmaps", "secrets", "persistentvolumeclaims"}, unit.Spec.IncludedResources)
 	})
 
-	t.Run("misc unit without excluded components", func(t *testing.T) {
-		miscOnly := state.BackupState{Name: "backup", Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeMisc}}}
+	t.Run("misc unit selects all components in one requirement", func(t *testing.T) {
+		miscOnly := state.BackupState{
+			Name:  "backup",
+			Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeMisc}},
+			Components: []backupv1.ComponentStatus{
+				{Name: "k8s-lop-idp", Version: "1.0.0"},
+				{Name: "k8s-loki", Version: "2.0.0"},
+			},
+		}
 
 		unitBackups, err := desiredUnitBackups(newBackupForTest("ns", "backup"), miscOnly, "default")
 
 		require.NoError(t, err)
 		require.Len(t, unitBackups, 1)
-		assert.Len(t, unitBackups[0].Spec.LabelSelector.MatchExpressions, 2)
+		assert.Equal(t, &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
+			{Key: "k8s.cloudogu.com/component.name", Operator: metav1.LabelSelectorOpIn, Values: []string{"k8s-lop-idp", "k8s-loki"}},
+		}}, unitBackups[0].Spec.LabelSelector)
+	})
+
+	t.Run("misc unit without components fails", func(t *testing.T) {
+		miscOnly := state.BackupState{Name: "backup", Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeMisc}}}
+
+		unitBackups, err := desiredUnitBackups(newBackupForTest("ns", "backup"), miscOnly, "default")
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "misc unit requires at least one component")
+		assert.Nil(t, unitBackups)
 	})
 
 	t.Run("Do not modify the default labels", func(t *testing.T) {
