@@ -4,7 +4,7 @@ go 1.27.3
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/cloudogu/k8s-backup-lib v1.6.1-0.20261110083111-24e9f2297fa6
+	github.com/cloudogu/k8s-backup-lib v1.11.0
 	github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0
 	github.com/cloudogu/k8s-component-lib v1.15.0
 	github.com/cloudogu/k8s-dogu-lib/v3 v3.3.0
