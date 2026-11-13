@@ -19,6 +19,7 @@ const (
 	// unitNameHashLength is the number of hex characters of the hash which makes truncated unit names unique.
 	unitNameHashLength = 8
 
+	v2DoguNameLabelKey         = "dogu.name"
 	doguNameLabelKey           = "k8s.cloudogu.com/dogu.name"
 	backupScopeLabelKey        = "k8s.cloudogu.com/backup-scope"
 	typeLabelKey               = "k8s.cloudogu.com/type"
@@ -123,7 +124,7 @@ func unitSelector(backupState state.BackupState, unit backupv1.UnitIdentifier) (
 			names = append(names, dogu.Name)
 		}
 		return &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
-			{Key: doguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: names},
+			{Key: v2DoguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: names},
 		}}, nil
 	case backupv1.UnitTypeGlobalConfig:
 		return &metav1.LabelSelector{MatchLabels: map[string]string{typeLabelKey: globalConfigTypeLabelValue}}, nil
