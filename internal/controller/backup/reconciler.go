@@ -777,12 +777,10 @@ func (c *defaultReconciler) unitCreationStatusUpdate(
 	desiredUnits []*velerov1.Backup,
 	creationResult unitCreationResult,
 ) statusUpdate {
-	progress := providerBackupCreationProgress(backup, desiredUnits, len(creationResult.created) > 0, creationResult.failed)
+	progress := providerBackupCreationProgress(desiredUnits, creationResult.failed)
 	return func(status *backupv1.BackupStatus) {
 		populateUnitStatus(status, backup.Name, backupState, creationResult.started)
-		if progress != nil {
-			meta.SetStatusCondition(&status.Conditions, *progress)
-		}
+		meta.SetStatusCondition(&status.Conditions, progress)
 		if len(creationResult.created) > 0 && status.StartTimestamp.IsZero() {
 			status.StartTimestamp = metav1.NewTime(c.clock.Now())
 		}
@@ -815,14 +813,9 @@ func (f unitCreationError) Unwrap() error {
 }
 
 // providerBackupCreationProgress returns the succeeded condition which shows how many units exist and which units
-// could not be created. It returns nil if the condition does not need to be changed.
-// unitsCreated tells whether this run created at least one unit.
-func providerBackupCreationProgress(
-	backup *backupv1.Backup,
-	desiredUnits []*velerov1.Backup,
-	unitsCreated bool,
-	failedUnits []unitCreationError,
-) *metav1.Condition {
+// could not be created. Without failures, all desired units exist. This also replaces a creation failure of a previous
+// run, even if this run created nothing, e.g. because the previous run created the units but failed to patch the status.
+func providerBackupCreationProgress(desiredUnits []*velerov1.Backup, failedUnits []unitCreationError) metav1.Condition {
 	if len(failedUnits) > 0 {
 		existingCount := len(desiredUnits) - len(failedUnits)
 		failures := make([]string, 0, len(failedUnits))
@@ -830,7 +823,7 @@ func providerBackupCreationProgress(
 			failures = append(failures, fmt.Sprintf("%s (%v)", failure.unit.Name, failure.err))
 		}
 
-		return &metav1.Condition{
+		return metav1.Condition{
 			Type:    backupv1.ConditionSucceeded,
 			Status:  metav1.ConditionUnknown,
 			Reason:  reasonProviderBackupCreationFailed,
@@ -838,14 +831,7 @@ func providerBackupCreationProgress(
 		}
 	}
 
-	// A creation failure of a previous run is replaced as soon as the creation succeeds.
-	current := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
-	previousRunFailed := current != nil && current.Reason == reasonProviderBackupCreationFailed
-	if !unitsCreated && !previousRunFailed {
-		return nil
-	}
-
-	return &metav1.Condition{
+	return metav1.Condition{
 		Type:    backupv1.ConditionSucceeded,
 		Status:  metav1.ConditionUnknown,
 		Reason:  reasonProviderBackupsCreated,

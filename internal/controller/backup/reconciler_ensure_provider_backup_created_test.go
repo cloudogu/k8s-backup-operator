@@ -135,7 +135,10 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 		require.NotNil(t, backup.Status.Misc)
 		assert.Equal(t, &backupv1.ProviderRef{Name: "backup-misc"}, backup.Status.Misc.ProviderRef)
-		assert.Nil(t, meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded))
+		succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+		require.NotNil(t, succeeded)
+		assert.Equal(t, reasonProviderBackupsCreated, succeeded.Reason)
+		assert.Equal(t, "Provider backups of all 4 units exist.", succeeded.Message)
 		assert.True(t, backup.Status.StartTimestamp.IsZero())
 	})
 
