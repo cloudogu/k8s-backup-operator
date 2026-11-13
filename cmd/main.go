@@ -17,6 +17,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
 	operatortime "github.com/cloudogu/k8s-backup-operator/internal/time"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
+	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
 	doguv3beta1 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 	doguv3Client "github.com/cloudogu/k8s-dogu-lib/v3/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
@@ -75,6 +76,7 @@ func init() {
 	utilruntime.Must(velerov1.AddToScheme(scheme))
 	utilruntime.Must(blueprintv3.AddToScheme(scheme))
 	utilruntime.Must(doguv3beta1.AddToScheme(scheme))
+	utilruntime.Must(componentv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
