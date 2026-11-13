@@ -68,7 +68,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		require.NotNil(t, succeeded)
 		assert.Equal(t, metav1.ConditionUnknown, succeeded.Status)
-		assert.Equal(t, reasonProviderBackupResourceDoesNotExist, succeeded.Reason)
+		assert.Equal(t, reasonProviderBackupsCreated, succeeded.Reason)
 		assert.Equal(t, "Provider backups of all 4 units exist.", succeeded.Message)
 		assert.False(t, backup.Status.StartTimestamp.IsZero())
 
@@ -385,7 +385,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		assert.Equal(t, Next, nextAction)
 		succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		require.NotNil(t, succeeded)
-		assert.Equal(t, reasonProviderBackupResourceDoesNotExist, succeeded.Reason)
+		assert.Equal(t, reasonProviderBackupsCreated, succeeded.Reason)
 		assert.Equal(t, "Provider backups of all 4 units exist.", succeeded.Message)
 	})
 
@@ -417,7 +417,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		assert.Equal(t, &backupv1.ProviderRef{Name: "backup-doguv2"}, backup.Status.V2Dogus.ProviderRef)
 		succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
 		require.NotNil(t, succeeded)
-		assert.Equal(t, reasonProviderBackupResourceDoesNotExist, succeeded.Reason)
+		assert.Equal(t, reasonProviderBackupsCreated, succeeded.Reason)
 		assert.Equal(t, "Provider backups of all 4 units exist.", succeeded.Message)
 	})
 

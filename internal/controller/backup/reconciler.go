@@ -40,6 +40,7 @@ const (
 	reasonProviderBackupInProgress               = "ProviderBackupInProgress"
 	reasonOtherProviderBackupInProgress          = "OtherProviderBackupInProgress"
 	reasonCanceledProviderBackupDeleted          = "CanceledProviderBackupDeleted"
+	reasonProviderBackupsCreated                 = "ProviderBackupsCreated"
 	reasonProviderBackupFailed                   = "ProviderBackupFailed"
 	reasonProviderBackupDeletionFailed           = "ProviderBackupDeletionFailed"
 	reasonProviderBackupDeletionRetried          = "ProviderBackupDeletionRetried"
@@ -847,7 +848,7 @@ func providerBackupCreationProgress(
 	return &metav1.Condition{
 		Type:    backupv1.ConditionSucceeded,
 		Status:  metav1.ConditionUnknown,
-		Reason:  reasonProviderBackupResourceDoesNotExist,
+		Reason:  reasonProviderBackupsCreated,
 		Message: fmt.Sprintf("Provider backups of all %d units exist.", len(desiredUnits)),
 	}
 }
