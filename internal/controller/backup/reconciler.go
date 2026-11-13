@@ -470,7 +470,7 @@ func (c *defaultReconciler) ensureBackupMetadata(ctx context.Context, backup *ba
 	backupApplyConfiguration := backupApply.Backup(backup.Name, backup.Namespace).WithLabels(defaultLabels).WithFinalizers(backupv1.BackupFinalizer)
 	err := c.client.Apply(ctx, backupApplyConfiguration, client.FieldOwner("k8s-backup-operator"))
 	if err != nil {
-		return Abort, fmt.Errorf("failed to apply default labels and finalizer: %w", err)
+		return Abort, fmt.Errorf("apply default labels and finalizer: %w", err)
 	}
 
 	logging.Info(ctx, "persisted default labels and finalizer")
