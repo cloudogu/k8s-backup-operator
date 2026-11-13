@@ -102,7 +102,7 @@ func unitStatusFromProviderBackup(backup *velerov1.Backup) (unitStatus backupv1.
 		// treat missing same as in progress
 		completionState = unitsInProgress
 		unitStatus.State = backupv1.UnitStateMissing
-		unitStatus.Reason = reasonProviderBackupMissing
+		unitStatus.Reason = reasonProviderBackupResourceDoesNotExist
 		unitStatus.Message = "the provider backup for this unit is missing or might not have been created yet"
 		return
 	}
