@@ -182,7 +182,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			},
 			expectedV2Dogus: &backupv1.V2DogusUnitStatus{
 				State:   "Missing",
-				Reason:  "ProviderBackupMissing",
+				Reason:  "ProviderBackupResourceDoesNotExist",
 				Message: "the provider backup for this unit is missing or might not have been created yet",
 				Dogus:   nil,
 			},
