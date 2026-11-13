@@ -14,35 +14,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-func TestCreateVeleroBackupResource(t *testing.T) {
-	backup := &k8sv1.Backup{ObjectMeta: metav1.ObjectMeta{
-		Name: testBackup, Namespace: testNamespace,
-		Annotations: map[string]string{"backup.cloudogu.com/blueprintId": "blueprint-id"},
-	}}
-	labels := map[string]string{"app": "ces", "k8s.cloudogu.com/part-of": "backup"}
+func TestCreateVeleroUnitBackupResource(t *testing.T) {
+	labels := map[string]string{"app": "ces", "k8s.cloudogu.com/backup": testBackup}
+	annotations := map[string]string{"k8s.cloudogu.com/backup-units": `[{"type":"misc"}]`}
+	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"k8s.cloudogu.com/dogu.name": "ldap"}}
+	includedResources := []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}
 
-	actual := CreateVeleroBackupResource(backup, "backup-storage", labels)
+	actual := CreateVeleroUnitBackupResource(testNamespace, "unit-name", "backup-storage", labels, annotations, selector, includedResources)
 
-	assert.Equal(t, backup.Name, actual.Name)
-	assert.Equal(t, backup.Namespace, actual.Namespace)
+	assert.Equal(t, "unit-name", actual.Name)
+	assert.Equal(t, testNamespace, actual.Namespace)
 	assert.Equal(t, labels, actual.Labels)
-	assert.Equal(t, backup.Annotations, actual.Annotations)
-	assert.Equal(t, []string{backup.Namespace}, actual.Spec.IncludedNamespaces)
-	assert.Equal(t, []string{"configmaps", "secrets", "persistentvolumeclaims", "persistentvolumes", "dogus.k8s.cloudogu.com"}, actual.Spec.IncludedResources)
-	require.Len(t, actual.Spec.OrLabelSelectors, 3)
-	assert.Equal(t, map[string]string{"k8s.cloudogu.com/type": "global-config"}, actual.Spec.OrLabelSelectors[0].MatchLabels)
-	assert.Equal(t, "dogu.name", actual.Spec.OrLabelSelectors[1].MatchExpressions[0].Key)
-	assert.Equal(t, "k8s.cloudogu.com/backup-scope", actual.Spec.OrLabelSelectors[2].MatchExpressions[0].Key)
-	assert.Equal(t, metav1.LabelSelectorOpExists, actual.Spec.OrLabelSelectors[1].MatchExpressions[0].Operator)
-	assert.Equal(t, metav1.LabelSelectorOpExists, actual.Spec.OrLabelSelectors[2].MatchExpressions[0].Operator)
-	assert.Equal(t, metav1.Duration{Duration: defaultBackupTTL}, actual.Spec.TTL)
+	assert.Equal(t, annotations, actual.Annotations)
+	assert.Equal(t, []string{testNamespace}, actual.Spec.IncludedNamespaces)
+	assert.Equal(t, includedResources, actual.Spec.IncludedResources)
+	assert.Equal(t, selector, actual.Spec.LabelSelector)
+	assert.Empty(t, actual.Spec.OrLabelSelectors)
 	assert.Equal(t, "backup-storage", actual.Spec.StorageLocation)
+	assert.Equal(t, defaultBackupTTL, actual.Spec.TTL.Duration)
 	require.NotNil(t, actual.Spec.DefaultVolumesToFsBackup)
 	assert.False(t, *actual.Spec.DefaultVolumesToFsBackup)
 }
 
 func TestCreateVeleroDeleteBackupRequestIfNotExists(t *testing.T) {
-	backup := &k8sv1.Backup{ObjectMeta: metav1.ObjectMeta{Name: testBackup, Namespace: testNamespace}}
+	backup := &k8sv1.Backup{Name: testBackup, Namespace: testNamespace}
 
 	t.Run("creates a missing request", func(t *testing.T) {
 		writes := &writeCounter{}
@@ -57,7 +52,7 @@ func TestCreateVeleroDeleteBackupRequestIfNotExists(t *testing.T) {
 	})
 
 	t.Run("returns an existing request without writing", func(t *testing.T) {
-		existing := &velerov1.DeleteBackupRequest{ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace}, Spec: velerov1.DeleteBackupRequestSpec{BackupName: backup.Name}}
+		existing := &velerov1.DeleteBackupRequest{Name: backup.Name, Namespace: backup.Namespace, Spec: velerov1.DeleteBackupRequestSpec{BackupName: backup.Name}}
 		writes := &writeCounter{}
 		k8sClient := newTestClient(t, writes, backup, existing)
 		actual, err := CreateVeleroDeleteBackupRequestIfNotExists(context.Background(), k8sClient, backup)

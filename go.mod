@@ -4,8 +4,7 @@ go 1.27.3
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/cloudogu/ces-commons-lib v0.3.0
-	github.com/cloudogu/k8s-backup-lib v1.10.0
+	github.com/cloudogu/k8s-backup-lib v1.6.1-0.20261110083111-24e9f2297fa6
 	github.com/cloudogu/k8s-blueprint-lib/v3 v3.2.0
 	github.com/cloudogu/k8s-component-lib v1.15.0
 	github.com/cloudogu/k8s-dogu-lib/v3 v3.3.0
@@ -33,6 +32,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/cloudogu/ces-commons-lib v0.3.0 // indirect
 	github.com/cloudogu/cesapp-lib v0.18.3 // indirect
 	github.com/cloudogu/retry-lib v0.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

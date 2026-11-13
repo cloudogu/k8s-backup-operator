@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/json/v2"
 	"fmt"
+	"slices"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
@@ -17,6 +18,12 @@ type BackupState struct {
 	Components       []backupv1.ComponentStatus
 	Fqdn             string
 	Domain           string
+}
+
+func (s BackupState) ContainsUnitType(unitType backupv1.UnitType) bool {
+	return slices.ContainsFunc(s.Units, func(identifier backupv1.UnitIdentifier) bool {
+		return identifier.Type == unitType
+	})
 }
 
 func (s BackupState) CommonLabels() map[string]string {

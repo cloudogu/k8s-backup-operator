@@ -347,6 +347,41 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "should not create misc unit when no resource with backup scope label is present - even if ignoreMisc is not ignored",
+			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
+				return builder.WithObjects(
+					&blueprintv3.Blueprint{Name: "blueprint", Namespace: testNamespace, Spec: blueprintv3.BlueprintSpec{DisplayName: "test-blueprint"}},
+					&doguv3.Dogu{Name: "cockpit", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cockpit", Version: "1.3.3", DoguNamespace: "official", DoguApiVersion: "v2"}, Status: doguv3.DoguStatus{InstalledVersion: "1.2.3"}},
+					&doguv3.Dogu{Name: "baseline", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "baseline", Version: "3.3.1", DoguNamespace: "official", DoguApiVersion: "v3"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
+					&doguv3.Dogu{Name: "unknown-version", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "excluded", Version: "3.2.1", DoguNamespace: "official", DoguApiVersion: "v4"}, Status: doguv3.DoguStatus{InstalledVersion: "3.2.1"}},
+					&componentv1.Component{Name: "lop-idp", Namespace: testNamespace, Status: componentv1.ComponentStatus{InstalledVersion: "1.0.0"}},
+					&corev1.ConfigMap{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0"}},
+					&corev1.Secret{Name: "lop-idp-config", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0"}},
+					&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", componentv1.ComponentVersionLabelKey: "1.0.0"}},
+					&corev1.PersistentVolumeClaim{Name: "orphaned-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "orphaned", componentv1.ComponentVersionLabelKey: "1.0.0"}},
+					&corev1.ConfigMap{Name: "global-config", Namespace: testNamespace, Data: map[string]string{"config.yaml": `{"fqdn": "fqdn.example.com","domain": "domain.example.com"}`}},
+				)
+			},
+			backup: &backupv1.Backup{
+				Name: testBackupName, Namespace: testNamespace,
+			},
+			want: BackupState{
+				Name:        testBackupName,
+				Coverage:    backupv1.BackupCoverageFull,
+				BlueprintId: "test-blueprint",
+				Units: []backupv1.UnitIdentifier{
+					{Type: "doguv2"},
+					{Type: "dogu", Name: "baseline"},
+					{Type: "global-config"},
+				},
+				InstalledDogusV2: []backupv1.DoguVersion{{Name: "cockpit", Version: "1.2.3"}},
+				InstalledDogusV3: []backupv1.DoguVersion{{Name: "baseline", Version: "3.2.1"}},
+				Fqdn:             "fqdn.example.com",
+				Domain:           "domain.example.com",
+			},
+			wantErr: assert.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

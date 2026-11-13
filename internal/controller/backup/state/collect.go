@@ -59,7 +59,7 @@ func (b *BackupStateCollector) Collect(ctx context.Context, backup *backupv1.Bac
 		Name:             backup.Name,
 		Coverage:         b.getCoverage(backup),
 		BlueprintId:      blueprintId,
-		Units:            b.getUnits(backup, v2Dogus, v3Dogus),
+		Units:            b.getUnits(backup, v2Dogus, v3Dogus, components),
 		InstalledDogusV2: v2Dogus,
 		InstalledDogusV3: v3Dogus,
 		Components:       components,
@@ -251,7 +251,7 @@ func (b *BackupStateCollector) getGlobalConfigInfo(ctx context.Context, backup *
 	return fqdn, domain, nil
 }
 
-func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backupv1.DoguVersion, v3Dogus []backupv1.DoguVersion) (units []backupv1.UnitIdentifier) {
+func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backupv1.DoguVersion, v3Dogus []backupv1.DoguVersion, components []backupv1.ComponentStatus) (units []backupv1.UnitIdentifier) {
 	if len(v2Dogus) > 0 {
 		units = append(units, backupv1.UnitIdentifier{
 			Type: backupv1.UnitTypeDoguV2,
@@ -268,7 +268,7 @@ func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backu
 			Type: backupv1.UnitTypeGlobalConfig,
 		})
 	}
-	if !backup.Spec.Options.IgnoreMisc {
+	if !backup.Spec.Options.IgnoreMisc && len(components) != 0 {
 		units = append(units, backupv1.UnitIdentifier{
 			Type: backupv1.UnitTypeMisc,
 		})
