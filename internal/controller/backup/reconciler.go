@@ -769,7 +769,6 @@ func (c *defaultReconciler) createMissingUnits(ctx context.Context, desiredUnits
 
 // unitCreationStatusUpdate returns the status update for the creation of the units. It populates the unit status, sets the
 // creation progress condition and sets the start timestamp once the first unit was created.
-// The unit status is populated on every run, so that a failed status patch of a previous run is repaired.
 // Only missing fields are added, so the results of later steps are kept.
 func (c *defaultReconciler) unitCreationStatusUpdate(
 	backup *backupv1.Backup,
@@ -777,7 +776,7 @@ func (c *defaultReconciler) unitCreationStatusUpdate(
 	desiredUnits []*velerov1.Backup,
 	creationResult unitCreationResult,
 ) statusUpdate {
-	progress := providerBackupCreationProgress(backup, desiredUnits, creationResult.started, len(creationResult.created) > 0, creationResult.failed)
+	progress := providerBackupCreationProgress(backup, desiredUnits, len(creationResult.created) > 0, creationResult.failed)
 	return func(status *backupv1.BackupStatus) {
 		populateUnitStatus(status, backup.Name, backupState, creationResult.started)
 		if progress != nil {
@@ -816,25 +815,15 @@ func (f unitCreationError) Unwrap() error {
 
 // providerBackupCreationProgress returns the succeeded condition which shows how many units exist and which units
 // could not be created. It returns nil if the condition does not need to be changed.
-// startedUnits contains the names of the existing provider backups and is only used to count the existing units on a
-// failure: without a failure, all desired units exist. unitsCreated tells whether this run created at least one unit.
+// unitsCreated tells whether this run created at least one unit.
 func providerBackupCreationProgress(
 	backup *backupv1.Backup,
 	desiredUnits []*velerov1.Backup,
-	startedUnits map[string]struct{},
 	unitsCreated bool,
 	failedUnits []unitCreationError,
 ) *metav1.Condition {
 	if len(failedUnits) > 0 {
-		// Only on a failure some units may be missing. startedUnits can contain provider backups with the label of
-		// the backup which are not desired, so the desired units are counted.
-		existingCount := 0
-		for _, unit := range desiredUnits {
-			if _, started := startedUnits[unit.Name]; started {
-				existingCount++
-			}
-		}
-
+		existingCount := len(desiredUnits) - len(failedUnits)
 		failures := make([]string, 0, len(failedUnits))
 		for _, failure := range failedUnits {
 			failures = append(failures, fmt.Sprintf("%s (%v)", failure.unit.Name, failure.err))
