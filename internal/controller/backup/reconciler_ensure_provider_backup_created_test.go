@@ -95,6 +95,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 			assert.Equal(t, "default", unit.Spec.StorageLocation)
 		}
 		assert.ElementsMatch(t, []string{"backup-doguv2", "backup-dogu-ldap", "backup-global-config", "backup-misc"}, names)
+		assertEventRecorded(t, reconciler, "Normal ProviderBackupInProgress Provider backup of unit backup-misc started")
 	})
 
 	t.Run("Set the start time only once", func(t *testing.T) {
@@ -442,7 +443,7 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 		assert.Equal(t, 1, counter.subResourcePatchCount)
 	})
 
-	t.Run("If patching the status fails, abort", func(t *testing.T) {
+	t.Run("If patching the status fails, abort but record the events of the created units", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		counter := &callCounter{subResourcePatchCallError: errors.New("patch error")}
 		collector := newMockBackupStateCollector(t)
@@ -453,6 +454,8 @@ func TestReconcilerEnsureProviderBackupCreated(t *testing.T) {
 
 		assert.ErrorContains(t, err, "patch error")
 		assert.Equal(t, Abort, nextAction)
+		assert.Equal(t, 4, counter.veleroBackupCreateCount)
+		assertEventRecorded(t, reconciler, "Normal ProviderBackupInProgress Provider backup of unit backup-misc started")
 	})
 }
 
