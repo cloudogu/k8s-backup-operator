@@ -2,7 +2,9 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strconv"
@@ -10,7 +12,9 @@ import (
 	"time"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	backupApply "github.com/cloudogu/k8s-backup-lib/applyconfiguration/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
+	"github.com/cloudogu/k8s-backup-operator/internal/controller/backup/state"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -32,9 +36,11 @@ const (
 	reasonMaintenanceModesActivationFailed       = "MaintenanceModesActivationFailed"
 	reasonMaintenanceModesDeactivationFailed     = "MaintenanceModesDeactivationFailed"
 	reasonProviderBackupResourceDoesNotExist     = "ProviderBackupResourceDoesNotExist"
+	reasonProviderBackupCreationFailed           = "ProviderBackupCreationFailed"
 	reasonProviderBackupInProgress               = "ProviderBackupInProgress"
 	reasonOtherProviderBackupInProgress          = "OtherProviderBackupInProgress"
 	reasonCanceledProviderBackupDeleted          = "CanceledProviderBackupDeleted"
+	reasonProviderBackupsCreated                 = "ProviderBackupsCreated"
 	reasonProviderBackupFailed                   = "ProviderBackupFailed"
 	reasonProviderBackupDeletionFailed           = "ProviderBackupDeletionFailed"
 	reasonProviderBackupDeletionRetried          = "ProviderBackupDeletionRetried"
@@ -118,6 +124,10 @@ type eventRecorder interface {
 	events.EventRecorder
 }
 
+type backupStateCollector interface {
+	Collect(ctx context.Context, backup *backupv1.Backup) (state.BackupState, error)
+}
+
 type defaultReconciler struct {
 	client                 client.Client
 	recorder               eventRecorder
@@ -125,6 +135,7 @@ type defaultReconciler struct {
 	clock                  Clock
 	backupStorageName      string
 	providerDeploymentName string
+	stateCollector         backupStateCollector
 }
 
 func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGateway maintenanceGateway, clock Clock, backupStorageName string, providerDeploymentName string) *defaultReconciler {
@@ -135,6 +146,7 @@ func NewReconciler(client client.Client, recorder eventRecorder, maintenanceGate
 		clock:                  clock,
 		backupStorageName:      backupStorageName,
 		providerDeploymentName: providerDeploymentName,
+		stateCollector:         state.NewCollector(client),
 	}
 }
 
@@ -455,9 +467,10 @@ func (c *defaultReconciler) ensureBackupMetadata(ctx context.Context, backup *ba
 	}
 
 	// write backup
-	err := c.client.Update(ctx, backup)
+	backupApplyConfiguration := backupApply.Backup(backup.Name, backup.Namespace).WithLabels(defaultLabels).WithFinalizers(backupv1.BackupFinalizer)
+	err := c.client.Apply(ctx, backupApplyConfiguration, client.FieldOwner("k8s-backup-operator"))
 	if err != nil {
-		return Abort, fmt.Errorf("update backup to set labels, annotations and finalizer: %w", err)
+		return Abort, fmt.Errorf("apply default labels and finalizer: %w", err)
 	}
 
 	logging.Info(ctx, "persisted default labels and finalizer")
@@ -650,43 +663,188 @@ func (c *defaultReconciler) ensureMaintenanceActivated(ctx context.Context, back
 }
 
 func (c *defaultReconciler) ensureProviderBackupCreated(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	var veleroBackup, err = c.getProviderBackup(ctx, backup.GetNamespacedName())
+	// The state is collected on every run. The maintenance mode is active, so the state does not change between
+	// two runs and all units get the same metadata.
+	backupState, desiredUnits, existingUnits, err := c.getBackupCreationPlan(ctx, backup)
 	if err != nil {
-		return Abort, fmt.Errorf("get velero backup resource: %w", err)
+		return Abort, err
 	}
 
-	if veleroBackup == nil {
-		logging.Debug(ctx, "ensureProviderBackupCreated: provider backup not found -> Succeeded = Unknown, RETRY")
+	creationResult := c.createMissingUnits(ctx, backup, desiredUnits, existingUnits)
+	createErr := creationResult.err()
 
-		providerBackupCr := veleroprovider.CreateVeleroBackupResource(backup, c.backupStorageName, defaultLabels)
-		createErr := c.client.Create(ctx, providerBackupCr)
-		if createErr != nil {
-			return Abort, fmt.Errorf("create velero backup resource: %w", createErr)
-		}
-		logging.Info(ctx, "created the velero backup", "backupStorageLocation", c.backupStorageName)
-
-		patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
-			meta.SetStatusCondition(&status.Conditions, metav1.Condition{
-				Type:    backupv1.ConditionSucceeded,
-				Status:  metav1.ConditionUnknown,
-				Reason:  reasonProviderBackupResourceDoesNotExist,
-				Message: "Provider backup resource does not exist.",
-			})
-			if status.StartTimestamp.IsZero() {
-				status.StartTimestamp = metav1.NewTime(c.clock.Now())
-			}
-		})
-		if patchErr != nil {
-			return Abort, fmt.Errorf("patch status of backup resource: %w", patchErr)
-		}
-
-		c.recorder.Eventf(backup, providerBackupCr, corev1.EventTypeNormal, reasonProviderBackupInProgress, actionCreateProviderBackup, "Provider backup started")
-		logging.Debug(ctx, "Retrying backup reconciliation", "reason", "the provider backup was created")
-		return Retry, nil
+	// The status is patched even if a unit failed. The start timestamp guards
+	// ensureBackupIsPrepared as soon as the first unit exists.
+	if err = c.patchStatusIfChanged(ctx, backup, c.unitCreationStatusUpdate(backup, backupState, desiredUnits, creationResult)); err != nil {
+		return Abort, errors.Join(createErr, fmt.Errorf("patch status of backup resource: %w", err))
 	}
 
-	logging.Debug(ctx, "ensureProviderBackupCreated: provider backup resource found -> NEXT")
+	if createErr != nil {
+		// Units which cannot be created do not block the backup of the other units. The failed units are retried
+		// on every reconciliation, because all steps run again. The completion step waits for all desired units
+		// until they are finished or the time window expires.
+		logging.Error(ctx, createErr, "ensureProviderBackupCreated: failed to create provider backups of some units -> NEXT")
+	} else {
+		logging.Debug(ctx, "ensureProviderBackupCreated: provider backups of all units exist -> NEXT")
+	}
+
 	return Next, nil
+}
+
+func (c *defaultReconciler) getBackupCreationPlan(ctx context.Context, backup *backupv1.Backup) (state.BackupState, []*velerov1.Backup, map[string]struct{}, error) {
+	backupState, err := c.stateCollector.Collect(ctx, backup)
+	if err != nil {
+		return state.BackupState{}, nil, nil, fmt.Errorf("collect backup state for creating backup units: %w", err)
+	}
+
+	desiredUnits, err := desiredUnitBackups(backup, backupState, c.backupStorageName)
+	if err != nil {
+		return state.BackupState{}, nil, nil, fmt.Errorf("build backup units: %w", err)
+	}
+
+	existingUnits, err := c.listOwnProviderBackupNames(ctx, backup)
+	if err != nil {
+		return state.BackupState{}, nil, nil, err
+	}
+
+	return backupState, desiredUnits, existingUnits, nil
+}
+
+// unitCreationResult describes the outcome of creating the missing provider backups of the units.
+type unitCreationResult struct {
+	// unitsCreated tells whether at least one unit was created in this run.
+	unitsCreated bool
+	// failed contains the units which could not be created in this run.
+	failed []unitCreationError
+	// started contains the names of all existing provider backups, including the ones created in this run.
+	started map[string]struct{}
+}
+
+// err joins the failures of all units which could not be created. It returns nil if no unit failed.
+func (r unitCreationResult) err() error {
+	errs := make([]error, 0, len(r.failed))
+	for _, failure := range r.failed {
+		errs = append(errs, failure)
+	}
+	return errors.Join(errs...)
+}
+
+// createMissingUnits creates the provider backups of all desired units which do not exist yet.
+// Existing units are not checked for changed metadata. The system state cannot change during the
+// backup because of the maintenance mode.
+// A failing unit does not stop the creation of the remaining units, so that a single blocked unit does not
+// prevent the backup of all other units.
+// An event is recorded for every created and every failed unit.
+func (c *defaultReconciler) createMissingUnits(ctx context.Context, backup *backupv1.Backup, desiredUnits []*velerov1.Backup, existingUnits map[string]struct{}) unitCreationResult {
+	result := unitCreationResult{started: maps.Clone(existingUnits)}
+	for _, unit := range desiredUnits {
+		if _, exists := existingUnits[unit.Name]; exists {
+			continue
+		}
+
+		err := c.client.Create(ctx, unit)
+		if apierrors.IsAlreadyExists(err) {
+			// Cache lag
+			logging.Debug(ctx, "ensureProviderBackupCreated: velero unit backup already exists", "unit", unit.Name)
+			result.started[unit.Name] = struct{}{}
+			continue
+		}
+		if err != nil {
+			c.recorder.Eventf(backup, unit, corev1.EventTypeWarning, reasonProviderBackupCreationFailed, actionCreateProviderBackup, "Failed to create the provider backup of unit %s: %v", unit.Name, err)
+			result.failed = append(result.failed, unitCreationError{unit: unit, err: err})
+			continue
+		}
+
+		c.recorder.Eventf(backup, unit, corev1.EventTypeNormal, reasonProviderBackupInProgress, actionCreateProviderBackup, "Provider backup of unit %s started", unit.Name)
+		result.unitsCreated = true
+		result.started[unit.Name] = struct{}{}
+		logging.Info(ctx, "created the velero unit backup", "unit", unit.Name, "backupStorageLocation", c.backupStorageName)
+	}
+	return result
+}
+
+// unitCreationStatusUpdate returns the status update for the creation of the units. It populates the unit status, sets the
+// creation progress condition and sets the start timestamp once the first unit was created.
+// Only missing fields are added, so the results of later steps are kept.
+func (c *defaultReconciler) unitCreationStatusUpdate(
+	backup *backupv1.Backup,
+	backupState state.BackupState,
+	desiredUnits []*velerov1.Backup,
+	creationResult unitCreationResult,
+) statusUpdate {
+	progress := providerBackupCreationProgress(desiredUnits, creationResult.failed)
+	return func(status *backupv1.BackupStatus) {
+		populateUnitStatus(status, backup.Name, backupState, creationResult.started)
+		meta.SetStatusCondition(&status.Conditions, progress)
+		if creationResult.unitsCreated && status.StartTimestamp.IsZero() {
+			status.StartTimestamp = metav1.NewTime(c.clock.Now())
+		}
+	}
+}
+
+// patchStatusIfChanged applies the update to a copy of the current status and patches the status only if the
+// update changes it.
+func (c *defaultReconciler) patchStatusIfChanged(ctx context.Context, backup *backupv1.Backup, update statusUpdate) error {
+	desired := backup.Status.DeepCopy()
+	update(desired)
+	if reflect.DeepEqual(*desired, backup.Status) {
+		return nil
+	}
+	return c.patchStatus(ctx, backup, update)
+}
+
+// unitCreationError describes a unit whose provider backup could not be created.
+type unitCreationError struct {
+	unit *velerov1.Backup
+	err  error
+}
+
+func (f unitCreationError) Error() string {
+	return fmt.Sprintf("create velero unit backup %s: %v", f.unit.Name, f.err)
+}
+
+func (f unitCreationError) Unwrap() error {
+	return f.err
+}
+
+// providerBackupCreationProgress returns the succeeded condition which shows how many units exist and which units
+// could not be created. Without failures, all desired units exist. This also replaces a creation failure of a previous
+// run, even if this run created nothing, e.g. because the previous run created the units but failed to patch the status.
+func providerBackupCreationProgress(desiredUnits []*velerov1.Backup, failedUnits []unitCreationError) metav1.Condition {
+	if len(failedUnits) > 0 {
+		existingCount := len(desiredUnits) - len(failedUnits)
+		failures := make([]string, 0, len(failedUnits))
+		for _, failure := range failedUnits {
+			failures = append(failures, fmt.Sprintf("%s (%v)", failure.unit.Name, failure.err))
+		}
+
+		return metav1.Condition{
+			Type:    backupv1.ConditionSucceeded,
+			Status:  metav1.ConditionUnknown,
+			Reason:  reasonProviderBackupCreationFailed,
+			Message: fmt.Sprintf("Failed to create the provider backups of units %s. Provider backups for %d out of %d units exist.", strings.Join(failures, ", "), existingCount, len(desiredUnits)),
+		}
+	}
+
+	return metav1.Condition{
+		Type:    backupv1.ConditionSucceeded,
+		Status:  metav1.ConditionUnknown,
+		Reason:  reasonProviderBackupsCreated,
+		Message: fmt.Sprintf("Provider backups of all %d units exist.", len(desiredUnits)),
+	}
+}
+
+func (c *defaultReconciler) listOwnProviderBackupNames(ctx context.Context, backup *backupv1.Backup) (map[string]struct{}, error) {
+	providerBackups := &velerov1.BackupList{}
+	if err := c.client.List(ctx, providerBackups, client.InNamespace(backup.Namespace), client.MatchingLabels{backupv1.BackupLabelKey: backup.Name}); err != nil {
+		return nil, fmt.Errorf("list velero unit backups of backup: %w", err)
+	}
+
+	names := make(map[string]struct{}, len(providerBackups.Items))
+	for _, providerBackup := range providerBackups.Items {
+		names[providerBackup.Name] = struct{}{}
+	}
+	return names, nil
 }
 
 func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
