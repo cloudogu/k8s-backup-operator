@@ -132,7 +132,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 
 	t.Run("fail on unknown status", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
-		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseQueued)
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseDeleting)
 		veleroBackup.Labels[backupv1.BackupLabelKey] = "backup"
 		veleroBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeDoguV2)
 		veleroBackup.Annotations[backupv1.InstalledDogusV2AnnotationKey] = `[{"name": "cockpit", "version": "1.2.3-1"}]`
