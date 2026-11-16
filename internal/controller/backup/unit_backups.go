@@ -44,7 +44,7 @@ func desiredUnitBackups(backup *backupv1.Backup, backupState state.BackupState, 
 		}
 		maps.Copy(annotations, typeAnnotations)
 
-		selector, selectorErr := unitSelector(backupState, unit)
+		selector, orSelectors, selectorErr := unitSelector(backupState, unit)
 		if selectorErr != nil {
 			return nil, selectorErr
 		}
@@ -54,15 +54,20 @@ func desiredUnitBackups(backup *backupv1.Backup, backupState state.BackupState, 
 			return nil, resourcesErr
 		}
 
-		unitBackups = append(unitBackups, veleroprovider.CreateVeleroUnitBackupResource(
+		resource, backupErr := veleroprovider.CreateVeleroUnitBackupResource(
 			backup.Namespace,
 			unitBackupName(backup.Name, unit),
 			backupStorageName,
 			labels,
 			annotations,
 			selector,
+			orSelectors,
 			resources,
-		))
+		)
+		if backupErr != nil {
+			return nil, fmt.Errorf("create provider backup for unit %q: %w", unit.Type, backupErr)
+		}
+		unitBackups = append(unitBackups, resource)
 	}
 
 	return unitBackups, nil
@@ -114,24 +119,30 @@ func unitTypeAnnotations(backupState state.BackupState, unit backupv1.UnitIdenti
 	}
 }
 
-func unitSelector(backupState state.BackupState, unit backupv1.UnitIdentifier) (*metav1.LabelSelector, error) {
+func unitSelector(backupState state.BackupState, unit backupv1.UnitIdentifier) (*metav1.LabelSelector, []*metav1.LabelSelector, error) {
 	switch unit.Type {
 	case backupv1.UnitTypeDogu:
-		return &metav1.LabelSelector{MatchLabels: map[string]string{doguNameLabelKey: unit.Name}}, nil
+		return &metav1.LabelSelector{MatchLabels: map[string]string{doguNameLabelKey: unit.Name}}, nil, nil
 	case backupv1.UnitTypeDoguV2:
+		// The dogu-operator does not add the k8s.cloudogu.com/dogu.name label to resources of v2 dogus; they only
+		// carry the legacy dogu.name label.
 		names := make([]string, 0, len(backupState.InstalledDogusV2))
 		for _, dogu := range backupState.InstalledDogusV2 {
 			names = append(names, dogu.Name)
 		}
-		return &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+		doguLabelSelector := &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: doguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: names},
+		}}
+		v2DoguLabelSelector := &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: v2DoguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: names},
-		}}, nil
+		}}
+		return nil, []*metav1.LabelSelector{doguLabelSelector, v2DoguLabelSelector}, nil
 	case backupv1.UnitTypeGlobalConfig:
-		return &metav1.LabelSelector{MatchLabels: map[string]string{typeLabelKey: globalConfigTypeLabelValue}}, nil
+		return &metav1.LabelSelector{MatchLabels: map[string]string{typeLabelKey: globalConfigTypeLabelValue}}, nil, nil
 	case backupv1.UnitTypeMisc:
 		// The misc unit only contains resources of components labeled with the backup-scope label.
 		if len(backupState.Components) == 0 {
-			return nil, fmt.Errorf("misc unit requires at least one component")
+			return nil, nil, fmt.Errorf("misc unit requires at least one component")
 		}
 		names := make([]string, 0, len(backupState.Components))
 		for _, component := range backupState.Components {
@@ -140,9 +151,9 @@ func unitSelector(backupState state.BackupState, unit backupv1.UnitIdentifier) (
 		return &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: backupScopeLabelKey, Operator: metav1.LabelSelectorOpExists},
 			{Key: componentv1.ComponentNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: names},
-		}}, nil
+		}}, nil, nil
 	default:
-		return nil, fmt.Errorf("unknown unit type %q", unit.Type)
+		return nil, nil, fmt.Errorf("unknown unit type %q", unit.Type)
 	}
 }
 
