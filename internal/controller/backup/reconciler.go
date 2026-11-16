@@ -102,6 +102,8 @@ var defaultLabels = map[string]string{
 
 var veleroBackupIsRunningPhases = []velerov1.BackupPhase{
 	velerov1.BackupPhaseNew,
+	velerov1.BackupPhaseQueued,
+	velerov1.BackupPhaseReadyToStart,
 	velerov1.BackupPhaseInProgress,
 	velerov1.BackupPhaseFinalizing,
 	velerov1.BackupPhaseFinalizingPartiallyFailed,
