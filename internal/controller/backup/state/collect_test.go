@@ -9,6 +9,7 @@ import (
 	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
 	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -409,4 +410,62 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	assert.NoError(t, err)
 
 	return scheme
+}
+
+func TestBackupStateCollector_ListDogus(t *testing.T) {
+	t.Run("returns all dogus of the namespace without filtering", func(t *testing.T) {
+		v2Dogu := &doguv3.Dogu{Name: "cas", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cas", DoguApiVersion: doguv3.DoguApiVersionV2}}
+		v3Dogu := &doguv3.Dogu{Name: "ldap", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "ldap", DoguApiVersion: doguv3.DoguApiVersionV3}}
+		otherNamespaceDogu := &doguv3.Dogu{Name: "redmine", Namespace: "other", Spec: doguv3.DoguSpec{Name: "redmine", DoguApiVersion: doguv3.DoguApiVersionV3}}
+		k8sClient := fake.NewClientBuilder().WithScheme(testScheme(t)).WithObjects(v2Dogu, v3Dogu, otherNamespaceDogu).Build()
+
+		dogus, err := NewCollector(k8sClient).ListDogus(context.Background(), testNamespace)
+
+		require.NoError(t, err)
+		names := make([]string, 0, len(dogus))
+		for _, dogu := range dogus {
+			names = append(names, dogu.Name)
+		}
+		assert.ElementsMatch(t, []string{"cas", "ldap"}, names)
+	})
+
+	t.Run("returns an error if listing fails", func(t *testing.T) {
+		k8sClient := fake.NewClientBuilder().WithScheme(testScheme(t)).WithInterceptorFuncs(interceptor.Funcs{
+			List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				return assert.AnError
+			},
+		}).Build()
+
+		_, err := NewCollector(k8sClient).ListDogus(context.Background(), testNamespace)
+
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "list dogus")
+	})
+}
+
+func TestBackupStateCollector_ListComponents(t *testing.T) {
+	t.Run("returns all components of the namespace", func(t *testing.T) {
+		component := &componentv1.Component{Name: "lop-idp", Namespace: testNamespace}
+		otherNamespaceComponent := &componentv1.Component{Name: "other", Namespace: "other"}
+		k8sClient := fake.NewClientBuilder().WithScheme(testScheme(t)).WithObjects(component, otherNamespaceComponent).Build()
+
+		components, err := NewCollector(k8sClient).ListComponents(context.Background(), testNamespace)
+
+		require.NoError(t, err)
+		require.Len(t, components, 1)
+		assert.Equal(t, "lop-idp", components[0].Name)
+	})
+
+	t.Run("returns an error if listing fails", func(t *testing.T) {
+		k8sClient := fake.NewClientBuilder().WithScheme(testScheme(t)).WithInterceptorFuncs(interceptor.Funcs{
+			List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				return assert.AnError
+			},
+		}).Build()
+
+		_, err := NewCollector(k8sClient).ListComponents(context.Background(), testNamespace)
+
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "list components")
+	})
 }

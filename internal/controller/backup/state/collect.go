@@ -91,14 +91,13 @@ func (b *BackupStateCollector) getBlueprintId(ctx context.Context, namespace str
 func (b *BackupStateCollector) getDogus(ctx context.Context, backup *backupv1.Backup) (v2DoguVersions, v3DoguVersions []backupv1.DoguVersion, err error) {
 	logger := log.FromContext(ctx).WithName("BackupStateCollector.getDogus").WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
-	doguList := doguv3.DoguList{}
-	err = b.k8sClient.List(ctx, &doguList, client.InNamespace(backup.Namespace))
+	dogus, err := b.ListDogus(ctx, backup.Namespace)
 	if err != nil {
-		return nil, nil, fmt.Errorf("list dogus: %w", err)
+		return nil, nil, err
 	}
 
 outer:
-	for _, dogu := range doguList.Items {
+	for _, dogu := range dogus {
 		if dogu.Spec.DoguApiVersion == doguv3.DoguApiVersionV2 {
 			if !backup.Spec.Options.IgnoreV2Dogus {
 				v2DoguVersions = append(v2DoguVersions, backupv1.DoguVersion{
@@ -124,6 +123,26 @@ outer:
 		})
 	}
 	return v2DoguVersions, v3DoguVersions, nil
+}
+
+// ListDogus returns all dogus of the namespace. In contrast to Collect, the exclusions and options of a backup are not
+// applied.
+func (b *BackupStateCollector) ListDogus(ctx context.Context, namespace string) ([]doguv3.Dogu, error) {
+	doguList := doguv3.DoguList{}
+	if err := b.k8sClient.List(ctx, &doguList, client.InNamespace(namespace)); err != nil {
+		return nil, fmt.Errorf("list dogus: %w", err)
+	}
+	return doguList.Items, nil
+}
+
+// ListComponents returns all components of the namespace, regardless of whether they have resources to back up.
+// In contrast to Collect, the exclusions and options of a backup are not applied.
+func (b *BackupStateCollector) ListComponents(ctx context.Context, namespace string) ([]componentv1.Component, error) {
+	componentList := componentv1.ComponentList{}
+	if err := b.k8sClient.List(ctx, &componentList, client.InNamespace(namespace)); err != nil {
+		return nil, fmt.Errorf("list components: %w", err)
+	}
+	return componentList.Items, nil
 }
 
 func (b *BackupStateCollector) getComponents(ctx context.Context, backup *backupv1.Backup) ([]backupv1.ComponentStatus, error) {

@@ -17,6 +17,8 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/controller/backup/state"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
+	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
+	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -63,6 +65,7 @@ const (
 	reasonVeleroBackupFailed                     = "VeleroBackupFailed"
 	reasonBackupLeaseAquired                     = "BackupLeaseAquired"
 	reasonBackupLeaseFailed                      = "BackupLeaseFailed"
+	reasonInvalidExclusions                      = "InvalidExclusions"
 )
 
 const (
@@ -76,6 +79,7 @@ const (
 	actionCreateProviderBackup      = "CreateProviderBackup"
 	actionCompleteProviderBackup    = "CompleteProviderBackup"
 	actionCheckProviderReadiness    = "CheckProviderReadiness"
+	actionValidateExclusions        = "ValidateExclusions"
 	actionActivateMaintenanceMode   = "ActivateMaintenanceMode"
 	actionDeactivateMaintenanceMode = "DeactivateMaintenanceMode"
 )
@@ -126,6 +130,10 @@ type eventRecorder interface {
 
 type backupStateCollector interface {
 	Collect(ctx context.Context, backup *backupv1.Backup) (state.BackupState, error)
+	// ListDogus returns all dogus of the namespace without applying the exclusions of a backup.
+	ListDogus(ctx context.Context, namespace string) ([]doguv3.Dogu, error)
+	// ListComponents returns all components of the namespace without applying the exclusions of a backup.
+	ListComponents(ctx context.Context, namespace string) ([]componentv1.Component, error)
 }
 
 type defaultReconciler struct {
@@ -540,6 +548,14 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		}
 	}
 
+	invalid, err := c.getInvalidExclusions(ctx, backup)
+	if err != nil {
+		return Abort, err
+	}
+	if !invalid.isEmpty() {
+		return c.failBackupWithInvalidExclusions(ctx, backup, invalid)
+	}
+
 	readiness, err := veleroprovider.CheckReady(ctx, c.client, backup.Namespace, c.backupStorageName, c.providerDeploymentName)
 	if err != nil {
 		return Abort, err
@@ -599,6 +615,36 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		logging.Info(ctx, "backup prepared", "backupStorageLocation", c.backupStorageName)
 	}
 	return Next, nil
+}
+
+// failBackupWithInvalidExclusions marks the backup as failed, because its exclusions do not match the cluster. The
+// backup has not started yet, so there is nothing to clean up. Succeeded = False routes all further reconciliations
+// to operationIgnore, so the reconciliation is aborted for good.
+func (c *defaultReconciler) failBackupWithInvalidExclusions(ctx context.Context, backup *backupv1.Backup, invalid invalidExclusions) (action, error) {
+	message := invalid.message()
+
+	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
+		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
+			Type:    backupv1.ConditionPrepared,
+			Status:  metav1.ConditionFalse,
+			Reason:  reasonInvalidExclusions,
+			Message: message,
+		})
+		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
+			Type:    backupv1.ConditionSucceeded,
+			Status:  metav1.ConditionFalse,
+			Reason:  reasonInvalidExclusions,
+			Message: message,
+		})
+	})
+	if patchErr != nil {
+		return Abort, fmt.Errorf("patch conditions to report invalid exclusions: %w", patchErr)
+	}
+
+	logging.Info(ctx, "backup failed because of invalid exclusions", "message", message)
+	c.recorder.Eventf(backup, nil, corev1.EventTypeWarning, reasonInvalidExclusions, actionValidateExclusions, message)
+	logging.Debug(ctx, "ensureBackupIsPrepared: invalid exclusions -> Prepared = False, Succeeded = False, ABORT")
+	return Abort, nil
 }
 
 func findRunningProviderBackupOfAnotherRun(backup *backupv1.Backup, providerBackups *velerov1.BackupList) *velerov1.Backup {
