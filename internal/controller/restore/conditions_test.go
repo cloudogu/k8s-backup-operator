@@ -241,7 +241,7 @@ func TestIsTerminalKeepsExistingTerminalLegacyRestoresOutOfNewWork(t *testing.T)
 
 func TestObserveProviderRestoreStateMapsEveryState(t *testing.T) {
 	tests := []struct {
-		state      velero.RestoreState
+		state      velero.RestoreObservation
 		wantStatus metav1.ConditionStatus
 		wantReason string
 	}{
@@ -249,8 +249,8 @@ func TestObserveProviderRestoreStateMapsEveryState(t *testing.T) {
 		{state: velero.RestoreRunning, wantStatus: metav1.ConditionUnknown, wantReason: ReasonProviderRestoreRunning},
 		{state: velero.RestoreSucceeded, wantStatus: metav1.ConditionTrue, wantReason: ReasonProviderRestoreCompleted},
 		{state: velero.RestoreFailed, wantStatus: metav1.ConditionFalse, wantReason: ReasonProviderRestoreFailed},
-		{state: velero.RestoreStateUnknown, wantStatus: metav1.ConditionUnknown, wantReason: ReasonProviderRestoreStateUnknown},
-		{state: velero.RestoreState("SomeStateNobodyDefined"), wantStatus: metav1.ConditionUnknown, wantReason: ReasonProviderRestoreStateUnknown},
+		{state: velero.RestoreUnknown, wantStatus: metav1.ConditionUnknown, wantReason: ReasonProviderRestoreStateUnknown},
+		{state: velero.RestoreObservation("SomeStateNobodyDefined"), wantStatus: metav1.ConditionUnknown, wantReason: ReasonProviderRestoreStateUnknown},
 	}
 
 	for _, test := range tests {
@@ -266,7 +266,7 @@ func TestObserveProviderRestoreStateMapsEveryState(t *testing.T) {
 // A state the operator cannot interpret must never look like an outcome, because terminality is
 // derived from the condition status.
 func TestObserveProviderRestoreStateNeverReportsAnUnknownStateAsAnOutcome(t *testing.T) {
-	for _, state := range []velero.RestoreState{velero.RestoreStateUnknown, "", "Deleting", "succeeded"} {
+	for _, state := range []velero.RestoreObservation{velero.RestoreUnknown, "", "Deleting", "succeeded"} {
 		status, _ := observeProviderRestoreState(state)
 
 		assert.Equal(t, metav1.ConditionUnknown, status, "state %q must not be reported as an outcome", state)

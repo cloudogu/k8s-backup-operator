@@ -119,7 +119,7 @@ func reachedMilestone(conditionType string, reason string, message string) metav
 // Unknown means that the provider has not decided yet, so a state this operator does not know is
 // never reported as success or failure. Translating provider vocabulary into a state is the provider
 // package's job; this function only decides what the condition says about it.
-func observeProviderRestoreState(state velero.RestoreState) (metav1.ConditionStatus, string) {
+func observeProviderRestoreState(state velero.RestoreObservation) (metav1.ConditionStatus, string) {
 	switch state {
 	case velero.RestorePending:
 		return metav1.ConditionUnknown, ReasonProviderRestorePending
