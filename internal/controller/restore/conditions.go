@@ -84,10 +84,12 @@ const (
 	ReasonMaintenanceModeDeactivated = "MaintenanceModeDeactivated"
 	// ReasonUnitsFailed marks a restore with at least one failed unit restore.
 	ReasonUnitsFailed = "UnitsFailed"
-	// ReasonUnusableUnits marks a restore with a planned unit whose velero backup is missing or not successful.
+	// ReasonUnusableUnits marks a restore with a unit to restore whose provider backup is unusable, or with none left.
 	ReasonUnusableUnits = "UnusableUnits"
 	// ReasonInvalidExclusions marks a restore whose exclusions do not match its backup.
 	ReasonInvalidExclusions = "InvalidExclusions"
+	// ReasonSourceBackupNotFound marks a restore whose backup does not exist.
+	ReasonSourceBackupNotFound = "SourceBackupNotFound"
 )
 
 // initialWorkflowConditions are the conditions every running restore carries, in the order a reader
