@@ -82,6 +82,12 @@ const (
 	ReasonMaintenanceModeActivated = "MaintenanceModeActivated"
 	// ReasonMaintenanceModeDeactivated marks the successfully removed maintenance notice.
 	ReasonMaintenanceModeDeactivated = "MaintenanceModeDeactivated"
+	// ReasonUnitsFailed marks a restore with at least one failed unit restore.
+	ReasonUnitsFailed = "UnitsFailed"
+	// ReasonUnusableUnits marks a restore with a planned unit whose velero backup is missing or not successful.
+	ReasonUnusableUnits = "UnusableUnits"
+	// ReasonInvalidExclusions marks a restore whose exclusions do not match its backup.
+	ReasonInvalidExclusions = "InvalidExclusions"
 )
 
 // initialWorkflowConditions are the conditions every running restore carries, in the order a reader
