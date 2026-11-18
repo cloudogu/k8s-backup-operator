@@ -11,8 +11,8 @@ import (
 	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 )
 
-// invalidExclusions describes the excluded dogus and components of a backup which do not match the cluster.
-type invalidExclusions struct {
+// invalidExclusionsError describes the excluded dogus and components of a backup which do not match the cluster.
+type invalidExclusionsError struct {
 	// missingDogus are excluded dogus which are not installed as v3 dogus.
 	missingDogus []string
 	// v2Dogus are excluded dogus which are v2 dogus. They can only be excluded as a whole.
@@ -21,11 +21,11 @@ type invalidExclusions struct {
 	missingComponents []string
 }
 
-func (i invalidExclusions) isEmpty() bool {
+func (i invalidExclusionsError) isEmpty() bool {
 	return len(i.missingDogus) == 0 && len(i.v2Dogus) == 0 && len(i.missingComponents) == 0
 }
 
-func (i invalidExclusions) message() string {
+func (i invalidExclusionsError) Error() string {
 	var parts []string
 	if len(i.missingDogus) > 0 {
 		parts = append(parts, fmt.Sprintf("The excluded dogus %v are not installed as v3 dogus.", i.missingDogus))
@@ -43,14 +43,15 @@ func (i invalidExclusions) message() string {
 	return strings.Join(parts, " ")
 }
 
-// findInvalidExclusions compares the excluded dogus and components of the backup with the installed ones.
-func findInvalidExclusions(spec backupv1.BackupSpec, dogus []doguv3.Dogu, components []componentv1.Component) invalidExclusions {
+// findInvalidExclusions compares the excluded dogus and components of the backup with the installed ones. It returns
+// an invalidExclusionsError if any exclusion does not match the cluster and nil otherwise.
+func findInvalidExclusions(spec backupv1.BackupSpec, dogus []doguv3.Dogu, components []componentv1.Component) error {
 	doguApiVersions := make(map[string]doguv3.DoguApiVersion, len(dogus))
 	for _, dogu := range dogus {
 		doguApiVersions[dogu.Spec.Name] = dogu.Spec.DoguApiVersion
 	}
 
-	var result invalidExclusions
+	var result invalidExclusionsError
 	for _, excludedDogu := range spec.ExcludedDogus {
 		apiVersion, exists := doguApiVersions[excludedDogu]
 		switch {
@@ -72,17 +73,21 @@ func findInvalidExclusions(spec backupv1.BackupSpec, dogus []doguv3.Dogu, compon
 		}
 	}
 
+	if result.isEmpty() {
+		return nil
+	}
 	return result
 }
 
-// getInvalidExclusions lists the installed dogus and components and returns the exclusions of the backup which do not
-// match them. The cluster is only queried if the backup has exclusions.
-func (c *defaultReconciler) getInvalidExclusions(ctx context.Context, backup *backupv1.Backup) (invalidExclusions, error) {
+// validateExclusions lists the installed dogus and components and checks the exclusions of the backup against them.
+// It returns an invalidExclusionsError if the exclusions do not match the cluster and a general error if the cluster
+// could not be queried. The cluster is only queried if the backup has exclusions.
+func (c *defaultReconciler) validateExclusions(ctx context.Context, backup *backupv1.Backup) error {
 	var dogus []doguv3.Dogu
 	if len(backup.Spec.ExcludedDogus) > 0 {
 		var err error
 		if dogus, err = c.stateCollector.ListDogus(ctx, backup.Namespace); err != nil {
-			return invalidExclusions{}, fmt.Errorf("validate excluded dogus: %w", err)
+			return fmt.Errorf("validate excluded dogus: %w", err)
 		}
 	}
 
@@ -90,9 +95,9 @@ func (c *defaultReconciler) getInvalidExclusions(ctx context.Context, backup *ba
 	if len(backup.Spec.ExcludedComponents) > 0 {
 		var err error
 		if components, err = c.stateCollector.ListComponents(ctx, backup.Namespace); err != nil {
-			return invalidExclusions{}, fmt.Errorf("validate excluded components: %w", err)
+			return fmt.Errorf("validate excluded components: %w", err)
 		}
 	}
 
-	return findInvalidExclusions(backup.Spec, dogus, components), nil
+	return findInvalidExclusions(backup.Spec, dogus, components)
 }

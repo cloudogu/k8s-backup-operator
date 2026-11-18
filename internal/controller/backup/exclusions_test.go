@@ -27,42 +27,42 @@ func TestFindInvalidExclusions(t *testing.T) {
 	tests := []struct {
 		name string
 		spec backupv1.BackupSpec
-		want invalidExclusions
+		want error
 	}{
 		{
 			name: "no exclusions",
 			spec: backupv1.BackupSpec{},
-			want: invalidExclusions{},
+			want: nil,
 		},
 		{
 			name: "installed v3 dogus and components are valid",
 			spec: backupv1.BackupSpec{ExcludedDogus: []string{"ldap", "redmine"}, ExcludedComponents: []string{"k8s-dogu-operator"}},
-			want: invalidExclusions{},
+			want: nil,
 		},
 		{
 			name: "dogus which are not installed are invalid",
 			spec: backupv1.BackupSpec{ExcludedDogus: []string{"scm", "ldap", "jenkins"}},
-			want: invalidExclusions{missingDogus: []string{"scm", "jenkins"}},
+			want: invalidExclusionsError{missingDogus: []string{"scm", "jenkins"}},
 		},
 		{
 			name: "dogus with an unknown api version are not installed as v3 dogus",
 			spec: backupv1.BackupSpec{ExcludedDogus: []string{"unknown-api"}},
-			want: invalidExclusions{missingDogus: []string{"unknown-api"}},
+			want: invalidExclusionsError{missingDogus: []string{"unknown-api"}},
 		},
 		{
 			name: "v2 dogus are invalid",
 			spec: backupv1.BackupSpec{ExcludedDogus: []string{"cas"}},
-			want: invalidExclusions{v2Dogus: []string{"cas"}},
+			want: invalidExclusionsError{v2Dogus: []string{"cas"}},
 		},
 		{
 			name: "components which are not installed are invalid",
 			spec: backupv1.BackupSpec{ExcludedComponents: []string{"k8s-dogu-operator", "k8s-longhorn", "k8s-cert-manager"}},
-			want: invalidExclusions{missingComponents: []string{"k8s-longhorn", "k8s-cert-manager"}},
+			want: invalidExclusionsError{missingComponents: []string{"k8s-longhorn", "k8s-cert-manager"}},
 		},
 		{
 			name: "all kinds of invalid exclusions are collected",
 			spec: backupv1.BackupSpec{ExcludedDogus: []string{"cas", "scm"}, ExcludedComponents: []string{"k8s-longhorn"}},
-			want: invalidExclusions{missingDogus: []string{"scm"}, v2Dogus: []string{"cas"}, missingComponents: []string{"k8s-longhorn"}},
+			want: invalidExclusionsError{missingDogus: []string{"scm"}, v2Dogus: []string{"cas"}, missingComponents: []string{"k8s-longhorn"}},
 		},
 	}
 	for _, tt := range tests {
@@ -72,30 +72,26 @@ func TestFindInvalidExclusions(t *testing.T) {
 	}
 }
 
-func TestInvalidExclusions_isEmpty(t *testing.T) {
-	assert.True(t, invalidExclusions{}.isEmpty())
-	assert.False(t, invalidExclusions{missingDogus: []string{"scm"}}.isEmpty())
-	assert.False(t, invalidExclusions{v2Dogus: []string{"cas"}}.isEmpty())
-	assert.False(t, invalidExclusions{missingComponents: []string{"k8s-longhorn"}}.isEmpty())
+func TestInvalidExclusionsError_isEmpty(t *testing.T) {
+	assert.True(t, invalidExclusionsError{}.isEmpty())
+	assert.False(t, invalidExclusionsError{missingDogus: []string{"scm"}}.isEmpty())
+	assert.False(t, invalidExclusionsError{v2Dogus: []string{"cas"}}.isEmpty())
+	assert.False(t, invalidExclusionsError{missingComponents: []string{"k8s-longhorn"}}.isEmpty())
 }
 
-func TestInvalidExclusions_message(t *testing.T) {
+func TestInvalidExclusionsError_Error(t *testing.T) {
 	t.Run("contains all invalid exclusions", func(t *testing.T) {
-		invalid := invalidExclusions{missingDogus: []string{"scm"}, v2Dogus: []string{"cas"}, missingComponents: []string{"k8s-longhorn"}}
+		invalid := invalidExclusionsError{missingDogus: []string{"scm"}, v2Dogus: []string{"cas"}, missingComponents: []string{"k8s-longhorn"}}
 
 		assert.Equal(t, "The excluded dogus [scm] are not installed as v3 dogus. "+
 			"The excluded dogus [cas] are v2 dogus, which can only be excluded as a whole with options.ignoreV2Dogus. "+
 			"The excluded components [k8s-longhorn] are not installed. "+
-			"Create a new backup with valid exclusions.", invalid.message())
-	})
-
-	t.Run("is empty without invalid exclusions", func(t *testing.T) {
-		assert.Empty(t, invalidExclusions{}.message())
+			"Create a new backup with valid exclusions.", invalid.Error())
 	})
 
 	t.Run("only contains the present kinds", func(t *testing.T) {
-		invalid := invalidExclusions{missingComponents: []string{"k8s-longhorn"}}
+		invalid := invalidExclusionsError{missingComponents: []string{"k8s-longhorn"}}
 
-		assert.Equal(t, "The excluded components [k8s-longhorn] are not installed. Create a new backup with valid exclusions.", invalid.message())
+		assert.Equal(t, "The excluded components [k8s-longhorn] are not installed. Create a new backup with valid exclusions.", invalid.Error())
 	})
 }

@@ -548,12 +548,11 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 		}
 	}
 
-	invalid, err := c.getInvalidExclusions(ctx, backup)
-	if err != nil {
+	if err := c.validateExclusions(ctx, backup); err != nil {
+		if errors.As(err, &invalidExclusionsError{}) {
+			return c.failBackupWithInvalidExclusions(ctx, backup, err.Error())
+		}
 		return Abort, err
-	}
-	if !invalid.isEmpty() {
-		return c.failBackupWithInvalidExclusions(ctx, backup, invalid)
 	}
 
 	readiness, err := veleroprovider.CheckReady(ctx, c.client, backup.Namespace, c.backupStorageName, c.providerDeploymentName)
@@ -620,9 +619,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 // failBackupWithInvalidExclusions marks the backup as failed, because its exclusions do not match the cluster. The
 // backup has not started yet, so there is nothing to clean up. Succeeded = False routes all further reconciliations
 // to operationIgnore, so the reconciliation is aborted for good.
-func (c *defaultReconciler) failBackupWithInvalidExclusions(ctx context.Context, backup *backupv1.Backup, invalid invalidExclusions) (action, error) {
-	message := invalid.message()
-
+func (c *defaultReconciler) failBackupWithInvalidExclusions(ctx context.Context, backup *backupv1.Backup, message string) (action, error) {
 	patchErr := c.patchStatus(ctx, backup, func(status *backupv1.BackupStatus) {
 		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 			Type:    backupv1.ConditionPrepared,
