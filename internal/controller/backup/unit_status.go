@@ -5,6 +5,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/controller/backup/state"
+	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 )
 
 // populateUnitStatus adds the metadata of the backup state and the provider references of the started units to the
@@ -21,7 +22,7 @@ func populateUnitStatus(status *backupv1.BackupStatus, backupName string, backup
 
 	for _, unit := range backupState.Units {
 		var providerRef *backupv1.ProviderRef
-		providerBackupName := unitBackupName(backupName, unit)
+		providerBackupName := veleroprovider.UnitObjectName(backupName, unit)
 		if _, started := startedUnits[providerBackupName]; started {
 			providerRef = &backupv1.ProviderRef{Name: providerBackupName}
 		}

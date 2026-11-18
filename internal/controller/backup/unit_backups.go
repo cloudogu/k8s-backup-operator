@@ -2,7 +2,6 @@ package backup
 
 import (
 	"fmt"
-	"hash/fnv"
 	"maps"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -14,11 +13,6 @@ import (
 )
 
 const (
-	// maxObjectNameLength is the maximum length of metadata.name.
-	maxObjectNameLength = 253
-	// unitNameHashLength is the number of hex characters of the hash which makes truncated unit names unique.
-	unitNameHashLength = 8
-
 	doguNameLabelKey           = "k8s.cloudogu.com/dogu.name"
 	backupScopeLabelKey        = "k8s.cloudogu.com/backup-scope"
 	typeLabelKey               = "k8s.cloudogu.com/type"
@@ -55,7 +49,7 @@ func desiredUnitBackups(backup *backupv1.Backup, backupState state.BackupState, 
 
 		unitBackups = append(unitBackups, veleroprovider.CreateVeleroUnitBackupResource(
 			backup.Namespace,
-			unitBackupName(backup.Name, unit),
+			veleroprovider.UnitObjectName(backup.Name, unit),
 			backupStorageName,
 			labels,
 			annotations,
@@ -65,26 +59,6 @@ func desiredUnitBackups(backup *backupv1.Backup, backupState state.BackupState, 
 	}
 
 	return unitBackups, nil
-}
-
-// unitBackupName concatenates the backup name, the unit type and, for dogu units, the dogu name.
-// Names exceeding the maximum object name length are truncated and suffixed with a hash of the full
-// name, so that two long names which only differ at the end stay unique.
-func unitBackupName(backupName string, unit backupv1.UnitIdentifier) string {
-	name := fmt.Sprintf("%s-%s", backupName, unit.Type)
-	if unit.Name != "" {
-		name = fmt.Sprintf("%s-%s", name, unit.Name)
-	}
-
-	if len(name) <= maxObjectNameLength {
-		return name
-	}
-
-	hasher := fnv.New64a()
-	_, _ = hasher.Write([]byte(name)) // hash.Hash.Write never returns an error
-	suffix := fmt.Sprintf("%016x", hasher.Sum64())[:unitNameHashLength]
-
-	return fmt.Sprintf("%s-%s", name[:maxObjectNameLength-unitNameHashLength-1], suffix)
 }
 
 func unitLabels(backupState state.BackupState, unit backupv1.UnitIdentifier) map[string]string {
