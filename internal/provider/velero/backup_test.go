@@ -84,3 +84,34 @@ func TestCreateVeleroDeleteBackupRequestIfNotExists(t *testing.T) {
 		assert.EqualError(t, err, "create velero delete backup request: create failed")
 	})
 }
+
+func TestGetBackupReturnsTheBackup(t *testing.T) {
+	k8sClient := newTestClient(t, &writeCounter{}, &velerov1.Backup{Name: testBackup, Namespace: testNamespace, Labels: map[string]string{"app": "ces"}})
+
+	got, err := GetBackup(testCtx, k8sClient, testNamespace, testBackup)
+
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, testBackup, got.Name)
+	assert.Equal(t, map[string]string{"app": "ces"}, got.Labels)
+}
+
+func TestGetBackupReturnsNilForAMissingBackup(t *testing.T) {
+	got, err := GetBackup(testCtx, newTestClient(t, &writeCounter{}), testNamespace, testBackup)
+
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
+func TestGetBackupReturnsApiErrors(t *testing.T) {
+	k8sClient := interceptor.NewClient(newTestClient(t, &writeCounter{}), interceptor.Funcs{
+		Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {
+			return assert.AnError
+		},
+	})
+
+	_, err := GetBackup(testCtx, k8sClient, testNamespace, testBackup)
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.ErrorContains(t, err, "get velero backup "+testBackup)
+}

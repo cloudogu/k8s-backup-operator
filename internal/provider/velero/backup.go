@@ -13,6 +13,7 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // defaultBackupTTL is ten years, basically infinity in backup standards.
@@ -88,4 +89,17 @@ func DeleteVeleroDeleteBackupRequestIfExists(ctx context.Context, k8sClient clie
 	}
 
 	return nil
+}
+
+// GetBackup returns the named velero backup; nil if it does not exist.
+func GetBackup(ctx context.Context, k8sClient client.Client, namespace string, name string) (*velerov1.Backup, error) {
+	backup := &velerov1.Backup{}
+	err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, backup)
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get velero backup %s: %w", name, err)
+	}
+	return backup, nil
 }

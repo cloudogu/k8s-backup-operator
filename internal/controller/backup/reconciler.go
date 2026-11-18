@@ -211,7 +211,7 @@ func (s deletionScope) getDeletionSubject() string {
 }
 
 func (c *defaultReconciler) ensureDeletingProviderBackup(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	veleroBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
+	veleroBackup, err := veleroprovider.GetBackup(ctx, c.client, backup.Namespace, backup.Name)
 	if err != nil {
 		c.recorder.Eventf(backup, nil, corev1.EventTypeWarning, reasonProviderBackupDeletionFailed, actionDeleteBackup, "Failed to get provider backup")
 		return Abort, fmt.Errorf("get the velero backup resource to check if it exists: %w", err)
@@ -419,7 +419,7 @@ func (c *defaultReconciler) ensureCanceledProviderBackupDeleted(ctx context.Cont
 		return Next, nil
 	}
 
-	providerBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
+	providerBackup, err := veleroprovider.GetBackup(ctx, c.client, backup.Namespace, backup.Name)
 	if err != nil {
 		return Abort, fmt.Errorf("get the velero backup resource of the canceled backup: %w", err)
 	}
@@ -877,7 +877,7 @@ func (c *defaultReconciler) listOwnProviderBackupNames(ctx context.Context, back
 }
 
 func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	providerBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
+	providerBackup, err := veleroprovider.GetBackup(ctx, c.client, backup.Namespace, backup.Name)
 	if err != nil || providerBackup == nil {
 		return Abort, fmt.Errorf("checking velero backup resource for completion: %w", err)
 	}
@@ -1196,9 +1196,9 @@ func (c *defaultReconciler) handleTimeWindowExpiredBackupNotStarted(ctx context.
 }
 
 func (c *defaultReconciler) handleTimeWindowExpiredBackupStarted(ctx context.Context, backup *backupv1.Backup) (action, error) {
-	veleroBackup, err := c.getProviderBackup(ctx, backup.GetNamespacedName())
+	veleroBackup, err := veleroprovider.GetBackup(ctx, c.client, backup.Namespace, backup.Name)
 	if err != nil {
-		return Abort, fmt.Errorf("get velero backup: %w", err)
+		return Abort, fmt.Errorf("handle expired time window: %w", err)
 	}
 
 	// A not available Velero, but available CRD will lead to a CR without a status.
@@ -1314,15 +1314,6 @@ func (c *defaultReconciler) hasTimeWindowExpired(ctx context.Context, backup *ba
 	}
 
 	return c.clock.Now().Sub(backup.CreationTimestamp.Time) > time.Duration(backupRetryTimeLimit)*time.Minute, nil
-}
-
-func (c *defaultReconciler) getProviderBackup(ctx context.Context, namespacedName types.NamespacedName) (*velerov1.Backup, error) {
-	var veleroBackup = &velerov1.Backup{}
-	err := c.client.Get(ctx, namespacedName, veleroBackup)
-	if apierrors.IsNotFound(err) {
-		return nil, nil
-	}
-	return veleroBackup, err
 }
 
 func isProviderBackupInProgress(backup *velerov1.Backup) bool {
