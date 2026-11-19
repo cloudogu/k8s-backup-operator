@@ -169,7 +169,9 @@ func includedResources(unit backupv1.UnitIdentifier) ([]string, error) {
 	case backupv1.UnitTypeDogu, backupv1.UnitTypeDoguV2:
 		return []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}, nil
 	case backupv1.UnitTypeMisc:
-		return []string{"configmaps", "secrets", "persistentvolumeclaims"}, nil
+		// Service account producers are backed up so that the restore of a producer component deletes and recreates
+		// its producer. This makes the service-account-operator delete and recreate the secrets of the requests.
+		return []string{"configmaps", "secrets", "persistentvolumeclaims", "serviceaccountproducers.k8s.cloudogu.com"}, nil
 	default:
 		return nil, fmt.Errorf("failed to determine included resources for unit type %q", unit.Type)
 	}

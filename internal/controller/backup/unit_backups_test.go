@@ -105,7 +105,7 @@ func TestDesiredUnitBackups(t *testing.T) {
 			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
 			{Key: "k8s.cloudogu.com/component.name", Operator: metav1.LabelSelectorOpIn, Values: []string{"k8s-lop-idp"}},
 		}}, unit.Spec.LabelSelector)
-		assert.Equal(t, []string{"configmaps", "secrets", "persistentvolumeclaims"}, unit.Spec.IncludedResources)
+		assert.Equal(t, []string{"configmaps", "secrets", "persistentvolumeclaims", "serviceaccountproducers.k8s.cloudogu.com"}, unit.Spec.IncludedResources)
 	})
 
 	t.Run("misc unit selects all components in one requirement", func(t *testing.T) {
@@ -152,7 +152,7 @@ func TestIncludedResources(t *testing.T) {
 		{name: "dogu", unitType: backupv1.UnitTypeDogu, expected: []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}},
 		{name: "doguv2", unitType: backupv1.UnitTypeDoguV2, expected: []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}},
 		{name: "global-config", unitType: backupv1.UnitTypeGlobalConfig, expected: []string{"configmaps"}},
-		{name: "misc", unitType: backupv1.UnitTypeMisc, expected: []string{"configmaps", "secrets", "persistentvolumeclaims"}},
+		{name: "misc", unitType: backupv1.UnitTypeMisc, expected: []string{"configmaps", "secrets", "persistentvolumeclaims", "serviceaccountproducers.k8s.cloudogu.com"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

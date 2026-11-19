@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -124,6 +125,25 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError) &&
 					assert.ErrorContains(t, err, "get components: collect backupable items: list component PVCs")
+			},
+		},
+		{
+			name: "fail to list component service account producers",
+			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
+				return builder.WithInterceptorFuncs(interceptor.Funcs{
+					List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+						if unstructuredList, ok := list.(*unstructured.UnstructuredList); ok && unstructuredList.GetKind() == "ServiceAccountProducerList" {
+							return assert.AnError
+						}
+						return client.List(ctx, list, opts...)
+					},
+				})
+			},
+			backup: &backupv1.Backup{Name: testBackupName, Namespace: testNamespace},
+			want:   BackupState{},
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
+				return assert.ErrorIs(t, err, assert.AnError) &&
+					assert.ErrorContains(t, err, "get components: collect backupable items: list component service account producers")
 			},
 		},
 		{
@@ -349,6 +369,32 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "should create misc unit for component with labeled service account producer",
+			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
+				return builder.WithObjects(
+					&componentv1.Component{Name: "lop-idp", Namespace: testNamespace, Status: componentv1.ComponentStatus{InstalledVersion: "1.0.0"}},
+					serviceAccountProducer("lop-idp-sapr", map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", backupScopeLabelKey: "lop-idp"}),
+					serviceAccountProducer("unlabeled-sapr", map[string]string{componentv1.ComponentNameLabelKey: "other"}),
+					&corev1.ConfigMap{Name: "global-config", Namespace: testNamespace, Data: map[string]string{"config.yaml": `{"fqdn": "fqdn.example.com","domain": "domain.example.com"}`}},
+				)
+			},
+			backup: &backupv1.Backup{
+				Name: testBackupName, Namespace: testNamespace,
+			},
+			want: BackupState{
+				Name:     testBackupName,
+				Coverage: backupv1.BackupCoverageFull,
+				Units: []backupv1.UnitIdentifier{
+					{Type: "global-config"},
+					{Type: "misc"},
+				},
+				Components: []backupv1.ComponentStatus{{Name: "lop-idp", Version: "1.0.0"}},
+				Fqdn:       "fqdn.example.com",
+				Domain:     "domain.example.com",
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "should not create misc unit when no resource with backup scope label is present - even if ignoreMisc is not ignored",
 			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
 				return builder.WithObjects(
@@ -386,7 +432,7 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := NewCollector(tt.k8sClientBuilderModifier(fake.NewClientBuilder().WithScheme(testScheme(t))).Build())
+			b := NewCollector(tt.k8sClientBuilderModifier(fake.NewClientBuilder().WithScheme(serviceAccountProducerScheme(t))).Build())
 			got, err := b.Collect(t.Context(), tt.backup)
 			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)
@@ -410,6 +456,45 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	assert.NoError(t, err)
 
 	return scheme
+}
+
+func TestBackupStateCollector_Collect_withoutServiceAccountProducerCRD(t *testing.T) {
+	k8sClient := fake.NewClientBuilder().WithScheme(testScheme(t)).WithObjects(
+		&componentv1.Component{Name: "lop-idp", Namespace: testNamespace, Status: componentv1.ComponentStatus{InstalledVersion: "1.0.0"}},
+		&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", backupScopeLabelKey: "lop-idp"}},
+	).Build()
+	backup := &backupv1.Backup{
+		Name: testBackupName, Namespace: testNamespace,
+		Spec: backupv1.BackupSpec{Options: backupv1.UnitOptions{IgnoreGlobalConfig: true}},
+	}
+
+	got, err := NewCollector(k8sClient).Collect(t.Context(), backup)
+
+	require.NoError(t, err)
+	assert.Equal(t, []backupv1.ComponentStatus{{Name: "lop-idp", Version: "1.0.0"}}, got.Components)
+	assert.Equal(t, []backupv1.UnitIdentifier{{Type: "misc"}}, got.Units)
+}
+
+var serviceAccountProducerGVK = schema.GroupVersionKind{Group: "k8s.cloudogu.com", Version: "v2", Kind: "ServiceAccountProducer"}
+
+// serviceAccountProducerScheme registers service account producers as unstructured types, because the backup operator
+// does not depend on the service account lib.
+func serviceAccountProducerScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+
+	scheme := testScheme(t)
+	scheme.AddKnownTypeWithName(serviceAccountProducerGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(serviceAccountProducerGVK.GroupVersion().WithKind("ServiceAccountProducerList"), &unstructured.UnstructuredList{})
+	return scheme
+}
+
+func serviceAccountProducer(name string, labels map[string]string) *unstructured.Unstructured {
+	sapr := &unstructured.Unstructured{}
+	sapr.SetGroupVersionKind(serviceAccountProducerGVK)
+	sapr.SetName(name)
+	sapr.SetNamespace(testNamespace)
+	sapr.SetLabels(labels)
+	return sapr
 }
 
 func TestBackupStateCollector_ListDogus(t *testing.T) {

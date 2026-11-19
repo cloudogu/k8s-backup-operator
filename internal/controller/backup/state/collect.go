@@ -188,10 +188,20 @@ func (b *BackupStateCollector) collectBackupableComponentItems(ctx context.Conte
 		return nil, fmt.Errorf("list component PVCs: %w", err)
 	}
 
-	backupableItems := make([]unstructured.Unstructured, 0, len(configMapList.Items)+len(secretList.Items)+len(pvcList.Items))
+	saprList := unstructured.UnstructuredList{}
+	saprList.SetAPIVersion("k8s.cloudogu.com/v2")
+	saprList.SetKind("ServiceAccountProducerList")
+	err = b.k8sClient.List(ctx, &saprList, client.InNamespace(backup.Namespace), client.HasLabels{componentv1.ComponentNameLabelKey, backupScopeLabelKey})
+	// no match means no service account producer crd is available in the cluster
+	if err != nil && !meta.IsNoMatchError(err) {
+		return nil, fmt.Errorf("list component service account producers: %w", err)
+	}
+
+	backupableItems := make([]unstructured.Unstructured, 0, len(configMapList.Items)+len(secretList.Items)+len(pvcList.Items)+len(saprList.Items))
 	backupableItems = append(backupableItems, configMapList.Items...)
 	backupableItems = append(backupableItems, secretList.Items...)
 	backupableItems = append(backupableItems, pvcList.Items...)
+	backupableItems = append(backupableItems, saprList.Items...)
 	return backupableItems, nil
 }
 
