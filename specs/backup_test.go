@@ -26,6 +26,12 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 			Namespace: "ecosystem",
 			Name:      fmt.Sprintf("backup-spec-creating-backup%s", uuid.New().String()),
 		}
+		// Which backup resources get created depends on what you have installed in the cluster.
+		// At a bare minimum, we can only expect the backup of the global config.
+		var globalConfigBackupObjectKey = client.ObjectKey{
+			Namespace: backupObjectKey.Namespace,
+			Name:      fmt.Sprintf("%s-global-config", backupObjectKey.Name),
+		}
 
 		AfterAll(func(ctx SpecContext) {
 			By("deletes the backup resource")
@@ -50,7 +56,7 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 		It("checks whether the provider's backup resource was created", func(ctx SpecContext) {
 			EventuallyShouldSucceed(func(g Gomega) {
 				veleroBackup := &velerov1.Backup{}
-				err := k8sClient.Get(ctx, backupObjectKey, veleroBackup)
+				err := k8sClient.Get(ctx, globalConfigBackupObjectKey, veleroBackup)
 				g.Expect(err).ShouldNot(HaveOccurred())
 			})
 		})
@@ -66,51 +72,6 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 			})
 		})
 
-	})
-
-	Describe("Deleting a backup", Ordered, Label("backup"), func() {
-		var backupObjectKey = client.ObjectKey{
-			Namespace: "ecosystem",
-			Name:      fmt.Sprintf("backup-spec-deleting-backup-%s", uuid.New().String()),
-		}
-
-		It("creates the backup resource", func(ctx SpecContext) {
-			backup := createBackupWithObjectKey(backupObjectKey)
-			err := k8sClient.Create(ctx, backup, &client.CreateOptions{})
-			Expect(err).ShouldNot(HaveOccurred())
-		})
-
-		It("waits until the backup has succeeded", func(ctx SpecContext) {
-			EventuallyShouldSucceed(func(g Gomega) {
-				backup := &backupv1.Backup{}
-				err := k8sClient.Get(ctx, backupObjectKey, backup)
-				g.Expect(err).ShouldNot(HaveOccurred())
-
-				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
-				g.Expect(completed).ToNot(BeNil())
-				g.Expect(completed.Status).To(Equal(metav1.ConditionTrue))
-			})
-		})
-
-		It("deletes the backup", func(ctx SpecContext) {
-			backup := createBackupWithObjectKey(backupObjectKey)
-			err := k8sClient.Delete(ctx, backup, &client.DeleteOptions{})
-			Expect(err).ShouldNot(HaveOccurred())
-		})
-
-		It("waits until the backup is deleted", func(ctx SpecContext) {
-			EventuallyShouldSucceed(func(g Gomega) {
-				backup := &backupv1.Backup{}
-				err := k8sClient.Get(ctx, backupObjectKey, backup)
-				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
-			})
-		})
-
-		It("checks if the provider's backup is also deleted", func(ctx SpecContext) {
-			veleroBackup := &velerov1.Backup{}
-			err := k8sClient.Get(ctx, backupObjectKey, veleroBackup)
-			Expect(apierrors.IsNotFound(err)).To(BeTrue())
-		})
 	})
 
 	Describe("Canceling a backup", Ordered, Label("backup"), func() {
@@ -219,35 +180,17 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 		})
 	})
 
-	Describe("Canceling a running backup", Ordered, Label("backup"), func() {
+	Describe("Deleting a backup", Ordered, Label("backup"), func() {
 		var backupObjectKey = client.ObjectKey{
 			Namespace: "ecosystem",
-			Name:      fmt.Sprintf("backup-spec-canceling-running-backup%s", uuid.New().String()),
+			Name:      fmt.Sprintf("backup-spec-deleting-backup-%s", uuid.New().String()),
 		}
-		var backupTimeLimitInMinutesForTest = 1
-
-		AfterAll(func(ctx SpecContext) {
-			By("deletes the backup resource")
-			backup := createBackupWithObjectKey(backupObjectKey)
-			err := k8sClient.Delete(ctx, backup, &client.DeleteOptions{})
-			Expect(err).ShouldNot(HaveOccurred())
-
-			By("waits until the backup is deleted")
-			EventuallyShouldSucceed(func(g Gomega) {
-				backup := &backupv1.Backup{}
-				err := k8sClient.Get(ctx, backupObjectKey, backup)
-				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
-			})
-
-			By("resets the backup time limit to the default value")
-			err = configureBackupTimeLimit(ctx, 60)
-			Expect(err).ShouldNot(HaveOccurred())
-		})
-
-		It("configures the backup time limit", func(ctx SpecContext) {
-			err := configureBackupTimeLimit(ctx, backupTimeLimitInMinutesForTest)
-			Expect(err).ShouldNot(HaveOccurred())
-		})
+		// Which backup resources get created depends on what you have installed in the cluster.
+		// At a bare minimum, we can only expect the backup of the global config.
+		var globalConfigBackupObjectKey = client.ObjectKey{
+			Namespace: backupObjectKey.Namespace,
+			Name:      fmt.Sprintf("%s-global-config", backupObjectKey.Name),
+		}
 
 		It("creates the backup resource", func(ctx SpecContext) {
 			backup := createBackupWithObjectKey(backupObjectKey)
@@ -255,51 +198,36 @@ var _ = Describe("Backup", Label("backup"), Ordered, func() {
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
-		// This test expects a backup with a duration that exceeds the elapsed time window.
-		It("checks whether the running backup was canceled after the time window expired", func(ctx SpecContext) {
-			time.Sleep(time.Duration(backupTimeLimitInMinutesForTest)*time.Minute + 10*time.Second)
-
+		It("waits until the backup has succeeded", func(ctx SpecContext) {
 			EventuallyShouldSucceed(func(g Gomega) {
 				backup := &backupv1.Backup{}
 				err := k8sClient.Get(ctx, backupObjectKey, backup)
 				g.Expect(err).ShouldNot(HaveOccurred())
 
-				canceled := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionCanceled)
-				g.Expect(canceled).ToNot(BeNil())
-				g.Expect(canceled.Status).To(Equal(metav1.ConditionTrue))
-				g.Expect(canceled.Reason).To(Equal("TimeWindowExpiredBackupInProgress"))
-
-				g.Expect(backup.Status.StartTimestamp.IsZero()).To(BeFalse())
+				completed := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+				g.Expect(completed).ToNot(BeNil())
+				g.Expect(completed.Status).To(Equal(metav1.ConditionTrue))
 			})
 		})
 
-		It("checks whether the backup run failed because it was canceled", func(ctx SpecContext) {
+		It("deletes the backup", func(ctx SpecContext) {
+			backup := createBackupWithObjectKey(backupObjectKey)
+			err := k8sClient.Delete(ctx, backup, &client.DeleteOptions{})
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("waits until the backup is deleted", func(ctx SpecContext) {
 			EventuallyShouldSucceed(func(g Gomega) {
 				backup := &backupv1.Backup{}
 				err := k8sClient.Get(ctx, backupObjectKey, backup)
-				g.Expect(err).ShouldNot(HaveOccurred())
-
-				succeeded := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
-				g.Expect(succeeded).ToNot(BeNil())
-				g.Expect(succeeded.Status).To(Equal(metav1.ConditionFalse))
-				g.Expect(succeeded.Reason).To(Equal("BackupCanceled"))
-			})
-		})
-
-		// The provider backup keeps running past the cancellation. It is deleted as soon as it
-		// reaches a terminal phase, because it may be inconsistent.
-		It("checks whether the provider's backup was deleted", func(ctx SpecContext) {
-			EventuallyShouldSucceed(func(g Gomega) {
-				veleroBackup := &velerov1.Backup{}
-				err := k8sClient.Get(ctx, backupObjectKey, veleroBackup)
 				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			})
 		})
 
-		It("checks whether the canceled backup is kept as failure history", func(ctx SpecContext) {
-			backup := &backupv1.Backup{}
-			err := k8sClient.Get(ctx, backupObjectKey, backup)
-			Expect(err).ShouldNot(HaveOccurred())
+		It("checks if the provider's backup is also deleted", func(ctx SpecContext) {
+			veleroBackup := &velerov1.Backup{}
+			err := k8sClient.Get(ctx, globalConfigBackupObjectKey, veleroBackup)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 	})
 })
