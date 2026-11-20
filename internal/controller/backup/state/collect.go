@@ -302,10 +302,10 @@ func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backu
 }
 
 func (b *BackupStateCollector) getCoverage(backup *backupv1.Backup) backupv1.BackupCoverage {
+	options := backup.Spec.Options
 	if len(backup.Spec.ExcludedDogus) == 0 &&
 		len(backup.Spec.ExcludedComponents) == 0 &&
-		(backup.Spec.Options == nil ||
-			!(backup.Spec.Options.IgnoreGlobalConfig || backup.Spec.Options.IgnoreV2Dogus)) {
+		(options == nil || (!options.IgnoreGlobalConfig && !options.IgnoreV2Dogus)) {
 		return backupv1.BackupCoverageFull
 	}
 	return backupv1.BackupCoveragePartial
