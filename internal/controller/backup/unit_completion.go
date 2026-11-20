@@ -39,7 +39,7 @@ func determineUnitCompletion(
 	backupStatusPatch statusUpdate,
 	err error,
 ) {
-	doguUnitMap, v2DogusBackup, globalConfigBackup, miscBackup := sortUnitTypes(ctx, backup, actualUnits)
+	doguUnitMap, v2DogusBackup, globalConfigBackup, componentsBackup := sortUnitTypes(ctx, backup, actualUnits)
 
 	completionState = unitsSucceeded
 
@@ -56,13 +56,17 @@ func determineUnitCompletion(
 
 	setCompletionState(&completionState, v2CompletionState)
 
-	miscUnitStatus, miscCompletionState := determineMiscUnitStatus(expectedState, miscBackup)
-	setCompletionState(&completionState, miscCompletionState)
+	componentsUnitStatus, componentsCompletionState, err := determineComponentsUnitStatus(expectedState, componentsBackup)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	setCompletionState(&completionState, componentsCompletionState)
 
 	return completionState, func(status *backupv1.BackupStatus) {
 		status.Dogus = doguUnitsStatus
 		status.GlobalConfig = globalConfigStatus
-		status.Misc = miscUnitStatus
+		status.Components = componentsUnitStatus
 		status.V2Dogus = doguV2UnitStatus
 	}, nil
 }
@@ -71,7 +75,7 @@ func sortUnitTypes(ctx context.Context, backup *backupv1.Backup, actualUnits []v
 	doguUnitMap map[string]*velerov1.Backup,
 	v2DogusBackup *velerov1.Backup,
 	globalConfigBackup *velerov1.Backup,
-	miscBackup *velerov1.Backup,
+	componentsBackup *velerov1.Backup,
 ) {
 	logger := log.FromContext(ctx).
 		WithName("sortUnitTypes").
@@ -87,14 +91,14 @@ func sortUnitTypes(ctx context.Context, backup *backupv1.Backup, actualUnits []v
 			v2DogusBackup = &unit
 		case backupv1.UnitTypeGlobalConfig:
 			globalConfigBackup = &unit
-		case backupv1.UnitTypeMisc:
-			miscBackup = &unit
+		case backupv1.UnitTypeComponents:
+			componentsBackup = &unit
 		default:
 			logger.Info("Unknown backup type", "type", unit.Labels[backupv1.BackupTypeLabelKey])
 			continue
 		}
 	}
-	return doguUnitMap, v2DogusBackup, globalConfigBackup, miscBackup
+	return doguUnitMap, v2DogusBackup, globalConfigBackup, componentsBackup
 }
 
 func unitStatusFromProviderBackup(backup *velerov1.Backup) (unitStatus backupv1.UnitStatus, completionState unitCompletionState) {
@@ -133,12 +137,24 @@ func unitStatusFromProviderBackup(backup *velerov1.Backup) (unitStatus backupv1.
 	return
 }
 
-func determineMiscUnitStatus(expectedState state.BackupState, miscBackup *velerov1.Backup) (*backupv1.UnitStatus, unitCompletionState) {
-	if expectedState.ContainsUnitType(backupv1.UnitTypeMisc) {
-		unitStatus, unitCompletionState := unitStatusFromProviderBackup(miscBackup)
-		return &unitStatus, unitCompletionState
+func determineComponentsUnitStatus(expectedState state.BackupState, componentsBackup *velerov1.Backup) (*backupv1.ComponentsUnitStatus, unitCompletionState, error) {
+	if expectedState.ContainsUnitType(backupv1.UnitTypeComponents) {
+		unitStatus, unitCompletionState := unitStatusFromProviderBackup(componentsBackup)
+
+		var includedComponents []backupv1.ComponentVersion
+		if componentsBackup != nil && componentsBackup.Annotations != nil {
+			installedDogusV2String := componentsBackup.Annotations[backupv1.ComponentsAnnotationKey]
+			err := json.Unmarshal([]byte(installedDogusV2String), &includedComponents)
+			if err != nil {
+				return nil, 0, fmt.Errorf("unmarshal included components from unit: %w", err)
+			}
+		}
+		return &backupv1.ComponentsUnitStatus{
+			UnitStatus: unitStatus,
+			Components: includedComponents,
+		}, unitCompletionState, nil
 	}
-	return nil, unitsSucceeded
+	return nil, unitsSucceeded, nil
 }
 
 func determineV2DoguUnitStatus(expectedState state.BackupState, v2DogusBackup *velerov1.Backup) (*backupv1.V2DogusUnitStatus, unitCompletionState, error) {

@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -15,9 +16,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
+var longBackupName = strings.Repeat("a", 64)
+var truncatedBackupName = fmt.Sprintf("%s-d96f0f85", strings.Repeat("a", 54))
+
 func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 	t.Run("fail to list provider backups", func(t *testing.T) {
-		backup := newBackupForTest("ns", "backup")
+		backup := newBackupForTest("ns", longBackupName)
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup, veleroBackup).
@@ -41,7 +45,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 	})
 
 	t.Run("fail to collect backup state", func(t *testing.T) {
-		backup := newBackupForTest("ns", "backup")
+		backup := newBackupForTest("ns", longBackupName)
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
 		fakeClient := newFakeClientBuilder(t).
 			WithObjects(backup, veleroBackup).
@@ -60,9 +64,9 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 	})
 
 	t.Run("fail to unmarshal v2 dogus", func(t *testing.T) {
-		backup := newBackupForTest("ns", "backup")
+		backup := newBackupForTest("ns", longBackupName)
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
-		veleroBackup.Labels[backupv1.BackupLabelKey] = "backup"
+		veleroBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 		veleroBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeDoguV2)
 		veleroBackup.Annotations[backupv1.InstalledDogusV2AnnotationKey] = "invalid json"
 		fakeClient := newFakeClientBuilder(t).
@@ -80,6 +84,30 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 		nextAction, err := reconciler.ensureProviderBackupCompleted(t.Context(), backup)
 
 		assert.ErrorContains(t, err, "determining unit completion: unmarshal installed dogus v2 from unit")
+		assert.Equal(t, Abort, nextAction)
+	})
+
+	t.Run("fail to unmarshal components", func(t *testing.T) {
+		backup := newBackupForTest("ns", longBackupName)
+		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseInProgress)
+		veleroBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
+		veleroBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeComponents)
+		veleroBackup.Annotations[backupv1.ComponentsAnnotationKey] = "invalid json"
+		fakeClient := newFakeClientBuilder(t).
+			WithObjects(backup, veleroBackup).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+		stateCollector := newMockBackupStateCollector(t)
+		stateCollector.EXPECT().Collect(t.Context(), backup).
+			Return(state.BackupState{
+				Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeComponents}},
+			}, nil)
+		reconciler.stateCollector = stateCollector
+
+		nextAction, err := reconciler.ensureProviderBackupCompleted(t.Context(), backup)
+
+		assert.ErrorContains(t, err, "determining unit completion: unmarshal included components from unit")
 		assert.Equal(t, Abort, nextAction)
 	})
 
@@ -102,9 +130,9 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 	}
 	for _, tt := range patchStatusErrTests {
 		t.Run(fmt.Sprintf("fail to patch status %s", tt.name), func(t *testing.T) {
-			backup := newBackupForTest("ns", "backup")
+			backup := newBackupForTest("ns", longBackupName)
 			veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", tt.veleroStatus)
-			veleroBackup.Labels[backupv1.BackupLabelKey] = "backup"
+			veleroBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 			veleroBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeDoguV2)
 			veleroBackup.Annotations[backupv1.InstalledDogusV2AnnotationKey] = `[{"name": "cockpit", "version": "1.2.3-1"}]`
 			fakeClient := newFakeClientBuilder(t).
@@ -131,9 +159,9 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 	}
 
 	t.Run("fail on unknown status", func(t *testing.T) {
-		backup := newBackupForTest("ns", "backup")
+		backup := newBackupForTest("ns", longBackupName)
 		veleroBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseDeleting)
-		veleroBackup.Labels[backupv1.BackupLabelKey] = "backup"
+		veleroBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 		veleroBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeDoguV2)
 		veleroBackup.Annotations[backupv1.InstalledDogusV2AnnotationKey] = `[{"name": "cockpit", "version": "1.2.3-1"}]`
 		fakeClient := newFakeClientBuilder(t).
@@ -156,7 +184,6 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 
 	successTests := []struct {
 		name                 string
-		backup               *backupv1.Backup
 		veleroBackups        *velerov1.BackupList
 		backupState          state.BackupState
 		expectedStatus       string
@@ -164,12 +191,11 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 		expectedGlobalConfig *backupv1.GlobalConfigStatus
 		expectedV2Dogus      *backupv1.V2DogusUnitStatus
 		expectedDogus        []backupv1.DoguUnitStatus
-		expectedMisc         *backupv1.UnitStatus
+		expectedComponents   *backupv1.ComponentsUnitStatus
 		expectedAction       action
 	}{
 		{
 			name:          "no provider unit found means in progress",
-			backup:        newBackupForTest("ns", "backup"),
 			veleroBackups: &velerov1.BackupList{},
 			backupState: state.BackupState{
 				Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeDoguV2}},
@@ -189,8 +215,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			expectedAction: Retry,
 		},
 		{
-			name:   "in progress provider backup means in progress",
-			backup: newBackupForTest("ns", "backup"),
+			name: "in progress provider backup means in progress",
 			veleroBackups: &velerov1.BackupList{
 				Items: []velerov1.Backup{func() velerov1.Backup {
 					providerBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhaseFinalizing)
@@ -198,7 +223,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 						backupv1.FQDNAnnotationKey:   "my.fqdn",
 						backupv1.DomainAnnotationKey: "my.domain",
 					}
-					providerBackup.Labels[backupv1.BackupLabelKey] = "backup"
+					providerBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 					providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeGlobalConfig)
 					return *providerBackup
 				}()},
@@ -223,14 +248,13 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			expectedAction: Retry,
 		},
 		{
-			name:   "failed provider backup means failed",
-			backup: newBackupForTest("ns", "backup"),
+			name: "failed provider backup means failed",
 			veleroBackups: &velerov1.BackupList{
 				Items: []velerov1.Backup{func() velerov1.Backup {
 					providerBackup := newVeleroBackupForReconcilerTest("ns", "backup", velerov1.BackupPhasePartiallyFailed)
 					providerBackup.Labels[backupv1.DoguNameLabelKey] = "baseline"
 					providerBackup.Labels[backupv1.DoguVersionLabelKey] = "1.2.3-3"
-					providerBackup.Labels[backupv1.BackupLabelKey] = "backup"
+					providerBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 					providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeDogu)
 					return *providerBackup
 				}()},
@@ -257,15 +281,14 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			expectedAction: Next,
 		},
 		{
-			name:   "completion state priority is respected",
-			backup: newBackupForTest("ns", "backup"),
+			name: "completion state priority is respected",
 			veleroBackups: &velerov1.BackupList{
 				Items: []velerov1.Backup{
 					func() velerov1.Backup {
 						providerBackup := newVeleroBackupForReconcilerTest("ns", "baseline", velerov1.BackupPhasePartiallyFailed)
 						providerBackup.Labels[backupv1.DoguNameLabelKey] = "baseline"
 						providerBackup.Labels[backupv1.DoguVersionLabelKey] = "1.2.3-3"
-						providerBackup.Labels[backupv1.BackupLabelKey] = "backup"
+						providerBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 						providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeDogu)
 						return *providerBackup
 					}(),
@@ -275,19 +298,19 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 							backupv1.FQDNAnnotationKey:   "my.fqdn",
 							backupv1.DomainAnnotationKey: "my.domain",
 						}
-						providerBackup.Labels[backupv1.BackupLabelKey] = "backup"
+						providerBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 						providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeGlobalConfig)
 						return *providerBackup
 					}(),
 					func() velerov1.Backup {
-						providerBackup := newVeleroBackupForReconcilerTest("ns", "misc", velerov1.BackupPhaseFailed)
-						providerBackup.Labels[backupv1.BackupLabelKey] = "backup"
-						providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeMisc)
+						providerBackup := newVeleroBackupForReconcilerTest("ns", "components", velerov1.BackupPhaseFailed)
+						providerBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
+						providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeComponents)
 						return *providerBackup
 					}(),
 					func() velerov1.Backup {
 						providerBackup := newVeleroBackupForReconcilerTest("ns", "doguv2", velerov1.BackupPhaseCompleted)
-						providerBackup.Labels[backupv1.BackupLabelKey] = "backup"
+						providerBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 						providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeDoguV2)
 						providerBackup.Annotations[backupv1.InstalledDogusV2AnnotationKey] = `[{"name": "cockpit", "version": "1.2.3-1"}]`
 						return *providerBackup
@@ -298,7 +321,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 				Units: []backupv1.UnitIdentifier{
 					{Type: backupv1.UnitTypeGlobalConfig},
 					{Type: backupv1.UnitTypeDoguV2},
-					{Type: backupv1.UnitTypeMisc},
+					{Type: backupv1.UnitTypeComponents},
 					{Type: "invalid"},
 					{Type: backupv1.UnitTypeDogu, Name: "baseline"},
 				},
@@ -329,11 +352,11 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 					Version: "1.2.3-1",
 				}},
 			},
-			expectedMisc: &backupv1.UnitStatus{
+			expectedComponents: &backupv1.ComponentsUnitStatus{
 				State:       "Failed",
 				Reason:      "ProviderBackupFailed",
 				Message:     "provider backup failed with status phase: Failed",
-				ProviderRef: &backupv1.ProviderRef{Name: "misc"},
+				ProviderRef: &backupv1.ProviderRef{Name: "components"},
 			},
 			expectedDogus: []backupv1.DoguUnitStatus{
 				{
@@ -348,15 +371,14 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			expectedAction: Retry,
 		},
 		{
-			name:   "succeed if all is completed",
-			backup: newBackupForTest("ns", "backup"),
+			name: "succeed if all is completed",
 			veleroBackups: &velerov1.BackupList{
 				Items: []velerov1.Backup{
 					func() velerov1.Backup {
 						providerBackup := newVeleroBackupForReconcilerTest("ns", "baseline", velerov1.BackupPhaseCompleted)
 						providerBackup.Labels[backupv1.DoguNameLabelKey] = "baseline"
 						providerBackup.Labels[backupv1.DoguVersionLabelKey] = "1.2.3-3"
-						providerBackup.Labels[backupv1.BackupLabelKey] = "backup"
+						providerBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 						providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeDogu)
 						return *providerBackup
 					}(),
@@ -366,19 +388,19 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 							backupv1.FQDNAnnotationKey:   "my.fqdn",
 							backupv1.DomainAnnotationKey: "my.domain",
 						}
-						providerBackup.Labels[backupv1.BackupLabelKey] = "backup"
+						providerBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 						providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeGlobalConfig)
 						return *providerBackup
 					}(),
 					func() velerov1.Backup {
-						providerBackup := newVeleroBackupForReconcilerTest("ns", "misc", velerov1.BackupPhaseCompleted)
-						providerBackup.Labels[backupv1.BackupLabelKey] = "backup"
-						providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeMisc)
+						providerBackup := newVeleroBackupForReconcilerTest("ns", "components", velerov1.BackupPhaseCompleted)
+						providerBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
+						providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeComponents)
 						return *providerBackup
 					}(),
 					func() velerov1.Backup {
 						providerBackup := newVeleroBackupForReconcilerTest("ns", "doguv2", velerov1.BackupPhaseCompleted)
-						providerBackup.Labels[backupv1.BackupLabelKey] = "backup"
+						providerBackup.Labels[backupv1.BackupLabelKey] = truncatedBackupName
 						providerBackup.Labels[backupv1.BackupTypeLabelKey] = string(backupv1.UnitTypeDoguV2)
 						providerBackup.Annotations[backupv1.InstalledDogusV2AnnotationKey] = `[{"name": "cockpit", "version": "1.2.3-1"}]`
 						return *providerBackup
@@ -389,7 +411,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 				Units: []backupv1.UnitIdentifier{
 					{Type: backupv1.UnitTypeGlobalConfig},
 					{Type: backupv1.UnitTypeDoguV2},
-					{Type: backupv1.UnitTypeMisc},
+					{Type: backupv1.UnitTypeComponents},
 					{Type: backupv1.UnitTypeDogu, Name: "baseline"},
 				},
 				InstalledDogusV2: []backupv1.DoguVersion{{Name: "cockpit", Version: "1.2.3-1"}},
@@ -419,11 +441,11 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 					Version: "1.2.3-1",
 				}},
 			},
-			expectedMisc: &backupv1.UnitStatus{
+			expectedComponents: &backupv1.ComponentsUnitStatus{
 				State:       "Succeeded",
 				Reason:      "ProviderBackupSucceeded",
 				Message:     "",
-				ProviderRef: &backupv1.ProviderRef{Name: "misc"},
+				ProviderRef: &backupv1.ProviderRef{Name: "components"},
 			},
 			expectedDogus: []backupv1.DoguUnitStatus{
 				{
@@ -440,24 +462,25 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 	}
 	for _, tt := range successTests {
 		t.Run(tt.name, func(t *testing.T) {
+			backup := newBackupForTest("ns", longBackupName)
 			fakeClient := newFakeClientBuilder(t).
-				WithObjects(tt.backup).
+				WithObjects(backup).
 				WithLists(tt.veleroBackups).
-				WithStatusSubresource(tt.backup).
+				WithStatusSubresource(backup).
 				Build()
 			reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 			stateCollector := newMockBackupStateCollector(t)
-			stateCollector.EXPECT().Collect(t.Context(), tt.backup).
+			stateCollector.EXPECT().Collect(t.Context(), backup).
 				Return(tt.backupState, nil)
 			reconciler.stateCollector = stateCollector
 
-			nextAction, err := reconciler.ensureProviderBackupCompleted(t.Context(), tt.backup)
+			nextAction, err := reconciler.ensureProviderBackupCompleted(t.Context(), backup)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedAction, nextAction)
 			actualBackup := &backupv1.Backup{}
 
-			err = fakeClient.Get(t.Context(), tt.backup.GetNamespacedName(), actualBackup)
+			err = fakeClient.Get(t.Context(), backup.GetNamespacedName(), actualBackup)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedStatus, actualBackup.Status.Status)
 
@@ -469,7 +492,7 @@ func TestReconcilerEnsureProviderBackupCompleted(t *testing.T) {
 			assert.Equal(t, tt.expectedGlobalConfig, actualBackup.Status.GlobalConfig)
 			assert.Equal(t, tt.expectedV2Dogus, actualBackup.Status.V2Dogus)
 			assert.Equal(t, tt.expectedDogus, actualBackup.Status.Dogus)
-			assert.Equal(t, tt.expectedMisc, actualBackup.Status.Misc)
+			assert.Equal(t, tt.expectedComponents, actualBackup.Status.Components)
 		})
 	}
 }
