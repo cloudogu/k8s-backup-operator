@@ -139,14 +139,14 @@ func TestRestoreState_InvalidExclusions(t *testing.T) {
 	unitBased := RestoreState{
 		Kind: KindUnits,
 		Units: []UnitBackup{
-			{Type: backupv1.UnitTypeMisc, ProviderBackup: &velerov1.Backup{}},
+			{Type: backupv1.UnitTypeComponents, ProviderBackup: &velerov1.Backup{}},
 			{Type: backupv1.UnitTypeDogu, Name: "redmine", ProviderBackup: &velerov1.Backup{}},
 		},
 		V2Dogus:    []string{"cockpit"},
 		Components: []string{"k8s-loki"},
 	}
-	withoutMisc := unitBased
-	withoutMisc.Components = nil
+	withoutComponents := unitBased
+	withoutComponents.Components = nil
 	legacy := RestoreState{Kind: KindLegacy, Units: []UnitBackup{{Type: UnitTypeLegacy}}}
 	legacyNotSupported := []string{"exclusions and options are not supported for a legacy backup"}
 
@@ -170,20 +170,21 @@ func TestRestoreState_InvalidExclusions(t *testing.T) {
 			want:  []string{"excludedComponents: k8s-foo is not in the backup"},
 		},
 		{
-			name:  "misc backup missing invalidates every excludedComponents entry",
+			name:  "backup without components invalidates every excludedComponents entry",
 			spec:  backupv1.RestoreSpec{ExcludedComponents: []string{"k8s-loki", "k8s-foo"}},
-			state: withoutMisc,
+			state: withoutComponents,
 			want:  []string{"excludedComponents: k8s-loki is not in the backup", "excludedComponents: k8s-foo is not in the backup"},
 		},
 		{
 			name:  "ignoreV2Dogus without doguv2 unit is fine",
-			spec:  backupv1.RestoreSpec{Options: backupv1.UnitOptions{IgnoreV2Dogus: true}},
+			spec:  backupv1.RestoreSpec{Options: &backupv1.UnitOptions{IgnoreV2Dogus: true}},
 			state: unitBased,
 		},
 		{name: "legacy without exclusions", state: legacy},
 		{name: "legacy with excludedDogus", spec: backupv1.RestoreSpec{ExcludedDogus: []string{"redmine"}}, state: legacy, want: legacyNotSupported},
 		{name: "legacy with excludedComponents", spec: backupv1.RestoreSpec{ExcludedComponents: []string{"k8s-loki"}}, state: legacy, want: legacyNotSupported},
-		{name: "legacy with option", spec: backupv1.RestoreSpec{Options: backupv1.UnitOptions{IgnoreMisc: true}}, state: legacy, want: legacyNotSupported},
+		{name: "legacy with option", spec: backupv1.RestoreSpec{Options: &backupv1.UnitOptions{IgnoreGlobalConfig: true}}, state: legacy, want: legacyNotSupported},
+		{name: "legacy with empty options", spec: backupv1.RestoreSpec{Options: &backupv1.UnitOptions{}}, state: legacy},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -202,13 +203,13 @@ func TestUnitBackup_IsUsable(t *testing.T) {
 		unit UnitBackup
 		want bool
 	}{
-		{name: "unit completed", unit: unitInPhase(backupv1.UnitTypeMisc, velerov1.BackupPhaseCompleted), want: true},
-		{name: "unit partially failed", unit: unitInPhase(backupv1.UnitTypeMisc, velerov1.BackupPhasePartiallyFailed), want: false},
-		{name: "unit failed", unit: unitInPhase(backupv1.UnitTypeMisc, velerov1.BackupPhaseFailed), want: false},
-		{name: "unit in progress", unit: unitInPhase(backupv1.UnitTypeMisc, velerov1.BackupPhaseInProgress), want: false},
-		{name: "unit missing", unit: UnitBackup{Type: backupv1.UnitTypeMisc}, want: false},
+		{name: "unit completed", unit: unitInPhase(backupv1.UnitTypeComponents, velerov1.BackupPhaseCompleted), want: true},
+		{name: "unit partially failed", unit: unitInPhase(backupv1.UnitTypeComponents, velerov1.BackupPhasePartiallyFailed), want: false},
+		{name: "unit failed", unit: unitInPhase(backupv1.UnitTypeComponents, velerov1.BackupPhaseFailed), want: false},
+		{name: "unit in progress", unit: unitInPhase(backupv1.UnitTypeComponents, velerov1.BackupPhaseInProgress), want: false},
+		{name: "unit missing", unit: UnitBackup{Type: backupv1.UnitTypeComponents}, want: false},
 		{name: "legacy completed", unit: unitInPhase(UnitTypeLegacy, velerov1.BackupPhaseCompleted), want: true},
-		{name: "legacy partially failed", unit: unitInPhase(UnitTypeLegacy, velerov1.BackupPhasePartiallyFailed), want: true},
+		{name: "legacy partially failed", unit: unitInPhase(UnitTypeLegacy, velerov1.BackupPhasePartiallyFailed), want: false},
 		{name: "legacy failed", unit: unitInPhase(UnitTypeLegacy, velerov1.BackupPhaseFailed), want: false},
 		{name: "legacy in progress", unit: unitInPhase(UnitTypeLegacy, velerov1.BackupPhaseInProgress), want: false},
 	}

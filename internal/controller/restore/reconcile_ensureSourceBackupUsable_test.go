@@ -113,7 +113,7 @@ func TestARestorableSourceBackupLetsThePreparationRun(t *testing.T) {
 		return reconciler.Reconcile
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory,
-		restore, readyStorageLocation(), readyProviderDeployment(), sourceBackup(velerov1.BackupPhasePartiallyFailed))
+		restore, readyStorageLocation(), readyProviderDeployment(), sourceBackup(velerov1.BackupPhaseCompleted))
 
 	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -176,13 +176,13 @@ func TestCheckSourceBackup(t *testing.T) {
 	backupInPhase := func(phase velerov1.BackupPhase) *velerov1.Backup {
 		return &velerov1.Backup{Status: velerov1.BackupStatus{Phase: phase}}
 	}
-	// includes misc / redmine if provided
-	unitsWith := func(misc, redmine *velerov1.Backup) state.RestoreState {
+	// includes components / redmine if provided
+	unitsWith := func(components, redmine *velerov1.Backup) state.RestoreState {
 		return state.RestoreState{
 			Kind: state.KindUnits,
 			Units: []state.UnitBackup{
 				{Type: k8sv1.UnitTypeGlobalConfig, ProviderBackup: backupInPhase(velerov1.BackupPhaseCompleted)},
-				{Type: k8sv1.UnitTypeMisc, ProviderBackup: misc},
+				{Type: k8sv1.UnitTypeComponents, ProviderBackup: components},
 				{Type: k8sv1.UnitTypeDoguV2, ProviderBackup: backupInPhase(velerov1.BackupPhaseInProgress)},
 				{Type: k8sv1.UnitTypeDogu, Name: "redmine", ProviderBackup: redmine},
 			},
@@ -191,7 +191,7 @@ func TestCheckSourceBackup(t *testing.T) {
 		}
 	}
 	completed := backupInPhase(velerov1.BackupPhaseCompleted)
-	ignoreV2 := k8sv1.RestoreSpec{BackupName: testBackup, Options: k8sv1.UnitOptions{IgnoreV2Dogus: true}}
+	ignoreV2 := k8sv1.RestoreSpec{BackupName: testBackup, Options: &k8sv1.UnitOptions{IgnoreV2Dogus: true}}
 	legacyInPhase := func(phase velerov1.BackupPhase) state.RestoreState {
 		return state.RestoreState{Kind: state.KindLegacy, Units: []state.UnitBackup{{Type: state.UnitTypeLegacy, ProviderBackup: backupInPhase(phase)}}}
 	}
@@ -213,7 +213,7 @@ func TestCheckSourceBackup(t *testing.T) {
 		{
 			name:        "invalid exclusions are listed and reported before unusable units",
 			spec:        k8sv1.RestoreSpec{BackupName: testBackup, ExcludedDogus: []string{"cockpit"}, ExcludedComponents: []string{"k8s-foo"}},
-			state:       unitsWith(nil, completed), // misc unusable, but invalid exclusions go first
+			state:       unitsWith(nil, completed), // components unusable, but invalid exclusions go first
 			wantReason:  ReasonInvalidExclusions,
 			wantMessage: "The exclusions do not match the backup: excludedDogus: cockpit is a V2 dogu; excludedComponents: k8s-foo is not in the backup.",
 		},
@@ -222,11 +222,11 @@ func TestCheckSourceBackup(t *testing.T) {
 			spec:        k8sv1.RestoreSpec{BackupName: testBackup},
 			state:       unitsWith(nil, backupInPhase(velerov1.BackupPhasePartiallyFailed)),
 			wantReason:  ReasonUnusableUnits,
-			wantMessage: "The backups of these units cannot be restored: misc (missing, skip with options.ignoreMisc); doguv2 (phase InProgress, skip with options.ignoreV2Dogus); dogu redmine (phase PartiallyFailed, skip with excludedDogus).",
+			wantMessage: "The backups of these units cannot be restored: components (missing, skip with excludedComponents); doguv2 (phase InProgress, skip with options.ignoreV2Dogus); dogu redmine (phase PartiallyFailed, skip with excludedDogus).",
 		},
 		{
 			name:        "unusable global-config names its option",
-			spec:        k8sv1.RestoreSpec{BackupName: testBackup, Options: k8sv1.UnitOptions{IgnoreV2Dogus: true}},
+			spec:        k8sv1.RestoreSpec{BackupName: testBackup, Options: &k8sv1.UnitOptions{IgnoreV2Dogus: true}},
 			state:       state.RestoreState{Kind: state.KindUnits, Units: []state.UnitBackup{{Type: k8sv1.UnitTypeGlobalConfig, ProviderBackup: backupInPhase(velerov1.BackupPhaseFailed)}}},
 			wantReason:  ReasonUnusableUnits,
 			wantMessage: "The backups of these units cannot be restored: global-config (phase Failed, skip with options.ignoreGlobalConfig).",
@@ -240,12 +240,12 @@ func TestCheckSourceBackup(t *testing.T) {
 		},
 		{
 			name:  "skipped unusable units do not fail the restore",
-			spec:  k8sv1.RestoreSpec{BackupName: testBackup, ExcludedDogus: []string{"redmine"}, Options: k8sv1.UnitOptions{IgnoreMisc: true, IgnoreV2Dogus: true}},
+			spec:  k8sv1.RestoreSpec{BackupName: testBackup, ExcludedDogus: []string{"redmine"}, ExcludedComponents: []string{"k8s-loki"}, Options: &k8sv1.UnitOptions{IgnoreV2Dogus: true}},
 			state: unitsWith(nil, nil),
 		},
 		{
 			name:        "nothing left to restore",
-			spec:        k8sv1.RestoreSpec{BackupName: testBackup, ExcludedDogus: []string{"redmine"}, Options: k8sv1.UnitOptions{IgnoreGlobalConfig: true, IgnoreMisc: true, IgnoreV2Dogus: true}},
+			spec:        k8sv1.RestoreSpec{BackupName: testBackup, ExcludedDogus: []string{"redmine"}, ExcludedComponents: []string{"k8s-loki"}, Options: &k8sv1.UnitOptions{IgnoreGlobalConfig: true, IgnoreV2Dogus: true}},
 			state:       unitsWith(completed, completed),
 			wantReason:  ReasonUnusableUnits,
 			wantMessage: "No unit is left to restore after applying the exclusions and options.",
@@ -259,10 +259,13 @@ func TestCheckSourceBackup(t *testing.T) {
 			wantMessage: "The backups of these units cannot be restored: legacy (phase Failed).",
 		},
 		{
-			name:  "partially failed legacy backup do not fail the restore",
-			spec:  k8sv1.RestoreSpec{BackupName: testBackup},
-			state: legacyInPhase(velerov1.BackupPhasePartiallyFailed),
+			name:        "partially failed legacy backup",
+			spec:        k8sv1.RestoreSpec{BackupName: testBackup},
+			state:       legacyInPhase(velerov1.BackupPhasePartiallyFailed),
+			wantReason:  ReasonUnusableUnits,
+			wantMessage: "The backups of these units cannot be restored: legacy (phase PartiallyFailed).",
 		},
+		{name: "usable legacy backup", spec: k8sv1.RestoreSpec{BackupName: testBackup}, state: legacyInPhase(velerov1.BackupPhaseCompleted)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

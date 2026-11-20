@@ -64,7 +64,7 @@ func (s RestoreState) RestoredComponents(spec backupv1.RestoreSpec) []string {
 // InvalidExclusions describes each exclusion or option not matching the backup; empty if all match.
 func (s RestoreState) InvalidExclusions(spec backupv1.RestoreSpec) []string {
 	if s.Kind == KindLegacy {
-		if len(spec.ExcludedDogus) > 0 || len(spec.ExcludedComponents) > 0 || spec.Options != (backupv1.UnitOptions{}) {
+		if len(spec.ExcludedDogus) > 0 || len(spec.ExcludedComponents) > 0 || ptr.Deref(spec.Options, backupv1.UnitOptions{}) != (backupv1.UnitOptions{}) {
 			return []string{"exclusions and options are not supported for a legacy backup"}
 		}
 		return nil
@@ -89,17 +89,9 @@ func (s RestoreState) InvalidExclusions(spec backupv1.RestoreSpec) []string {
 	return invalid
 }
 
-// IsUsable reports whether the unit's provider backup can be restored; legacy backups also when partially failed.
+// IsUsable reports whether the unit's provider backup can be restored.
 func (u UnitBackup) IsUsable() bool {
-	if u.ProviderBackup == nil {
-		return false
-	}
-	phase := u.ProviderBackup.Status.Phase
-	// TODO: legacy partiallyFailed => unusable too, to simplify the code?
-	if u.Type == UnitTypeLegacy && phase == velerov1.BackupPhasePartiallyFailed {
-		return true
-	}
-	return phase == velerov1.BackupPhaseCompleted
+	return u.ProviderBackup != nil && u.ProviderBackup.Status.Phase == velerov1.BackupPhaseCompleted
 }
 
 // SkipOption names the exclusion or option that skips the unit; empty for the legacy unit.
@@ -107,8 +99,8 @@ func (u UnitBackup) SkipOption() string {
 	switch u.Type {
 	case backupv1.UnitTypeGlobalConfig:
 		return "options.ignoreGlobalConfig"
-	case backupv1.UnitTypeMisc:
-		return "options.ignoreMisc"
+	case backupv1.UnitTypeComponents:
+		return "excludedComponents"
 	case backupv1.UnitTypeDoguV2:
 		return "options.ignoreV2Dogus"
 	case backupv1.UnitTypeDogu:
