@@ -30,7 +30,7 @@ func TestDesiredUnitBackups(t *testing.T) {
 		assert.Equal(t, "backup", unitBackup.Labels["k8s.cloudogu.com/part-of"])
 		assert.Equal(t, backup.Name, unitBackup.Labels[backupv1.BackupLabelKey])
 		assert.Equal(t, string(backupv1.BackupCoverageFull), unitBackup.Labels[backupv1.BackupCoverageLabelKey])
-		assert.Equal(t, `[{"type":"doguv2"},{"type":"dogu","name":"ldap"},{"type":"global-config"},{"type":"misc"}]`, unitBackup.Annotations[backupv1.UnitsAnnotationKey])
+		assert.Equal(t, `[{"type":"doguv2"},{"type":"dogu","name":"ldap"},{"type":"global-config"},{"type":"components"}]`, unitBackup.Annotations[backupv1.UnitsAnnotationKey])
 		assert.Equal(t, `[{"name":"cas","version":"7.0.0-1"}]`, unitBackup.Annotations[backupv1.InstalledDogusV2AnnotationKey])
 		assert.Equal(t, `[{"name":"ldap","version":"2.6.8-1"}]`, unitBackup.Annotations[backupv1.InstalledDogusV3AnnotationKey])
 		assert.Equal(t, "blueprint-id", unitBackup.Annotations[backupv1.BlueprintIDAnnotationKey])
@@ -53,9 +53,13 @@ func TestDesiredUnitBackups(t *testing.T) {
 		require.NotNil(t, unit)
 		assert.Equal(t, string(backupv1.UnitTypeDoguV2), unit.Labels[backupv1.BackupTypeLabelKey])
 		assert.NotContains(t, unit.Labels, backupv1.DoguNameLabelKey)
-		assert.Equal(t, &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+		orSelector := []*metav1.LabelSelector{{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: "k8s.cloudogu.com/dogu.name", Operator: metav1.LabelSelectorOpIn, Values: []string{"cas"}},
-		}}, unit.Spec.LabelSelector)
+		}}, {MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "dogu.name", Operator: metav1.LabelSelectorOpIn, Values: []string{"cas"}},
+		}}}
+		assert.Nil(t, unit.Spec.LabelSelector)
+		assert.Equal(t, orSelector, unit.Spec.OrLabelSelectors)
 		assert.Equal(t, []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}, unit.Spec.IncludedResources)
 	})
 
@@ -69,27 +73,46 @@ func TestDesiredUnitBackups(t *testing.T) {
 		assert.Equal(t, []string{"configmaps"}, unit.Spec.IncludedResources)
 	})
 
-	t.Run("misc unit", func(t *testing.T) {
-		unit := byName["backup-misc"]
+	t.Run("components unit", func(t *testing.T) {
+		unit := byName["backup-components"]
 		require.NotNil(t, unit)
-		assert.Equal(t, string(backupv1.UnitTypeMisc), unit.Labels[backupv1.BackupTypeLabelKey])
+		assert.Equal(t, string(backupv1.UnitTypeComponents), unit.Labels[backupv1.BackupTypeLabelKey])
 		assert.Contains(t, unit.Annotations, backupv1.ComponentsAnnotationKey)
 		assert.Equal(t, &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
-			{Key: "k8s.cloudogu.com/dogu.name", Operator: metav1.LabelSelectorOpDoesNotExist},
-			{Key: "k8s.cloudogu.com/component.name", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"k8s-loki"}},
+			{Key: "k8s.cloudogu.com/component.name", Operator: metav1.LabelSelectorOpIn, Values: []string{"k8s-lop-idp"}},
 		}}, unit.Spec.LabelSelector)
-		assert.Equal(t, []string{"configmaps", "secrets", "persistentvolumeclaims"}, unit.Spec.IncludedResources)
+		assert.Equal(t, []string{"configmaps", "secrets", "persistentvolumeclaims", "serviceaccountproducers.k8s.cloudogu.com"}, unit.Spec.IncludedResources)
 	})
 
-	t.Run("misc unit without excluded components", func(t *testing.T) {
-		miscOnly := state.BackupState{Name: "backup", Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeMisc}}}
+	t.Run("components unit selects all components in one requirement", func(t *testing.T) {
+		componentsOnly := state.BackupState{
+			Name:  "backup",
+			Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeComponents}},
+			Components: []backupv1.ComponentVersion{
+				{Name: "k8s-lop-idp", Version: "1.0.0"},
+				{Name: "k8s-loki", Version: "2.0.0"},
+			},
+		}
 
-		unitBackups, err := desiredUnitBackups(newBackupForTest("ns", "backup"), miscOnly, "default")
+		unitBackups, err := desiredUnitBackups(newBackupForTest("ns", "backup"), componentsOnly, "default")
 
 		require.NoError(t, err)
 		require.Len(t, unitBackups, 1)
-		assert.Len(t, unitBackups[0].Spec.LabelSelector.MatchExpressions, 2)
+		assert.Equal(t, &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
+			{Key: "k8s.cloudogu.com/component.name", Operator: metav1.LabelSelectorOpIn, Values: []string{"k8s-lop-idp", "k8s-loki"}},
+		}}, unitBackups[0].Spec.LabelSelector)
+	})
+
+	t.Run("components unit without components fails", func(t *testing.T) {
+		componentsOnly := state.BackupState{Name: "backup", Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeComponents}}}
+
+		unitBackups, err := desiredUnitBackups(newBackupForTest("ns", "backup"), componentsOnly, "default")
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "components unit requires at least one component")
+		assert.Nil(t, unitBackups)
 	})
 
 	t.Run("Do not modify the default labels", func(t *testing.T) {
@@ -106,7 +129,7 @@ func TestIncludedResources(t *testing.T) {
 		{name: "dogu", unitType: backupv1.UnitTypeDogu, expected: []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}},
 		{name: "doguv2", unitType: backupv1.UnitTypeDoguV2, expected: []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}},
 		{name: "global-config", unitType: backupv1.UnitTypeGlobalConfig, expected: []string{"configmaps"}},
-		{name: "misc", unitType: backupv1.UnitTypeMisc, expected: []string{"configmaps", "secrets", "persistentvolumeclaims"}},
+		{name: "components", unitType: backupv1.UnitTypeComponents, expected: []string{"configmaps", "secrets", "persistentvolumeclaims", "serviceaccountproducers.k8s.cloudogu.com"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

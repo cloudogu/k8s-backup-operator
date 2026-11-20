@@ -34,7 +34,7 @@ func populateUnitStatus(status *backupv1.BackupStatus, backupName string, backup
 			populateV2DogusStatus(status, backupState, providerRef)
 		case backupv1.UnitTypeDogu:
 			populateDoguStatus(status, backupState, unit.Name, providerRef)
-		case backupv1.UnitTypeMisc:
+		case backupv1.UnitTypeComponents:
 			populateMiscStatus(status, backupState, providerRef)
 		}
 	}
@@ -78,13 +78,13 @@ func populateDoguStatus(status *backupv1.BackupStatus, backupState state.BackupS
 }
 
 func populateMiscStatus(status *backupv1.BackupStatus, backupState state.BackupState, providerRef *backupv1.ProviderRef) {
-	if status.Misc == nil {
-		status.Misc = &backupv1.UnitStatus{}
+	if status.Components == nil {
+		status.Components = &backupv1.ComponentsUnitStatus{}
 	}
-	if len(status.Components) == 0 && len(backupState.Components) > 0 {
-		status.Components = slices.Clone(backupState.Components)
+	if len(status.Components.Components) == 0 && len(backupState.Components) > 0 {
+		status.Components.Components = slices.Clone(backupState.Components)
 	}
-	setProviderRefIfMissing(status.Misc, providerRef)
+	setProviderRefIfMissing(&status.Components.UnitStatus, providerRef)
 }
 
 func setProviderRefIfMissing(unitStatus *backupv1.UnitStatus, providerRef *backupv1.ProviderRef) {

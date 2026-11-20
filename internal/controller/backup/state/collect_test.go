@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -9,17 +10,21 @@ import (
 	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
 	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
+// long name to verify truncation
+var testBackupName = strings.Repeat("a", 64)
+
 const (
-	testBackupName = "testBackup"
-	testNamespace  = "testNamespace"
+	testNamespace = "testNamespace"
 )
 
 func TestBackupStateCollector_Collect(t *testing.T) {
@@ -126,6 +131,25 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 			},
 		},
 		{
+			name: "fail to list component service account producers",
+			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
+				return builder.WithInterceptorFuncs(interceptor.Funcs{
+					List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+						if unstructuredList, ok := list.(*unstructured.UnstructuredList); ok && unstructuredList.GetKind() == "ServiceAccountProducerList" {
+							return assert.AnError
+						}
+						return client.List(ctx, list, opts...)
+					},
+				})
+			},
+			backup: &backupv1.Backup{Name: testBackupName, Namespace: testNamespace},
+			want:   BackupState{},
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
+				return assert.ErrorIs(t, err, assert.AnError) &&
+					assert.ErrorContains(t, err, "get components: collect backupable items: list component service account producers")
+			},
+		},
+		{
 			name: "fail because component name label is missing",
 			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
 				return builder.WithInterceptorFuncs(interceptor.Funcs{
@@ -229,7 +253,7 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 			},
 		},
 		{
-			name: "success with ignore v2 dogus, misc and global config",
+			name: "success with ignore v2 dogus and global config",
 			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
 				return builder.WithObjects(
 					&blueprintv3.Blueprint{Name: "blueprint", Namespace: testNamespace, Spec: blueprintv3.BlueprintSpec{DisplayName: "test-blueprint"}},
@@ -246,9 +270,8 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 			backup: &backupv1.Backup{
 				Name: testBackupName, Namespace: testNamespace,
 				Spec: backupv1.BackupSpec{
-					Options: backupv1.UnitOptions{
+					Options: &backupv1.UnitOptions{
 						IgnoreV2Dogus:      true,
-						IgnoreMisc:         true,
 						IgnoreGlobalConfig: true,
 					}},
 			},
@@ -256,10 +279,10 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 				Name:             testBackupName,
 				Coverage:         backupv1.BackupCoveragePartial,
 				BlueprintId:      "test-blueprint",
-				Units:            []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeDogu, Name: "baseline"}},
+				Units:            []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeDogu, Name: "baseline"}, {Type: backupv1.UnitTypeComponents}},
 				InstalledDogusV2: nil,
 				InstalledDogusV3: []backupv1.DoguVersion{{Name: "baseline", Version: "3.2.1"}},
-				Components:       nil,
+				Components:       []backupv1.ComponentVersion{{Name: "lop-idp", Version: "1.0.0"}},
 				Fqdn:             "",
 				Domain:           "",
 			},
@@ -300,11 +323,11 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 					{Type: "doguv2"},
 					{Type: "dogu", Name: "baseline"},
 					{Type: "global-config"},
-					{Type: "misc"},
+					{Type: "components"},
 				},
 				InstalledDogusV2: []backupv1.DoguVersion{{Name: "cockpit", Version: "1.2.3"}},
 				InstalledDogusV3: []backupv1.DoguVersion{{Name: "baseline", Version: "3.2.1"}},
-				Components:       []backupv1.ComponentStatus{{Name: "lop-idp", Version: "1.0.0"}},
+				Components:       []backupv1.ComponentVersion{{Name: "lop-idp", Version: "1.0.0"}},
 				Fqdn:             "fqdn.example.com",
 				Domain:           "domain.example.com",
 			},
@@ -337,18 +360,44 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 					{Type: "doguv2"},
 					{Type: "dogu", Name: "baseline"},
 					{Type: "global-config"},
-					{Type: "misc"},
+					{Type: "components"},
 				},
 				InstalledDogusV2: []backupv1.DoguVersion{{Name: "cockpit", Version: "1.2.3"}},
 				InstalledDogusV3: []backupv1.DoguVersion{{Name: "baseline", Version: "3.2.1"}},
-				Components:       []backupv1.ComponentStatus{{Name: "lop-idp", Version: "1.0.0"}},
+				Components:       []backupv1.ComponentVersion{{Name: "lop-idp", Version: "1.0.0"}},
 				Fqdn:             "fqdn.example.com",
 				Domain:           "domain.example.com",
 			},
 			wantErr: assert.NoError,
 		},
 		{
-			name: "should not create misc unit when no resource with backup scope label is present - even if ignoreMisc is not ignored",
+			name: "should create components unit for component with labeled service account producer",
+			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
+				return builder.WithObjects(
+					&componentv1.Component{Name: "lop-idp", Namespace: testNamespace, Status: componentv1.ComponentStatus{InstalledVersion: "1.0.0"}},
+					serviceAccountProducer("lop-idp-sapr", map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", backupScopeLabelKey: "lop-idp"}),
+					serviceAccountProducer("unlabeled-sapr", map[string]string{componentv1.ComponentNameLabelKey: "other"}),
+					&corev1.ConfigMap{Name: "global-config", Namespace: testNamespace, Data: map[string]string{"config.yaml": `{"fqdn": "fqdn.example.com","domain": "domain.example.com"}`}},
+				)
+			},
+			backup: &backupv1.Backup{
+				Name: testBackupName, Namespace: testNamespace,
+			},
+			want: BackupState{
+				Name:     testBackupName,
+				Coverage: backupv1.BackupCoverageFull,
+				Units: []backupv1.UnitIdentifier{
+					{Type: "global-config"},
+					{Type: "components"},
+				},
+				Components: []backupv1.ComponentVersion{{Name: "lop-idp", Version: "1.0.0"}},
+				Fqdn:       "fqdn.example.com",
+				Domain:     "domain.example.com",
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "should not create components unit when no resource with backup scope label is present - even if ignoreComponents is not ignored",
 			k8sClientBuilderModifier: func(builder *fake.ClientBuilder) *fake.ClientBuilder {
 				return builder.WithObjects(
 					&blueprintv3.Blueprint{Name: "blueprint", Namespace: testNamespace, Spec: blueprintv3.BlueprintSpec{DisplayName: "test-blueprint"}},
@@ -385,7 +434,7 @@ func TestBackupStateCollector_Collect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := NewCollector(tt.k8sClientBuilderModifier(fake.NewClientBuilder().WithScheme(testScheme(t))).Build())
+			b := NewCollector(tt.k8sClientBuilderModifier(fake.NewClientBuilder().WithScheme(serviceAccountProducerScheme(t))).Build())
 			got, err := b.Collect(t.Context(), tt.backup)
 			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)
@@ -409,4 +458,101 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	assert.NoError(t, err)
 
 	return scheme
+}
+
+func TestBackupStateCollector_Collect_withoutServiceAccountProducerCRD(t *testing.T) {
+	k8sClient := fake.NewClientBuilder().WithScheme(testScheme(t)).WithObjects(
+		&componentv1.Component{Name: "lop-idp", Namespace: testNamespace, Status: componentv1.ComponentStatus{InstalledVersion: "1.0.0"}},
+		&corev1.PersistentVolumeClaim{Name: "lop-idp-pvc", Namespace: testNamespace, Labels: map[string]string{componentv1.ComponentNameLabelKey: "lop-idp", backupScopeLabelKey: "lop-idp"}},
+	).Build()
+	backup := &backupv1.Backup{
+		Name: testBackupName, Namespace: testNamespace,
+		Spec: backupv1.BackupSpec{Options: &backupv1.UnitOptions{IgnoreGlobalConfig: true}},
+	}
+
+	got, err := NewCollector(k8sClient).Collect(t.Context(), backup)
+
+	require.NoError(t, err)
+	assert.Equal(t, []backupv1.ComponentVersion{{Name: "lop-idp", Version: "1.0.0"}}, got.Components)
+	assert.Equal(t, []backupv1.UnitIdentifier{{Type: "components"}}, got.Units)
+}
+
+var serviceAccountProducerGVK = schema.GroupVersionKind{Group: "k8s.cloudogu.com", Version: "v2", Kind: "ServiceAccountProducer"}
+
+// serviceAccountProducerScheme registers service account producers as unstructured types, because the backup operator
+// does not depend on the service account lib.
+func serviceAccountProducerScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+
+	scheme := testScheme(t)
+	scheme.AddKnownTypeWithName(serviceAccountProducerGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(serviceAccountProducerGVK.GroupVersion().WithKind("ServiceAccountProducerList"), &unstructured.UnstructuredList{})
+	return scheme
+}
+
+func serviceAccountProducer(name string, labels map[string]string) *unstructured.Unstructured {
+	sapr := &unstructured.Unstructured{}
+	sapr.SetGroupVersionKind(serviceAccountProducerGVK)
+	sapr.SetName(name)
+	sapr.SetNamespace(testNamespace)
+	sapr.SetLabels(labels)
+	return sapr
+}
+
+func TestBackupStateCollector_ListDogus(t *testing.T) {
+	t.Run("returns all dogus of the namespace without filtering", func(t *testing.T) {
+		v2Dogu := &doguv3.Dogu{Name: "cas", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "cas", DoguApiVersion: doguv3.DoguApiVersionV2}}
+		v3Dogu := &doguv3.Dogu{Name: "ldap", Namespace: testNamespace, Spec: doguv3.DoguSpec{Name: "ldap", DoguApiVersion: doguv3.DoguApiVersionV3}}
+		otherNamespaceDogu := &doguv3.Dogu{Name: "redmine", Namespace: "other", Spec: doguv3.DoguSpec{Name: "redmine", DoguApiVersion: doguv3.DoguApiVersionV3}}
+		k8sClient := fake.NewClientBuilder().WithScheme(testScheme(t)).WithObjects(v2Dogu, v3Dogu, otherNamespaceDogu).Build()
+
+		dogus, err := NewCollector(k8sClient).ListDogus(context.Background(), testNamespace)
+
+		require.NoError(t, err)
+		names := make([]string, 0, len(dogus))
+		for _, dogu := range dogus {
+			names = append(names, dogu.Name)
+		}
+		assert.ElementsMatch(t, []string{"cas", "ldap"}, names)
+	})
+
+	t.Run("returns an error if listing fails", func(t *testing.T) {
+		k8sClient := fake.NewClientBuilder().WithScheme(testScheme(t)).WithInterceptorFuncs(interceptor.Funcs{
+			List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				return assert.AnError
+			},
+		}).Build()
+
+		_, err := NewCollector(k8sClient).ListDogus(context.Background(), testNamespace)
+
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "list dogus")
+	})
+}
+
+func TestBackupStateCollector_ListComponents(t *testing.T) {
+	t.Run("returns all components of the namespace", func(t *testing.T) {
+		component := &componentv1.Component{Name: "lop-idp", Namespace: testNamespace}
+		otherNamespaceComponent := &componentv1.Component{Name: "other", Namespace: "other"}
+		k8sClient := fake.NewClientBuilder().WithScheme(testScheme(t)).WithObjects(component, otherNamespaceComponent).Build()
+
+		components, err := NewCollector(k8sClient).ListComponents(context.Background(), testNamespace)
+
+		require.NoError(t, err)
+		require.Len(t, components, 1)
+		assert.Equal(t, "lop-idp", components[0].Name)
+	})
+
+	t.Run("returns an error if listing fails", func(t *testing.T) {
+		k8sClient := fake.NewClientBuilder().WithScheme(testScheme(t)).WithInterceptorFuncs(interceptor.Funcs{
+			List: func(ctx context.Context, client client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				return assert.AnError
+			},
+		}).Build()
+
+		_, err := NewCollector(k8sClient).ListComponents(context.Background(), testNamespace)
+
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "list components")
+	})
 }

@@ -1,6 +1,7 @@
 package velero
 
 import (
+	"errors"
 	"time"
 
 	"context"
@@ -28,9 +29,15 @@ func CreateVeleroUnitBackupResource(
 	labels map[string]string,
 	annotations map[string]string,
 	selector *metav1.LabelSelector,
+	orSelectors []*metav1.LabelSelector,
 	includedResources []string,
-) *velerov1.Backup {
+) (*velerov1.Backup, error) {
 	volumeFsBackup := false
+
+	if selector != nil && len(orSelectors) > 0 {
+		return nil, errors.New("selector and orSelectors must not both be set")
+	}
+
 	return &velerov1.Backup{
 		Name:        name,
 		Namespace:   namespace,
@@ -40,11 +47,12 @@ func CreateVeleroUnitBackupResource(
 			IncludedNamespaces:       []string{namespace},
 			IncludedResources:        includedResources,
 			LabelSelector:            selector,
+			OrLabelSelectors:         orSelectors,
 			TTL:                      metav1.Duration{Duration: defaultBackupTTL},
 			StorageLocation:          backupStorageName,
 			DefaultVolumesToFsBackup: &volumeFsBackup,
 		},
-	}
+	}, nil
 }
 
 // CreateVeleroDeleteBackupRequestIfNotExists returns the Velero DeleteBackupRequest belonging to the given backup.

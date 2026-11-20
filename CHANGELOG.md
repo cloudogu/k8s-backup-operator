@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - [#174] (WIP) Create backups with backup units
   - [#181] Backup state collector
+  - [#192] Fail backups whose excluded dogus or components are not installed (or are v2 dogus)
+  - Back up and clean up `ServiceAccountProducers` of components with the label `k8s.cloudogu.com/backup-scope` in the misc unit
 
 ### Changed
 - [#174] (WIP) Create backups with backup units

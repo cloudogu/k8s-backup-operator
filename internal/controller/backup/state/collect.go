@@ -91,16 +91,15 @@ func (b *BackupStateCollector) getBlueprintId(ctx context.Context, namespace str
 func (b *BackupStateCollector) getDogus(ctx context.Context, backup *backupv1.Backup) (v2DoguVersions, v3DoguVersions []backupv1.DoguVersion, err error) {
 	logger := log.FromContext(ctx).WithName("BackupStateCollector.getDogus").WithValues("backup", backup.Name, "namespace", backup.Namespace)
 
-	doguList := doguv3.DoguList{}
-	err = b.k8sClient.List(ctx, &doguList, client.InNamespace(backup.Namespace))
+	dogus, err := b.ListDogus(ctx, backup.Namespace)
 	if err != nil {
-		return nil, nil, fmt.Errorf("list dogus: %w", err)
+		return nil, nil, err
 	}
 
 outer:
-	for _, dogu := range doguList.Items {
+	for _, dogu := range dogus {
 		if dogu.Spec.DoguApiVersion == doguv3.DoguApiVersionV2 {
-			if !backup.Spec.Options.IgnoreV2Dogus {
+			if backup.Spec.Options == nil || !backup.Spec.Options.IgnoreV2Dogus {
 				v2DoguVersions = append(v2DoguVersions, backupv1.DoguVersion{
 					Name:    dogu.Spec.Name,
 					Version: dogu.Status.InstalledVersion,
@@ -126,11 +125,27 @@ outer:
 	return v2DoguVersions, v3DoguVersions, nil
 }
 
-func (b *BackupStateCollector) getComponents(ctx context.Context, backup *backupv1.Backup) ([]backupv1.ComponentStatus, error) {
-	if backup.Spec.Options.IgnoreMisc {
-		return nil, nil
+// ListDogus returns all dogus of the namespace. In contrast to Collect, the exclusions and options of a backup are not
+// applied.
+func (b *BackupStateCollector) ListDogus(ctx context.Context, namespace string) ([]doguv3.Dogu, error) {
+	doguList := doguv3.DoguList{}
+	if err := b.k8sClient.List(ctx, &doguList, client.InNamespace(namespace)); err != nil {
+		return nil, fmt.Errorf("list dogus: %w", err)
 	}
+	return doguList.Items, nil
+}
 
+// ListComponents returns all components of the namespace, regardless of whether they have resources to back up.
+// In contrast to Collect, the exclusions and options of a backup are not applied.
+func (b *BackupStateCollector) ListComponents(ctx context.Context, namespace string) ([]componentv1.Component, error) {
+	componentList := componentv1.ComponentList{}
+	if err := b.k8sClient.List(ctx, &componentList, client.InNamespace(namespace)); err != nil {
+		return nil, fmt.Errorf("list components: %w", err)
+	}
+	return componentList.Items, nil
+}
+
+func (b *BackupStateCollector) getComponents(ctx context.Context, backup *backupv1.Backup) ([]backupv1.ComponentVersion, error) {
 	backupableItems, err := b.collectBackupableComponentItems(ctx, backup)
 	if err != nil {
 		return nil, fmt.Errorf("collect backupable items: %w", err)
@@ -169,14 +184,24 @@ func (b *BackupStateCollector) collectBackupableComponentItems(ctx context.Conte
 		return nil, fmt.Errorf("list component PVCs: %w", err)
 	}
 
-	backupableItems := make([]unstructured.Unstructured, 0, len(configMapList.Items)+len(secretList.Items)+len(pvcList.Items))
+	saprList := unstructured.UnstructuredList{}
+	saprList.SetAPIVersion("k8s.cloudogu.com/v2")
+	saprList.SetKind("ServiceAccountProducerList")
+	err = b.k8sClient.List(ctx, &saprList, client.InNamespace(backup.Namespace), client.HasLabels{componentv1.ComponentNameLabelKey, backupScopeLabelKey})
+	// no match means no service account producer crd is available in the cluster
+	if err != nil && !meta.IsNoMatchError(err) {
+		return nil, fmt.Errorf("list component service account producers: %w", err)
+	}
+
+	backupableItems := make([]unstructured.Unstructured, 0, len(configMapList.Items)+len(secretList.Items)+len(pvcList.Items)+len(saprList.Items))
 	backupableItems = append(backupableItems, configMapList.Items...)
 	backupableItems = append(backupableItems, secretList.Items...)
 	backupableItems = append(backupableItems, pvcList.Items...)
+	backupableItems = append(backupableItems, saprList.Items...)
 	return backupableItems, nil
 }
 
-func (b *BackupStateCollector) componentsFromItems(ctx context.Context, backupableItems []unstructured.Unstructured, backup *backupv1.Backup) (components []backupv1.ComponentStatus, err error) {
+func (b *BackupStateCollector) componentsFromItems(ctx context.Context, backupableItems []unstructured.Unstructured, backup *backupv1.Backup) (components []backupv1.ComponentVersion, err error) {
 	logger := log.FromContext(ctx).
 		WithName("BackupStateCollector.componentsFromItems").
 		WithValues("backup", backup.Name, "namespace", backup.Namespace)
@@ -208,13 +233,13 @@ outer:
 			continue
 		}
 		componentSet[componentName] = struct{}{}
-		components = append(components, backupv1.ComponentStatus{Name: componentName, Version: component.Status.InstalledVersion})
+		components = append(components, backupv1.ComponentVersion{Name: componentName, Version: component.Status.InstalledVersion})
 	}
 	return components, nil
 }
 
 func (b *BackupStateCollector) getGlobalConfigInfo(ctx context.Context, backup *backupv1.Backup) (string, string, error) {
-	if backup.Spec.Options.IgnoreGlobalConfig {
+	if backup.Spec.Options != nil && backup.Spec.Options.IgnoreGlobalConfig {
 		return "", "", nil
 	}
 
@@ -251,7 +276,7 @@ func (b *BackupStateCollector) getGlobalConfigInfo(ctx context.Context, backup *
 	return fqdn, domain, nil
 }
 
-func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backupv1.DoguVersion, v3Dogus []backupv1.DoguVersion, components []backupv1.ComponentStatus) (units []backupv1.UnitIdentifier) {
+func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backupv1.DoguVersion, v3Dogus []backupv1.DoguVersion, components []backupv1.ComponentVersion) (units []backupv1.UnitIdentifier) {
 	if len(v2Dogus) > 0 {
 		units = append(units, backupv1.UnitIdentifier{
 			Type: backupv1.UnitTypeDoguV2,
@@ -263,25 +288,24 @@ func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backu
 			Name: dogu.Name,
 		})
 	}
-	if !backup.Spec.Options.IgnoreGlobalConfig {
+	if backup.Spec.Options == nil || !backup.Spec.Options.IgnoreGlobalConfig {
 		units = append(units, backupv1.UnitIdentifier{
 			Type: backupv1.UnitTypeGlobalConfig,
 		})
 	}
-	if !backup.Spec.Options.IgnoreMisc && len(components) != 0 {
+	if len(components) != 0 {
 		units = append(units, backupv1.UnitIdentifier{
-			Type: backupv1.UnitTypeMisc,
+			Type: backupv1.UnitTypeComponents,
 		})
 	}
 	return units
 }
 
 func (b *BackupStateCollector) getCoverage(backup *backupv1.Backup) backupv1.BackupCoverage {
+	options := backup.Spec.Options
 	if len(backup.Spec.ExcludedDogus) == 0 &&
 		len(backup.Spec.ExcludedComponents) == 0 &&
-		!backup.Spec.Options.IgnoreMisc &&
-		!backup.Spec.Options.IgnoreGlobalConfig &&
-		!backup.Spec.Options.IgnoreV2Dogus {
+		(options == nil || (!options.IgnoreGlobalConfig && !options.IgnoreV2Dogus)) {
 		return backupv1.BackupCoverageFull
 	}
 	return backupv1.BackupCoveragePartial

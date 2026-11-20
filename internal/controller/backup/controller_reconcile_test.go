@@ -8,6 +8,8 @@ import (
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	backupac "github.com/cloudogu/k8s-backup-lib/applyconfiguration"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
+	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
+	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -301,6 +303,8 @@ func newFakeClientBuilder(t *testing.T) *fake.ClientBuilder {
 	require.NoError(t, coordinationv1.AddToScheme(scheme))
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, doguv3.AddToScheme(scheme))
+	require.NoError(t, componentv1.AddToScheme(scheme))
 
 	return fake.NewClientBuilder().WithScheme(scheme).WithTypeConverters(clientgoac.NewTypeConverter(scheme), backupac.NewTypeConverter(scheme), managedfields.NewDeducedTypeConverter())
 }
