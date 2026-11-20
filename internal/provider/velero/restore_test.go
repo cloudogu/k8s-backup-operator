@@ -124,6 +124,39 @@ func TestBuildRestore(t *testing.T) {
 	assert.Equal(t, restoreDoguModifierConfigMapName, child.Spec.ResourceModifier.Name)
 }
 
+func TestBuildRestoreGlobalConfigSelector(t *testing.T) {
+	tests := map[string]struct {
+		options      *k8sv1.UnitOptions
+		wantSelector *metav1.LabelSelector
+	}{
+		"options omitted": {},
+		"ignoreGlobalConfig false": {
+			options: &k8sv1.UnitOptions{IgnoreGlobalConfig: false},
+		},
+		"ignoreGlobalConfig true": {
+			options: &k8sv1.UnitOptions{IgnoreGlobalConfig: true},
+			wantSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{{
+					Key:      "k8s.cloudogu.com/type",
+					Operator: metav1.LabelSelectorOpNotIn,
+					Values:   []string{"global-config"},
+				}},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			parent := newParentRestore()
+			parent.Spec.Options = test.options
+
+			child := BuildRestore(parent)
+
+			assert.Equal(t, test.wantSelector, child.Spec.LabelSelector)
+		})
+	}
+}
+
 func TestEnsureRestoreCreatesTheChild(t *testing.T) {
 	parent := newParentRestore()
 	writes := &writeCounter{}

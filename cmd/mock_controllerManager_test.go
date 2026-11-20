@@ -11,13 +11,13 @@ import (
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
-	internal "k8s.io/client-go/tools/events"
 	record "k8s.io/client-go/tools/record"
 	cache "sigs.k8s.io/controller-runtime/pkg/cache"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	config "sigs.k8s.io/controller-runtime/pkg/config"
 	healthz "sigs.k8s.io/controller-runtime/pkg/healthz"
 	manager "sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/recorder"
 	webhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 	conversion "sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
@@ -550,19 +550,19 @@ func (_c *mockControllerManager_GetConverterRegistry_Call) RunAndReturn(run func
 }
 
 // GetEventRecorder provides a mock function with given fields: name
-func (_m *mockControllerManager) GetEventRecorder(name string) internal.EventRecorder {
+func (_m *mockControllerManager) GetEventRecorder(name string) recorder.EventRecorder {
 	ret := _m.Called(name)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEventRecorder")
 	}
 
-	var r0 internal.EventRecorder
-	if rf, ok := ret.Get(0).(func(string) internal.EventRecorder); ok {
+	var r0 recorder.EventRecorder
+	if rf, ok := ret.Get(0).(func(string) recorder.EventRecorder); ok {
 		r0 = rf(name)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(internal.EventRecorder)
+			r0 = ret.Get(0).(recorder.EventRecorder)
 		}
 	}
 
@@ -587,12 +587,12 @@ func (_c *mockControllerManager_GetEventRecorder_Call) Run(run func(name string)
 	return _c
 }
 
-func (_c *mockControllerManager_GetEventRecorder_Call) Return(_a0 internal.EventRecorder) *mockControllerManager_GetEventRecorder_Call {
+func (_c *mockControllerManager_GetEventRecorder_Call) Return(_a0 recorder.EventRecorder) *mockControllerManager_GetEventRecorder_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockControllerManager_GetEventRecorder_Call) RunAndReturn(run func(string) internal.EventRecorder) *mockControllerManager_GetEventRecorder_Call {
+func (_c *mockControllerManager_GetEventRecorder_Call) RunAndReturn(run func(string) recorder.EventRecorder) *mockControllerManager_GetEventRecorder_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -5,10 +5,16 @@ package garbagecollection
 import (
 	context "context"
 
-	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	mock "github.com/stretchr/testify/mock"
+	apiv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	mock "github.com/stretchr/testify/mock"
+
 	types "k8s.io/apimachinery/pkg/types"
+
+	v1 "github.com/cloudogu/k8s-backup-lib/applyconfiguration/api/v1"
+
 	watch "k8s.io/apimachinery/pkg/watch"
 )
 
@@ -25,29 +31,29 @@ func (_m *mockBackupClient) EXPECT() *mockBackupClient_Expecter {
 	return &mockBackupClient_Expecter{mock: &_m.Mock}
 }
 
-// AddFinalizer provides a mock function with given fields: ctx, backup, finalizer
-func (_m *mockBackupClient) AddFinalizer(ctx context.Context, backup *v1.Backup, finalizer string) (*v1.Backup, error) {
-	ret := _m.Called(ctx, backup, finalizer)
+// Apply provides a mock function with given fields: ctx, backup, opts
+func (_m *mockBackupClient) Apply(ctx context.Context, backup *v1.BackupApplyConfiguration, opts metav1.ApplyOptions) (*apiv1.Backup, error) {
+	ret := _m.Called(ctx, backup, opts)
 
 	if len(ret) == 0 {
-		panic("no return value specified for AddFinalizer")
+		panic("no return value specified for Apply")
 	}
 
-	var r0 *v1.Backup
+	var r0 *apiv1.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, string) (*v1.Backup, error)); ok {
-		return rf(ctx, backup, finalizer)
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.BackupApplyConfiguration, metav1.ApplyOptions) (*apiv1.Backup, error)); ok {
+		return rf(ctx, backup, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, string) *v1.Backup); ok {
-		r0 = rf(ctx, backup, finalizer)
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.BackupApplyConfiguration, metav1.ApplyOptions) *apiv1.Backup); ok {
+		r0 = rf(ctx, backup, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
+			r0 = ret.Get(0).(*apiv1.Backup)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup, string) error); ok {
-		r1 = rf(ctx, backup, finalizer)
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.BackupApplyConfiguration, metav1.ApplyOptions) error); ok {
+		r1 = rf(ctx, backup, opts)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -55,59 +61,59 @@ func (_m *mockBackupClient) AddFinalizer(ctx context.Context, backup *v1.Backup,
 	return r0, r1
 }
 
-// mockBackupClient_AddFinalizer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddFinalizer'
-type mockBackupClient_AddFinalizer_Call struct {
+// mockBackupClient_Apply_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Apply'
+type mockBackupClient_Apply_Call struct {
 	*mock.Call
 }
 
-// AddFinalizer is a helper method to define mock.On call
+// Apply is a helper method to define mock.On call
 //   - ctx context.Context
-//   - backup *v1.Backup
-//   - finalizer string
-func (_e *mockBackupClient_Expecter) AddFinalizer(ctx interface{}, backup interface{}, finalizer interface{}) *mockBackupClient_AddFinalizer_Call {
-	return &mockBackupClient_AddFinalizer_Call{Call: _e.mock.On("AddFinalizer", ctx, backup, finalizer)}
+//   - backup *v1.BackupApplyConfiguration
+//   - opts metav1.ApplyOptions
+func (_e *mockBackupClient_Expecter) Apply(ctx interface{}, backup interface{}, opts interface{}) *mockBackupClient_Apply_Call {
+	return &mockBackupClient_Apply_Call{Call: _e.mock.On("Apply", ctx, backup, opts)}
 }
 
-func (_c *mockBackupClient_AddFinalizer_Call) Run(run func(ctx context.Context, backup *v1.Backup, finalizer string)) *mockBackupClient_AddFinalizer_Call {
+func (_c *mockBackupClient_Apply_Call) Run(run func(ctx context.Context, backup *v1.BackupApplyConfiguration, opts metav1.ApplyOptions)) *mockBackupClient_Apply_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup), args[2].(string))
+		run(args[0].(context.Context), args[1].(*v1.BackupApplyConfiguration), args[2].(metav1.ApplyOptions))
 	})
 	return _c
 }
 
-func (_c *mockBackupClient_AddFinalizer_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_AddFinalizer_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *mockBackupClient_Apply_Call) Return(result *apiv1.Backup, err error) *mockBackupClient_Apply_Call {
+	_c.Call.Return(result, err)
 	return _c
 }
 
-func (_c *mockBackupClient_AddFinalizer_Call) RunAndReturn(run func(context.Context, *v1.Backup, string) (*v1.Backup, error)) *mockBackupClient_AddFinalizer_Call {
+func (_c *mockBackupClient_Apply_Call) RunAndReturn(run func(context.Context, *v1.BackupApplyConfiguration, metav1.ApplyOptions) (*apiv1.Backup, error)) *mockBackupClient_Apply_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// AddLabels provides a mock function with given fields: ctx, backup
-func (_m *mockBackupClient) AddLabels(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
-	ret := _m.Called(ctx, backup)
+// ApplyStatus provides a mock function with given fields: ctx, backup, opts
+func (_m *mockBackupClient) ApplyStatus(ctx context.Context, backup *v1.BackupApplyConfiguration, opts metav1.ApplyOptions) (*apiv1.Backup, error) {
+	ret := _m.Called(ctx, backup, opts)
 
 	if len(ret) == 0 {
-		panic("no return value specified for AddLabels")
+		panic("no return value specified for ApplyStatus")
 	}
 
-	var r0 *v1.Backup
+	var r0 *apiv1.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, error)); ok {
-		return rf(ctx, backup)
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.BackupApplyConfiguration, metav1.ApplyOptions) (*apiv1.Backup, error)); ok {
+		return rf(ctx, backup, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
-		r0 = rf(ctx, backup)
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.BackupApplyConfiguration, metav1.ApplyOptions) *apiv1.Backup); ok {
+		r0 = rf(ctx, backup, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
+			r0 = ret.Get(0).(*apiv1.Backup)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
-		r1 = rf(ctx, backup)
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.BackupApplyConfiguration, metav1.ApplyOptions) error); ok {
+		r1 = rf(ctx, backup, opts)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -115,57 +121,58 @@ func (_m *mockBackupClient) AddLabels(ctx context.Context, backup *v1.Backup) (*
 	return r0, r1
 }
 
-// mockBackupClient_AddLabels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddLabels'
-type mockBackupClient_AddLabels_Call struct {
+// mockBackupClient_ApplyStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ApplyStatus'
+type mockBackupClient_ApplyStatus_Call struct {
 	*mock.Call
 }
 
-// AddLabels is a helper method to define mock.On call
+// ApplyStatus is a helper method to define mock.On call
 //   - ctx context.Context
-//   - backup *v1.Backup
-func (_e *mockBackupClient_Expecter) AddLabels(ctx interface{}, backup interface{}) *mockBackupClient_AddLabels_Call {
-	return &mockBackupClient_AddLabels_Call{Call: _e.mock.On("AddLabels", ctx, backup)}
+//   - backup *v1.BackupApplyConfiguration
+//   - opts metav1.ApplyOptions
+func (_e *mockBackupClient_Expecter) ApplyStatus(ctx interface{}, backup interface{}, opts interface{}) *mockBackupClient_ApplyStatus_Call {
+	return &mockBackupClient_ApplyStatus_Call{Call: _e.mock.On("ApplyStatus", ctx, backup, opts)}
 }
 
-func (_c *mockBackupClient_AddLabels_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockBackupClient_AddLabels_Call {
+func (_c *mockBackupClient_ApplyStatus_Call) Run(run func(ctx context.Context, backup *v1.BackupApplyConfiguration, opts metav1.ApplyOptions)) *mockBackupClient_ApplyStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup))
+		run(args[0].(context.Context), args[1].(*v1.BackupApplyConfiguration), args[2].(metav1.ApplyOptions))
 	})
 	return _c
 }
 
-func (_c *mockBackupClient_AddLabels_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_AddLabels_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *mockBackupClient_ApplyStatus_Call) Return(result *apiv1.Backup, err error) *mockBackupClient_ApplyStatus_Call {
+	_c.Call.Return(result, err)
 	return _c
 }
 
-func (_c *mockBackupClient_AddLabels_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, error)) *mockBackupClient_AddLabels_Call {
+func (_c *mockBackupClient_ApplyStatus_Call) RunAndReturn(run func(context.Context, *v1.BackupApplyConfiguration, metav1.ApplyOptions) (*apiv1.Backup, error)) *mockBackupClient_ApplyStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Create provides a mock function with given fields: ctx, backup, opts
-func (_m *mockBackupClient) Create(ctx context.Context, backup *v1.Backup, opts metav1.CreateOptions) (*v1.Backup, error) {
+func (_m *mockBackupClient) Create(ctx context.Context, backup *apiv1.Backup, opts metav1.CreateOptions) (*apiv1.Backup, error) {
 	ret := _m.Called(ctx, backup, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Create")
 	}
 
-	var r0 *v1.Backup
+	var r0 *apiv1.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, metav1.CreateOptions) (*v1.Backup, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.Backup, metav1.CreateOptions) (*apiv1.Backup, error)); ok {
 		return rf(ctx, backup, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, metav1.CreateOptions) *v1.Backup); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.Backup, metav1.CreateOptions) *apiv1.Backup); ok {
 		r0 = rf(ctx, backup, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
+			r0 = ret.Get(0).(*apiv1.Backup)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup, metav1.CreateOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *apiv1.Backup, metav1.CreateOptions) error); ok {
 		r1 = rf(ctx, backup, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -181,25 +188,25 @@ type mockBackupClient_Create_Call struct {
 
 // Create is a helper method to define mock.On call
 //   - ctx context.Context
-//   - backup *v1.Backup
+//   - backup *apiv1.Backup
 //   - opts metav1.CreateOptions
 func (_e *mockBackupClient_Expecter) Create(ctx interface{}, backup interface{}, opts interface{}) *mockBackupClient_Create_Call {
 	return &mockBackupClient_Create_Call{Call: _e.mock.On("Create", ctx, backup, opts)}
 }
 
-func (_c *mockBackupClient_Create_Call) Run(run func(ctx context.Context, backup *v1.Backup, opts metav1.CreateOptions)) *mockBackupClient_Create_Call {
+func (_c *mockBackupClient_Create_Call) Run(run func(ctx context.Context, backup *apiv1.Backup, opts metav1.CreateOptions)) *mockBackupClient_Create_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup), args[2].(metav1.CreateOptions))
+		run(args[0].(context.Context), args[1].(*apiv1.Backup), args[2].(metav1.CreateOptions))
 	})
 	return _c
 }
 
-func (_c *mockBackupClient_Create_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_Create_Call {
+func (_c *mockBackupClient_Create_Call) Return(_a0 *apiv1.Backup, _a1 error) *mockBackupClient_Create_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockBackupClient_Create_Call) RunAndReturn(run func(context.Context, *v1.Backup, metav1.CreateOptions) (*v1.Backup, error)) *mockBackupClient_Create_Call {
+func (_c *mockBackupClient_Create_Call) RunAndReturn(run func(context.Context, *apiv1.Backup, metav1.CreateOptions) (*apiv1.Backup, error)) *mockBackupClient_Create_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -301,23 +308,23 @@ func (_c *mockBackupClient_DeleteCollection_Call) RunAndReturn(run func(context.
 }
 
 // Get provides a mock function with given fields: ctx, name, opts
-func (_m *mockBackupClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Backup, error) {
+func (_m *mockBackupClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiv1.Backup, error) {
 	ret := _m.Called(ctx, name, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Get")
 	}
 
-	var r0 *v1.Backup
+	var r0 *apiv1.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, metav1.GetOptions) (*v1.Backup, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, metav1.GetOptions) (*apiv1.Backup, error)); ok {
 		return rf(ctx, name, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, metav1.GetOptions) *v1.Backup); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, metav1.GetOptions) *apiv1.Backup); ok {
 		r0 = rf(ctx, name, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
+			r0 = ret.Get(0).(*apiv1.Backup)
 		}
 	}
 
@@ -350,34 +357,34 @@ func (_c *mockBackupClient_Get_Call) Run(run func(ctx context.Context, name stri
 	return _c
 }
 
-func (_c *mockBackupClient_Get_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_Get_Call {
+func (_c *mockBackupClient_Get_Call) Return(_a0 *apiv1.Backup, _a1 error) *mockBackupClient_Get_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockBackupClient_Get_Call) RunAndReturn(run func(context.Context, string, metav1.GetOptions) (*v1.Backup, error)) *mockBackupClient_Get_Call {
+func (_c *mockBackupClient_Get_Call) RunAndReturn(run func(context.Context, string, metav1.GetOptions) (*apiv1.Backup, error)) *mockBackupClient_Get_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // List provides a mock function with given fields: ctx, opts
-func (_m *mockBackupClient) List(ctx context.Context, opts metav1.ListOptions) (*v1.BackupList, error) {
+func (_m *mockBackupClient) List(ctx context.Context, opts metav1.ListOptions) (*apiv1.BackupList, error) {
 	ret := _m.Called(ctx, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for List")
 	}
 
-	var r0 *v1.BackupList
+	var r0 *apiv1.BackupList
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, metav1.ListOptions) (*v1.BackupList, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, metav1.ListOptions) (*apiv1.BackupList, error)); ok {
 		return rf(ctx, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, metav1.ListOptions) *v1.BackupList); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, metav1.ListOptions) *apiv1.BackupList); ok {
 		r0 = rf(ctx, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.BackupList)
+			r0 = ret.Get(0).(*apiv1.BackupList)
 		}
 	}
 
@@ -409,18 +416,18 @@ func (_c *mockBackupClient_List_Call) Run(run func(ctx context.Context, opts met
 	return _c
 }
 
-func (_c *mockBackupClient_List_Call) Return(_a0 *v1.BackupList, _a1 error) *mockBackupClient_List_Call {
+func (_c *mockBackupClient_List_Call) Return(_a0 *apiv1.BackupList, _a1 error) *mockBackupClient_List_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockBackupClient_List_Call) RunAndReturn(run func(context.Context, metav1.ListOptions) (*v1.BackupList, error)) *mockBackupClient_List_Call {
+func (_c *mockBackupClient_List_Call) RunAndReturn(run func(context.Context, metav1.ListOptions) (*apiv1.BackupList, error)) *mockBackupClient_List_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Patch provides a mock function with given fields: ctx, name, pt, data, opts, subresources
-func (_m *mockBackupClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*v1.Backup, error) {
+func (_m *mockBackupClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*apiv1.Backup, error) {
 	_va := make([]interface{}, len(subresources))
 	for _i := range subresources {
 		_va[_i] = subresources[_i]
@@ -434,16 +441,16 @@ func (_m *mockBackupClient) Patch(ctx context.Context, name string, pt types.Pat
 		panic("no return value specified for Patch")
 	}
 
-	var r0 *v1.Backup
+	var r0 *apiv1.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.PatchType, []byte, metav1.PatchOptions, ...string) (*v1.Backup, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.PatchType, []byte, metav1.PatchOptions, ...string) (*apiv1.Backup, error)); ok {
 		return rf(ctx, name, pt, data, opts, subresources...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.PatchType, []byte, metav1.PatchOptions, ...string) *v1.Backup); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.PatchType, []byte, metav1.PatchOptions, ...string) *apiv1.Backup); ok {
 		r0 = rf(ctx, name, pt, data, opts, subresources...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
+			r0 = ret.Get(0).(*apiv1.Backup)
 		}
 	}
 
@@ -486,98 +493,38 @@ func (_c *mockBackupClient_Patch_Call) Run(run func(ctx context.Context, name st
 	return _c
 }
 
-func (_c *mockBackupClient_Patch_Call) Return(result *v1.Backup, err error) *mockBackupClient_Patch_Call {
+func (_c *mockBackupClient_Patch_Call) Return(result *apiv1.Backup, err error) *mockBackupClient_Patch_Call {
 	_c.Call.Return(result, err)
 	return _c
 }
 
-func (_c *mockBackupClient_Patch_Call) RunAndReturn(run func(context.Context, string, types.PatchType, []byte, metav1.PatchOptions, ...string) (*v1.Backup, error)) *mockBackupClient_Patch_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// RemoveFinalizer provides a mock function with given fields: ctx, backup, finalizer
-func (_m *mockBackupClient) RemoveFinalizer(ctx context.Context, backup *v1.Backup, finalizer string) (*v1.Backup, error) {
-	ret := _m.Called(ctx, backup, finalizer)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RemoveFinalizer")
-	}
-
-	var r0 *v1.Backup
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, string) (*v1.Backup, error)); ok {
-		return rf(ctx, backup, finalizer)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, string) *v1.Backup); ok {
-		r0 = rf(ctx, backup, finalizer)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup, string) error); ok {
-		r1 = rf(ctx, backup, finalizer)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockBackupClient_RemoveFinalizer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveFinalizer'
-type mockBackupClient_RemoveFinalizer_Call struct {
-	*mock.Call
-}
-
-// RemoveFinalizer is a helper method to define mock.On call
-//   - ctx context.Context
-//   - backup *v1.Backup
-//   - finalizer string
-func (_e *mockBackupClient_Expecter) RemoveFinalizer(ctx interface{}, backup interface{}, finalizer interface{}) *mockBackupClient_RemoveFinalizer_Call {
-	return &mockBackupClient_RemoveFinalizer_Call{Call: _e.mock.On("RemoveFinalizer", ctx, backup, finalizer)}
-}
-
-func (_c *mockBackupClient_RemoveFinalizer_Call) Run(run func(ctx context.Context, backup *v1.Backup, finalizer string)) *mockBackupClient_RemoveFinalizer_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *mockBackupClient_RemoveFinalizer_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_RemoveFinalizer_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockBackupClient_RemoveFinalizer_Call) RunAndReturn(run func(context.Context, *v1.Backup, string) (*v1.Backup, error)) *mockBackupClient_RemoveFinalizer_Call {
+func (_c *mockBackupClient_Patch_Call) RunAndReturn(run func(context.Context, string, types.PatchType, []byte, metav1.PatchOptions, ...string) (*apiv1.Backup, error)) *mockBackupClient_Patch_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Update provides a mock function with given fields: ctx, backup, opts
-func (_m *mockBackupClient) Update(ctx context.Context, backup *v1.Backup, opts metav1.UpdateOptions) (*v1.Backup, error) {
+func (_m *mockBackupClient) Update(ctx context.Context, backup *apiv1.Backup, opts metav1.UpdateOptions) (*apiv1.Backup, error) {
 	ret := _m.Called(ctx, backup, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Update")
 	}
 
-	var r0 *v1.Backup
+	var r0 *apiv1.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, metav1.UpdateOptions) (*v1.Backup, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.Backup, metav1.UpdateOptions) (*apiv1.Backup, error)); ok {
 		return rf(ctx, backup, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, metav1.UpdateOptions) *v1.Backup); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.Backup, metav1.UpdateOptions) *apiv1.Backup); ok {
 		r0 = rf(ctx, backup, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
+			r0 = ret.Get(0).(*apiv1.Backup)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup, metav1.UpdateOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *apiv1.Backup, metav1.UpdateOptions) error); ok {
 		r1 = rf(ctx, backup, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -593,51 +540,51 @@ type mockBackupClient_Update_Call struct {
 
 // Update is a helper method to define mock.On call
 //   - ctx context.Context
-//   - backup *v1.Backup
+//   - backup *apiv1.Backup
 //   - opts metav1.UpdateOptions
 func (_e *mockBackupClient_Expecter) Update(ctx interface{}, backup interface{}, opts interface{}) *mockBackupClient_Update_Call {
 	return &mockBackupClient_Update_Call{Call: _e.mock.On("Update", ctx, backup, opts)}
 }
 
-func (_c *mockBackupClient_Update_Call) Run(run func(ctx context.Context, backup *v1.Backup, opts metav1.UpdateOptions)) *mockBackupClient_Update_Call {
+func (_c *mockBackupClient_Update_Call) Run(run func(ctx context.Context, backup *apiv1.Backup, opts metav1.UpdateOptions)) *mockBackupClient_Update_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup), args[2].(metav1.UpdateOptions))
+		run(args[0].(context.Context), args[1].(*apiv1.Backup), args[2].(metav1.UpdateOptions))
 	})
 	return _c
 }
 
-func (_c *mockBackupClient_Update_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_Update_Call {
+func (_c *mockBackupClient_Update_Call) Return(_a0 *apiv1.Backup, _a1 error) *mockBackupClient_Update_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockBackupClient_Update_Call) RunAndReturn(run func(context.Context, *v1.Backup, metav1.UpdateOptions) (*v1.Backup, error)) *mockBackupClient_Update_Call {
+func (_c *mockBackupClient_Update_Call) RunAndReturn(run func(context.Context, *apiv1.Backup, metav1.UpdateOptions) (*apiv1.Backup, error)) *mockBackupClient_Update_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UpdateStatus provides a mock function with given fields: ctx, backup, opts
-func (_m *mockBackupClient) UpdateStatus(ctx context.Context, backup *v1.Backup, opts metav1.UpdateOptions) (*v1.Backup, error) {
+func (_m *mockBackupClient) UpdateStatus(ctx context.Context, backup *apiv1.Backup, opts metav1.UpdateOptions) (*apiv1.Backup, error) {
 	ret := _m.Called(ctx, backup, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateStatus")
 	}
 
-	var r0 *v1.Backup
+	var r0 *apiv1.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, metav1.UpdateOptions) (*v1.Backup, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.Backup, metav1.UpdateOptions) (*apiv1.Backup, error)); ok {
 		return rf(ctx, backup, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup, metav1.UpdateOptions) *v1.Backup); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.Backup, metav1.UpdateOptions) *apiv1.Backup); ok {
 		r0 = rf(ctx, backup, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
+			r0 = ret.Get(0).(*apiv1.Backup)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup, metav1.UpdateOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *apiv1.Backup, metav1.UpdateOptions) error); ok {
 		r1 = rf(ctx, backup, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -653,261 +600,25 @@ type mockBackupClient_UpdateStatus_Call struct {
 
 // UpdateStatus is a helper method to define mock.On call
 //   - ctx context.Context
-//   - backup *v1.Backup
+//   - backup *apiv1.Backup
 //   - opts metav1.UpdateOptions
 func (_e *mockBackupClient_Expecter) UpdateStatus(ctx interface{}, backup interface{}, opts interface{}) *mockBackupClient_UpdateStatus_Call {
 	return &mockBackupClient_UpdateStatus_Call{Call: _e.mock.On("UpdateStatus", ctx, backup, opts)}
 }
 
-func (_c *mockBackupClient_UpdateStatus_Call) Run(run func(ctx context.Context, backup *v1.Backup, opts metav1.UpdateOptions)) *mockBackupClient_UpdateStatus_Call {
+func (_c *mockBackupClient_UpdateStatus_Call) Run(run func(ctx context.Context, backup *apiv1.Backup, opts metav1.UpdateOptions)) *mockBackupClient_UpdateStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup), args[2].(metav1.UpdateOptions))
+		run(args[0].(context.Context), args[1].(*apiv1.Backup), args[2].(metav1.UpdateOptions))
 	})
 	return _c
 }
 
-func (_c *mockBackupClient_UpdateStatus_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_UpdateStatus_Call {
+func (_c *mockBackupClient_UpdateStatus_Call) Return(_a0 *apiv1.Backup, _a1 error) *mockBackupClient_UpdateStatus_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *mockBackupClient_UpdateStatus_Call) RunAndReturn(run func(context.Context, *v1.Backup, metav1.UpdateOptions) (*v1.Backup, error)) *mockBackupClient_UpdateStatus_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateStatusCompleted provides a mock function with given fields: ctx, backup
-func (_m *mockBackupClient) UpdateStatusCompleted(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
-	ret := _m.Called(ctx, backup)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateStatusCompleted")
-	}
-
-	var r0 *v1.Backup
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, error)); ok {
-		return rf(ctx, backup)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
-		r0 = rf(ctx, backup)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
-		r1 = rf(ctx, backup)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockBackupClient_UpdateStatusCompleted_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStatusCompleted'
-type mockBackupClient_UpdateStatusCompleted_Call struct {
-	*mock.Call
-}
-
-// UpdateStatusCompleted is a helper method to define mock.On call
-//   - ctx context.Context
-//   - backup *v1.Backup
-func (_e *mockBackupClient_Expecter) UpdateStatusCompleted(ctx interface{}, backup interface{}) *mockBackupClient_UpdateStatusCompleted_Call {
-	return &mockBackupClient_UpdateStatusCompleted_Call{Call: _e.mock.On("UpdateStatusCompleted", ctx, backup)}
-}
-
-func (_c *mockBackupClient_UpdateStatusCompleted_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockBackupClient_UpdateStatusCompleted_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup))
-	})
-	return _c
-}
-
-func (_c *mockBackupClient_UpdateStatusCompleted_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_UpdateStatusCompleted_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockBackupClient_UpdateStatusCompleted_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, error)) *mockBackupClient_UpdateStatusCompleted_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateStatusDeleting provides a mock function with given fields: ctx, backup
-func (_m *mockBackupClient) UpdateStatusDeleting(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
-	ret := _m.Called(ctx, backup)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateStatusDeleting")
-	}
-
-	var r0 *v1.Backup
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, error)); ok {
-		return rf(ctx, backup)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
-		r0 = rf(ctx, backup)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
-		r1 = rf(ctx, backup)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockBackupClient_UpdateStatusDeleting_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStatusDeleting'
-type mockBackupClient_UpdateStatusDeleting_Call struct {
-	*mock.Call
-}
-
-// UpdateStatusDeleting is a helper method to define mock.On call
-//   - ctx context.Context
-//   - backup *v1.Backup
-func (_e *mockBackupClient_Expecter) UpdateStatusDeleting(ctx interface{}, backup interface{}) *mockBackupClient_UpdateStatusDeleting_Call {
-	return &mockBackupClient_UpdateStatusDeleting_Call{Call: _e.mock.On("UpdateStatusDeleting", ctx, backup)}
-}
-
-func (_c *mockBackupClient_UpdateStatusDeleting_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockBackupClient_UpdateStatusDeleting_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup))
-	})
-	return _c
-}
-
-func (_c *mockBackupClient_UpdateStatusDeleting_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_UpdateStatusDeleting_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockBackupClient_UpdateStatusDeleting_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, error)) *mockBackupClient_UpdateStatusDeleting_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateStatusFailed provides a mock function with given fields: ctx, backup
-func (_m *mockBackupClient) UpdateStatusFailed(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
-	ret := _m.Called(ctx, backup)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateStatusFailed")
-	}
-
-	var r0 *v1.Backup
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, error)); ok {
-		return rf(ctx, backup)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
-		r0 = rf(ctx, backup)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
-		r1 = rf(ctx, backup)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockBackupClient_UpdateStatusFailed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStatusFailed'
-type mockBackupClient_UpdateStatusFailed_Call struct {
-	*mock.Call
-}
-
-// UpdateStatusFailed is a helper method to define mock.On call
-//   - ctx context.Context
-//   - backup *v1.Backup
-func (_e *mockBackupClient_Expecter) UpdateStatusFailed(ctx interface{}, backup interface{}) *mockBackupClient_UpdateStatusFailed_Call {
-	return &mockBackupClient_UpdateStatusFailed_Call{Call: _e.mock.On("UpdateStatusFailed", ctx, backup)}
-}
-
-func (_c *mockBackupClient_UpdateStatusFailed_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockBackupClient_UpdateStatusFailed_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup))
-	})
-	return _c
-}
-
-func (_c *mockBackupClient_UpdateStatusFailed_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_UpdateStatusFailed_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockBackupClient_UpdateStatusFailed_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, error)) *mockBackupClient_UpdateStatusFailed_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateStatusInProgress provides a mock function with given fields: ctx, backup
-func (_m *mockBackupClient) UpdateStatusInProgress(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
-	ret := _m.Called(ctx, backup)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateStatusInProgress")
-	}
-
-	var r0 *v1.Backup
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) (*v1.Backup, error)); ok {
-		return rf(ctx, backup)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Backup) *v1.Backup); ok {
-		r0 = rf(ctx, backup)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.Backup)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.Backup) error); ok {
-		r1 = rf(ctx, backup)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockBackupClient_UpdateStatusInProgress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStatusInProgress'
-type mockBackupClient_UpdateStatusInProgress_Call struct {
-	*mock.Call
-}
-
-// UpdateStatusInProgress is a helper method to define mock.On call
-//   - ctx context.Context
-//   - backup *v1.Backup
-func (_e *mockBackupClient_Expecter) UpdateStatusInProgress(ctx interface{}, backup interface{}) *mockBackupClient_UpdateStatusInProgress_Call {
-	return &mockBackupClient_UpdateStatusInProgress_Call{Call: _e.mock.On("UpdateStatusInProgress", ctx, backup)}
-}
-
-func (_c *mockBackupClient_UpdateStatusInProgress_Call) Run(run func(ctx context.Context, backup *v1.Backup)) *mockBackupClient_UpdateStatusInProgress_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Backup))
-	})
-	return _c
-}
-
-func (_c *mockBackupClient_UpdateStatusInProgress_Call) Return(_a0 *v1.Backup, _a1 error) *mockBackupClient_UpdateStatusInProgress_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockBackupClient_UpdateStatusInProgress_Call) RunAndReturn(run func(context.Context, *v1.Backup) (*v1.Backup, error)) *mockBackupClient_UpdateStatusInProgress_Call {
+func (_c *mockBackupClient_UpdateStatus_Call) RunAndReturn(run func(context.Context, *apiv1.Backup, metav1.UpdateOptions) (*apiv1.Backup, error)) *mockBackupClient_UpdateStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

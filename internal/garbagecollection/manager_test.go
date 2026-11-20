@@ -16,7 +16,7 @@ const testNamespace = "test-ns"
 var testCtx = context.Background()
 
 func TestNewManager(t *testing.T) {
-	clientSetMock := newMockEcosystemClientSet(t)
+	clientSetMock := newMockBackupClientSet(t)
 
 	manager := NewManager(clientSetMock, testNamespace, "keepAll")
 	assert.NotEmpty(t, manager)
@@ -50,10 +50,10 @@ func Test_manager_CollectGarbage(t *testing.T) {
 
 		backupClientMock := newMockBackupClient(t)
 		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(nil, assert.AnError)
-		v1alpha1Mock := newMockEcosystemV1Alpha1(t)
-		v1alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		clientSetMock := newMockEcosystemClientSet(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+		v1Mock := newMockBackupV1Client(t)
+		v1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
+		clientSetMock := newMockBackupClientSet(t)
+		clientSetMock.EXPECT().BackupV1().Return(v1Mock)
 
 		sut := &manager{
 			clientSet:      clientSetMock,
@@ -86,10 +86,10 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(backups, nil)
 		backupClientMock.EXPECT().Delete(testCtx, "backup-1", metav1.DeleteOptions{}).Return(assert.AnError)
 		backupClientMock.EXPECT().Delete(testCtx, "backup-2", metav1.DeleteOptions{}).Return(nil)
-		v1alpha1Mock := newMockEcosystemV1Alpha1(t)
-		v1alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		clientSetMock := newMockEcosystemClientSet(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+		v1Mock := newMockBackupV1Client(t)
+		v1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
+		clientSetMock := newMockBackupClientSet(t)
+		clientSetMock.EXPECT().BackupV1().Return(v1Mock)
 
 		sut := &manager{
 			clientSet:      clientSetMock,
@@ -122,10 +122,10 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(backups, nil)
 		backupClientMock.EXPECT().Delete(testCtx, "backup-1", metav1.DeleteOptions{}).Return(assert.AnError)
 		backupClientMock.EXPECT().Delete(testCtx, "backup-2", metav1.DeleteOptions{}).Return(assert.AnError)
-		v1alpha1Mock := newMockEcosystemV1Alpha1(t)
-		v1alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		clientSetMock := newMockEcosystemClientSet(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+		v1Mock := newMockBackupV1Client(t)
+		v1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
+		clientSetMock := newMockBackupClientSet(t)
+		clientSetMock.EXPECT().BackupV1().Return(v1Mock)
 
 		sut := &manager{
 			clientSet:      clientSetMock,
@@ -158,10 +158,10 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		backupClientMock := newMockBackupClient(t)
 		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(backups, nil)
 		backupClientMock.EXPECT().Delete(testCtx, "backup-2", metav1.DeleteOptions{}).Return(nil)
-		v1alpha1Mock := newMockEcosystemV1Alpha1(t)
-		v1alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		clientSetMock := newMockEcosystemClientSet(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+		v1Mock := newMockBackupV1Client(t)
+		v1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
+		clientSetMock := newMockBackupClientSet(t)
+		clientSetMock.EXPECT().BackupV1().Return(v1Mock)
 
 		sut := &manager{
 			clientSet:      clientSetMock,
@@ -191,10 +191,10 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		backupClientMock := newMockBackupClient(t)
 		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(backups, nil)
 		backupClientMock.EXPECT().Delete(testCtx, "backup-1", metav1.DeleteOptions{}).Return(nil)
-		v1alpha1Mock := newMockEcosystemV1Alpha1(t)
-		v1alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		clientSetMock := newMockEcosystemClientSet(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+		v1Mock := newMockBackupV1Client(t)
+		v1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
+		clientSetMock := newMockBackupClientSet(t)
+		clientSetMock.EXPECT().BackupV1().Return(v1Mock)
 
 		sut := &manager{
 			clientSet:      clientSetMock,
@@ -225,10 +225,10 @@ func Test_manager_CollectGarbage(t *testing.T) {
 		backupClientMock.EXPECT().List(testCtx, metav1.ListOptions{}).Return(backups, nil)
 		backupClientMock.EXPECT().Delete(testCtx, "backup-1", metav1.DeleteOptions{}).Return(nil)
 		backupClientMock.EXPECT().Delete(testCtx, "backup-2", metav1.DeleteOptions{}).Return(nil)
-		v1alpha1Mock := newMockEcosystemV1Alpha1(t)
-		v1alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		clientSetMock := newMockEcosystemClientSet(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1alpha1Mock)
+		v1Mock := newMockBackupV1Client(t)
+		v1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
+		clientSetMock := newMockBackupClientSet(t)
+		clientSetMock.EXPECT().BackupV1().Return(v1Mock)
 
 		sut := &manager{
 			clientSet:      clientSetMock,

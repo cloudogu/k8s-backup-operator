@@ -8,20 +8,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	backupclient "github.com/cloudogu/k8s-backup-lib/client"
 	"github.com/cloudogu/k8s-backup-operator/internal/retention"
 )
 
 type manager struct {
-	clientSet      ecosystemClientSet
+	clientSet      backupClientSet
 	namespace      string
 	strategyName   retention.StrategyId
 	strategyGetter strategyGetter
 }
 
 // NewManager creates an instance of a Manager capable of deleting old backups.
-func NewManager(clientSet ecosystem.Interface, namespace string, strategyName string) Manager {
+func NewManager(clientSet backupclient.Interface, namespace string, strategyName string) Manager {
 	return &manager{
 		clientSet:      clientSet,
 		namespace:      namespace,
@@ -42,7 +42,7 @@ func (m *manager) CollectGarbage(ctx context.Context) error {
 
 	logger.Info(fmt.Sprintf("using retention strategy %q to delete backups", retentionStrategy.GetName()))
 
-	backupClient := m.clientSet.EcosystemV1Alpha1().Backups(m.namespace)
+	backupClient := m.clientSet.BackupV1().Backups(m.namespace)
 	backupList, err := backupClient.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list backups: %w", err)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
+	backupclient "github.com/cloudogu/k8s-backup-lib/client"
 	operatortime "github.com/cloudogu/k8s-backup-operator/internal/time"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -20,7 +20,7 @@ type Options struct {
 }
 
 type DefaultManager struct {
-	clientSet ecosystemClientSet
+	clientSet backupClientSet
 	options   Options
 	clock     timeProvider
 }
@@ -44,7 +44,7 @@ func (dm *DefaultManager) ScheduleBackup(ctx context.Context) error {
 		},
 	}
 
-	_, err := dm.clientSet.EcosystemV1Alpha1().Backups(dm.options.Namespace).Create(ctx, scheduledBackup, metav1.CreateOptions{})
+	_, err := dm.clientSet.BackupV1().Backups(dm.options.Namespace).Create(ctx, scheduledBackup, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to apply backup %q: %w", backupName, err)
 	}
@@ -52,6 +52,6 @@ func (dm *DefaultManager) ScheduleBackup(ctx context.Context) error {
 	return nil
 }
 
-func NewManager(clientSet ecosystem.Interface, options Options) Manager {
+func NewManager(clientSet backupclient.Interface, options Options) Manager {
 	return &DefaultManager{clientSet: clientSet, options: options, clock: &operatortime.Clock{}}
 }
