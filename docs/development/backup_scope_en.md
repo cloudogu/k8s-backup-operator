@@ -8,6 +8,15 @@ Because the Dogu resource is backed up, the Dogu operator can recreate any other
 
 Additional resources can be included in the backup by adding the label `k8s.cloudogu.com/backup-scope` to them, for example on component `PersistentVolumeClaims`.
 Be aware that the limitation to the aforementioned kinds of resources still applies.
+In addition, `ServiceAccountProducers` of components with this label are backed up as well.
+
+### Components as service account producers
+
+The component-operator adds the label `k8s.cloudogu.com/backup-scope` to every `ServiceAccountProducer` of a component.
+The cleanup before a restore then deletes the producer, and the service-account-operator deletes the secrets of all
+`ServiceAccountRequests` for this producer.
+Once the restore recreates the producer, the service-account-operator rotates the account and recreates the secrets with
+new credentials, so they match the new data.
 
 ## Restore Behavior For Additional Resources
 

@@ -7,9 +7,13 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
+	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
+	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/events"
@@ -371,10 +375,172 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
 		assert.Equal(t, veleroprovider.ReasonVeleroDeploymentNotFound, preparedCondition.Reason)
 	})
+	t.Run("Invalid exclusions fail the backup, report an event and abort", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		backup.Spec.ExcludedDogus = []string{"ldap", "cas", "scm"}
+		backup.Spec.ExcludedComponents = []string{"k8s-dogu-operator", "k8s-longhorn"}
+		ldap := &doguv3.Dogu{Name: "ldap", Namespace: "ns", Spec: doguv3.DoguSpec{Name: "ldap", DoguApiVersion: doguv3.DoguApiVersionV3}}
+		cas := &doguv3.Dogu{Name: "cas", Namespace: "ns", Spec: doguv3.DoguSpec{Name: "cas", DoguApiVersion: doguv3.DoguApiVersionV2}}
+		doguOperator := &componentv1.Component{Name: "k8s-dogu-operator", Namespace: "ns", Spec: componentv1.ComponentSpec{Name: "k8s-dogu-operator"}}
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
+		counter := &callCounter{}
+		fakeClient := newFakeClientBuilderWithCounter(t, counter).
+			WithObjects(backup, ldap, cas, doguOperator, veleroBackupStorageLocation, providerDeployment(1)).
+			WithStatusSubresource(backup).
+			Build()
+		recorder := events.NewFakeRecorder(100)
+		reconciler := NewReconciler(fakeClient, recorder, nil, newRealClock(), "default", "velero")
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Abort, nextAction)
+
+		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
+		require.NotNil(t, preparedCondition)
+		assert.Equal(t, metav1.ConditionFalse, preparedCondition.Status)
+		assert.Equal(t, reasonInvalidExclusions, preparedCondition.Reason)
+		assert.Contains(t, preparedCondition.Message, "[scm] are not installed as v3 dogus")
+		assert.Contains(t, preparedCondition.Message, "[cas] are v2 dogus")
+		assert.Contains(t, preparedCondition.Message, "[k8s-longhorn] are not installed")
+
+		succeededCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded)
+		require.NotNil(t, succeededCondition)
+		assert.Equal(t, metav1.ConditionFalse, succeededCondition.Status)
+		assert.Equal(t, reasonInvalidExclusions, succeededCondition.Reason)
+		assert.Equal(t, preparedCondition.Message, succeededCondition.Message)
+		assert.Equal(t, operationIgnore, requiredOperation(backup), "the failed backup must not be reconciled again")
+
+		assert.Equal(t, 1, counter.subResourcePatchCount)
+		require.Len(t, recorder.Events, 1)
+		event := <-recorder.Events
+		assert.Contains(t, event, corev1.EventTypeWarning)
+		assert.Contains(t, event, reasonInvalidExclusions)
+	})
+
+	t.Run("Valid exclusions continue with the provider check", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		backup.Spec.ExcludedDogus = []string{"ldap"}
+		backup.Spec.ExcludedComponents = []string{"k8s-dogu-operator"}
+		ldap := &doguv3.Dogu{Name: "ldap", Namespace: "ns", Spec: doguv3.DoguSpec{Name: "ldap", DoguApiVersion: doguv3.DoguApiVersionV3}}
+		doguOperator := &componentv1.Component{Name: "k8s-dogu-operator", Namespace: "ns", Spec: componentv1.ComponentSpec{Name: "k8s-dogu-operator"}}
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
+		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
+			WithObjects(backup, ldap, doguOperator, veleroBackupStorageLocation, providerDeployment(1)).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+
+		preparedCondition := meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionPrepared)
+		require.NotNil(t, preparedCondition)
+		assert.Equal(t, metav1.ConditionTrue, preparedCondition.Status)
+		assert.Equal(t, veleroprovider.ReasonVeleroProviderReady, preparedCondition.Reason)
+	})
+
+	t.Run("An existing own unit backup skips the validation of the exclusions", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		backup.Spec.ExcludedDogus = []string{"uninstalled-meanwhile"}
+		ownVeleroBackup := newUnitVeleroBackupForReconcilerTest("ns", "backup-dogux", "backup", velerov1.BackupPhaseInProgress)
+		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
+			WithObjects(backup, ownVeleroBackup).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+		// the mock fails the test if the dogus or components are listed
+		reconciler.stateCollector = newMockBackupStateCollector(t)
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+		assert.Nil(t, meta.FindStatusCondition(backup.Status.Conditions, backupv1.ConditionSucceeded))
+	})
+
+	t.Run("No exclusions do not list dogus and components", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		veleroBackupStorageLocation := newVeleroBackupStorageLocationForReconcilerTest(velerov1.BackupStorageLocationPhaseAvailable)
+		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
+			WithObjects(backup, veleroBackupStorageLocation, providerDeployment(1)).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+		reconciler.stateCollector = newMockBackupStateCollector(t)
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.NoError(t, err)
+		assert.Equal(t, Next, nextAction)
+	})
+
+	t.Run("If listing the dogus failed then abort", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		backup.Spec.ExcludedDogus = []string{"ldap"}
+		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
+			WithObjects(backup).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+		stateCollector := newMockBackupStateCollector(t)
+		stateCollector.EXPECT().ListDogus(mock.Anything, "ns").Return(nil, assert.AnError)
+		reconciler.stateCollector = stateCollector
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "validate excluded dogus")
+		assert.Equal(t, Abort, nextAction)
+		assert.Empty(t, backup.Status.Conditions)
+	})
+
+	t.Run("If listing the components failed then abort", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		backup.Spec.ExcludedComponents = []string{"k8s-dogu-operator"}
+		fakeClient := newFakeClientBuilderWithCounter(t, &callCounter{}).
+			WithObjects(backup).
+			WithStatusSubresource(backup).
+			Build()
+		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
+		stateCollector := newMockBackupStateCollector(t)
+		stateCollector.EXPECT().ListComponents(mock.Anything, "ns").Return(nil, assert.AnError)
+		reconciler.stateCollector = stateCollector
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "validate excluded components")
+		assert.Equal(t, Abort, nextAction)
+		assert.Empty(t, backup.Status.Conditions)
+	})
+
+	t.Run("If patching the status of invalid exclusions failed then abort", func(t *testing.T) {
+		backup := newBackupForTest("ns", "backup")
+		backup.Spec.ExcludedDogus = []string{"scm"}
+		counter := &callCounter{subResourcePatchCallError: assert.AnError}
+		fakeClient := newFakeClientBuilderWithCounter(t, counter).
+			WithObjects(backup).
+			WithStatusSubresource(backup).
+			Build()
+		recorder := events.NewFakeRecorder(100)
+		reconciler := NewReconciler(fakeClient, recorder, nil, newRealClock(), "default", "velero")
+
+		nextAction, err := reconciler.ensureBackupIsPrepared(context.Background(), backup)
+
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "report invalid exclusions")
+		assert.Equal(t, Abort, nextAction)
+		assert.Empty(t, recorder.Events)
+	})
+
 }
 
 func newUnitVeleroBackupForReconcilerTest(namespace string, name string, backupName string, phase velerov1.BackupPhase) *velerov1.Backup {
 	veleroBackup := newVeleroBackupForReconcilerTest(namespace, name, phase)
-	veleroBackup.Labels = map[string]string{backupv1.BackupLabelKey: backupName}
+	veleroBackup.Labels = map[string]string{backupv1.BackupLabelKey: backupv1.GetTruncatedName(backupName)}
 	return veleroBackup
+
 }
