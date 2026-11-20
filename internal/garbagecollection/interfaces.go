@@ -3,7 +3,8 @@ package garbagecollection
 import (
 	"context"
 
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
+	backupclient "github.com/cloudogu/k8s-backup-lib/client"
+	typedv1 "github.com/cloudogu/k8s-backup-lib/client/typed/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/retention"
 )
 
@@ -12,8 +13,8 @@ type Manager interface {
 	CollectGarbage(ctx context.Context) error
 }
 
-type ecosystemClientSet interface {
-	ecosystem.Interface
+type backupClientSet interface {
+	backupclient.Interface
 }
 
 type strategyGetter interface {
@@ -29,12 +30,12 @@ type strategy interface {
 
 //nolint:unused
 //goland:noinspection GoUnusedType
-type ecosystemV1Alpha1 interface {
-	ecosystem.V1Alpha1Interface
+type backupV1Client interface {
+	typedv1.BackupV1Interface
 }
 
 //nolint:unused
 //goland:noinspection GoUnusedType
 type backupClient interface {
-	ecosystem.BackupInterface
+	typedv1.BackupInterface
 }
