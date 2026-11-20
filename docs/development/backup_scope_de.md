@@ -8,6 +8,15 @@ Da die Dogu-Ressource gesichert wird, kann der Dogu-Operator alle anderen Ressou
 
 Zusätzliche Ressourcen können in das Backup aufgenommen werden, indem ihnen das Label `k8s.cloudogu.com/backup-scope` gesetzt wird, zum Beispiel auf `PersistentVolumeClaims` von Komponenten.
 Dabei gilt weiterhin die Beschränkung auf die zuvor genannten Ressourcentypen.
+Zusätzlich werden `ServiceAccountProducer` von Komponenten mit diesem Label gesichert.
+
+### Komponenten als Service-Account-Producer
+
+Der Component-Operator setzt das Label `k8s.cloudogu.com/backup-scope` an jeden `ServiceAccountProducer` einer Component.
+Der Cleanup vor einem Restore löscht dann den Producer, und der Service-Account-Operator löscht die Secrets aller
+`ServiceAccountRequests` dieses Producers.
+Stellt der Restore den Producer wieder her, rotiert der Service-Account-Operator den Account und legt die Secrets mit
+neuen Credentials an, sodass sie wieder zu den neuen Daten passen.
 
 ## Restore-Verhalten für zusätzliche Ressourcen
 
