@@ -112,8 +112,8 @@ func unitTypeAnnotations(backupState state.BackupState, unit backupv1.UnitIdenti
 	switch unit.Type {
 	case backupv1.UnitTypeGlobalConfig:
 		return backupState.GlobalConfigUnitAnnotations(), nil
-	case backupv1.UnitTypeMisc:
-		return backupState.MiscUnitAnnotations()
+	case backupv1.UnitTypeComponents:
+		return backupState.ComponentsUnitAnnotations()
 	default:
 		return nil, nil
 	}
@@ -139,10 +139,10 @@ func unitSelector(backupState state.BackupState, unit backupv1.UnitIdentifier) (
 		return nil, []*metav1.LabelSelector{doguLabelSelector, v2DoguLabelSelector}, nil
 	case backupv1.UnitTypeGlobalConfig:
 		return &metav1.LabelSelector{MatchLabels: map[string]string{typeLabelKey: globalConfigTypeLabelValue}}, nil, nil
-	case backupv1.UnitTypeMisc:
-		// The misc unit only contains resources of components labeled with the backup-scope label.
+	case backupv1.UnitTypeComponents:
+		// The components unit only contains resources of components labeled with the backup-scope label.
 		if len(backupState.Components) == 0 {
-			return nil, nil, fmt.Errorf("misc unit requires at least one component")
+			return nil, nil, fmt.Errorf("components unit requires at least one component")
 		}
 		names := make([]string, 0, len(backupState.Components))
 		for _, component := range backupState.Components {
@@ -168,7 +168,7 @@ func includedResources(unit backupv1.UnitIdentifier) ([]string, error) {
 		return []string{"configmaps"}, nil
 	case backupv1.UnitTypeDogu, backupv1.UnitTypeDoguV2:
 		return []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}, nil
-	case backupv1.UnitTypeMisc:
+	case backupv1.UnitTypeComponents:
 		// Service account producers are backed up so that the restore of a producer component deletes and recreates
 		// its producer. This makes the service-account-operator delete and recreate the secrets of the requests.
 		return []string{"configmaps", "secrets", "persistentvolumeclaims", "serviceaccountproducers.k8s.cloudogu.com"}, nil

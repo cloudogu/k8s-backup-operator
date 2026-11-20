@@ -14,7 +14,7 @@ import (
 
 func TestUnitBackupName(t *testing.T) {
 	t.Run("Concatenate backup name and unit type", func(t *testing.T) {
-		assert.Equal(t, "backup-misc", unitBackupName("backup", backupv1.UnitIdentifier{Type: backupv1.UnitTypeMisc}))
+		assert.Equal(t, "backup-components", unitBackupName("backup", backupv1.UnitIdentifier{Type: backupv1.UnitTypeComponents}))
 	})
 
 	t.Run("Concatenate backup name, unit type and dogu name", func(t *testing.T) {
@@ -53,7 +53,7 @@ func TestDesiredUnitBackups(t *testing.T) {
 		assert.Equal(t, "backup", unitBackup.Labels["k8s.cloudogu.com/part-of"])
 		assert.Equal(t, backup.Name, unitBackup.Labels[backupv1.BackupLabelKey])
 		assert.Equal(t, string(backupv1.BackupCoverageFull), unitBackup.Labels[backupv1.BackupCoverageLabelKey])
-		assert.Equal(t, `[{"type":"doguv2"},{"type":"dogu","name":"ldap"},{"type":"global-config"},{"type":"misc"}]`, unitBackup.Annotations[backupv1.UnitsAnnotationKey])
+		assert.Equal(t, `[{"type":"doguv2"},{"type":"dogu","name":"ldap"},{"type":"global-config"},{"type":"components"}]`, unitBackup.Annotations[backupv1.UnitsAnnotationKey])
 		assert.Equal(t, `[{"name":"cas","version":"7.0.0-1"}]`, unitBackup.Annotations[backupv1.InstalledDogusV2AnnotationKey])
 		assert.Equal(t, `[{"name":"ldap","version":"2.6.8-1"}]`, unitBackup.Annotations[backupv1.InstalledDogusV3AnnotationKey])
 		assert.Equal(t, "blueprint-id", unitBackup.Annotations[backupv1.BlueprintIDAnnotationKey])
@@ -96,10 +96,10 @@ func TestDesiredUnitBackups(t *testing.T) {
 		assert.Equal(t, []string{"configmaps"}, unit.Spec.IncludedResources)
 	})
 
-	t.Run("misc unit", func(t *testing.T) {
-		unit := byName["backup-misc"]
+	t.Run("components unit", func(t *testing.T) {
+		unit := byName["backup-components"]
 		require.NotNil(t, unit)
-		assert.Equal(t, string(backupv1.UnitTypeMisc), unit.Labels[backupv1.BackupTypeLabelKey])
+		assert.Equal(t, string(backupv1.UnitTypeComponents), unit.Labels[backupv1.BackupTypeLabelKey])
 		assert.Contains(t, unit.Annotations, backupv1.ComponentsAnnotationKey)
 		assert.Equal(t, &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: "k8s.cloudogu.com/backup-scope", Operator: metav1.LabelSelectorOpExists},
@@ -108,17 +108,17 @@ func TestDesiredUnitBackups(t *testing.T) {
 		assert.Equal(t, []string{"configmaps", "secrets", "persistentvolumeclaims", "serviceaccountproducers.k8s.cloudogu.com"}, unit.Spec.IncludedResources)
 	})
 
-	t.Run("misc unit selects all components in one requirement", func(t *testing.T) {
-		miscOnly := state.BackupState{
+	t.Run("components unit selects all components in one requirement", func(t *testing.T) {
+		componentsOnly := state.BackupState{
 			Name:  "backup",
-			Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeMisc}},
-			Components: []backupv1.ComponentStatus{
+			Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeComponents}},
+			Components: []backupv1.ComponentVersion{
 				{Name: "k8s-lop-idp", Version: "1.0.0"},
 				{Name: "k8s-loki", Version: "2.0.0"},
 			},
 		}
 
-		unitBackups, err := desiredUnitBackups(newBackupForTest("ns", "backup"), miscOnly, "default")
+		unitBackups, err := desiredUnitBackups(newBackupForTest("ns", "backup"), componentsOnly, "default")
 
 		require.NoError(t, err)
 		require.Len(t, unitBackups, 1)
@@ -128,13 +128,13 @@ func TestDesiredUnitBackups(t *testing.T) {
 		}}, unitBackups[0].Spec.LabelSelector)
 	})
 
-	t.Run("misc unit without components fails", func(t *testing.T) {
-		miscOnly := state.BackupState{Name: "backup", Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeMisc}}}
+	t.Run("components unit without components fails", func(t *testing.T) {
+		componentsOnly := state.BackupState{Name: "backup", Units: []backupv1.UnitIdentifier{{Type: backupv1.UnitTypeComponents}}}
 
-		unitBackups, err := desiredUnitBackups(newBackupForTest("ns", "backup"), miscOnly, "default")
+		unitBackups, err := desiredUnitBackups(newBackupForTest("ns", "backup"), componentsOnly, "default")
 
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "misc unit requires at least one component")
+		assert.ErrorContains(t, err, "components unit requires at least one component")
 		assert.Nil(t, unitBackups)
 	})
 
@@ -152,7 +152,7 @@ func TestIncludedResources(t *testing.T) {
 		{name: "dogu", unitType: backupv1.UnitTypeDogu, expected: []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}},
 		{name: "doguv2", unitType: backupv1.UnitTypeDoguV2, expected: []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}},
 		{name: "global-config", unitType: backupv1.UnitTypeGlobalConfig, expected: []string{"configmaps"}},
-		{name: "misc", unitType: backupv1.UnitTypeMisc, expected: []string{"configmaps", "secrets", "persistentvolumeclaims", "serviceaccountproducers.k8s.cloudogu.com"}},
+		{name: "components", unitType: backupv1.UnitTypeComponents, expected: []string{"configmaps", "secrets", "persistentvolumeclaims", "serviceaccountproducers.k8s.cloudogu.com"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

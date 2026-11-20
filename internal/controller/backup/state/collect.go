@@ -99,7 +99,7 @@ func (b *BackupStateCollector) getDogus(ctx context.Context, backup *backupv1.Ba
 outer:
 	for _, dogu := range dogus {
 		if dogu.Spec.DoguApiVersion == doguv3.DoguApiVersionV2 {
-			if !backup.Spec.Options.IgnoreV2Dogus {
+			if backup.Spec.Options == nil || !backup.Spec.Options.IgnoreV2Dogus {
 				v2DoguVersions = append(v2DoguVersions, backupv1.DoguVersion{
 					Name:    dogu.Spec.Name,
 					Version: dogu.Status.InstalledVersion,
@@ -145,11 +145,7 @@ func (b *BackupStateCollector) ListComponents(ctx context.Context, namespace str
 	return componentList.Items, nil
 }
 
-func (b *BackupStateCollector) getComponents(ctx context.Context, backup *backupv1.Backup) ([]backupv1.ComponentStatus, error) {
-	if backup.Spec.Options.IgnoreMisc {
-		return nil, nil
-	}
-
+func (b *BackupStateCollector) getComponents(ctx context.Context, backup *backupv1.Backup) ([]backupv1.ComponentVersion, error) {
 	backupableItems, err := b.collectBackupableComponentItems(ctx, backup)
 	if err != nil {
 		return nil, fmt.Errorf("collect backupable items: %w", err)
@@ -205,7 +201,7 @@ func (b *BackupStateCollector) collectBackupableComponentItems(ctx context.Conte
 	return backupableItems, nil
 }
 
-func (b *BackupStateCollector) componentsFromItems(ctx context.Context, backupableItems []unstructured.Unstructured, backup *backupv1.Backup) (components []backupv1.ComponentStatus, err error) {
+func (b *BackupStateCollector) componentsFromItems(ctx context.Context, backupableItems []unstructured.Unstructured, backup *backupv1.Backup) (components []backupv1.ComponentVersion, err error) {
 	logger := log.FromContext(ctx).
 		WithName("BackupStateCollector.componentsFromItems").
 		WithValues("backup", backup.Name, "namespace", backup.Namespace)
@@ -237,13 +233,13 @@ outer:
 			continue
 		}
 		componentSet[componentName] = struct{}{}
-		components = append(components, backupv1.ComponentStatus{Name: componentName, Version: component.Status.InstalledVersion})
+		components = append(components, backupv1.ComponentVersion{Name: componentName, Version: component.Status.InstalledVersion})
 	}
 	return components, nil
 }
 
 func (b *BackupStateCollector) getGlobalConfigInfo(ctx context.Context, backup *backupv1.Backup) (string, string, error) {
-	if backup.Spec.Options.IgnoreGlobalConfig {
+	if backup.Spec.Options != nil && backup.Spec.Options.IgnoreGlobalConfig {
 		return "", "", nil
 	}
 
@@ -280,7 +276,7 @@ func (b *BackupStateCollector) getGlobalConfigInfo(ctx context.Context, backup *
 	return fqdn, domain, nil
 }
 
-func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backupv1.DoguVersion, v3Dogus []backupv1.DoguVersion, components []backupv1.ComponentStatus) (units []backupv1.UnitIdentifier) {
+func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backupv1.DoguVersion, v3Dogus []backupv1.DoguVersion, components []backupv1.ComponentVersion) (units []backupv1.UnitIdentifier) {
 	if len(v2Dogus) > 0 {
 		units = append(units, backupv1.UnitIdentifier{
 			Type: backupv1.UnitTypeDoguV2,
@@ -292,14 +288,14 @@ func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backu
 			Name: dogu.Name,
 		})
 	}
-	if !backup.Spec.Options.IgnoreGlobalConfig {
+	if backup.Spec.Options == nil || !backup.Spec.Options.IgnoreGlobalConfig {
 		units = append(units, backupv1.UnitIdentifier{
 			Type: backupv1.UnitTypeGlobalConfig,
 		})
 	}
-	if !backup.Spec.Options.IgnoreMisc && len(components) != 0 {
+	if len(components) != 0 {
 		units = append(units, backupv1.UnitIdentifier{
-			Type: backupv1.UnitTypeMisc,
+			Type: backupv1.UnitTypeComponents,
 		})
 	}
 	return units
@@ -308,9 +304,8 @@ func (b *BackupStateCollector) getUnits(backup *backupv1.Backup, v2Dogus []backu
 func (b *BackupStateCollector) getCoverage(backup *backupv1.Backup) backupv1.BackupCoverage {
 	if len(backup.Spec.ExcludedDogus) == 0 &&
 		len(backup.Spec.ExcludedComponents) == 0 &&
-		!backup.Spec.Options.IgnoreMisc &&
-		!backup.Spec.Options.IgnoreGlobalConfig &&
-		!backup.Spec.Options.IgnoreV2Dogus {
+		(backup.Spec.Options == nil ||
+			!(backup.Spec.Options.IgnoreGlobalConfig || backup.Spec.Options.IgnoreV2Dogus)) {
 		return backupv1.BackupCoverageFull
 	}
 	return backupv1.BackupCoveragePartial

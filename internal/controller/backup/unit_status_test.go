@@ -13,7 +13,7 @@ func allStartedUnitsForTest() map[string]struct{} {
 		"backup-doguv2":        {},
 		"backup-dogu-ldap":     {},
 		"backup-global-config": {},
-		"backup-misc":          {},
+		"backup-components":    {},
 	}
 }
 
@@ -21,7 +21,7 @@ func TestPopulateUnitStatus(t *testing.T) {
 	t.Run("Fill an empty status with the metadata and provider references of all units", func(t *testing.T) {
 		backupState := newBackupStateForTest("backup")
 		backupState.BlueprintId = "blueprint-id"
-		backupState.Components = []backupv1.ComponentStatus{{Name: "k8s-loki", Version: "3.0.0-1"}}
+		backupState.Components = []backupv1.ComponentVersion{{Name: "k8s-loki", Version: "3.0.0-1"}}
 		status := &backupv1.BackupStatus{}
 
 		populateUnitStatus(status, "backup", backupState, allStartedUnitsForTest())
@@ -42,15 +42,17 @@ func TestPopulateUnitStatus(t *testing.T) {
 				DoguVersion: backupv1.DoguVersion{Name: "ldap", Version: "2.6.8-1"},
 				UnitStatus:  backupv1.UnitStatus{ProviderRef: &backupv1.ProviderRef{Name: "backup-dogu-ldap"}},
 			}},
-			Components: []backupv1.ComponentStatus{{Name: "k8s-loki", Version: "3.0.0-1"}},
-			Misc:       &backupv1.UnitStatus{ProviderRef: &backupv1.ProviderRef{Name: "backup-misc"}},
+			Components: &backupv1.ComponentsUnitStatus{
+				Components:  []backupv1.ComponentVersion{{Name: "k8s-loki", Version: "3.0.0-1"}},
+				ProviderRef: &backupv1.ProviderRef{Name: "backup-components"},
+			},
 		}, status)
 	})
 
 	t.Run("Do not set a provider reference for units which were not started", func(t *testing.T) {
 		status := &backupv1.BackupStatus{}
 
-		populateUnitStatus(status, "backup", newBackupStateForTest("backup"), map[string]struct{}{"backup-misc": {}})
+		populateUnitStatus(status, "backup", newBackupStateForTest("backup"), map[string]struct{}{"backup-components": {}})
 
 		require.NotNil(t, status.GlobalConfig)
 		assert.Nil(t, status.GlobalConfig.ProviderRef)
@@ -60,8 +62,8 @@ func TestPopulateUnitStatus(t *testing.T) {
 		require.Len(t, status.Dogus, 1)
 		assert.Nil(t, status.Dogus[0].ProviderRef)
 		assert.Equal(t, "2.6.8-1", status.Dogus[0].Version)
-		require.NotNil(t, status.Misc)
-		assert.Equal(t, &backupv1.ProviderRef{Name: "backup-misc"}, status.Misc.ProviderRef)
+		require.NotNil(t, status.Components)
+		assert.Equal(t, &backupv1.ProviderRef{Name: "backup-components"}, status.Components.ProviderRef)
 	})
 
 	t.Run("Add the provider reference when the unit is started in a later run", func(t *testing.T) {
@@ -92,8 +94,10 @@ func TestPopulateUnitStatus(t *testing.T) {
 				{DoguVersion: backupv1.DoguVersion{Name: "other", Version: "1.0.0-1"}, UnitStatus: finished},
 				{DoguVersion: backupv1.DoguVersion{Name: "ldap", Version: "2.6.7-1"}, UnitStatus: finished},
 			},
-			Components: []backupv1.ComponentStatus{{Name: "k8s-loki", Version: "2.0.0-1"}},
-			Misc:       finished.DeepCopy(),
+			Components: &backupv1.ComponentsUnitStatus{
+				Components: []backupv1.ComponentVersion{{Name: "k8s-loki", Version: "2.0.0-1"}},
+				UnitStatus: *finished.DeepCopy(),
+			},
 		}
 		expected := status.DeepCopy()
 
@@ -121,7 +125,7 @@ func TestPopulateUnitStatus(t *testing.T) {
 
 		assert.Nil(t, status.GlobalConfig)
 		assert.Nil(t, status.V2Dogus)
-		assert.Nil(t, status.Misc)
+		assert.Nil(t, status.Components)
 		assert.Empty(t, status.Components)
 		require.Len(t, status.Dogus, 1)
 		assert.Equal(t, "ldap", status.Dogus[0].Name)
