@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/json/v2"
 	"fmt"
+	"slices"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
@@ -14,14 +15,20 @@ type BackupState struct {
 	Units            []backupv1.UnitIdentifier
 	InstalledDogusV2 []backupv1.DoguVersion
 	InstalledDogusV3 []backupv1.DoguVersion
-	Components       []backupv1.ComponentStatus
+	Components       []backupv1.ComponentVersion
 	Fqdn             string
 	Domain           string
 }
 
+func (s BackupState) ContainsUnitType(unitType backupv1.UnitType) bool {
+	return slices.ContainsFunc(s.Units, func(identifier backupv1.UnitIdentifier) bool {
+		return identifier.Type == unitType
+	})
+}
+
 func (s BackupState) CommonLabels() map[string]string {
 	return map[string]string{
-		backupv1.BackupLabelKey:         s.Name,
+		backupv1.BackupLabelKey:         backupv1.GetTruncatedName(s.Name),
 		backupv1.BackupCoverageLabelKey: string(s.Coverage),
 	}
 }
@@ -43,6 +50,7 @@ func (s BackupState) CommonUnitAnnotations() (map[string]string, error) {
 	}
 
 	annotation := map[string]string{
+		backupv1.BackupAnnotationKey:           s.Name,
 		backupv1.UnitsAnnotationKey:            string(unitsJson),
 		backupv1.InstalledDogusV3AnnotationKey: string(v3DogusJson),
 	}
@@ -62,7 +70,7 @@ func (s BackupState) GlobalConfigUnitAnnotations() map[string]string {
 	}
 }
 
-func (s BackupState) MiscUnitAnnotations() (map[string]string, error) {
+func (s BackupState) ComponentsUnitAnnotations() (map[string]string, error) {
 	componentsJson, err := json.Marshal(s.Components)
 	if err != nil {
 		return nil, fmt.Errorf("marshal components: %w", err)
