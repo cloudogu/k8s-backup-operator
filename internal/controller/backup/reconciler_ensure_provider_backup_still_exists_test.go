@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,8 +52,9 @@ func TestReconcilerensureOrphanedBackupDeleted(t *testing.T) {
 	})
 
 	t.Run("Keep the backup when at least one provider unit backup still exists", func(t *testing.T) {
-		backup := backupWithStartedProviderBackup("ns", "backup")
-		veleroBackup := newUnitVeleroBackupForReconcilerTest("ns", "backup-dogux", "backup", velerov1.BackupPhaseCompleted)
+		backupName := strings.Repeat("a", 64)
+		backup := backupWithStartedProviderBackup("ns", backupName)
+		veleroBackup := newUnitVeleroBackupForReconcilerTest("ns", "backup-dogux", backupName, velerov1.BackupPhaseCompleted)
 		fakeClient := newFakeClientBuilder(t).WithObjects(backup, veleroBackup).Build()
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 

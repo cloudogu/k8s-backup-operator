@@ -540,7 +540,7 @@ func TestReconcilerEnsureBackupIsPrepared(t *testing.T) {
 
 func newUnitVeleroBackupForReconcilerTest(namespace string, name string, backupName string, phase velerov1.BackupPhase) *velerov1.Backup {
 	veleroBackup := newVeleroBackupForReconcilerTest(namespace, name, phase)
-	veleroBackup.Labels = map[string]string{backupv1.BackupLabelKey: backupName}
+	veleroBackup.Labels = map[string]string{backupv1.BackupLabelKey: backupv1.GetTruncatedName(backupName)}
 	return veleroBackup
 
 }
