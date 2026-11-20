@@ -82,6 +82,12 @@ const (
 	ReasonMaintenanceModeActivated = "MaintenanceModeActivated"
 	// ReasonMaintenanceModeDeactivated marks the successfully removed maintenance notice.
 	ReasonMaintenanceModeDeactivated = "MaintenanceModeDeactivated"
+	// ReasonUnitsFailed marks a restore with at least one failed unit restore.
+	ReasonUnitsFailed = "UnitsFailed"
+	// ReasonUnusableUnits marks a restore with a planned unit whose velero backup is missing or not successful.
+	ReasonUnusableUnits = "UnusableUnits"
+	// ReasonInvalidExclusions marks a restore whose exclusions do not match its backup.
+	ReasonInvalidExclusions = "InvalidExclusions"
 )
 
 // initialWorkflowConditions are the conditions every running restore carries, in the order a reader
@@ -119,7 +125,7 @@ func reachedMilestone(conditionType string, reason string, message string) metav
 // Unknown means that the provider has not decided yet, so a state this operator does not know is
 // never reported as success or failure. Translating provider vocabulary into a state is the provider
 // package's job; this function only decides what the condition says about it.
-func observeProviderRestoreState(state velero.RestoreState) (metav1.ConditionStatus, string) {
+func observeProviderRestoreState(state velero.RestoreObservation) (metav1.ConditionStatus, string) {
 	switch state {
 	case velero.RestorePending:
 		return metav1.ConditionUnknown, ReasonProviderRestorePending
