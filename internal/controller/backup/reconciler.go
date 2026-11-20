@@ -895,7 +895,7 @@ func (c *defaultReconciler) listOwnProviderBackupNames(ctx context.Context, back
 
 func (c *defaultReconciler) ensureProviderBackupCompleted(ctx context.Context, backup *backupv1.Backup) (action, error) {
 	var unitBackups velerov1.BackupList
-	err := c.client.List(ctx, &unitBackups, client.InNamespace(backup.Namespace), client.MatchingLabels{backupv1.BackupLabelKey: backup.Name})
+	err := c.client.List(ctx, &unitBackups, client.InNamespace(backup.Namespace), client.MatchingLabels{backupv1.BackupLabelKey: backup.GetTruncatedName()})
 	if err != nil {
 		return Abort, fmt.Errorf("listing unit backups: %w", err)
 	}

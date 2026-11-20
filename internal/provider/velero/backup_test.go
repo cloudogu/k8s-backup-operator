@@ -16,7 +16,7 @@ import (
 
 func TestCreateVeleroUnitBackupResource(t *testing.T) {
 	labels := map[string]string{"app": "ces", "k8s.cloudogu.com/backup": testBackup}
-	annotations := map[string]string{"k8s.cloudogu.com/backup-units": `[{"type":"misc"}]`}
+	annotations := map[string]string{"k8s.cloudogu.com/backup-units": `[{"type":"components"}]`}
 	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"k8s.cloudogu.com/dogu.name": "ldap"}}
 	orSelectors := []*metav1.LabelSelector{{MatchLabels: map[string]string{"k8s.cloudogu.com/dogu.name": "ldap"}}, {MatchLabels: map[string]string{"dogu.name": "ldap"}}}
 	includedResources := []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}
