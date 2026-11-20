@@ -38,7 +38,7 @@ func (c *RestoreStateCollector) Collect(ctx context.Context, restore *backupv1.R
 
 	unitBackups := velerov1.BackupList{}
 	err = c.k8sClient.List(ctx, &unitBackups, client.InNamespace(restore.Namespace),
-		client.MatchingLabels{backupv1.BackupLabelKey: restore.Spec.BackupName})
+		client.MatchingLabels{backupv1.BackupLabelKey: backupv1.GetTruncatedName(restore.Spec.BackupName)})
 	if err != nil {
 		return RestoreState{}, fmt.Errorf("list unit backups: %w", err)
 	}
@@ -78,21 +78,24 @@ func collectUnitState(unitBackups []velerov1.Backup) (RestoreState, error) {
 		result.V2Dogus = append(result.V2Dogus, dogu.Name)
 	}
 
-	result.Components, err = miscComponents(unitBackups)
+	result.Components, err = componentNames(unitBackups)
 	if err != nil {
-		return RestoreState{}, fmt.Errorf("get misc components: %w", err)
+		return RestoreState{}, fmt.Errorf("get components: %w", err)
 	}
 
 	return result, nil
 }
 
-// miscComponents returns the component names of the misc backup; nil if it is missing.
-func miscComponents(unitBackups []velerov1.Backup) ([]string, error) {
-	miscBackup := findUnitBackup(unitBackups, backupv1.UnitIdentifier{Type: backupv1.UnitTypeMisc})
-	if miscBackup == nil {
+// componentNames returns the components of the first unit backup that carries the components annotation.
+func componentNames(unitBackups []velerov1.Backup) ([]string, error) {
+	index := slices.IndexFunc(unitBackups, func(unitBackup velerov1.Backup) bool {
+		_, ok := unitBackup.Annotations[backupv1.ComponentsAnnotationKey]
+		return ok
+	})
+	if index < 0 {
 		return nil, nil
 	}
-	components, err := unmarshalAnnotation[[]backupv1.ComponentStatus](miscBackup.Annotations, backupv1.ComponentsAnnotationKey)
+	components, err := unmarshalAnnotation[[]backupv1.ComponentVersion](unitBackups[index].Annotations, backupv1.ComponentsAnnotationKey)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +122,7 @@ func unmarshalAnnotation[T any](annotations map[string]string, key string) (T, e
 
 var unitTypeOrder = []backupv1.UnitType{
 	backupv1.UnitTypeGlobalConfig,
-	backupv1.UnitTypeMisc,
+	backupv1.UnitTypeComponents,
 	backupv1.UnitTypeDoguV2,
 	backupv1.UnitTypeDogu,
 }

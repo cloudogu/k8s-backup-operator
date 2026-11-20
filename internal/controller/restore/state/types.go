@@ -5,6 +5,7 @@ import (
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 )
@@ -36,7 +37,7 @@ type RestoreState struct {
 	Units []UnitBackup
 	// V2Dogus are the dogus of the V2 blob.
 	V2Dogus []string
-	// Components are the components of the misc unit.
+	// Components are the components of the components unit.
 	Components []string
 }
 
@@ -60,14 +61,14 @@ func (s RestoreState) RestoredComponents(spec backupv1.RestoreSpec) []string {
 }
 
 func (s RestoreState) isSkipped(spec backupv1.RestoreSpec, unit UnitBackup) bool {
+	options := ptr.Deref(spec.Options, backupv1.UnitOptions{})
 	switch unit.Type {
 	case backupv1.UnitTypeGlobalConfig:
-		return spec.Options.IgnoreGlobalConfig
-	case backupv1.UnitTypeMisc:
-		// the misc unit holds only components, so without one left there is nothing to restore
-		return spec.Options.IgnoreMisc || (unit.ProviderBackup != nil && len(s.RestoredComponents(spec)) == 0)
+		return options.IgnoreGlobalConfig
+	case backupv1.UnitTypeComponents:
+		return len(s.RestoredComponents(spec)) == 0
 	case backupv1.UnitTypeDoguV2:
-		return spec.Options.IgnoreV2Dogus
+		return options.IgnoreV2Dogus
 	case backupv1.UnitTypeDogu:
 		return slices.Contains(spec.ExcludedDogus, unit.Name)
 	default:

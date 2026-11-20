@@ -10,7 +10,7 @@ import (
 
 var (
 	globalConfigUnit = UnitBackup{Type: backupv1.UnitTypeGlobalConfig, ProviderBackup: &velerov1.Backup{}}
-	miscUnit         = UnitBackup{Type: backupv1.UnitTypeMisc, ProviderBackup: &velerov1.Backup{}}
+	componentsUnit   = UnitBackup{Type: backupv1.UnitTypeComponents, ProviderBackup: &velerov1.Backup{}}
 	doguV2Unit       = UnitBackup{Type: backupv1.UnitTypeDoguV2, ProviderBackup: &velerov1.Backup{}}
 	postfixUnit      = UnitBackup{Type: backupv1.UnitTypeDogu, Name: "postfix", ProviderBackup: &velerov1.Backup{}}
 	redmineUnit      = UnitBackup{Type: backupv1.UnitTypeDogu, Name: "redmine", ProviderBackup: &velerov1.Backup{}}
@@ -19,15 +19,15 @@ var (
 func unitState() RestoreState {
 	return RestoreState{
 		Kind:       KindUnits,
-		Units:      []UnitBackup{globalConfigUnit, miscUnit, doguV2Unit, postfixUnit, redmineUnit},
+		Units:      []UnitBackup{globalConfigUnit, componentsUnit, doguV2Unit, postfixUnit, redmineUnit},
 		Components: []string{"k8s-loki", "k8s-velero"},
 	}
 }
 
 func TestRestoreState_UnitsToRestore(t *testing.T) {
-	missingMisc := unitState()
-	missingMisc.Units[1].ProviderBackup = nil
-	missingMisc.Components = nil
+	// the components are known from the annotations of the other provider backups
+	missingComponents := unitState()
+	missingComponents.Units[1].ProviderBackup = nil
 
 	withoutComponents := unitState()
 	withoutComponents.Components = nil
@@ -38,57 +38,57 @@ func TestRestoreState_UnitsToRestore(t *testing.T) {
 		spec  backupv1.RestoreSpec
 		want  []UnitBackup
 	}{
-		{name: "all units", state: unitState(), want: []UnitBackup{globalConfigUnit, miscUnit, doguV2Unit, postfixUnit, redmineUnit}},
+		{name: "all units", state: unitState(), want: []UnitBackup{globalConfigUnit, componentsUnit, doguV2Unit, postfixUnit, redmineUnit}},
 		{
 			name:  "ignoreGlobalConfig drops the global-config unit",
 			state: unitState(),
-			spec:  backupv1.RestoreSpec{Options: backupv1.UnitOptions{IgnoreGlobalConfig: true}},
-			want:  []UnitBackup{miscUnit, doguV2Unit, postfixUnit, redmineUnit},
-		},
-		{
-			name:  "ignoreMisc drops the misc unit",
-			state: unitState(),
-			spec:  backupv1.RestoreSpec{Options: backupv1.UnitOptions{IgnoreMisc: true}},
-			want:  []UnitBackup{globalConfigUnit, doguV2Unit, postfixUnit, redmineUnit},
+			spec:  backupv1.RestoreSpec{Options: &backupv1.UnitOptions{IgnoreGlobalConfig: true}},
+			want:  []UnitBackup{componentsUnit, doguV2Unit, postfixUnit, redmineUnit},
 		},
 		{
 			name:  "ignoreV2Dogus drops the doguv2 unit",
 			state: unitState(),
-			spec:  backupv1.RestoreSpec{Options: backupv1.UnitOptions{IgnoreV2Dogus: true}},
-			want:  []UnitBackup{globalConfigUnit, miscUnit, postfixUnit, redmineUnit},
+			spec:  backupv1.RestoreSpec{Options: &backupv1.UnitOptions{IgnoreV2Dogus: true}},
+			want:  []UnitBackup{globalConfigUnit, componentsUnit, postfixUnit, redmineUnit},
 		},
 		{
 			name:  "excludedDogus drops V3 dogu units only",
 			state: unitState(),
 			spec:  backupv1.RestoreSpec{ExcludedDogus: []string{"redmine", "cockpit"}},
-			want:  []UnitBackup{globalConfigUnit, miscUnit, doguV2Unit, postfixUnit},
+			want:  []UnitBackup{globalConfigUnit, componentsUnit, doguV2Unit, postfixUnit},
 		},
 		{
-			name:  "some components excluded keeps the misc unit",
+			name:  "some components excluded keeps the components unit",
 			state: unitState(),
 			spec:  backupv1.RestoreSpec{ExcludedComponents: []string{"k8s-loki"}},
-			want:  []UnitBackup{globalConfigUnit, miscUnit, doguV2Unit, postfixUnit, redmineUnit},
+			want:  []UnitBackup{globalConfigUnit, componentsUnit, doguV2Unit, postfixUnit, redmineUnit},
 		},
 		{
-			name:  "all components excluded drops the misc unit",
+			name:  "all components excluded drops the components unit",
 			state: unitState(),
 			spec:  backupv1.RestoreSpec{ExcludedComponents: []string{"k8s-loki", "k8s-velero"}},
 			want:  []UnitBackup{globalConfigUnit, doguV2Unit, postfixUnit, redmineUnit},
 		},
 		{
-			name:  "misc backup without components drops the misc unit",
+			name:  "backup without components drops the components unit",
 			state: withoutComponents,
 			want:  []UnitBackup{globalConfigUnit, doguV2Unit, postfixUnit, redmineUnit},
 		},
 		{
-			name:  "missing misc backup keeps the misc unit",
-			state: missingMisc,
-			want:  []UnitBackup{globalConfigUnit, {Type: backupv1.UnitTypeMisc}, doguV2Unit, postfixUnit, redmineUnit},
+			name:  "missing components backup keeps the components unit",
+			state: missingComponents,
+			want:  []UnitBackup{globalConfigUnit, {Type: backupv1.UnitTypeComponents}, doguV2Unit, postfixUnit, redmineUnit},
+		},
+		{
+			name:  "missing components backup is dropped if all components are excluded",
+			state: missingComponents,
+			spec:  backupv1.RestoreSpec{ExcludedComponents: []string{"k8s-loki", "k8s-velero"}},
+			want:  []UnitBackup{globalConfigUnit, doguV2Unit, postfixUnit, redmineUnit},
 		},
 		{
 			name:  "legacy unit is kept",
 			state: RestoreState{Kind: KindLegacy, Units: []UnitBackup{{Type: UnitTypeLegacy}}},
-			spec:  backupv1.RestoreSpec{ExcludedDogus: []string{"redmine"}, Options: backupv1.UnitOptions{IgnoreMisc: true}},
+			spec:  backupv1.RestoreSpec{ExcludedDogus: []string{"redmine"}, Options: &backupv1.UnitOptions{IgnoreGlobalConfig: true}},
 			want:  []UnitBackup{{Type: UnitTypeLegacy}},
 		},
 	}
@@ -102,7 +102,7 @@ func TestRestoreState_UnitsToRestore(t *testing.T) {
 func TestRestoreState_UnitsToRestore_KeepsTheState(t *testing.T) {
 	state := unitState()
 
-	state.UnitsToRestore(backupv1.RestoreSpec{Options: backupv1.UnitOptions{IgnoreGlobalConfig: true}})
+	state.UnitsToRestore(backupv1.RestoreSpec{Options: &backupv1.UnitOptions{IgnoreGlobalConfig: true}})
 
 	assert.Equal(t, unitState(), state)
 }
@@ -124,7 +124,7 @@ func TestProviderRestoreName(t *testing.T) {
 	}{
 		{name: "legacy", restoreName: "myrestore", unit: backupv1.UnitIdentifier{Type: UnitTypeLegacy}, want: "myrestore"},
 		{name: "global-config", restoreName: "myrestore", unit: backupv1.UnitIdentifier{Type: backupv1.UnitTypeGlobalConfig}, want: "myrestore-global-config"},
-		{name: "misc", restoreName: "myrestore", unit: backupv1.UnitIdentifier{Type: backupv1.UnitTypeMisc}, want: "myrestore-misc"},
+		{name: "components", restoreName: "myrestore", unit: backupv1.UnitIdentifier{Type: backupv1.UnitTypeComponents}, want: "myrestore-components"},
 		{name: "doguv2", restoreName: "myrestore", unit: backupv1.UnitIdentifier{Type: backupv1.UnitTypeDoguV2}, want: "myrestore-doguv2"},
 		{name: "dogu", restoreName: "myrestore", unit: backupv1.UnitIdentifier{Type: backupv1.UnitTypeDogu, Name: "redmine"}, want: "myrestore-dogu-redmine"},
 	}

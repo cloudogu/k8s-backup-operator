@@ -27,9 +27,9 @@ func UnitObjectName(parentName string, unit backupv1.UnitIdentifier) string {
 		return name
 	}
 
-	hasher := fnv.New64a()
+	hasher := fnv.New32a()
 	_, _ = hasher.Write([]byte(name)) // hash.Hash.Write never returns an error
-	suffix := fmt.Sprintf("%016x", hasher.Sum64())[:unitNameHashLength]
+	suffix := fmt.Sprintf("%x", hasher.Sum32())
 
 	return fmt.Sprintf("%s-%s", name[:maxObjectNameLength-unitNameHashLength-1], suffix)
 }

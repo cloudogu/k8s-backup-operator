@@ -10,7 +10,7 @@ import (
 
 func TestUnitObjectName(t *testing.T) {
 	t.Run("Concatenate parent name and unit type", func(t *testing.T) {
-		assert.Equal(t, "backup-misc", UnitObjectName("backup", backupv1.UnitIdentifier{Type: backupv1.UnitTypeMisc}))
+		assert.Equal(t, "backup-components", UnitObjectName("backup", backupv1.UnitIdentifier{Type: backupv1.UnitTypeComponents}))
 	})
 
 	t.Run("Concatenate parent name, unit type and dogu name", func(t *testing.T) {
@@ -29,9 +29,9 @@ func TestUnitObjectName(t *testing.T) {
 		assert.True(t, strings.HasPrefix(first, parentName))
 	})
 
-	t.Run("Suffix truncated names with the first 8 hex characters of the fnv-64a hash of the full name", func(t *testing.T) {
+	t.Run("Suffix truncated names with the fnv-32a hash of the full name", func(t *testing.T) {
 		got := UnitObjectName(strings.Repeat("a", 250), backupv1.UnitIdentifier{Type: backupv1.UnitTypeDogu, Name: "redmine"})
 
-		assert.Equal(t, strings.Repeat("a", 244)+"-011ddf00", got)
+		assert.Equal(t, strings.Repeat("a", 244)+"-5457c592", got)
 	})
 }

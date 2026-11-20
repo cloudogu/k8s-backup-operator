@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"maps"
+	"strings"
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -22,15 +23,15 @@ const (
 )
 
 var (
-	unitsAnnotation      = `[{"type":"doguv2"},{"type":"dogu","name":"redmine"},{"type":"dogu","name":"postfix"},{"type":"global-config"},{"type":"misc"}]`
+	unitsAnnotation      = `[{"type":"doguv2"},{"type":"dogu","name":"redmine"},{"type":"dogu","name":"postfix"},{"type":"global-config"},{"type":"components"}]`
 	dogusV3Annotation    = `[{"name":"redmine","version":"5.1.3-1"},{"name":"postfix","version":"3.8.4-1"}]`
 	dogusV2Annotation    = `[{"name":"cockpit","version":"1.2.3"},{"name":"nginx","version":"1.26.1-1"}]`
 	componentsAnnotation = `[{"name":"k8s-loki","version":"3.3.2-1"},{"name":"k8s-velero","version":"10.0.1-1"}]`
 )
 
 func TestCollect_NotFound(t *testing.T) {
-	foreignUnitBackup := veleroBackup("otherbackup-misc", velerov1.BackupPhaseCompleted,
-		map[string]string{"k8s.cloudogu.com/backup": "otherbackup", "k8s.cloudogu.com/backup-type": "misc"}, nil)
+	foreignUnitBackup := veleroBackup("otherbackup-components", velerov1.BackupPhaseCompleted,
+		map[string]string{"k8s.cloudogu.com/backup": "otherbackup", "k8s.cloudogu.com/backup-type": "components"}, nil)
 
 	restore := &backupv1.Restore{
 		Name: testRestoreName, Namespace: testNamespace,
@@ -60,7 +61,7 @@ func TestCollect_Legacy(t *testing.T) {
 
 func TestCollect_Units(t *testing.T) {
 	globalConfig := unitBackup("global-config", map[string]string{"k8s.cloudogu.com/backup-fqdn": "ces.local"})
-	misc := unitBackup("misc", map[string]string{"k8s.cloudogu.com/backup-components": componentsAnnotation})
+	components := unitBackup("components", map[string]string{"k8s.cloudogu.com/backup-components": componentsAnnotation})
 	doguV2 := unitBackup("doguv2", nil)
 	redmine := doguV3UnitBackup("redmine", "5.1.3-1")
 
@@ -68,18 +69,18 @@ func TestCollect_Units(t *testing.T) {
 		Name: testRestoreName, Namespace: testNamespace,
 		Spec: backupv1.RestoreSpec{BackupName: testBackupName},
 	}
-	got, err := NewCollector(fakeClientBuilder(t, []client.Object{globalConfig, misc, doguV2, redmine}...).Build()).Collect(t.Context(), restore)
+	got, err := NewCollector(fakeClientBuilder(t, []client.Object{globalConfig, components, doguV2, redmine}...).Build()).Collect(t.Context(), restore)
 
 	require.NoError(t, err)
 	assert.Equal(t, KindUnits, got.Kind)
-	// globalConf + misc + doguV2 + postfix(missing) + redmine
+	// globalConf + components + doguV2 + postfix(missing) + redmine
 	assert.Len(t, got.Units, 5)
 	// units are deterministically sorted by type then name
 	assert.Equal(t, backupv1.UnitTypeGlobalConfig, got.Units[0].Type)
 	assert.Equal(t, "mybackup-global-config", got.Units[0].ProviderBackup.Name)
 
-	assert.Equal(t, backupv1.UnitTypeMisc, got.Units[1].Type)
-	assert.Equal(t, "mybackup-misc", got.Units[1].ProviderBackup.Name)
+	assert.Equal(t, backupv1.UnitTypeComponents, got.Units[1].Type)
+	assert.Equal(t, "mybackup-components", got.Units[1].ProviderBackup.Name)
 
 	assert.Equal(t, backupv1.UnitTypeDoguV2, got.Units[2].Type)
 	assert.Equal(t, "mybackup-doguv2", got.Units[2].ProviderBackup.Name)
@@ -96,11 +97,45 @@ func TestCollect_Units(t *testing.T) {
 	assert.Equal(t, []string{"k8s-loki", "k8s-velero"}, got.Components)
 }
 
+func TestCollect_ComponentsFromAnotherUnitBackupIfTheComponentsBackupIsMissing(t *testing.T) {
+	globalConfig := unitBackup("global-config", map[string]string{"k8s.cloudogu.com/backup-components": componentsAnnotation})
+	doguV2 := unitBackup("doguv2", nil)
+
+	restore := &backupv1.Restore{
+		Name: testRestoreName, Namespace: testNamespace,
+		Spec: backupv1.RestoreSpec{BackupName: testBackupName},
+	}
+	got, err := NewCollector(fakeClientBuilder(t, []client.Object{doguV2, globalConfig}...).Build()).Collect(t.Context(), restore)
+
+	require.NoError(t, err)
+	assert.Equal(t, backupv1.UnitTypeComponents, got.Units[1].Type)
+	assert.Nil(t, got.Units[1].ProviderBackup)
+	assert.Equal(t, []string{"k8s-loki", "k8s-velero"}, got.Components)
+}
+
+func TestCollect_FindsTheUnitBackupsOfALongBackupNameByTheTruncatedLabel(t *testing.T) {
+	longName := strings.Repeat("b", 70)
+	unit := veleroBackup(longName+"-doguv2", velerov1.BackupPhaseCompleted,
+		map[string]string{"k8s.cloudogu.com/backup": backupv1.GetTruncatedName(longName), "k8s.cloudogu.com/backup-type": "doguv2"},
+		map[string]string{"k8s.cloudogu.com/backup": longName, "k8s.cloudogu.com/backup-units": `[{"type":"doguv2"}]`})
+
+	restore := &backupv1.Restore{
+		Name: testRestoreName, Namespace: testNamespace,
+		Spec: backupv1.RestoreSpec{BackupName: longName},
+	}
+	got, err := NewCollector(fakeClientBuilder(t, unit).Build()).Collect(t.Context(), restore)
+
+	require.NoError(t, err)
+	assert.Equal(t, KindUnits, got.Kind)
+	require.Len(t, got.Units, 1)
+	assert.Equal(t, longName+"-doguv2", got.Units[0].ProviderBackup.Name)
+}
+
 func TestCollect_SameNamedUnitBackupIsNoLegacyBackup(t *testing.T) {
 	// we detect by labels/annotations not by name
 	labelled := veleroBackup(testBackupName, velerov1.BackupPhaseCompleted,
-		map[string]string{"k8s.cloudogu.com/backup": testBackupName, "k8s.cloudogu.com/backup-type": "misc"},
-		map[string]string{"k8s.cloudogu.com/backup-units": `[{"type":"misc"}]`})
+		map[string]string{"k8s.cloudogu.com/backup": testBackupName, "k8s.cloudogu.com/backup-type": "components"},
+		map[string]string{"k8s.cloudogu.com/backup-units": `[{"type":"components"}]`})
 
 	restore := &backupv1.Restore{
 		Name: testRestoreName, Namespace: testNamespace,
@@ -111,7 +146,7 @@ func TestCollect_SameNamedUnitBackupIsNoLegacyBackup(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, KindUnits, got.Kind)
 	assert.Len(t, got.Units, 1)
-	assert.Equal(t, backupv1.UnitTypeMisc, got.Units[0].Type)
+	assert.Equal(t, backupv1.UnitTypeComponents, got.Units[0].Type)
 	assert.Equal(t, testBackupName, got.Units[0].ProviderBackup.Name)
 }
 
@@ -119,11 +154,11 @@ func TestCollect_Errors(t *testing.T) {
 	unitLabels := func(unitType string) map[string]string {
 		return map[string]string{"k8s.cloudogu.com/backup": testBackupName, "k8s.cloudogu.com/backup-type": unitType}
 	}
-	withoutUnits := veleroBackup("mybackup-misc", velerov1.BackupPhaseCompleted, unitLabels("misc"), nil)
-	brokenUnits := veleroBackup("mybackup-misc", velerov1.BackupPhaseCompleted, unitLabels("misc"),
+	withoutUnits := veleroBackup("mybackup-components", velerov1.BackupPhaseCompleted, unitLabels("components"), nil)
+	brokenUnits := veleroBackup("mybackup-components", velerov1.BackupPhaseCompleted, unitLabels("components"),
 		map[string]string{"k8s.cloudogu.com/backup-units": `{broken`})
-	brokenComponents := veleroBackup("mybackup-misc", velerov1.BackupPhaseCompleted, unitLabels("misc"),
-		map[string]string{"k8s.cloudogu.com/backup-units": `[{"type":"misc"}]`, "k8s.cloudogu.com/backup-components": `{broken`})
+	brokenComponents := veleroBackup("mybackup-components", velerov1.BackupPhaseCompleted, unitLabels("components"),
+		map[string]string{"k8s.cloudogu.com/backup-units": `[{"type":"components"}]`, "k8s.cloudogu.com/backup-components": `{broken`})
 	brokenV2Dogus := veleroBackup("mybackup-doguv2", velerov1.BackupPhaseCompleted, unitLabels("doguv2"),
 		map[string]string{"k8s.cloudogu.com/backup-units": `[{"type":"doguv2"}]`, "k8s.cloudogu.com/backup-installed-dogus-v2": `{broken`})
 	doguV2 := unitBackup("doguv2", nil)
@@ -154,10 +189,10 @@ func TestCollect_Errors(t *testing.T) {
 			wantContains: "list unit backups",
 			wantIs:       assert.AnError,
 		},
-		{name: "missing units annotation", builder: fakeClientBuilder(t, withoutUnits), wantContains: "collect units: provider backup mybackup-misc has no annotation k8s.cloudogu.com/backup-units"},
+		{name: "missing units annotation", builder: fakeClientBuilder(t, withoutUnits), wantContains: "collect units: provider backup mybackup-components has no annotation k8s.cloudogu.com/backup-units"},
 		{name: "invalid units annotation", builder: fakeClientBuilder(t, brokenUnits), wantContains: "collect units: get units: unmarshal annotation k8s.cloudogu.com/backup-units"},
 		{name: "invalid v2 dogus annotation", builder: fakeClientBuilder(t, brokenV2Dogus), wantContains: "collect units: get installed V2 dogus: unmarshal annotation k8s.cloudogu.com/backup-installed-dogus-v2"},
-		{name: "invalid components annotation", builder: fakeClientBuilder(t, brokenComponents), wantContains: "collect units: get misc components: unmarshal annotation k8s.cloudogu.com/backup-components"},
+		{name: "invalid components annotation", builder: fakeClientBuilder(t, brokenComponents), wantContains: "collect units: get components: unmarshal annotation k8s.cloudogu.com/backup-components"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
