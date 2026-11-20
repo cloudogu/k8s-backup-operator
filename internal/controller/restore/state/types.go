@@ -1,6 +1,7 @@
 package state
 
 import (
+	"fmt"
 	"slices"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -58,6 +59,55 @@ func (s RestoreState) RestoredComponents(spec backupv1.RestoreSpec) []string {
 	return slices.DeleteFunc(slices.Clone(s.Components), func(component string) bool {
 		return slices.Contains(spec.ExcludedComponents, component)
 	})
+}
+
+// InvalidExclusions describes each exclusion or option not matching the backup; empty if all match.
+func (s RestoreState) InvalidExclusions(spec backupv1.RestoreSpec) []string {
+	if s.Kind == KindLegacy {
+		if len(spec.ExcludedDogus) > 0 || len(spec.ExcludedComponents) > 0 || ptr.Deref(spec.Options, backupv1.UnitOptions{}) != (backupv1.UnitOptions{}) {
+			return []string{"exclusions and options are not supported for a legacy backup"}
+		}
+		return nil
+	}
+
+	var invalid []string
+	for _, dogu := range spec.ExcludedDogus {
+		switch {
+		case slices.Contains(s.V2Dogus, dogu):
+			invalid = append(invalid, fmt.Sprintf("excludedDogus: %s is a V2 dogu", dogu))
+		case !slices.ContainsFunc(s.Units, func(unit UnitBackup) bool {
+			return unit.Type == backupv1.UnitTypeDogu && unit.Name == dogu
+		}):
+			invalid = append(invalid, fmt.Sprintf("excludedDogus: %s is not in the backup", dogu))
+		}
+	}
+	for _, component := range spec.ExcludedComponents {
+		if !slices.Contains(s.Components, component) {
+			invalid = append(invalid, fmt.Sprintf("excludedComponents: %s is not in the backup", component))
+		}
+	}
+	return invalid
+}
+
+// IsUsable reports whether the unit's provider backup can be restored.
+func (u UnitBackup) IsUsable() bool {
+	return u.ProviderBackup != nil && u.ProviderBackup.Status.Phase == velerov1.BackupPhaseCompleted
+}
+
+// SkipOption names the exclusion or option that skips the unit; empty for the legacy unit.
+func (u UnitBackup) SkipOption() string {
+	switch u.Type {
+	case backupv1.UnitTypeGlobalConfig:
+		return "options.ignoreGlobalConfig"
+	case backupv1.UnitTypeComponents:
+		return "excludedComponents"
+	case backupv1.UnitTypeDoguV2:
+		return "options.ignoreV2Dogus"
+	case backupv1.UnitTypeDogu:
+		return "excludedDogus"
+	default:
+		return ""
+	}
 }
 
 func (s RestoreState) isSkipped(spec backupv1.RestoreSpec, unit UnitBackup) bool {

@@ -259,6 +259,6 @@ func TestWasWaitingForProvider(t *testing.T) {
 
 	t.Run("a prepared restore and other reasons do not count as waiting", func(t *testing.T) {
 		assert.False(t, wasWaitingForProvider(restoreWithPrepared(metav1.ConditionTrue, velero.ReasonVeleroProviderReady)))
-		assert.False(t, wasWaitingForProvider(restoreWithPrepared(metav1.ConditionFalse, velero.ReasonVeleroSourceBackupNotUsable)))
+		assert.False(t, wasWaitingForProvider(restoreWithPrepared(metav1.ConditionFalse, ReasonSourceBackupNotFound)))
 	})
 }
