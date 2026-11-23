@@ -112,8 +112,6 @@ func unitTypeAnnotations(backupState state.BackupState, unit backupv1.UnitIdenti
 	switch unit.Type {
 	case backupv1.UnitTypeGlobalConfig:
 		return backupState.GlobalConfigUnitAnnotations(), nil
-	case backupv1.UnitTypeComponents:
-		return backupState.ComponentsUnitAnnotations()
 	default:
 		return nil, nil
 	}

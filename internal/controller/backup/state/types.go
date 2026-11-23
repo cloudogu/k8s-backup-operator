@@ -42,16 +42,26 @@ func (s BackupState) CommonUnitAnnotations() (map[string]string, error) {
 		return nil, fmt.Errorf("marshal installed dogus v3: %w", err)
 	}
 
+	componentsJson, err := json.Marshal(s.Components)
+	if err != nil {
+		return nil, fmt.Errorf("marshal components: %w", err)
+	}
+
 	annotation := map[string]string{
-		backupv1.BackupAnnotationKey:           s.Name,
-		backupv1.UnitsAnnotationKey:            string(unitsJson),
-		backupv1.InstalledDogusV3AnnotationKey: string(v3DogusJson),
+		backupv1.BackupAnnotationKey: s.Name,
+		backupv1.UnitsAnnotationKey:  string(unitsJson),
 	}
 	if s.BlueprintId != "" {
 		annotation[backupv1.BlueprintIDAnnotationKey] = s.BlueprintId
 	}
+	if len(s.InstalledDogusV3) > 0 {
+		annotation[backupv1.InstalledDogusV3AnnotationKey] = string(v3DogusJson)
+	}
 	if len(s.InstalledDogusV2) > 0 {
 		annotation[backupv1.InstalledDogusV2AnnotationKey] = string(v2DogusJson)
+	}
+	if len(s.Components) > 0 {
+		annotation[backupv1.ComponentsAnnotationKey] = string(componentsJson)
 	}
 	return annotation, nil
 }
@@ -61,15 +71,4 @@ func (s BackupState) GlobalConfigUnitAnnotations() map[string]string {
 		backupv1.FQDNAnnotationKey:   s.Fqdn,
 		backupv1.DomainAnnotationKey: s.Domain,
 	}
-}
-
-func (s BackupState) ComponentsUnitAnnotations() (map[string]string, error) {
-	componentsJson, err := json.Marshal(s.Components)
-	if err != nil {
-		return nil, fmt.Errorf("marshal components: %w", err)
-	}
-
-	return map[string]string{
-		backupv1.ComponentsAnnotationKey: string(componentsJson),
-	}, nil
 }
