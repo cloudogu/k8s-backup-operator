@@ -108,6 +108,7 @@ func TestCollect_ComponentsFromAnotherUnitBackupIfTheComponentsBackupIsMissing(t
 	got, err := NewCollector(fakeClientBuilder(t, []client.Object{doguV2, globalConfig}...).Build()).Collect(t.Context(), restore)
 
 	require.NoError(t, err)
+	// global-config first, components second
 	assert.Equal(t, backupv1.UnitTypeComponents, got.Units[1].Type)
 	assert.Nil(t, got.Units[1].ProviderBackup)
 	assert.Equal(t, []string{"k8s-loki", "k8s-velero"}, got.Components)
