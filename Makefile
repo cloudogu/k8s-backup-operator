@@ -92,7 +92,7 @@ GINKGO_SPEC_ARGS=-p -r -v --tags=acceptance $(if $(GINKGO_LABEL_FILTER),--label-
 acceptance-test: ## Run the cluster acceptance specs. DESTRUCTIVE - disposable clusters only.
 	@echo "WARNING: the restore specs delete all dogus and all backup-scope labeled"
 	@echo "ConfigMaps/Secrets/PVCs in the target namespace. Use a disposable cluster."
-	go run github.com/onsi/ginkgo/v2/ginkgo $(GINKGO_SPEC_ARGS) ./acceptance-tests/...
+	go run github.com/onsi/ginkgo/v2/ginkgo $(GINKGO_SPEC_ARGS) ./specs/...
 
 .PHONY: acceptance-test-restore
 acceptance-test-restore: ## Run only the Restore acceptance specs. DESTRUCTIVE - disposable clusters only.
