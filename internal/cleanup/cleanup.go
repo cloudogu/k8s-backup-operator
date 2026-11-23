@@ -38,7 +38,7 @@ func NewManager(doguClient doguClient, dynamicClient dynamicClient, namespace st
 // Cleanup deletes all resources that need to be deleted before restoring the backup.
 // It waits for the deletion of the resources to complete.
 // If the deletion fails, the cleanup will fail.
-func (c *DefaultCleanupManager) Cleanup(ctx context.Context) error {
+func (c *DefaultCleanupManager) Cleanup(ctx context.Context, ignoreGlobalConfig bool) error {
 	logging.Info(ctx, "starting cleanup before restore...")
 
 	// Create a timeout context for the entire cleanup
@@ -52,7 +52,7 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context) error {
 		return fmt.Errorf("failed to cleanup dogus: %w", err)
 	}
 
-	err = c.cleanupAdditionalResources(ctx, &wg, false)
+	err = c.cleanupAdditionalResources(ctx, &wg, ignoreGlobalConfig)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup additional resources: %w", err)
 	}

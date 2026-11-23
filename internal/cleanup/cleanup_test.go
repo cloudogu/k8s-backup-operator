@@ -16,9 +16,10 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 		additionalResourceManagerFn func(t *testing.T) additionalResourceManager
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		wantErr assert.ErrorAssertionFunc
+		name               string
+		fields             fields
+		ignoreGlobalConfig bool
+		wantErr            assert.ErrorAssertionFunc
 	}{
 		{
 			name: "fail to cleanup dogus",
@@ -79,7 +80,8 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 			},
 		},
 		{
-			name: "succeed",
+			name:               "succeed with global configuration protection",
+			ignoreGlobalConfig: true,
 			fields: fields{
 				doguManagerFn: func(t *testing.T) doguManager {
 					m := newMockDoguManager(t)
@@ -94,7 +96,7 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
 					m := newMockAdditionalResourceManager(t)
-					m.EXPECT().cleanupAdditionalResources(mock.Anything, mock.Anything, false).Run(
+					m.EXPECT().cleanupAdditionalResources(mock.Anything, mock.Anything, true).Run(
 						func(ctx context.Context, wg *sync.WaitGroup, ignoreGlobalConfig bool) {
 							wg.Add(1)
 							go func() {
@@ -117,7 +119,7 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 				doguManager:               tt.fields.doguManagerFn(t),
 				additionalResourceManager: tt.fields.additionalResourceManagerFn(t),
 			}
-			tt.wantErr(t, c.Cleanup(t.Context()))
+			tt.wantErr(t, c.Cleanup(t.Context(), tt.ignoreGlobalConfig))
 		})
 	}
 }

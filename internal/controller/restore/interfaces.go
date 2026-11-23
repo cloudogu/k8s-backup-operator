@@ -34,7 +34,7 @@ type maintenanceModeSwitch interface {
 
 type cleanupManager interface {
 	// Cleanup deletes all resources that need to be deleted before restoring the backup.
-	Cleanup(ctx context.Context) error
+	Cleanup(ctx context.Context, ignoreGlobalConfig bool) error
 }
 
 type scaleManager interface {

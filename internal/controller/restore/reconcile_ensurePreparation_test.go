@@ -32,51 +32,72 @@ func assertPreparedCondition(t *testing.T, testClient client.Client, status meta
 }
 
 func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheRestore(t *testing.T) {
-	restore := withInitializedConditions(withMetadata(newParentRestore()))
-	var stageOrder []string
-	recorderMock := newMockEventRecorder(t)
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparing, "Preparation in progress - scale down and cleanup").Once()
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonCleanupCompleted, "Cleanup before restore completed").Once()
-	recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
-
-	recordProviderCheck := interceptor.Funcs{
-		Get: func(ctx context.Context, wrapped client.WithWatch, key client.ObjectKey, object client.Object, opts ...client.GetOption) error {
-			if _, checksTheProvider := object.(*velerov1.BackupStorageLocation); checksTheProvider {
-				stageOrder = append(stageOrder, "provider-ready")
-			}
-
-			return wrapped.Get(ctx, key, object, opts...)
+	tests := []struct {
+		name                   string
+		options                *k8sv1.UnitOptions
+		wantIgnoreGlobalConfig bool
+	}{
+		{name: "options omitted"},
+		{
+			name:    "ignoreGlobalConfig false",
+			options: &k8sv1.UnitOptions{IgnoreGlobalConfig: false},
+		},
+		{
+			name:                   "ignoreGlobalConfig true",
+			options:                &k8sv1.UnitOptions{IgnoreGlobalConfig: true},
+			wantIgnoreGlobalConfig: true,
 		},
 	}
-	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleDown(testCtx).Run(func(context.Context) {
-		stageOrder = append(stageOrder, "scale-down")
-	}).Return(nil).Once()
-	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Run(func(context.Context) {
-		stageOrder = append(stageOrder, "cleanup")
-	}).Return(nil).Once()
-	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Run(func(context.Context) {
-		stageOrder = append(stageOrder, "maintenance")
-	}).Return(repository.MaintenanceModeDescription{}, true, nil).Once()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			restore := withInitializedConditions(withMetadata(newParentRestore()))
+			restore.Spec.Options = tt.options
+			var stageOrder []string
+			recorderMock := newMockEventRecorder(t)
+			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparing, "Preparation in progress - scale down and cleanup").Once()
+			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonCleanupCompleted, "Cleanup before restore completed").Once()
+			recorderMock.EXPECT().Event(matchesRestoreNamed(testRestore), corev1.EventTypeNormal, ReasonPreparationCompleted, "Preparation completed").Once()
 
-	factory := func(fakeClient client.WithWatch) reconcileFunction {
-		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
-		reconciler.maintenanceModeSwitch = maintenanceMock
+			recordProviderCheck := interceptor.Funcs{
+				Get: func(ctx context.Context, wrapped client.WithWatch, key client.ObjectKey, object client.Object, opts ...client.GetOption) error {
+					if _, checksTheProvider := object.(*velerov1.BackupStorageLocation); checksTheProvider {
+						stageOrder = append(stageOrder, "provider-ready")
+					}
 
-		return reconciler.Reconcile
+					return wrapped.Get(ctx, key, object, opts...)
+				},
+			}
+			scaleMock := newMockScaleManager(t)
+			scaleMock.EXPECT().ScaleDown(testCtx).Run(func(context.Context) {
+				stageOrder = append(stageOrder, "scale-down")
+			}).Return(nil).Once()
+			cleanupMock := newMockCleanupManager(t)
+			cleanupMock.EXPECT().Cleanup(testCtx, tt.wantIgnoreGlobalConfig).Run(func(context.Context, bool) {
+				stageOrder = append(stageOrder, "cleanup")
+			}).Return(nil).Once()
+			maintenanceMock := newMockMaintenanceModeSwitch(t)
+			maintenanceMock.EXPECT().GetStatus(testCtx).Run(func(context.Context) {
+				stageOrder = append(stageOrder, "maintenance")
+			}).Return(repository.MaintenanceModeDescription{}, true, nil).Once()
+
+			factory := func(fakeClient client.WithWatch) reconcileFunction {
+				reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
+				reconciler.maintenanceModeSwitch = maintenanceMock
+
+				return reconciler.Reconcile
+			}
+			fixture := newMultiReconcileFixture(t, recordProviderCheck, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
+
+			results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+
+			require.NoError(t, errs[0])
+			assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the preparation must end the reconciliation")
+			assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
+				"the preparation must persist its milestone in one status write")
+			assert.Equal(t, []string{"provider-ready", "maintenance", "scale-down", "cleanup"}, stageOrder)
+			assertPreparedCondition(t, fixture.client, metav1.ConditionTrue, ReasonPreparationCompleted)
+		})
 	}
-	fixture := newMultiReconcileFixture(t, recordProviderCheck, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
-
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
-
-	require.NoError(t, errs[0])
-	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the preparation must end the reconciliation")
-	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore)}, fixture.clientActions.snapshot(),
-		"the preparation must persist its milestone in one status write")
-	assert.Equal(t, []string{"provider-ready", "maintenance", "scale-down", "cleanup"}, stageOrder)
-	assertPreparedCondition(t, fixture.client, metav1.ConditionTrue, ReasonPreparationCompleted)
 }
 
 func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testing.T) {
@@ -147,7 +168,7 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(testCtx, false).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -206,7 +227,7 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Return(assert.AnError).Once()
+	cleanupMock.EXPECT().Cleanup(testCtx, false).Return(assert.AnError).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -234,7 +255,7 @@ func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(testCtx, false).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -318,7 +339,7 @@ func TestAnUnreadyProviderIsReportedOnceAndTheRecoveryIsReportedOnce(t *testing.
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(testCtx, false).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)

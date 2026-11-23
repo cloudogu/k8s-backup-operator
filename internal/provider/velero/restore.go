@@ -47,6 +47,7 @@ func BuildRestore(parent *k8sv1.Restore) *velerov1.Restore {
 
 	var labelSelector *metav1.LabelSelector
 	if parent.Spec.Options != nil && parent.Spec.Options.IgnoreGlobalConfig {
+		// This selector makes Velero skip resources labeled as global configuration during restore.
 		labelSelector = &metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{{
 				Key:      "k8s.cloudogu.com/type",
