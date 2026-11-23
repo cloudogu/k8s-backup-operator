@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       - Other information like the Dogu versions or the Blueprint-ID will be gathered by later steps.
   - [#184] Before starting backups check if backup units from other backups are running.
   - [#188] Check unit backups too when deleting orphaned cloudogu backups.
+  - [#193] Wait for unit backups to be completed and write status & conditions
 
 ## [v3.5.1] - 2026-09-22
 ### Changed
