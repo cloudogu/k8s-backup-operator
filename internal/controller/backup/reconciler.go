@@ -660,7 +660,7 @@ func findRunningProviderBackupOfAnotherRun(backup *backupv1.Backup, providerBack
 }
 
 func isOwnProviderBackup(backup *backupv1.Backup, providerBackup *velerov1.Backup) bool {
-	return backup.Name == providerBackup.Labels[backupv1.BackupLabelKey]
+	return backup.GetTruncatedName() == providerBackup.Labels[backupv1.BackupLabelKey]
 }
 
 func isLegacyProviderBackup(backup *backupv1.Backup, providerBackup *velerov1.Backup) bool {
@@ -879,7 +879,7 @@ func providerBackupCreationProgress(desiredUnits []*velerov1.Backup, failedUnits
 
 func (c *defaultReconciler) listOwnProviderBackupNames(ctx context.Context, backup *backupv1.Backup) (map[string]struct{}, error) {
 	providerBackups := &velerov1.BackupList{}
-	if err := c.client.List(ctx, providerBackups, client.InNamespace(backup.Namespace), client.MatchingLabels{backupv1.BackupLabelKey: backup.Name}); err != nil {
+	if err := c.client.List(ctx, providerBackups, client.InNamespace(backup.Namespace), client.MatchingLabels{backupv1.BackupLabelKey: backup.GetTruncatedName()}); err != nil {
 		return nil, fmt.Errorf("list velero unit backups of backup: %w", err)
 	}
 
