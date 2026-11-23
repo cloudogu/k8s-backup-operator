@@ -209,7 +209,7 @@ A deletion request for the provider child is not confused with its actual remova
 
 ## Acceptance tests
 
-The cluster acceptance tests are located in `../../acceptance-tests/restore_test.go`. They are excluded from normal unit test runs by the `acceptance` build tag and use Ginkgo/Gomega.
+The cluster acceptance tests are located in `../../specs`. They are excluded from normal unit test runs by the `acceptance` build tag and use Ginkgo/Gomega.
 
 ### Safety requirements
 

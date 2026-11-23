@@ -9,6 +9,8 @@ import (
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	blueprintv3 "github.com/cloudogu/k8s-blueprint-lib/v3/api/v3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
@@ -17,8 +19,8 @@ func TestEnsureBackupSetup(t *testing.T) {
 	t.Run("It should add default labels", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
-		var updateCalled = false
-		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		var applyCalled = false
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &applyCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupMetadata(context.Background(), backup)
@@ -29,7 +31,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 		assert.True(t, reflect.DeepEqual(backup.Labels, expectedLabels))
-		assert.True(t, updateCalled)
+		assert.True(t, applyCalled)
 	})
 
 	t.Run("It should keep existing label while adding the default labels", func(t *testing.T) {
@@ -39,8 +41,8 @@ func TestEnsureBackupSetup(t *testing.T) {
 			"example.com/key2": "value2",
 		}
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
-		var updateCalled = false
-		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		var applyCalled = false
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &applyCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupMetadata(context.Background(), backup)
@@ -52,14 +54,14 @@ func TestEnsureBackupSetup(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 		assert.True(t, reflect.DeepEqual(backup.Labels, expectedLabels))
-		assert.True(t, updateCalled)
+		assert.True(t, applyCalled)
 	})
 
 	t.Run("It should add the finalizer", func(t *testing.T) {
 		backup := newBackupForTest("ns", "backup")
 		blueprintList := &blueprintv3.BlueprintList{Items: make([]blueprintv3.Blueprint, 0)}
-		var updateCalled = false
-		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		var applyCalled = false
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &applyCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupMetadata(context.Background(), backup)
@@ -69,7 +71,7 @@ func TestEnsureBackupSetup(t *testing.T) {
 
 		expectedFinalizers := []string{backupv1.BackupFinalizer}
 		assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
-		assert.True(t, updateCalled)
+		assert.True(t, applyCalled)
 	})
 
 	t.Run("It should keep existing finalizers while adding the finalizer", func(t *testing.T) {
@@ -78,18 +80,18 @@ func TestEnsureBackupSetup(t *testing.T) {
 		blueprintList := &blueprintv3.BlueprintList{
 			Items: []blueprintv3.Blueprint{},
 		}
-		var updateCalled = false
-		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &updateCalled)
+		var applyCalled = true
+		fakeClient := newFakeClientForEnsureBackupSetupTest(t, backup, blueprintList, &applyCalled)
 		reconciler := NewReconciler(fakeClient, newTestEventRecorder(), nil, newRealClock(), "default", "velero")
 
 		nextAction, err := reconciler.ensureBackupMetadata(context.Background(), backup)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, Next, nextAction)
 
 		expectedFinalizers := []string{backupv1.BackupFinalizer, "finalizer01", "finalizer02"}
 		assert.ElementsMatch(t, backup.Finalizers, expectedFinalizers)
-		assert.True(t, updateCalled)
+		assert.True(t, applyCalled)
 	})
 
 	t.Run("should not update unchanged metadata", func(t *testing.T) {
@@ -114,14 +116,14 @@ func TestEnsureBackupSetup(t *testing.T) {
 	})
 }
 
-func newFakeClientForEnsureBackupSetupTest(t *testing.T, backup *backupv1.Backup, blueprintList *blueprintv3.BlueprintList, updateCalled *bool) client.WithWatch {
+func newFakeClientForEnsureBackupSetupTest(t *testing.T, backup *backupv1.Backup, blueprintList *blueprintv3.BlueprintList, patchCalled *bool) client.WithWatch {
 	return newFakeClientBuilder(t).
 		WithObjects(backup).
 		WithLists(blueprintList).
 		WithInterceptorFuncs(interceptor.Funcs{
-			Update: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
-				*updateCalled = true
-				return client.Update(ctx, obj, opts...)
+			Apply: func(ctx context.Context, client client.WithWatch, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
+				*patchCalled = true
+				return client.Apply(ctx, obj, opts...)
 			},
 		}).
 		Build()
