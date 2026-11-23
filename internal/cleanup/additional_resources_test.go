@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -279,6 +280,37 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			}
 		})
 	}
+}
+
+// default behavior: the ConfigMap labeled as global configuration is deleted before a restore
+// to be replaced by the one from the backup
+func TestCleanupDeletesGlobalConfigMapWithBackupScopeLabel(t *testing.T) {
+	globalConfig := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "global-config",
+			Namespace: "test-namespace",
+			Labels: map[string]string{
+				"k8s.cloudogu.com/type":         "global-config",
+				// label backup-scope may not have any value, existence is sufficient
+				"k8s.cloudogu.com/backup-scope": "",
+			},
+		},
+	}
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	dynamicClient := fake.NewSimpleDynamicClient(scheme, globalConfig)
+	manager := newAdditionalResourceManager(dynamicClient, globalConfig.Namespace)
+	configMaps := dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(globalConfig.Namespace)
+	_, err := configMaps.Get(t.Context(), globalConfig.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	err = manager.cleanupAdditionalResources(t.Context(), &wg)
+	wg.Wait()
+	require.NoError(t, err)
+
+	_, err = configMaps.Get(t.Context(), globalConfig.Name, metav1.GetOptions{})
+	assert.True(t, k8sErrs.IsNotFound(err), "expected the global ConfigMap to be deleted, got %v", err)
 }
 
 func Test_newAdditionalResourceManager(t *testing.T) {
