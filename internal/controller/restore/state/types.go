@@ -45,7 +45,13 @@ type RestoreState struct {
 type UnitBackup struct {
 	backupv1.UnitIdentifier
 	// ProviderBackup is nil if the unit's provider backup is missing.
-	ProviderBackup *velerov1.Backup
+	ProviderBackup *ProviderBackup
+}
+
+// ProviderBackup is the provider backup of a unit as far as the restore needs it.
+type ProviderBackup struct {
+	Name  string
+	Phase velerov1.BackupPhase
 }
 
 // UnitsToRestore returns the units without the ignored or excluded ones, in restore order.

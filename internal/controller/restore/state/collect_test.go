@@ -56,7 +56,7 @@ func TestCollect_Legacy(t *testing.T) {
 	assert.Equal(t, KindLegacy, got.Kind)
 	assert.Len(t, got.Units, 1)
 	assert.Equal(t, UnitTypeLegacy, got.Units[0].Type)
-	assert.Equal(t, testBackupName, got.Units[0].ProviderBackup.Name)
+	assert.Equal(t, &ProviderBackup{Name: testBackupName, Phase: velerov1.BackupPhasePartiallyFailed}, got.Units[0].ProviderBackup)
 }
 
 func TestCollect_Units(t *testing.T) {
@@ -91,7 +91,7 @@ func TestCollect_Units(t *testing.T) {
 
 	assert.Equal(t, backupv1.UnitTypeDogu, got.Units[4].Type)
 	assert.Equal(t, "redmine", got.Units[4].Name)
-	assert.Equal(t, "mybackup-dogu-redmine", got.Units[4].ProviderBackup.Name)
+	assert.Equal(t, &ProviderBackup{Name: "mybackup-dogu-redmine", Phase: velerov1.BackupPhaseCompleted}, got.Units[4].ProviderBackup)
 
 	assert.Equal(t, []string{"cockpit", "nginx"}, got.V2Dogus)
 	assert.Equal(t, []string{"k8s-loki", "k8s-velero"}, got.Components)
