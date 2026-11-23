@@ -19,7 +19,7 @@ type doguManager interface {
 }
 
 type additionalResourceManager interface {
-	cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup) error
+	cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, ignoreGlobalConfig bool) error
 }
 
 type DefaultCleanupManager struct {
@@ -52,7 +52,7 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context) error {
 		return fmt.Errorf("failed to cleanup dogus: %w", err)
 	}
 
-	err = c.cleanupAdditionalResources(ctx, &wg)
+	err = c.cleanupAdditionalResources(ctx, &wg, false)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup additional resources: %w", err)
 	}

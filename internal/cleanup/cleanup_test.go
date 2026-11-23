@@ -48,7 +48,7 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
 					m := newMockAdditionalResourceManager(t)
-					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}).Return(assert.AnError)
+					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}, false).Return(assert.AnError)
 					return m
 				},
 			},
@@ -67,8 +67,8 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
 					m := newMockAdditionalResourceManager(t)
-					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}).Run(
-						func(ctx context.Context, wg *sync.WaitGroup) {
+					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}, false).Run(
+						func(ctx context.Context, wg *sync.WaitGroup, ignoreGlobalConfig bool) {
 							wg.Add(1)
 						}).Return(nil)
 					return m
@@ -94,8 +94,8 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
 					m := newMockAdditionalResourceManager(t)
-					m.EXPECT().cleanupAdditionalResources(mock.Anything, mock.Anything).Run(
-						func(ctx context.Context, wg *sync.WaitGroup) {
+					m.EXPECT().cleanupAdditionalResources(mock.Anything, mock.Anything, false).Run(
+						func(ctx context.Context, wg *sync.WaitGroup, ignoreGlobalConfig bool) {
 							wg.Add(1)
 							go func() {
 								wg.Done()

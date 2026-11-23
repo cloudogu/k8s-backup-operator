@@ -261,7 +261,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			defer cancel()
 			var wg sync.WaitGroup
 
-			tt.wantErr(t, c.cleanupAdditionalResources(tt.ctxFn(t), &wg))
+			tt.wantErr(t, c.cleanupAdditionalResources(tt.ctxFn(t), &wg, false))
 
 			done := make(chan struct{})
 			go func() {
@@ -305,12 +305,56 @@ func TestCleanupDeletesGlobalConfigMapWithBackupScopeLabel(t *testing.T) {
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
-	err = manager.cleanupAdditionalResources(t.Context(), &wg)
+	err = manager.cleanupAdditionalResources(t.Context(), &wg, false)
 	wg.Wait()
 	require.NoError(t, err)
 
 	_, err = configMaps.Get(t.Context(), globalConfig.Name, metav1.GetOptions{})
 	assert.True(t, k8sErrs.IsNotFound(err), "expected the global ConfigMap to be deleted, got %v", err)
+}
+
+func TestCleanupPreservesGlobalConfigMapWhenProtectionIsEnabled(t *testing.T) {
+	const namespace = "test-namespace"
+	globalConfig := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "global-config",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"k8s.cloudogu.com/type":         "global-config",
+				"k8s.cloudogu.com/backup-scope": "",
+			},
+		},
+		Data: map[string]string{"example": "target-value"},
+	}
+	ordinaryConfig := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ordinary-config",
+			Namespace: namespace,
+			Labels:    map[string]string{"k8s.cloudogu.com/backup-scope": ""},
+		},
+	}
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	dynamicClient := fake.NewSimpleDynamicClient(scheme, globalConfig, ordinaryConfig)
+	manager := newAdditionalResourceManager(dynamicClient, namespace)
+	configMaps := dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace)
+
+	ctx := t.Context()
+	before, err := configMaps.Get(ctx, globalConfig.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	_, err = configMaps.Get(ctx, ordinaryConfig.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	err = manager.cleanupAdditionalResources(ctx, &wg, true)
+	wg.Wait()
+	require.NoError(t, err)
+
+	after, err := configMaps.Get(ctx, globalConfig.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, before, after)
+	_, err = configMaps.Get(ctx, ordinaryConfig.Name, metav1.GetOptions{})
+	assert.True(t, k8sErrs.IsNotFound(err), "expected the ordinary ConfigMap to be deleted, got %v", err)
 }
 
 func Test_newAdditionalResourceManager(t *testing.T) {
