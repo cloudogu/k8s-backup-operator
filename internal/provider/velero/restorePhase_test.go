@@ -10,7 +10,7 @@ import (
 func TestObserveRestorePhaseMapsEveryPhaseOfTheSupportedVeleroVersion(t *testing.T) {
 	tests := []struct {
 		phase     velerov1.RestorePhase
-		wantState RestoreState
+		wantState RestoreObservation
 	}{
 		{phase: "", wantState: RestorePending},
 		{phase: velerov1.RestorePhaseNew, wantState: RestorePending},
@@ -23,7 +23,7 @@ func TestObserveRestorePhaseMapsEveryPhaseOfTheSupportedVeleroVersion(t *testing
 		{phase: velerov1.RestorePhaseFailedValidation, wantState: RestoreFailed},
 		{phase: velerov1.RestorePhasePartiallyFailed, wantState: RestoreFailed},
 		{phase: velerov1.RestorePhaseFailed, wantState: RestoreFailed},
-		{phase: velerov1.RestorePhase("SomePhaseAFutureVeleroAdded"), wantState: RestoreStateUnknown},
+		{phase: velerov1.RestorePhase("SomePhaseAFutureVeleroAdded"), wantState: RestoreUnknown},
 	}
 
 	for _, test := range tests {
@@ -62,7 +62,7 @@ func TestRestoreIsOnlyFinishedWhenVeleroStoppedWorking(t *testing.T) {
 		velerov1.RestorePhaseFailed,
 	}
 
-	terminal := []RestoreState{RestoreSucceeded, RestoreFailed}
+	terminal := []RestoreObservation{RestoreSucceeded, RestoreFailed}
 	for _, phase := range stillRunning {
 		assert.NotContains(t, terminal, ObserveRestorePhase(phase),
 			"phase %q is still running and must not be terminal", phase)

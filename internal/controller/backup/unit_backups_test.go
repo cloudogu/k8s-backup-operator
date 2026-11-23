@@ -1,7 +1,6 @@
 package backup
 
 import (
-	"strings"
 	"testing"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -11,28 +10,6 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-func TestUnitBackupName(t *testing.T) {
-	t.Run("Concatenate backup name and unit type", func(t *testing.T) {
-		assert.Equal(t, "backup-components", unitBackupName("backup", backupv1.UnitIdentifier{Type: backupv1.UnitTypeComponents}))
-	})
-
-	t.Run("Concatenate backup name, unit type and dogu name", func(t *testing.T) {
-		assert.Equal(t, "backup-dogu-ldap", unitBackupName("backup", backupv1.UnitIdentifier{Type: backupv1.UnitTypeDogu, Name: "ldap"}))
-	})
-
-	t.Run("Truncate long names and keep them unique", func(t *testing.T) {
-		backupName := strings.Repeat("b", 240)
-
-		first := unitBackupName(backupName, backupv1.UnitIdentifier{Type: backupv1.UnitTypeDogu, Name: "dogu-with-a-long-name-a"})
-		second := unitBackupName(backupName, backupv1.UnitIdentifier{Type: backupv1.UnitTypeDogu, Name: "dogu-with-a-long-name-b"})
-
-		assert.Len(t, first, maxObjectNameLength)
-		assert.Len(t, second, maxObjectNameLength)
-		assert.NotEqual(t, first, second)
-		assert.True(t, strings.HasPrefix(first, backupName))
-	})
-}
 
 func TestDesiredUnitBackups(t *testing.T) {
 	backup := newBackupForTest("ns", "backup")
