@@ -9,11 +9,11 @@ import (
 )
 
 var (
-	globalConfigUnit = UnitBackup{Type: backupv1.UnitTypeGlobalConfig, ProviderBackup: &velerov1.Backup{}}
-	componentsUnit   = UnitBackup{Type: backupv1.UnitTypeComponents, ProviderBackup: &velerov1.Backup{}}
-	doguV2Unit       = UnitBackup{Type: backupv1.UnitTypeDoguV2, ProviderBackup: &velerov1.Backup{}}
-	postfixUnit      = UnitBackup{Type: backupv1.UnitTypeDogu, Name: "postfix", ProviderBackup: &velerov1.Backup{}}
-	redmineUnit      = UnitBackup{Type: backupv1.UnitTypeDogu, Name: "redmine", ProviderBackup: &velerov1.Backup{}}
+	globalConfigUnit = UnitBackup{Type: backupv1.UnitTypeGlobalConfig, ProviderBackup: &ProviderBackup{}}
+	componentsUnit   = UnitBackup{Type: backupv1.UnitTypeComponents, ProviderBackup: &ProviderBackup{}}
+	doguV2Unit       = UnitBackup{Type: backupv1.UnitTypeDoguV2, ProviderBackup: &ProviderBackup{}}
+	postfixUnit      = UnitBackup{Type: backupv1.UnitTypeDogu, Name: "postfix", ProviderBackup: &ProviderBackup{}}
+	redmineUnit      = UnitBackup{Type: backupv1.UnitTypeDogu, Name: "redmine", ProviderBackup: &ProviderBackup{}}
 )
 
 func unitState() RestoreState {
@@ -139,8 +139,8 @@ func TestRestoreState_InvalidExclusions(t *testing.T) {
 	unitBased := RestoreState{
 		Kind: KindUnits,
 		Units: []UnitBackup{
-			{Type: backupv1.UnitTypeComponents, ProviderBackup: &velerov1.Backup{}},
-			{Type: backupv1.UnitTypeDogu, Name: "redmine", ProviderBackup: &velerov1.Backup{}},
+			{Type: backupv1.UnitTypeComponents, ProviderBackup: &ProviderBackup{}},
+			{Type: backupv1.UnitTypeDogu, Name: "redmine", ProviderBackup: &ProviderBackup{}},
 		},
 		V2Dogus:    []string{"cockpit"},
 		Components: []string{"k8s-loki"},
@@ -195,7 +195,7 @@ func TestRestoreState_InvalidExclusions(t *testing.T) {
 
 func TestUnitBackup_IsUsable(t *testing.T) {
 	unitInPhase := func(unitType backupv1.UnitType, phase velerov1.BackupPhase) UnitBackup {
-		return UnitBackup{Type: unitType, ProviderBackup: &velerov1.Backup{Status: velerov1.BackupStatus{Phase: phase}}}
+		return UnitBackup{Type: unitType, ProviderBackup: &ProviderBackup{Phase: phase}}
 	}
 
 	tests := []struct {

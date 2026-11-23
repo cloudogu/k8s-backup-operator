@@ -32,7 +32,7 @@ func (c *RestoreStateCollector) Collect(ctx context.Context, restore *backupv1.R
 	if legacyBackup != nil {
 		return RestoreState{
 			Kind:  KindLegacy,
-			Units: []UnitBackup{{Type: UnitTypeLegacy, ProviderBackup: legacyBackup}},
+			Units: []UnitBackup{{Type: UnitTypeLegacy, ProviderBackup: toProviderBackup(legacyBackup)}},
 		}, nil
 	}
 
@@ -135,13 +135,17 @@ func compareUnitsByTypeThenName(a, b backupv1.UnitIdentifier) int {
 }
 
 // findUnitBackup returns nil if the unit's provider backup is missing.
-func findUnitBackup(unitBackups []velerov1.Backup, unit backupv1.UnitIdentifier) *velerov1.Backup {
-	for i, backup := range unitBackups {
+func findUnitBackup(unitBackups []velerov1.Backup, unit backupv1.UnitIdentifier) *ProviderBackup {
+	for _, backup := range unitBackups {
 		if backup.Labels[backupv1.BackupTypeLabelKey] == string(unit.Type) && backup.Labels[backupv1.DoguNameLabelKey] == unit.Name {
-			return &unitBackups[i]
+			return toProviderBackup(&backup)
 		}
 	}
 	return nil
+}
+
+func toProviderBackup(backup *velerov1.Backup) *ProviderBackup {
+	return &ProviderBackup{Name: backup.Name, Phase: backup.Status.Phase}
 }
 
 // getLegacyBackup returns the provider backup named like the backup if it is no unit backup, else nil.

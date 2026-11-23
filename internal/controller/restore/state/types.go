@@ -46,7 +46,13 @@ type RestoreState struct {
 type UnitBackup struct {
 	backupv1.UnitIdentifier
 	// ProviderBackup is nil if the unit's provider backup is missing.
-	ProviderBackup *velerov1.Backup
+	ProviderBackup *ProviderBackup
+}
+
+// ProviderBackup is the provider backup of a unit as far as the restore needs it.
+type ProviderBackup struct {
+	Name  string
+	Phase velerov1.BackupPhase
 }
 
 // UnitsToRestore returns the units without the ignored or excluded ones, in restore order.
@@ -91,7 +97,7 @@ func (s RestoreState) InvalidExclusions(spec backupv1.RestoreSpec) []string {
 
 // IsUsable reports whether the unit's provider backup can be restored.
 func (u UnitBackup) IsUsable() bool {
-	return u.ProviderBackup != nil && u.ProviderBackup.Status.Phase == velerov1.BackupPhaseCompleted
+	return u.ProviderBackup != nil && u.ProviderBackup.Phase == velerov1.BackupPhaseCompleted
 }
 
 // SkipOption names the exclusion or option that skips the unit; empty for the legacy unit.

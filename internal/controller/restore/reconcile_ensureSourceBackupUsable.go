@@ -71,7 +71,7 @@ func describeUnusableUnit(unit state.UnitBackup) string {
 
 	observed := "missing"
 	if unit.ProviderBackup != nil {
-		phase := string(unit.ProviderBackup.Status.Phase)
+		phase := string(unit.ProviderBackup.Phase)
 		if phase == "" {
 			phase = "unknown"
 		}

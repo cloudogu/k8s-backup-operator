@@ -173,11 +173,11 @@ func TestAFailedSourceBackupReadIsRetriedWithoutTouchingTheEcosystem(t *testing.
 }
 
 func TestCheckSourceBackup(t *testing.T) {
-	backupInPhase := func(phase velerov1.BackupPhase) *velerov1.Backup {
-		return &velerov1.Backup{Status: velerov1.BackupStatus{Phase: phase}}
+	backupInPhase := func(phase velerov1.BackupPhase) *state.ProviderBackup {
+		return &state.ProviderBackup{Phase: phase}
 	}
 	// includes components / redmine if provided
-	unitsWith := func(components, redmine *velerov1.Backup) state.RestoreState {
+	unitsWith := func(components, redmine *state.ProviderBackup) state.RestoreState {
 		return state.RestoreState{
 			Kind: state.KindUnits,
 			Units: []state.UnitBackup{
