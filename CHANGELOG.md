@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- [#201] Add `spec.options.ignoreGlobalConfig` to `Restore` resources. Set it to `true` to preserve the
+  target instance's global ConfigMap during cleanup and skip the global ConfigMap from the backup during restore.
+  The default is to restore the global configuration from the backup, which is the behavior before this change. 
+
 ## [v3.5.1] - 2026-09-22
 ### Changed
 - [#168] Update kubectl to fix CVE-2026-31789
