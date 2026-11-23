@@ -16,6 +16,28 @@ resources in this namespace which are irrelevant to the backup process are remov
 This is especially necessary
 as installed dogus not included in the backup would be broken because the backup does not contain their database.
 
+## Keep the target instance's global configuration
+
+When restoring a backup from another Dogu v2 instance, set `spec.options.ignoreGlobalConfig: true`
+to keep the target instance's global configuration. The operator preserves the existing global ConfigMap during cleanup,
+even if it has the `k8s.cloudogu.com/backup-scope` label. Velero skips the global ConfigMap in the backup even when the
+target instance has no global ConfigMap.
+
+```yaml
+apiVersion: k8s.cloudogu.com/v1
+kind: Restore
+metadata:
+  name: restore-preserve-global-config
+spec:
+  provider: velero
+  backupName: backup-sample
+  options:
+    ignoreGlobalConfig: true
+```
+
+When the option is omitted or set to `false`, the restore uses the global configuration from the backup as usual.
+The option applies to each restore individually. The global configuration remains part of the backup.
+
 ## Starting a backup after a restore
 
 A backup created during this restore waits and starts only after the restore operation has finished. This does not
