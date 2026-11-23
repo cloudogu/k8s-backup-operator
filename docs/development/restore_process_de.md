@@ -209,7 +209,7 @@ Die Delete-Anforderung an den Provider-Child wird nicht mit dessen tatsächliche
 
 ## Acceptance-Tests
 
-Die Cluster-Acceptance-Tests liegen in `../../acceptance-tests/restore_test.go`. Sie sind mit dem Build-Tag `acceptance` von normalen Unit-Test-Läufen ausgeschlossen und verwenden Ginkgo/Gomega.
+Die Cluster-Acceptance-Tests liegen in `../../specs`. Sie sind mit dem Build-Tag `acceptance` von normalen Unit-Test-Läufen ausgeschlossen und verwenden Ginkgo/Gomega.
 
 ### Sicherheitsvoraussetzungen
 

@@ -20,12 +20,10 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var k8sClientSet kubernetes.Interface
 var k8sClient client.Client
 
 func TestSpecs(t *testing.T) {
@@ -48,8 +46,6 @@ var _ = BeforeSuite(func() {
 	if GinkgoParallelProcess() == 1 {
 		fmt.Printf("acceptance specs target cluster %s\n (in google this is not the external Ip, but the public one, see cluster details)", config.Host)
 	}
-	k8sClientSet, err = kubernetes.NewForConfig(config)
-	Expect(err).ShouldNot(HaveOccurred())
 
 	k8sClient, err = client.New(config, client.Options{})
 	Expect(err).ShouldNot(HaveOccurred())
