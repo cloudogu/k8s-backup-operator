@@ -32,10 +32,7 @@ func desiredUnitBackups(backup *backupv1.Backup, backupState state.BackupState, 
 		labels := unitLabels(backupState, unit)
 
 		annotations := maps.Clone(commonAnnotations)
-		typeAnnotations, typeErr := unitTypeAnnotations(backupState, unit)
-		if typeErr != nil {
-			return nil, typeErr
-		}
+		typeAnnotations := unitTypeAnnotations(backupState, unit)
 		maps.Copy(annotations, typeAnnotations)
 
 		selector, orSelectors, selectorErr := unitSelector(backupState, unit)
@@ -82,14 +79,12 @@ func unitLabels(backupState state.BackupState, unit backupv1.UnitIdentifier) map
 	return labels
 }
 
-func unitTypeAnnotations(backupState state.BackupState, unit backupv1.UnitIdentifier) (map[string]string, error) {
+func unitTypeAnnotations(backupState state.BackupState, unit backupv1.UnitIdentifier) map[string]string {
 	switch unit.Type {
 	case backupv1.UnitTypeGlobalConfig:
-		return backupState.GlobalConfigUnitAnnotations(), nil
-	case backupv1.UnitTypeComponents:
-		return backupState.ComponentsUnitAnnotations()
+		return backupState.GlobalConfigUnitAnnotations()
 	default:
-		return nil, nil
+		return nil
 	}
 }
 

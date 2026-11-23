@@ -28,8 +28,10 @@ func newTestEventRecorder() eventRecorder {
 
 func newVeleroBackupForReconcilerTest(namespace string, name string, phase velerov1.BackupPhase) *velerov1.Backup {
 	return &velerov1.Backup{
-		Name:      name,
-		Namespace: namespace,
+		Name:        name,
+		Namespace:   namespace,
+		Labels:      make(map[string]string),
+		Annotations: make(map[string]string),
 		Status: velerov1.BackupStatus{
 			Phase: phase,
 		},
