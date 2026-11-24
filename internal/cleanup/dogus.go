@@ -38,10 +38,17 @@ func newDoguManager(doguClient doguClient, pvcClient unstructuredClient) *defaul
 func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGroup, v2Dogus, v3Dogus []string) error {
 	logging.Info(ctx, "starting cleanup of dogus before restore...")
 
+	doguNames := slices.Concat(v2Dogus, v3Dogus)
+	if len(doguNames) == 0 {
+		// A label selector with the operator "in" requires at least one value.
+		logging.Info(ctx, "no dogus to clean up")
+		return nil
+	}
+
 	selector := metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
-				Key: doguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: slices.Concat(v2Dogus, v3Dogus),
+				Key: doguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: doguNames,
 			},
 		},
 	}

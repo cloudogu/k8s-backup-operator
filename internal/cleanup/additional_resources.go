@@ -48,26 +48,32 @@ func newAdditionalResourceManager(clients map[schema.GroupVersionResource]unstru
 func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, components []string) error {
 	logging.Info(ctx, "starting cleanup of additional resources before restore...")
 
+	if len(components) == 0 {
+		// A label selector with the operator "in" requires at least one value.
+		logging.Info(ctx, "no components to clean up additional resources for")
+		return nil
+	}
+
+	selector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key: componentNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: components,
+			},
+			{
+				Key: backupScopeLabelKey, Operator: metav1.LabelSelectorOpExists,
+			},
+		},
+	}
+	labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
+	if err != nil {
+		return fmt.Errorf("failed to parse label selector: %w", err)
+	}
+
 	sortedKeys := slices.SortedFunc(maps.Keys(c.clients), func(a schema.GroupVersionResource, b schema.GroupVersionResource) int {
 		return strings.Compare(a.Group+a.Version+a.Resource, b.Group+b.Version+b.Resource)
 	})
 	for _, gvr := range sortedKeys {
 		logging.Debug(ctx, "listing additional resources", "gvr", gvr.String())
-
-		selector := metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{
-				{
-					Key: componentNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: components,
-				},
-				{
-					Key: backupScopeLabelKey, Operator: metav1.LabelSelectorOpExists,
-				},
-			},
-		}
-		labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
-		if err != nil {
-			return fmt.Errorf("failed to parse label selector: %w", err)
-		}
 
 		client := c.clients[gvr]
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
