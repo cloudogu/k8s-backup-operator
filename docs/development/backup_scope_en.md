@@ -1,16 +1,41 @@
 # Backup Scope
 
-Currently, backup of single Dogus is not yet supported.
-For now, the data of all Dogus and the global config is backed up.
-Specifically, the resources with the label key `dogu.name` and the `k8s.cloudogu.com/type: global-config` label are selected.
-Only ConfigMaps, Secrets, PersistentVolumeClaims and the Dogu resource itself are backed up.
-Because the Dogu resource is backed up, the Dogu operator can recreate any other resources that are not included in the backup.
+## Backup Units
 
-Additional resources can be included in the backup by adding the label `k8s.cloudogu.com/backup-scope` to them, for example on component `PersistentVolumeClaims`.
-Be aware that the limitation to the aforementioned kinds of resources still applies.
-In addition, `ServiceAccountProducers` of components with this label are backed up as well.
+A Cloudogu backup contains several backup units that can be specified or excluded in the Backup custom resource.
+Each unit covers the resources listed below.
 
-### Components as service account producers
+### Global Config
+
+The backup includes only the ConfigMap labeled `k8s.cloudogu.com/type: global-config`.
+
+### V2 Dogus
+
+All V2 Dogus are backed up together as a single unit.
+The operator creates this unit only if the cluster contains V2 Dogus.
+
+For each V2 Dogu, the backup includes ConfigMaps, Secrets, PersistentVolumeClaims and the Dogu resource itself
+if the value of either `dogu.name` or `k8s.cloudogu.com/dogu.name` matches the Dogu name.
+A ValidatingAdmissionWebhook enforces explicit labeling on the Dogu resource.
+The Dogu operator sets the labels automatically on all other resources.
+
+### Dogus
+
+This currently refers to V3 Dogus, which can be selected individually for backup.
+
+For each selected Dogu, the backup includes ConfigMaps, Secrets, PersistentVolumeClaims and the Dogu resource itself
+if the value of `k8s.cloudogu.com/dogu.name` matches the Dogu name.
+
+### Components
+
+Components are backed up together as a single unit.
+The operator creates this unit only if the cluster contains components with resources to back up.
+
+The backup includes ConfigMaps, Secrets, PersistentVolumeClaims and ServiceAccountProducers that have the
+`k8s.cloudogu.com/backup-scope` label and whose `k8s.cloudogu.com/component.name` label value matches the name of a
+component that exists in the cluster and passes the backup's exclusion rules.
+
+#### Components as service account producers
 
 The component-operator adds the label `k8s.cloudogu.com/backup-scope` to every `ServiceAccountProducer` of a component.
 The cleanup before a restore then deletes the producer, and the service-account-operator deletes the secrets of all
@@ -23,7 +48,7 @@ new credentials, so they match the new data.
 During restore, the operator deletes all resources that belong to the restore scope before recreating them from the backup.
 This applies both to Dogus and to additional resources selected via `k8s.cloudogu.com/backup-scope`.
 
-If a workload mounts one of those additional resources, it must be scaled down before the restore starts and scaled up again after the restore finishes. 
+If a workload mounts or otherwise uses one of those additional resources, it must be scaled down before the restore starts and scaled up again after the restore finishes.
 To participate in this behavior, the workload must be labeled with `k8s.cloudogu.com/restore-scaledown-scope`.
 Otherwise, Pods may continue to access resources that are being deleted and recreated.
 
