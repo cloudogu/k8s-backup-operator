@@ -22,7 +22,7 @@ type doguManager interface {
 }
 
 type additionalResourceManager interface {
-	cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup) error
+	cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, components []string) error
 }
 
 type DefaultCleanupManager struct {
@@ -77,7 +77,7 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context, state state.Restore
 	// Pass ComponentList to the function and use component.name label selector with backup-scope together
 	// Option: We could pass the dogu v3 list too and delete orphaned resources from them
 
-	err = c.cleanupAdditionalResources(ctx, &wg)
+	err = c.cleanupAdditionalResources(ctx, &wg, state.Components)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup additional resources: %w", err)
 	}

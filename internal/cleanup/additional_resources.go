@@ -17,7 +17,10 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-const backupScopeLabelKey = "k8s.cloudogu.com/backup-scope"
+const (
+	backupScopeLabelKey   = "k8s.cloudogu.com/backup-scope"
+	componentNameLabelKey = "k8s.cloudogu.com/component.name"
+)
 
 var additionalResourceDeleteWaitTime = defaultWaitTime
 
@@ -42,7 +45,7 @@ func newAdditionalResourceManager(clients map[schema.GroupVersionResource]unstru
 
 // cleanupAdditionalResources deletes all additional resources that need to be deleted before restoring the backup.
 // It adds those deletions to the wait group.
-func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup) error {
+func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, components []string) error {
 	logging.Info(ctx, "starting cleanup of additional resources before restore...")
 
 	sortedKeys := slices.SortedFunc(maps.Keys(c.clients), func(a schema.GroupVersionResource, b schema.GroupVersionResource) int {
@@ -51,8 +54,23 @@ func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx contex
 	for _, gvr := range sortedKeys {
 		logging.Debug(ctx, "listing additional resources", "gvr", gvr.String())
 
+		selector := metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key: componentNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: components,
+				},
+				{
+					Key: backupScopeLabelKey, Operator: metav1.LabelSelectorOpExists,
+				},
+			},
+		}
+		labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
+		if err != nil {
+			return fmt.Errorf("failed to parse label selector: %w", err)
+		}
+
 		client := c.clients[gvr]
-		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: backupScopeLabelKey})
+		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
 		if err != nil {
 			return fmt.Errorf("failed to list %s: %w", gvr.Resource, err)
 		}
