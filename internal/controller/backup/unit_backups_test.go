@@ -45,7 +45,7 @@ func TestDesiredUnitBackups(t *testing.T) {
 		assert.Equal(t, &metav1.LabelSelector{MatchLabels: map[string]string{"k8s.cloudogu.com/dogu.name": "ldap"}}, unit.Spec.LabelSelector)
 		assert.Equal(t, []string{"configmaps", "secrets", "persistentvolumeclaims", "dogus.k8s.cloudogu.com"}, unit.Spec.IncludedResources)
 		assert.NotContains(t, unit.Annotations, backupv1.FQDNAnnotationKey)
-		assert.NotContains(t, unit.Annotations, backupv1.ComponentsAnnotationKey)
+		assert.Contains(t, unit.Annotations, backupv1.ComponentsAnnotationKey)
 	})
 
 	t.Run("doguv2 unit", func(t *testing.T) {

@@ -9,11 +9,11 @@ import (
 )
 
 var (
-	globalConfigUnit = UnitBackup{Type: backupv1.UnitTypeGlobalConfig, ProviderBackup: &velerov1.Backup{}}
-	componentsUnit   = UnitBackup{Type: backupv1.UnitTypeComponents, ProviderBackup: &velerov1.Backup{}}
-	doguV2Unit       = UnitBackup{Type: backupv1.UnitTypeDoguV2, ProviderBackup: &velerov1.Backup{}}
-	postfixUnit      = UnitBackup{Type: backupv1.UnitTypeDogu, Name: "postfix", ProviderBackup: &velerov1.Backup{}}
-	redmineUnit      = UnitBackup{Type: backupv1.UnitTypeDogu, Name: "redmine", ProviderBackup: &velerov1.Backup{}}
+	globalConfigUnit = UnitBackup{Type: backupv1.UnitTypeGlobalConfig, ProviderBackup: &ProviderBackup{}}
+	componentsUnit   = UnitBackup{Type: backupv1.UnitTypeComponents, ProviderBackup: &ProviderBackup{}}
+	doguV2Unit       = UnitBackup{Type: backupv1.UnitTypeDoguV2, ProviderBackup: &ProviderBackup{}}
+	postfixUnit      = UnitBackup{Type: backupv1.UnitTypeDogu, Name: "postfix", ProviderBackup: &ProviderBackup{}}
+	redmineUnit      = UnitBackup{Type: backupv1.UnitTypeDogu, Name: "redmine", ProviderBackup: &ProviderBackup{}}
 )
 
 func unitState() RestoreState {
@@ -149,6 +149,91 @@ func TestProviderBackupName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, ProviderBackupName(tt.backupName, tt.unit))
+		})
+	}
+}
+
+func TestRestoreState_InvalidExclusions(t *testing.T) {
+	unitBased := RestoreState{
+		Kind: KindUnits,
+		Units: []UnitBackup{
+			{Type: backupv1.UnitTypeComponents, ProviderBackup: &ProviderBackup{}},
+			{Type: backupv1.UnitTypeDogu, Name: "redmine", ProviderBackup: &ProviderBackup{}},
+		},
+		V2Dogus:    []string{"cockpit"},
+		Components: []string{"k8s-loki"},
+	}
+	withoutComponents := unitBased
+	withoutComponents.Components = nil
+	legacy := RestoreState{Kind: KindLegacy, Units: []UnitBackup{{Type: UnitTypeLegacy}}}
+	legacyNotSupported := []string{"exclusions and options are not supported for a legacy backup"}
+
+	tests := []struct {
+		name  string
+		spec  backupv1.RestoreSpec
+		state RestoreState
+		want  []string
+	}{
+		{name: "no exclusions", state: unitBased},
+		{
+			name:  "excludedDogus V2 dogu and dogu not in the backup",
+			spec:  backupv1.RestoreSpec{ExcludedDogus: []string{"redmine", "cockpit", "ghost"}},
+			state: unitBased,
+			want:  []string{"excludedDogus: cockpit is a V2 dogu", "excludedDogus: ghost is not in the backup"},
+		},
+		{
+			name:  "excludedComponents not in the backup",
+			spec:  backupv1.RestoreSpec{ExcludedComponents: []string{"k8s-loki", "k8s-foo"}},
+			state: unitBased,
+			want:  []string{"excludedComponents: k8s-foo is not in the backup"},
+		},
+		{
+			name:  "backup without components invalidates every excludedComponents entry",
+			spec:  backupv1.RestoreSpec{ExcludedComponents: []string{"k8s-loki", "k8s-foo"}},
+			state: withoutComponents,
+			want:  []string{"excludedComponents: k8s-loki is not in the backup", "excludedComponents: k8s-foo is not in the backup"},
+		},
+		{
+			name:  "ignoreV2Dogus without doguv2 unit is fine",
+			spec:  backupv1.RestoreSpec{Options: &backupv1.UnitOptions{IgnoreV2Dogus: true}},
+			state: unitBased,
+		},
+		{name: "legacy without exclusions", state: legacy},
+		{name: "legacy with excludedDogus", spec: backupv1.RestoreSpec{ExcludedDogus: []string{"redmine"}}, state: legacy, want: legacyNotSupported},
+		{name: "legacy with excludedComponents", spec: backupv1.RestoreSpec{ExcludedComponents: []string{"k8s-loki"}}, state: legacy, want: legacyNotSupported},
+		{name: "legacy with option", spec: backupv1.RestoreSpec{Options: &backupv1.UnitOptions{IgnoreGlobalConfig: true}}, state: legacy, want: legacyNotSupported},
+		{name: "legacy with empty options", spec: backupv1.RestoreSpec{Options: &backupv1.UnitOptions{}}, state: legacy},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.state.InvalidExclusions(tt.spec))
+		})
+	}
+}
+
+func TestUnitBackup_IsUsable(t *testing.T) {
+	unitInPhase := func(unitType backupv1.UnitType, phase velerov1.BackupPhase) UnitBackup {
+		return UnitBackup{Type: unitType, ProviderBackup: &ProviderBackup{Phase: phase}}
+	}
+
+	tests := []struct {
+		name string
+		unit UnitBackup
+		want bool
+	}{
+		{name: "unit completed", unit: unitInPhase(backupv1.UnitTypeComponents, velerov1.BackupPhaseCompleted), want: true},
+		{name: "unit partially failed", unit: unitInPhase(backupv1.UnitTypeComponents, velerov1.BackupPhasePartiallyFailed), want: false},
+		{name: "unit failed", unit: unitInPhase(backupv1.UnitTypeComponents, velerov1.BackupPhaseFailed), want: false},
+		{name: "unit in progress", unit: unitInPhase(backupv1.UnitTypeComponents, velerov1.BackupPhaseInProgress), want: false},
+		{name: "unit missing", unit: UnitBackup{Type: backupv1.UnitTypeComponents}, want: false},
+		{name: "legacy completed", unit: unitInPhase(UnitTypeLegacy, velerov1.BackupPhaseCompleted), want: true},
+		{name: "legacy partially failed", unit: unitInPhase(UnitTypeLegacy, velerov1.BackupPhasePartiallyFailed), want: false},
+		{name: "legacy failed", unit: unitInPhase(UnitTypeLegacy, velerov1.BackupPhaseFailed), want: false},
+		{name: "legacy in progress", unit: unitInPhase(UnitTypeLegacy, velerov1.BackupPhaseInProgress), want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.unit.IsUsable())
 		})
 	}
 }

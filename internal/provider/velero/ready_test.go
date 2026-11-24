@@ -169,8 +169,6 @@ func TestIsProviderNotReadyReason(t *testing.T) {
 	t.Run("reasons that do not describe a waiting provider are no waiting reasons", func(t *testing.T) {
 		for _, reason := range []string{
 			ReasonVeleroProviderReady,
-			ReasonVeleroSourceBackupUsable,
-			ReasonVeleroSourceBackupNotUsable,
 			"",
 			"SomeOtherReason",
 		} {
