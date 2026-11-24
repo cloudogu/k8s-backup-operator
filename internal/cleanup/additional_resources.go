@@ -45,13 +45,6 @@ func newAdditionalResourceManager(clients map[schema.GroupVersionResource]unstru
 func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup) error {
 	logging.Info(ctx, "starting cleanup of additional resources before restore...")
 
-	// TODO Does this work if you do a restore from lop-idp to non lop-idp? In this case the component is still in the cluster.
-	// - maybe not so bad. You have to delete the components manually after restore
-	// TODO Restore from non lop-idp cluster to lop-idp? Delete all Dogus. Who installs lop-idp?
-	// With SDB:
-	// TODO restore from lop-idp to non lop-idp: Wo deletes lop-idp?
-	// TODO restore from non lop-idp to lop-idp: Same questions like now: Wo installs lop-idp? Who deletes current dogus in change of lop-idp? We have to detect lop-idp and delete Dogus on Cleanup? Because we can't delete all Dogus in SBD
-
 	sortedKeys := slices.SortedFunc(maps.Keys(c.clients), func(a schema.GroupVersionResource, b schema.GroupVersionResource) int {
 		return strings.Compare(a.Group+a.Version+a.Resource, b.Group+b.Version+b.Resource)
 	})
