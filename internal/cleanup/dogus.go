@@ -68,22 +68,6 @@ func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGrou
 		}
 	}
 
-	// TODO v3 Dogus can contain orphaned resources like PVCs from sts
-	// Important resources remain in the cluster like SAREs with Helm's keep annotation
-	// TODO What should happen if a dogu developer adds a keep annotation to a regular pvc?
-	//    - Delete anyways -> We have to delete those resources because the restore will fail with exsiting PVCs
-	// or - Just keep? -> No
-	// What if other resource types contain keep? -> Velero update policy patches
-	// TODO Will velero throw an error if the resource container immutable fields like a sts?
-	//   -> velero will skip the resource
-	// TODO It is valid to set keep Annotation to other resources?
-	// -> Yes but only on Workloads with the scale down label. With that pods will be scaled down and the cleanup can still remove PVCs
-	// If PVCs with an other size will be restored STS may contain not real PVC Size. In this case the dogu-operator will correct this in his pvc resize logic.
-
-	// TODO Conclusion:
-	// List all PVCs with dogu labels from RestoreState, delete them and wait for deletion
-	// TODO Wait for resource deletion? -> Exists in additional_resources.go -> convert from method to function
-
 	doguPvcList, err := c.pvcClient.List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
 	if err != nil {
 		return fmt.Errorf("failed to list dogu pvcs: %w", err)
