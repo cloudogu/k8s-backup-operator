@@ -161,6 +161,19 @@ func TestEnsureRestoreReusesItsOwnChildWithoutWriting(t *testing.T) {
 	assert.Equal(t, firstResourceVersion, getPersistedRestore(t, k8sClient).ResourceVersion)
 }
 
+func TestCheckRestoreForConflictsComparesTheExpectedBackupName(t *testing.T) {
+	parent := newParentRestore()
+	child := BuildRestore(parent)
+	child.Spec.BackupName = "test-backup-global-config"
+
+	require.NoError(t, CheckRestoreForConflicts(parent, child, "test-backup-global-config"))
+
+	err := CheckRestoreForConflicts(parent, child, testBackup)
+	var conflictErr *ConflictError
+	require.ErrorAs(t, err, &conflictErr)
+	assert.EqualError(t, err, "velero restore [test-restore] conflicts with the expected child: it restores backup [test-backup-global-config] but restore [test-restore] expects backup [test-backup]")
+}
+
 func TestEnsureRestoreReportsConflicts(t *testing.T) {
 	tests := map[string]struct {
 		existing *velerov1.Restore
@@ -251,6 +264,32 @@ func TestEnsureRestorePropagatesClientErrors(t *testing.T) {
 	})
 }
 
+func TestHasOwnedRestoreRequiresTheOwnerReference(t *testing.T) {
+	parent := newParentRestore()
+	unownedRestore := BuildRestore(parent)
+	unownedRestore.Name = "a-unowned-with-uid-label"
+	unownedRestore.OwnerReferences = nil
+	owned := BuildRestore(parent)
+	owned.Name = "b-owned"
+
+	tests := []struct {
+		name     string
+		children []client.Object
+		want     bool
+	}{
+		{name: "a UID label without owner reference is not owned", children: []client.Object{unownedRestore}, want: false},
+		{name: "an owned child behind an unowned one is found", children: []client.Object{unownedRestore, owned}, want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := HasOwnedRestore(testCtx, newTestClient(t, &writeCounter{}, tt.children...), parent)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestGetRestoreTreatsAnAbsentChildAsNoChild(t *testing.T) {
 	writes := &writeCounter{}
 	k8sClient := newTestClient(t, writes)
@@ -317,7 +356,7 @@ func TestAMatchingRunningChildIsFoundAndReported(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.True(t, IsOwnedRestore(parent, found))
-	require.NoError(t, CheckRestoreForConflicts(parent, found))
+	require.NoError(t, CheckRestoreForConflicts(parent, found, testBackup))
 	assert.Equal(t, RestoreRunning, ObserveRestorePhase(found.Status.Phase))
 
 	// the running child is reused, never restarted

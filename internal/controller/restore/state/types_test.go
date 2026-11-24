@@ -134,3 +134,21 @@ func TestProviderRestoreName(t *testing.T) {
 		})
 	}
 }
+
+func TestProviderBackupName(t *testing.T) {
+	tests := []struct {
+		name       string
+		backupName string
+		unit       backupv1.UnitIdentifier
+		want       string
+	}{
+		{name: "legacy", backupName: "mybackup", unit: backupv1.UnitIdentifier{Type: UnitTypeLegacy}, want: "mybackup"},
+		{name: "global-config", backupName: "mybackup", unit: backupv1.UnitIdentifier{Type: backupv1.UnitTypeGlobalConfig}, want: "mybackup-global-config"},
+		{name: "dogu", backupName: "mybackup", unit: backupv1.UnitIdentifier{Type: backupv1.UnitTypeDogu, Name: "redmine"}, want: "mybackup-dogu-redmine"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, ProviderBackupName(tt.backupName, tt.unit))
+		})
+	}
+}
