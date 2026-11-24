@@ -115,6 +115,33 @@ func TestRestoreState_RestoredComponents(t *testing.T) {
 	assert.Empty(t, state.RestoredComponents(backupv1.RestoreSpec{ExcludedComponents: []string{"k8s-loki", "k8s-velero"}}))
 }
 
+func TestRestoreState_RestoredDogus(t *testing.T) {
+	state := unitState()
+	state.V2Dogus = []string{"cas", "ldap"}
+	state.V3Dogus = []string{"postfix", "redmine"}
+
+	tests := []struct {
+		name   string
+		spec   backupv1.RestoreSpec
+		wantV2 []string
+		wantV3 []string
+	}{
+		{name: "no exclusions", spec: backupv1.RestoreSpec{}, wantV2: []string{"cas", "ldap"}, wantV3: []string{"postfix", "redmine"}},
+		{name: "excluded dogu", spec: backupv1.RestoreSpec{ExcludedDogus: []string{"redmine"}}, wantV2: []string{"cas", "ldap"}, wantV3: []string{"postfix"}},
+		{name: "all dogus excluded", spec: backupv1.RestoreSpec{ExcludedDogus: []string{"postfix", "redmine"}}, wantV2: []string{"cas", "ldap"}, wantV3: []string{}},
+		{name: "ignore v2 dogus", spec: backupv1.RestoreSpec{Options: &backupv1.UnitOptions{IgnoreV2Dogus: true}}, wantV2: nil, wantV3: []string{"postfix", "redmine"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v2, v3 := state.RestoredDogus(tt.spec)
+			assert.Equal(t, tt.wantV2, v2)
+			assert.Equal(t, tt.wantV3, v3)
+		})
+	}
+	// the state itself is not changed
+	assert.Equal(t, []string{"postfix", "redmine"}, state.V3Dogus)
+}
+
 func TestProviderRestoreName(t *testing.T) {
 	tests := []struct {
 		name        string

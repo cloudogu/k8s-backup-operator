@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	corev1 "k8s.io/api/core/v1"
@@ -56,10 +57,9 @@ func NewManager(doguClient doguClient, dynamicClient dynamicClient, namespace st
 // Cleanup deletes all resources that need to be deleted before restoring the backup.
 // It waits for the deletion of the resources to complete.
 // If the deletion fails, the cleanup will fail.
-func (c *DefaultCleanupManager) Cleanup(ctx context.Context, state state.RestoreState) error {
+// Only the dogus and components which are restored are deleted; ignored or excluded ones are kept.
+func (c *DefaultCleanupManager) Cleanup(ctx context.Context, restoreState state.RestoreState, spec backupv1.RestoreSpec) error {
 	logging.Info(ctx, "starting cleanup before restore...")
-
-	// List of Dogus and Components (additional resources)
 
 	// Create a timeout context for the entire cleanup
 	ctx, cancel := context.WithTimeout(ctx, cleanupTimeout)
@@ -67,17 +67,13 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context, state state.Restore
 
 	var wg sync.WaitGroup
 
-	// Pass DoguLists to the function
-
-	err := c.cleanupDogus(ctx, &wg, state.V2Dogus, state.V3Dogus)
+	v2Dogus, v3Dogus := restoreState.RestoredDogus(spec)
+	err := c.cleanupDogus(ctx, &wg, v2Dogus, v3Dogus)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup dogus: %w", err)
 	}
 
-	// Pass ComponentList to the function and use component.name label selector with backup-scope together
-	// Option: We could pass the dogu v3 list too and delete orphaned resources from them
-
-	err = c.cleanupAdditionalResources(ctx, &wg, state.Components)
+	err = c.cleanupAdditionalResources(ctx, &wg, restoreState.RestoredComponents(spec))
 	if err != nil {
 		return fmt.Errorf("failed to cleanup additional resources: %w", err)
 	}

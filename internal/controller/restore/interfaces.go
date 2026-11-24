@@ -36,7 +36,8 @@ type maintenanceModeSwitch interface {
 
 type cleanupManager interface {
 	// Cleanup deletes all resources that need to be deleted before restoring the backup.
-	Cleanup(ctx context.Context, state state.RestoreState) error
+	// Ignored or excluded dogus and components are kept.
+	Cleanup(ctx context.Context, restoreState state.RestoreState, spec backupv1.RestoreSpec) error
 }
 
 type scaleManager interface {

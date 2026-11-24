@@ -373,7 +373,7 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	}
 	logging.Info(ctx, "scaled down the workloads")
 
-	if err := r.cleanup.Cleanup(ctx, restoreState); err != nil {
+	if err := r.cleanup.Cleanup(ctx, restoreState, restore.Spec); err != nil {
 		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonCleanupFailed, actionPrepareRestore, "Cleanup before restore failed")
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to cleanup before restore: %w", err))
 	}
