@@ -38,6 +38,8 @@ type RestoreState struct {
 	Units []UnitBackup
 	// V2Dogus are the dogus of the V2 blob.
 	V2Dogus []string
+	// V3Dogus are the dogus of all v3 dogu units.
+	V3Dogus []string
 	// Components are the components of the components unit.
 	Components []string
 }

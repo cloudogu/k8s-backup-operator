@@ -67,6 +67,10 @@ func collectUnitState(unitBackups []velerov1.Backup) (RestoreState, error) {
 	if err != nil {
 		return RestoreState{}, fmt.Errorf("get installed V2 dogus: %w", err)
 	}
+	v3Dogus, err := unmarshalAnnotation[[]backupv1.DoguVersion](commonAnnotations, backupv1.InstalledDogusV3AnnotationKey)
+	if err != nil {
+		return RestoreState{}, fmt.Errorf("get V3 dogus: %w", err)
+	}
 
 	result := RestoreState{Kind: KindUnits}
 	slices.SortFunc(unitIDs, compareUnitsByTypeThenName)
@@ -76,6 +80,10 @@ func collectUnitState(unitBackups []velerov1.Backup) (RestoreState, error) {
 
 	for _, dogu := range v2Dogus {
 		result.V2Dogus = append(result.V2Dogus, dogu.Name)
+	}
+
+	for _, dogu := range v3Dogus {
+		result.V3Dogus = append(result.V3Dogus, dogu.Name)
 	}
 
 	result.Components, err = componentNames(unitBackups)
