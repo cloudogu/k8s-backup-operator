@@ -23,7 +23,7 @@ const (
 	// holder cannot be identified safely.
 	ReasonInvalidRestoreLease = "InvalidRestoreLease"
 	// ReasonCollectStateFailed marks a failed state collection.
-	ReasonCollectStateFailed = "CleanupCompleted"
+	ReasonCollectStateFailed = "CollectStateFailed"
 	// ReasonCleanupCompleted marks a completed cleanup.
 	ReasonCleanupCompleted = "CleanupCompleted"
 	// ReasonCleanupFailed marks a failed cleanup.
