@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // doguListOptions select the resources of the v2 dogu cas and the v3 dogu test.
@@ -266,6 +267,7 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			doguSelector := mustParseSelector(t, doguListOptions.LabelSelector)
 			previousWaitTime := doguDeleteWaitTime
 			doguDeleteWaitTime = 10 * time.Millisecond
 			defer func() { doguDeleteWaitTime = previousWaitTime }()
@@ -290,7 +292,7 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 			defer cancel()
 			var wg sync.WaitGroup
 
-			tt.wantErr(t, c.cleanupDogus(tt.ctxFn(t), &wg, []string{"cas"}, []string{"test"}))
+			tt.wantErr(t, c.cleanupDogus(tt.ctxFn(t), &wg, doguSelector, doguSelector))
 
 			done := make(chan struct{})
 			go func() {
@@ -311,15 +313,16 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 	}
 }
 
-func Test_defaultDoguManager_cleanupDogus_withoutDogus(t *testing.T) {
-	// The clients carry no expectations, so no dogu or pvc may be listed or deleted.
-	c := &defaultDoguManager{
-		doguClient: newMockDoguClient(t),
-		pvcClient:  newMockUnstructuredClient(t),
-	}
+func Test_defaultDoguManager_cleanupDogus_withDifferentSelectors(t *testing.T) {
+	// a legacy cleanup lists all dogus but only the pvcs with a dogu label
+	doguClient := newMockDoguClient(t)
+	doguClient.EXPECT().List(t.Context(), metav1.ListOptions{}).Return(&doguv2.DoguList{}, nil)
+	pvcClient := newMockUnstructuredClient(t)
+	pvcClient.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/dogu.name"}).Return(&unstructured.UnstructuredList{}, nil)
+	c := &defaultDoguManager{doguClient: doguClient, pvcClient: pvcClient}
 	var wg sync.WaitGroup
 
-	err := c.cleanupDogus(t.Context(), &wg, nil, nil)
+	err := c.cleanupDogus(t.Context(), &wg, labels.Everything(), mustParseSelector(t, "k8s.cloudogu.com/dogu.name"))
 
 	assert.NoError(t, err)
 }

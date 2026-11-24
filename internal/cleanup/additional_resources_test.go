@@ -11,6 +11,7 @@ import (
 	k8sErrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -299,7 +300,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			defer cancel()
 			var wg sync.WaitGroup
 
-			tt.wantErr(t, c.cleanupAdditionalResources(tt.ctxFn(t), &wg, []string{"k8s-velero"}))
+			tt.wantErr(t, c.cleanupAdditionalResources(tt.ctxFn(t), &wg, mustParseSelector(t, componentResourceSelector)))
 
 			done := make(chan struct{})
 			go func() {
@@ -320,20 +321,6 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 	}
 }
 
-func Test_defaultAdditionalResourceManager_cleanupAdditionalResources_withoutComponents(t *testing.T) {
-	// The clients carry no expectations, so no resource may be listed or deleted.
-	c := &defaultAdditionalResourceManager{
-		clients: map[schema.GroupVersionResource]unstructuredClient{
-			corev1.SchemeGroupVersion.WithResource("configmaps"): newMockUnstructuredClient(t),
-		},
-	}
-	var wg sync.WaitGroup
-
-	err := c.cleanupAdditionalResources(t.Context(), &wg, nil)
-
-	assert.NoError(t, err)
-}
-
 func Test_newAdditionalResourceManager(t *testing.T) {
 	clients := map[schema.GroupVersionResource]unstructuredClient{
 		corev1.SchemeGroupVersion.WithResource("configmaps"): newMockUnstructuredClient(t),
@@ -342,4 +329,13 @@ func Test_newAdditionalResourceManager(t *testing.T) {
 	actual := newAdditionalResourceManager(clients)
 
 	assert.Equal(t, clients, actual.clients)
+}
+
+func mustParseSelector(t *testing.T, selector string) labels.Selector {
+	t.Helper()
+	parsed, err := labels.Parse(selector)
+	if err != nil {
+		t.Fatalf("invalid selector %q: %v", selector, err)
+	}
+	return parsed
 }

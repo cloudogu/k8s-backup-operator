@@ -10,6 +10,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestDefaultCleanupManager_Cleanup(t *testing.T) {
@@ -21,6 +22,8 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 	}
 	// the excluded dogus and components must be kept
 	spec := backupv1.RestoreSpec{ExcludedDogus: []string{"postfix"}, ExcludedComponents: []string{"k8s-loki"}}
+	restoredDogus := matchesSelector("k8s.cloudogu.com/dogu.name in (cas,redmine)")
+	restoredComponents := matchesSelector("k8s.cloudogu.com/backup-scope,k8s.cloudogu.com/component.name in (k8s-velero)")
 
 	type fields struct {
 		doguManagerFn               func(t *testing.T) doguManager
@@ -36,7 +39,7 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 			fields: fields{
 				doguManagerFn: func(t *testing.T) doguManager {
 					m := newMockDoguManager(t)
-					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, []string{"cas"}, []string{"redmine"}).Return(assert.AnError)
+					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, restoredDogus, restoredDogus).Return(assert.AnError)
 					return m
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
@@ -54,12 +57,12 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 			fields: fields{
 				doguManagerFn: func(t *testing.T) doguManager {
 					m := newMockDoguManager(t)
-					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, []string{"cas"}, []string{"redmine"}).Return(nil)
+					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, restoredDogus, restoredDogus).Return(nil)
 					return m
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
 					m := newMockAdditionalResourceManager(t)
-					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}, []string{"k8s-velero"}).Return(assert.AnError)
+					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}, restoredComponents).Return(assert.AnError)
 					return m
 				},
 			},
@@ -73,13 +76,13 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 			fields: fields{
 				doguManagerFn: func(t *testing.T) doguManager {
 					m := newMockDoguManager(t)
-					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, []string{"cas"}, []string{"redmine"}).Return(nil)
+					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, restoredDogus, restoredDogus).Return(nil)
 					return m
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
 					m := newMockAdditionalResourceManager(t)
-					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}, []string{"k8s-velero"}).Run(
-						func(ctx context.Context, wg *sync.WaitGroup, _ []string) {
+					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}, restoredComponents).Run(
+						func(ctx context.Context, wg *sync.WaitGroup, _ labels.Selector) {
 							wg.Add(1)
 						}).Return(nil)
 					return m
@@ -94,8 +97,8 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 			fields: fields{
 				doguManagerFn: func(t *testing.T) doguManager {
 					m := newMockDoguManager(t)
-					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, []string{"cas"}, []string{"redmine"}).Run(
-						func(ctx context.Context, wg *sync.WaitGroup, _ []string, _ []string) {
+					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, restoredDogus, restoredDogus).Run(
+						func(ctx context.Context, wg *sync.WaitGroup, _ labels.Selector, _ labels.Selector) {
 							wg.Add(1)
 							go func() {
 								wg.Done()
@@ -105,8 +108,8 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
 					m := newMockAdditionalResourceManager(t)
-					m.EXPECT().cleanupAdditionalResources(mock.Anything, mock.Anything, []string{"k8s-velero"}).Run(
-						func(ctx context.Context, wg *sync.WaitGroup, _ []string) {
+					m.EXPECT().cleanupAdditionalResources(mock.Anything, mock.Anything, restoredComponents).Run(
+						func(ctx context.Context, wg *sync.WaitGroup, _ labels.Selector) {
 							wg.Add(1)
 							go func() {
 								wg.Done()
@@ -131,4 +134,87 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 			tt.wantErr(t, c.Cleanup(t.Context(), restoreState, spec))
 		})
 	}
+}
+
+func TestDefaultCleanupManager_Cleanup_selectsResourcesByKind(t *testing.T) {
+	units := state.RestoreState{
+		Kind:       state.KindUnits,
+		V2Dogus:    []string{"cas"},
+		V3Dogus:    []string{"redmine"},
+		Components: []string{"k8s-velero"},
+	}
+	tests := []struct {
+		name           string
+		restoreState   state.RestoreState
+		spec           backupv1.RestoreSpec
+		wantDogus      string
+		wantDoguPVCs   string
+		wantAdditional string
+		skipDogus      bool
+		skipAdditional bool
+		wantErrMsg     string
+	}{
+		{
+			name:           "legacy deletes all dogus and all resources with a backup scope",
+			restoreState:   state.RestoreState{Kind: state.KindLegacy, Units: []state.UnitBackup{{}}},
+			wantDogus:      "",
+			wantDoguPVCs:   "k8s.cloudogu.com/dogu.name",
+			wantAdditional: "k8s.cloudogu.com/backup-scope",
+		},
+		{
+			name:           "units delete only the restored dogus and components",
+			restoreState:   units,
+			wantDogus:      "k8s.cloudogu.com/dogu.name in (cas,redmine)",
+			wantDoguPVCs:   "k8s.cloudogu.com/dogu.name in (cas,redmine)",
+			wantAdditional: "k8s.cloudogu.com/backup-scope,k8s.cloudogu.com/component.name in (k8s-velero)",
+		},
+		{
+			name:           "units without restored dogus skip the dogu cleanup",
+			restoreState:   units,
+			spec:           backupv1.RestoreSpec{ExcludedDogus: []string{"redmine"}, Options: &backupv1.UnitOptions{IgnoreV2Dogus: true}},
+			skipDogus:      true,
+			wantAdditional: "k8s.cloudogu.com/backup-scope,k8s.cloudogu.com/component.name in (k8s-velero)",
+		},
+		{
+			name:           "units without restored components skip the additional resource cleanup",
+			restoreState:   units,
+			spec:           backupv1.RestoreSpec{ExcludedComponents: []string{"k8s-velero"}},
+			wantDogus:      "k8s.cloudogu.com/dogu.name in (cas,redmine)",
+			wantDoguPVCs:   "k8s.cloudogu.com/dogu.name in (cas,redmine)",
+			skipAdditional: true,
+		},
+		{
+			name:           "unknown backup kind fails without deleting anything",
+			restoreState:   state.RestoreState{Kind: state.KindNotFound},
+			skipDogus:      true,
+			skipAdditional: true,
+			wantErrMsg:     "cannot clean up for a backup of kind \"NotFound\"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// mocks without expectations fail on any call
+			doguMock := newMockDoguManager(t)
+			if !tt.skipDogus {
+				doguMock.EXPECT().cleanupDogus(mock.Anything, mock.Anything, matchesSelector(tt.wantDogus), matchesSelector(tt.wantDoguPVCs)).Return(nil)
+			}
+			additionalMock := newMockAdditionalResourceManager(t)
+			if !tt.skipAdditional {
+				additionalMock.EXPECT().cleanupAdditionalResources(mock.Anything, mock.Anything, matchesSelector(tt.wantAdditional)).Return(nil)
+			}
+			c := &DefaultCleanupManager{doguManager: doguMock, additionalResourceManager: additionalMock}
+
+			err := c.Cleanup(t.Context(), tt.restoreState, tt.spec)
+
+			if tt.wantErrMsg != "" {
+				assert.ErrorContains(t, err, tt.wantErrMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func matchesSelector(want string) any {
+	return mock.MatchedBy(func(selector labels.Selector) bool { return selector.String() == want })
 }

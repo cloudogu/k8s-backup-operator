@@ -3,6 +3,7 @@ package cleanup
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -10,7 +11,9 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 )
 
 const defaultWaitTime = time.Second * 3
@@ -19,11 +22,11 @@ const defaultCleanupTimeout = time.Minute * 30
 var cleanupTimeout = defaultCleanupTimeout
 
 type doguManager interface {
-	cleanupDogus(ctx context.Context, wg *sync.WaitGroup, v2Dogus, v3Dogus []string) error
+	cleanupDogus(ctx context.Context, wg *sync.WaitGroup, doguSelector, pvcSelector labels.Selector) error
 }
 
 type additionalResourceManager interface {
-	cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, components []string) error
+	cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, selector labels.Selector) error
 }
 
 type DefaultCleanupManager struct {
@@ -50,16 +53,18 @@ func NewManager(doguClient doguClient, dynamicClient dynamicClient, namespace st
 	}
 }
 
-// Was passiert, wenn ein legacy Backup eingespielt wird?
-// Muss ebenfalls Liste von Dogus liefern -> Diese müssen gelöscht werden inkl. pvcs und additional resources.
-// Das legacy Backups muss preisgeben, ob legacy resources enthalten sind.
-
 // Cleanup deletes all resources that need to be deleted before restoring the backup.
 // It waits for the deletion of the resources to complete.
 // If the deletion fails, the cleanup will fail.
-// Only the dogus and components which are restored are deleted; ignored or excluded ones are kept.
+// For a unit backup only the dogus and components which are restored are deleted; ignored or excluded ones are kept.
+// For a legacy backup all dogus and all resources with a backup scope are deleted, because the whole backup is restored.
 func (c *DefaultCleanupManager) Cleanup(ctx context.Context, restoreState state.RestoreState, spec backupv1.RestoreSpec) error {
-	logging.Info(ctx, "starting cleanup before restore...")
+	logging.Info(ctx, "starting cleanup before restore...", "kind", restoreState.Kind)
+
+	selectors, err := newCleanupSelectors(restoreState, spec)
+	if err != nil {
+		return fmt.Errorf("failed to determine the resources to clean up: %w", err)
+	}
 
 	// Create a timeout context for the entire cleanup
 	ctx, cancel := context.WithTimeout(ctx, cleanupTimeout)
@@ -67,14 +72,15 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context, restoreState state.
 
 	var wg sync.WaitGroup
 
-	v2Dogus, v3Dogus := restoreState.RestoredDogus(spec)
-	err := c.cleanupDogus(ctx, &wg, v2Dogus, v3Dogus)
-	if err != nil {
+	if selectors.dogus == nil {
+		logging.Info(ctx, "no dogus to clean up")
+	} else if err := c.cleanupDogus(ctx, &wg, selectors.dogus, selectors.doguPVCs); err != nil {
 		return fmt.Errorf("failed to cleanup dogus: %w", err)
 	}
 
-	err = c.cleanupAdditionalResources(ctx, &wg, restoreState.RestoredComponents(spec))
-	if err != nil {
+	if selectors.additionalResources == nil {
+		logging.Info(ctx, "no components to clean up additional resources for")
+	} else if err := c.cleanupAdditionalResources(ctx, &wg, selectors.additionalResources); err != nil {
 		return fmt.Errorf("failed to cleanup additional resources: %w", err)
 	}
 
@@ -92,4 +98,75 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context, restoreState state.
 	case <-ctx.Done():
 		return fmt.Errorf("cleanup timed out: %w", ctx.Err())
 	}
+}
+
+// cleanupSelectors select the resources to delete before the restore; a nil selector means nothing to delete.
+type cleanupSelectors struct {
+	dogus               labels.Selector
+	doguPVCs            labels.Selector
+	additionalResources labels.Selector
+}
+
+func newCleanupSelectors(restoreState state.RestoreState, spec backupv1.RestoreSpec) (cleanupSelectors, error) {
+	switch restoreState.Kind {
+	case state.KindLegacy:
+		return legacyCleanupSelectors()
+	case state.KindUnits:
+		v2Dogus, v3Dogus := restoreState.RestoredDogus(spec)
+		return unitCleanupSelectors(slices.Concat(v2Dogus, v3Dogus), restoreState.RestoredComponents(spec))
+	default:
+		return cleanupSelectors{}, fmt.Errorf("cannot clean up for a backup of kind %q", restoreState.Kind)
+	}
+}
+
+// legacyCleanupSelectors select all dogus and all resources with a backup scope.
+// The pvcs of v2 dogus are deleted with their dogu; those of v3 dogus are selected by their dogu label.
+func legacyCleanupSelectors() (cleanupSelectors, error) {
+	doguPVCs, err := selectorOf(doguNameLabelKey, selection.Exists)
+	if err != nil {
+		return cleanupSelectors{}, err
+	}
+	additionalResources, err := selectorOf(backupScopeLabelKey, selection.Exists)
+	if err != nil {
+		return cleanupSelectors{}, err
+	}
+
+	return cleanupSelectors{dogus: labels.Everything(), doguPVCs: doguPVCs, additionalResources: additionalResources}, nil
+}
+
+// unitCleanupSelectors select the given dogus and the resources with a backup scope of the given components.
+// A label selector with the operator "in" requires at least one value, so a selector without values stays nil.
+func unitCleanupSelectors(dogus, components []string) (cleanupSelectors, error) {
+	var selectors cleanupSelectors
+
+	if len(dogus) > 0 {
+		doguSelector, err := selectorOf(doguNameLabelKey, selection.In, dogus...)
+		if err != nil {
+			return cleanupSelectors{}, err
+		}
+		selectors.dogus = doguSelector
+		selectors.doguPVCs = doguSelector
+	}
+
+	if len(components) > 0 {
+		additionalResources, err := selectorOf(backupScopeLabelKey, selection.Exists)
+		if err != nil {
+			return cleanupSelectors{}, err
+		}
+		componentRequirement, err := labels.NewRequirement(componentNameLabelKey, selection.In, components)
+		if err != nil {
+			return cleanupSelectors{}, fmt.Errorf("failed to create label selector: %w", err)
+		}
+		selectors.additionalResources = additionalResources.Add(*componentRequirement)
+	}
+
+	return selectors, nil
+}
+
+func selectorOf(key string, operator selection.Operator, values ...string) (labels.Selector, error) {
+	requirement, err := labels.NewRequirement(key, operator, values)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create label selector: %w", err)
+	}
+	return labels.NewSelector().Add(*requirement), nil
 }

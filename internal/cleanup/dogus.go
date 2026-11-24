@@ -3,7 +3,6 @@ package cleanup
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	doguv2 "github.com/cloudogu/k8s-dogu-lib/v3/api/v2"
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const doguNameLabelKey = "k8s.cloudogu.com/dogu.name"
@@ -33,31 +33,13 @@ func newDoguManager(doguClient doguClient, pvcClient unstructuredClient) *defaul
 	return &defaultDoguManager{doguClient: doguClient, pvcClient: pvcClient}
 }
 
-// cleanupDogus deletes all dogus that need to be deleted before restoring the backup.
+// cleanupDogus deletes the dogus and the dogu pvcs matching the selectors before restoring the backup.
+// The pvcs are deleted separately because the statefulset pvcs of v3 dogus are not owned by their dogu.
 // It adds those deletions to the wait group.
-func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGroup, v2Dogus, v3Dogus []string) error {
-	logging.Info(ctx, "starting cleanup of dogus before restore...")
+func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGroup, doguSelector, pvcSelector labels.Selector) error {
+	logging.Info(ctx, "starting cleanup of dogus before restore...", "dogus", doguSelector.String(), "pvcs", pvcSelector.String())
 
-	doguNames := slices.Concat(v2Dogus, v3Dogus)
-	if len(doguNames) == 0 {
-		// A label selector with the operator "in" requires at least one value.
-		logging.Info(ctx, "no dogus to clean up")
-		return nil
-	}
-
-	selector := metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{
-				Key: doguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: doguNames,
-			},
-		},
-	}
-	labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
-	if err != nil {
-		return fmt.Errorf("failed to parse label selector: %w", err)
-	}
-
-	doguList, err := c.doguClient.List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
+	doguList, err := c.doguClient.List(ctx, metav1.ListOptions{LabelSelector: doguSelector.String()})
 	if err != nil {
 		return fmt.Errorf("failed to list dogus: %w", err)
 	}
@@ -75,7 +57,7 @@ func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGrou
 		wg.Go(func() { c.waitForDoguDeletion(ctx, &dogu) })
 	}
 
-	doguPvcList, err := c.pvcClient.List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
+	doguPvcList, err := c.pvcClient.List(ctx, metav1.ListOptions{LabelSelector: pvcSelector.String()})
 	if err != nil {
 		return fmt.Errorf("failed to list dogu pvcs: %w", err)
 	}

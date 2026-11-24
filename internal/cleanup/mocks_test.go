@@ -12,6 +12,7 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 )
@@ -413,16 +414,16 @@ func (_m *mockDoguManager) EXPECT() *mockDoguManager_Expecter {
 }
 
 // cleanupDogus provides a mock function for the type mockDoguManager
-func (_mock *mockDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGroup, v2Dogus []string, v3Dogus []string) error {
-	ret := _mock.Called(ctx, wg, v2Dogus, v3Dogus)
+func (_mock *mockDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGroup, doguSelector labels.Selector, pvcSelector labels.Selector) error {
+	ret := _mock.Called(ctx, wg, doguSelector, pvcSelector)
 
 	if len(ret) == 0 {
 		panic("no return value specified for cleanupDogus")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sync.WaitGroup, []string, []string) error); ok {
-		r0 = returnFunc(ctx, wg, v2Dogus, v3Dogus)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sync.WaitGroup, labels.Selector, labels.Selector) error); ok {
+		r0 = returnFunc(ctx, wg, doguSelector, pvcSelector)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -437,13 +438,13 @@ type mockDoguManager_cleanupDogus_Call struct {
 // cleanupDogus is a helper method to define mock.On call
 //   - ctx context.Context
 //   - wg *sync.WaitGroup
-//   - v2Dogus []string
-//   - v3Dogus []string
-func (_e *mockDoguManager_Expecter) cleanupDogus(ctx any, wg any, v2Dogus any, v3Dogus any) *mockDoguManager_cleanupDogus_Call {
-	return &mockDoguManager_cleanupDogus_Call{Call: _e.mock.On("cleanupDogus", ctx, wg, v2Dogus, v3Dogus)}
+//   - doguSelector labels.Selector
+//   - pvcSelector labels.Selector
+func (_e *mockDoguManager_Expecter) cleanupDogus(ctx any, wg any, doguSelector any, pvcSelector any) *mockDoguManager_cleanupDogus_Call {
+	return &mockDoguManager_cleanupDogus_Call{Call: _e.mock.On("cleanupDogus", ctx, wg, doguSelector, pvcSelector)}
 }
 
-func (_c *mockDoguManager_cleanupDogus_Call) Run(run func(ctx context.Context, wg *sync.WaitGroup, v2Dogus []string, v3Dogus []string)) *mockDoguManager_cleanupDogus_Call {
+func (_c *mockDoguManager_cleanupDogus_Call) Run(run func(ctx context.Context, wg *sync.WaitGroup, doguSelector labels.Selector, pvcSelector labels.Selector)) *mockDoguManager_cleanupDogus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -453,13 +454,13 @@ func (_c *mockDoguManager_cleanupDogus_Call) Run(run func(ctx context.Context, w
 		if args[1] != nil {
 			arg1 = args[1].(*sync.WaitGroup)
 		}
-		var arg2 []string
+		var arg2 labels.Selector
 		if args[2] != nil {
-			arg2 = args[2].([]string)
+			arg2 = args[2].(labels.Selector)
 		}
-		var arg3 []string
+		var arg3 labels.Selector
 		if args[3] != nil {
-			arg3 = args[3].([]string)
+			arg3 = args[3].(labels.Selector)
 		}
 		run(
 			arg0,
@@ -476,7 +477,7 @@ func (_c *mockDoguManager_cleanupDogus_Call) Return(err error) *mockDoguManager_
 	return _c
 }
 
-func (_c *mockDoguManager_cleanupDogus_Call) RunAndReturn(run func(ctx context.Context, wg *sync.WaitGroup, v2Dogus []string, v3Dogus []string) error) *mockDoguManager_cleanupDogus_Call {
+func (_c *mockDoguManager_cleanupDogus_Call) RunAndReturn(run func(ctx context.Context, wg *sync.WaitGroup, doguSelector labels.Selector, pvcSelector labels.Selector) error) *mockDoguManager_cleanupDogus_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -518,16 +519,16 @@ func (_m *mockAdditionalResourceManager) EXPECT() *mockAdditionalResourceManager
 }
 
 // cleanupAdditionalResources provides a mock function for the type mockAdditionalResourceManager
-func (_mock *mockAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, components []string) error {
-	ret := _mock.Called(ctx, wg, components)
+func (_mock *mockAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, selector labels.Selector) error {
+	ret := _mock.Called(ctx, wg, selector)
 
 	if len(ret) == 0 {
 		panic("no return value specified for cleanupAdditionalResources")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sync.WaitGroup, []string) error); ok {
-		r0 = returnFunc(ctx, wg, components)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sync.WaitGroup, labels.Selector) error); ok {
+		r0 = returnFunc(ctx, wg, selector)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -542,12 +543,12 @@ type mockAdditionalResourceManager_cleanupAdditionalResources_Call struct {
 // cleanupAdditionalResources is a helper method to define mock.On call
 //   - ctx context.Context
 //   - wg *sync.WaitGroup
-//   - components []string
-func (_e *mockAdditionalResourceManager_Expecter) cleanupAdditionalResources(ctx any, wg any, components any) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
-	return &mockAdditionalResourceManager_cleanupAdditionalResources_Call{Call: _e.mock.On("cleanupAdditionalResources", ctx, wg, components)}
+//   - selector labels.Selector
+func (_e *mockAdditionalResourceManager_Expecter) cleanupAdditionalResources(ctx any, wg any, selector any) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
+	return &mockAdditionalResourceManager_cleanupAdditionalResources_Call{Call: _e.mock.On("cleanupAdditionalResources", ctx, wg, selector)}
 }
 
-func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) Run(run func(ctx context.Context, wg *sync.WaitGroup, components []string)) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
+func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) Run(run func(ctx context.Context, wg *sync.WaitGroup, selector labels.Selector)) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -557,9 +558,9 @@ func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) Run(run
 		if args[1] != nil {
 			arg1 = args[1].(*sync.WaitGroup)
 		}
-		var arg2 []string
+		var arg2 labels.Selector
 		if args[2] != nil {
-			arg2 = args[2].([]string)
+			arg2 = args[2].(labels.Selector)
 		}
 		run(
 			arg0,
@@ -575,7 +576,7 @@ func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) Return(
 	return _c
 }
 
-func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) RunAndReturn(run func(ctx context.Context, wg *sync.WaitGroup, components []string) error) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
+func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) RunAndReturn(run func(ctx context.Context, wg *sync.WaitGroup, selector labels.Selector) error) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
 	_c.Call.Return(run)
 	return _c
 }
