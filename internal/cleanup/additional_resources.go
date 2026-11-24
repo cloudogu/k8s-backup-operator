@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
-	corev1 "k8s.io/api/core/v1"
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,16 +36,7 @@ type defaultAdditionalResourceManager struct {
 }
 
 // newAdditionalResourceManager creates a new instance of defaultAdditionalResourceManager.
-func newAdditionalResourceManager(dynamicClient dynamicClient, namespace string) *defaultAdditionalResourceManager {
-	gvrs := []schema.GroupVersionResource{
-		corev1.SchemeGroupVersion.WithResource("configmaps"),
-		corev1.SchemeGroupVersion.WithResource("secrets"),
-		corev1.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
-	}
-	clients := make(map[schema.GroupVersionResource]unstructuredClient, len(gvrs))
-	for _, gvr := range gvrs {
-		clients[gvr] = dynamicClient.Resource(gvr).Namespace(namespace)
-	}
+func newAdditionalResourceManager(clients map[schema.GroupVersionResource]unstructuredClient) *defaultAdditionalResourceManager {
 	return &defaultAdditionalResourceManager{clients: clients}
 }
 
@@ -54,6 +44,13 @@ func newAdditionalResourceManager(dynamicClient dynamicClient, namespace string)
 // It adds those deletions to the wait group.
 func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup) error {
 	logging.Info(ctx, "starting cleanup of additional resources before restore...")
+
+	// TODO Does this work if you do a restore from lop-idp to non lop-idp? In this case the component is still in the cluster.
+	// - maybe not so bad. You have to delete the components manually after restore
+	// TODO Restore from non lop-idp cluster to lop-idp? Delete all Dogus. Who installs lop-idp?
+	// With SDB:
+	// TODO restore from lop-idp to non lop-idp: Wo deletes lop-idp?
+	// TODO restore from non lop-idp to lop-idp: Same questions like now: Wo installs lop-idp? Who deletes current dogus in change of lop-idp? We have to detect lop-idp and delete Dogus on Cleanup? Because we can't delete all Dogus in SBD
 
 	sortedKeys := slices.SortedFunc(maps.Keys(c.clients), func(a schema.GroupVersionResource, b schema.GroupVersionResource) int {
 		return strings.Compare(a.Group+a.Version+a.Resource, b.Group+b.Version+b.Resource)
@@ -75,14 +72,14 @@ func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx contex
 				return fmt.Errorf("failed to delete %s %q: %w", resource.GetKind(), resource.GetName(), err)
 			}
 
-			wg.Go(func() { c.waitForResourceDeletion(ctx, client, &resource) })
+			wg.Go(func() { waitForResourceDeletion(ctx, client, &resource) })
 		}
 	}
 
 	return nil
 }
 
-func (c *defaultAdditionalResourceManager) waitForResourceDeletion(ctx context.Context, client unstructuredClient, resource *unstructured.Unstructured) {
+func waitForResourceDeletion(ctx context.Context, client unstructuredClient, resource *unstructured.Unstructured) {
 	for {
 		logging.Debug(ctx, "waiting for resource to be deleted", "ns", resource.GetNamespace(), "kind", resource.GetKind(), "Name", resource.GetName())
 		_, err := client.Get(ctx, resource.GetName(), metav1.GetOptions{})

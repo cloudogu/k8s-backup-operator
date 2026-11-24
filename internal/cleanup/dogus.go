@@ -3,6 +3,7 @@ package cleanup
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	k8sErr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const doguNameLabelKey = "k8s.cloudogu.com/dogu.name"
 
 var doguDeleteWaitTime = defaultWaitTime
 
@@ -22,32 +25,77 @@ type doguClient interface {
 
 type defaultDoguManager struct {
 	doguClient doguClient
+	pvcClient  unstructuredClient
 }
 
 // newDoguManager creates a new instance of defaultDoguManager.
-func newDoguManager(doguClient doguClient) *defaultDoguManager {
-	return &defaultDoguManager{doguClient: doguClient}
+func newDoguManager(doguClient doguClient, pvcClient unstructuredClient) *defaultDoguManager {
+	return &defaultDoguManager{doguClient: doguClient, pvcClient: pvcClient}
 }
 
 // cleanupDogus deletes all dogus that need to be deleted before restoring the backup.
 // It adds those deletions to the wait group.
-func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGroup) error {
+func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGroup, v2Dogus, v3Dogus []string) error {
 	logging.Info(ctx, "starting cleanup of dogus before restore...")
 
-	doguList, err := c.doguClient.List(ctx, metav1.ListOptions{})
+	selector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key: doguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: slices.Concat(v2Dogus, v3Dogus),
+			},
+		},
+	}
+	labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
+	if err != nil {
+		return fmt.Errorf("failed to parse label selector: %w", err)
+	}
+
+	doguList, err := c.doguClient.List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
 	if err != nil {
 		return fmt.Errorf("failed to list dogus: %w", err)
 	}
 
-	// Delete dogus in foreground, so that all depending ressources are deleted before the dogu.
-	propagationPolicyForeground := metav1.DeletePropagationForeground
+	// Delete dogus in foreground, so that all depending resources are deleted before the dogu.
+	deleteOptions := metav1.DeleteOptions{PropagationPolicy: new(metav1.DeletePropagationForeground)}
 
 	for _, dogu := range doguList.Items {
-		if err := c.doguClient.Delete(ctx, dogu.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}); err != nil {
+		if err := c.doguClient.Delete(ctx, dogu.Name, deleteOptions); err != nil {
 			return fmt.Errorf("failed to delete dogu %q: %w", dogu.Name, err)
 		}
 
-		wg.Go(func() { c.waitForDoguDeletion(ctx, &dogu) })
+		if !k8sErr.IsNotFound(err) {
+			wg.Go(func() { c.waitForDoguDeletion(ctx, &dogu) })
+		}
+	}
+
+	// TODO v3 Dogus can contain orphaned resources like PVCs from sts
+	// Important resources remain in the cluster like SAREs with Helm's keep annotation
+	// TODO What should happen if a dogu developer adds a keep annotation to a regular pvc?
+	//    - Delete anyways -> We have to delete those resources because the restore will fail with exsiting PVCs
+	// or - Just keep? -> No
+	// What if other resource types contain keep? -> Velero update policy patches
+	// TODO Will velero throw an error if the resource container immutable fields like a sts?
+	//   -> velero will skip the resource
+	// TODO It is valid to set keep Annotation to other resources?
+	// -> Yes but only on Workloads with the scale down label. With that pods will be scaled down and the cleanup can still remove PVCs
+	// If PVCs with an other size will be restored STS may contain not real PVC Size. In this case the dogu-operator will correct this in his pvc resize logic.
+
+	// TODO Conclusion:
+	// List all PVCs with dogu labels from RestoreState, delete them and wait for deletion
+	// TODO Wait for resource deletion? -> Exists in additional_resources.go -> convert from method to function
+
+	doguPvcList, err := c.pvcClient.List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
+	if err != nil {
+		return fmt.Errorf("failed to list dogu pvcs: %w", err)
+	}
+
+	for _, pvc := range doguPvcList.Items {
+		if err := c.pvcClient.Delete(ctx, pvc.GetName(), deleteOptions); err != nil && !k8sErr.IsNotFound(err) {
+			return fmt.Errorf("failed to delete dogu pvc %q: %w", pvc.GetName(), err)
+		}
+		if !k8sErr.IsNotFound(err) {
+			wg.Go(func() { waitForResourceDeletion(ctx, c.pvcClient, &pvc) })
+		}
 	}
 
 	return nil
