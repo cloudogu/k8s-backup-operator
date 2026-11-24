@@ -21,7 +21,7 @@ The Dogu operator sets the labels automatically on all other resources.
 
 ### Dogus
 
-This currently refers to V3 Dogus, which can be selected individually for backup.
+This currently refers to V3 Dogus, which are backed up individually and can therefore be excluded individually.
 
 For each selected Dogu, the backup includes ConfigMaps, Secrets, PersistentVolumeClaims and the Dogu resource itself
 if the value of `k8s.cloudogu.com/dogu.name` matches the Dogu name.

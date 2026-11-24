@@ -15,7 +15,7 @@ V2-Dogus können nur alle zusammen in einer Einheit gesichert werden.
 Gibt es im Cluster keine V2-Dogus, wird diese Einheit nicht erzeugt.
 
 Hierbei werden von allen V2-Dogus alle ConfigMaps, Secrets, PersistentVolumeClaims und die Dogu-Ressource selbst
-gesichert, insofern sie entweder dem Label `dogu.name` ODER dem Label `k8s.cloudogu.com/dogu.name` entsprechen.
+gesichert, insofern sie dem Label `dogu.name` ODER dem Label `k8s.cloudogu.com/dogu.name` entsprechen.
 Der Wert des Labels muss hierbei dem Dogu-Namen entsprechen.
 Die Labels müssen nur an der Dogu-Ressource explizit gesetzt werden,
 was durch einen ValidatingAdmissionWebhook erzwungen wird.
@@ -23,7 +23,7 @@ An allen anderen Ressourcen werden die Labels automatisch vom Dogu-Operator gese
 
 ### Dogus
 
-Hiermit sind aktuell V3-Dogus gemeint. Diese können einzeln zur Sicherung ausgewählt werden.
+Hiermit sind aktuell V3-Dogus gemeint. Diese werden einzeln gesichert und können somit auch einzeln ausgeschlossen werden.
 
 Hierbei werden je Dogu ConfigMaps, Secrets, PersistentVolumeClaims und die Dogu-Ressource selbst gesichert,
 insofern der Wert des Labels `k8s.cloudogu.com/dogu.name` mit dem Dogu-Namen übereinstimmt.
