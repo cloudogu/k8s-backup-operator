@@ -85,8 +85,13 @@ func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx contex
 		propagationPolicyForeground := metav1.DeletePropagationForeground
 
 		for _, resource := range list.Items {
-			if err := client.Delete(ctx, resource.GetName(), metav1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}); err != nil {
-				return fmt.Errorf("failed to delete %s %q: %w", resource.GetKind(), resource.GetName(), err)
+			name := resource.GetName()
+
+			if deleteErr := client.Delete(ctx, name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}); deleteErr != nil && !k8sErr.IsNotFound(deleteErr) {
+				return fmt.Errorf("failed to delete %s %q: %w", resource.GetKind(), name, deleteErr)
+			} else if k8sErr.IsNotFound(deleteErr) {
+				logging.Debug(ctx, "resource was already deleted", "resource", name, "kind", resource.GetKind())
+				continue
 			}
 
 			wg.Go(func() { waitForResourceDeletion(ctx, client, &resource) })

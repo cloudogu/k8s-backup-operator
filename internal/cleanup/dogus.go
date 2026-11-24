@@ -66,13 +66,13 @@ func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGrou
 	deleteOptions := metav1.DeleteOptions{PropagationPolicy: new(metav1.DeletePropagationForeground)}
 
 	for _, dogu := range doguList.Items {
-		if err := c.doguClient.Delete(ctx, dogu.Name, deleteOptions); err != nil {
-			return fmt.Errorf("failed to delete dogu %q: %w", dogu.Name, err)
+		if deleteErr := c.doguClient.Delete(ctx, dogu.Name, deleteOptions); deleteErr != nil && !k8sErr.IsNotFound(deleteErr) {
+			return fmt.Errorf("failed to delete dogu %q: %w", dogu.Name, deleteErr)
+		} else if k8sErr.IsNotFound(deleteErr) {
+			logging.Debug(ctx, "dogu was already deleted", "dogu", dogu.Name)
+			continue
 		}
-
-		if !k8sErr.IsNotFound(err) {
-			wg.Go(func() { c.waitForDoguDeletion(ctx, &dogu) })
-		}
+		wg.Go(func() { c.waitForDoguDeletion(ctx, &dogu) })
 	}
 
 	doguPvcList, err := c.pvcClient.List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
@@ -81,12 +81,14 @@ func (c *defaultDoguManager) cleanupDogus(ctx context.Context, wg *sync.WaitGrou
 	}
 
 	for _, pvc := range doguPvcList.Items {
-		if err := c.pvcClient.Delete(ctx, pvc.GetName(), deleteOptions); err != nil && !k8sErr.IsNotFound(err) {
-			return fmt.Errorf("failed to delete dogu pvc %q: %w", pvc.GetName(), err)
+		name := pvc.GetName()
+		if deleteErr := c.pvcClient.Delete(ctx, name, deleteOptions); deleteErr != nil && !k8sErr.IsNotFound(deleteErr) {
+			return fmt.Errorf("failed to delete dogu pvc %q: %w", name, deleteErr)
+		} else if k8sErr.IsNotFound(deleteErr) {
+			logging.Debug(ctx, "pvc was already deleted", "pvc", name)
+			continue
 		}
-		if !k8sErr.IsNotFound(err) {
-			wg.Go(func() { waitForResourceDeletion(ctx, c.pvcClient, &pvc) })
-		}
+		wg.Go(func() { waitForResourceDeletion(ctx, c.pvcClient, &pvc) })
 	}
 
 	return nil
