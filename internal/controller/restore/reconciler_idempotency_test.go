@@ -99,7 +99,7 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	maintenanceMock.EXPECT().Activate(testCtx, mock.Anything, false).Return(nil).Once()
 	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Twice()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(nil).Once()
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Times(5)
@@ -201,7 +201,7 @@ func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheP
 	maintenanceMock.EXPECT().Activate(testCtx, mock.Anything, false).Return(nil).Once()
 	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(nil).Once()
 	// No ScaleUp expectation: recovering the workloads before the provider ran would fail here.
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()

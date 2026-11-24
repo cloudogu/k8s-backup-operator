@@ -6,11 +6,22 @@ import (
 	"testing"
 	"time"
 
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestDefaultCleanupManager_Cleanup(t *testing.T) {
+	restoreState := state.RestoreState{
+		Kind:       state.KindUnits,
+		V2Dogus:    []string{"cas"},
+		V3Dogus:    []string{"postfix", "redmine"},
+		Components: []string{"k8s-loki", "k8s-velero"},
+	}
+	// the excluded dogus and components must be kept
+	spec := backupv1.RestoreSpec{ExcludedDogus: []string{"postfix"}, ExcludedComponents: []string{"k8s-loki"}}
+
 	type fields struct {
 		doguManagerFn               func(t *testing.T) doguManager
 		additionalResourceManagerFn func(t *testing.T) additionalResourceManager
@@ -25,7 +36,7 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 			fields: fields{
 				doguManagerFn: func(t *testing.T) doguManager {
 					m := newMockDoguManager(t)
-					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}).Return(assert.AnError)
+					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, []string{"cas"}, []string{"redmine"}).Return(assert.AnError)
 					return m
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
@@ -43,12 +54,12 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 			fields: fields{
 				doguManagerFn: func(t *testing.T) doguManager {
 					m := newMockDoguManager(t)
-					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}).Return(nil)
+					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, []string{"cas"}, []string{"redmine"}).Return(nil)
 					return m
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
 					m := newMockAdditionalResourceManager(t)
-					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}).Return(assert.AnError)
+					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}, []string{"k8s-velero"}).Return(assert.AnError)
 					return m
 				},
 			},
@@ -62,13 +73,13 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 			fields: fields{
 				doguManagerFn: func(t *testing.T) doguManager {
 					m := newMockDoguManager(t)
-					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}).Return(nil)
+					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, []string{"cas"}, []string{"redmine"}).Return(nil)
 					return m
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
 					m := newMockAdditionalResourceManager(t)
-					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}).Run(
-						func(ctx context.Context, wg *sync.WaitGroup) {
+					m.EXPECT().cleanupAdditionalResources(mock.Anything, &sync.WaitGroup{}, []string{"k8s-velero"}).Run(
+						func(ctx context.Context, wg *sync.WaitGroup, _ []string) {
 							wg.Add(1)
 						}).Return(nil)
 					return m
@@ -83,8 +94,8 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 			fields: fields{
 				doguManagerFn: func(t *testing.T) doguManager {
 					m := newMockDoguManager(t)
-					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}).Run(
-						func(ctx context.Context, wg *sync.WaitGroup) {
+					m.EXPECT().cleanupDogus(mock.Anything, &sync.WaitGroup{}, []string{"cas"}, []string{"redmine"}).Run(
+						func(ctx context.Context, wg *sync.WaitGroup, _ []string, _ []string) {
 							wg.Add(1)
 							go func() {
 								wg.Done()
@@ -94,8 +105,8 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 				},
 				additionalResourceManagerFn: func(t *testing.T) additionalResourceManager {
 					m := newMockAdditionalResourceManager(t)
-					m.EXPECT().cleanupAdditionalResources(mock.Anything, mock.Anything).Run(
-						func(ctx context.Context, wg *sync.WaitGroup) {
+					m.EXPECT().cleanupAdditionalResources(mock.Anything, mock.Anything, []string{"k8s-velero"}).Run(
+						func(ctx context.Context, wg *sync.WaitGroup, _ []string) {
 							wg.Add(1)
 							go func() {
 								wg.Done()
@@ -117,7 +128,7 @@ func TestDefaultCleanupManager_Cleanup(t *testing.T) {
 				doguManager:               tt.fields.doguManagerFn(t),
 				additionalResourceManager: tt.fields.additionalResourceManagerFn(t),
 			}
-			tt.wantErr(t, c.Cleanup(t.Context()))
+			tt.wantErr(t, c.Cleanup(t.Context(), restoreState, spec))
 		})
 	}
 }

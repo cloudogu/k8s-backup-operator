@@ -11,10 +11,11 @@ import (
 	k8sErrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic/fake"
 )
+
+// componentResourceSelector selects the resources with a backup scope of the component k8s-velero.
+const componentResourceSelector = "k8s.cloudogu.com/backup-scope,k8s.cloudogu.com/component.name in (k8s-velero)"
 
 func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing.T) {
 	cancelCtx, cancel := context.WithCancel(t.Context())
@@ -30,7 +31,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			name: "fail to list configmaps",
 			configMapClientFn: func(t *testing.T) unstructuredClient {
 				m := newMockUnstructuredClient(t)
-				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/backup-scope"}).Return(nil, assert.AnError)
+				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(nil, assert.AnError)
 				return m
 			},
 			pvcClientFn: func(t *testing.T) unstructuredClient {
@@ -48,7 +49,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			name: "fail to delete configmap",
 			configMapClientFn: func(t *testing.T) unstructuredClient {
 				m := newMockUnstructuredClient(t)
-				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/backup-scope"}).Return(&unstructured.UnstructuredList{
+				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{
 					Items: []unstructured.Unstructured{
 						{Object: map[string]interface{}{
 							"apiVersion": "v1",
@@ -76,7 +77,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			name: "timeout with fail to get configmap",
 			configMapClientFn: func(t *testing.T) unstructuredClient {
 				m := newMockUnstructuredClient(t)
-				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/backup-scope"}).Return(&unstructured.UnstructuredList{
+				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{
 					Items: []unstructured.Unstructured{
 						{Object: map[string]interface{}{
 							"apiVersion": "v1",
@@ -92,7 +93,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			},
 			pvcClientFn: func(t *testing.T) unstructuredClient {
 				m := newMockUnstructuredClient(t)
-				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/backup-scope"}).Return(&unstructured.UnstructuredList{
+				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{
 					Items: []unstructured.Unstructured{
 						{Object: map[string]interface{}{
 							"apiVersion": "v1",
@@ -116,7 +117,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			name: "timeout with success to get configmap",
 			configMapClientFn: func(t *testing.T) unstructuredClient {
 				m := newMockUnstructuredClient(t)
-				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/backup-scope"}).Return(&unstructured.UnstructuredList{
+				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{
 					Items: []unstructured.Unstructured{
 						{Object: map[string]interface{}{
 							"apiVersion": "v1",
@@ -132,7 +133,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			},
 			pvcClientFn: func(t *testing.T) unstructuredClient {
 				m := newMockUnstructuredClient(t)
-				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/backup-scope"}).Return(&unstructured.UnstructuredList{
+				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{
 					Items: []unstructured.Unstructured{
 						{Object: map[string]interface{}{
 							"apiVersion": "v1",
@@ -156,7 +157,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			name: "abort on cancelled context",
 			configMapClientFn: func(t *testing.T) unstructuredClient {
 				m := newMockUnstructuredClient(t)
-				m.EXPECT().List(cancelCtx, metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/backup-scope"}).Return(&unstructured.UnstructuredList{
+				m.EXPECT().List(cancelCtx, metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{
 					Items: []unstructured.Unstructured{
 						{Object: map[string]interface{}{
 							"apiVersion": "v1",
@@ -176,7 +177,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			},
 			pvcClientFn: func(t *testing.T) unstructuredClient {
 				m := newMockUnstructuredClient(t)
-				m.EXPECT().List(cancelCtx, metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/backup-scope"}).Return(&unstructured.UnstructuredList{
+				m.EXPECT().List(cancelCtx, metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{
 					Items: []unstructured.Unstructured{
 						{Object: map[string]interface{}{
 							"apiVersion": "v1",
@@ -201,10 +202,48 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			shouldTimeout: false,
 		},
 		{
+			name: "skip already deleted resource and delete the following ones",
+			configMapClientFn: func(t *testing.T) unstructuredClient {
+				m := newMockUnstructuredClient(t)
+				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{
+					Items: []unstructured.Unstructured{
+						{Object: map[string]interface{}{
+							"apiVersion": "v1",
+							"kind":       "ConfigMap",
+							"metadata":   map[string]interface{}{"name": "gone"},
+						}},
+						{Object: map[string]interface{}{
+							"apiVersion": "v1",
+							"kind":       "ConfigMap",
+							"metadata":   map[string]interface{}{"name": "test"},
+						}},
+					},
+				}, nil)
+				propagationPolicyForeground := metav1.DeletePropagationForeground
+				m.EXPECT().Delete(t.Context(), "gone", metav1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}).
+					Return(&k8sErrs.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonNotFound}})
+				m.EXPECT().Delete(t.Context(), "test", metav1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}).Return(nil)
+				m.EXPECT().Get(t.Context(), "test", metav1.GetOptions{}).
+					Return(nil, &k8sErrs.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonNotFound}})
+				return m
+			},
+			// the following resource types must be cleaned up, too
+			pvcClientFn: func(t *testing.T) unstructuredClient {
+				m := newMockUnstructuredClient(t)
+				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{}, nil)
+				return m
+			},
+			ctxFn: func(t *testing.T) context.Context {
+				return t.Context()
+			},
+			wantErr:       assert.NoError,
+			shouldTimeout: false,
+		},
+		{
 			name: "succeed without timeout on not found",
 			configMapClientFn: func(t *testing.T) unstructuredClient {
 				m := newMockUnstructuredClient(t)
-				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/backup-scope"}).Return(&unstructured.UnstructuredList{
+				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{
 					Items: []unstructured.Unstructured{
 						{Object: map[string]interface{}{
 							"apiVersion": "v1",
@@ -221,7 +260,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			},
 			pvcClientFn: func(t *testing.T) unstructuredClient {
 				m := newMockUnstructuredClient(t)
-				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: "k8s.cloudogu.com/backup-scope"}).Return(&unstructured.UnstructuredList{
+				m.EXPECT().List(t.Context(), metav1.ListOptions{LabelSelector: componentResourceSelector}).Return(&unstructured.UnstructuredList{
 					Items: []unstructured.Unstructured{
 						{Object: map[string]interface{}{
 							"apiVersion": "v1",
@@ -260,7 +299,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			defer cancel()
 			var wg sync.WaitGroup
 
-			tt.wantErr(t, c.cleanupAdditionalResources(tt.ctxFn(t), &wg))
+			tt.wantErr(t, c.cleanupAdditionalResources(tt.ctxFn(t), &wg, []string{"k8s-velero"}))
 
 			done := make(chan struct{})
 			go func() {
@@ -281,13 +320,26 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 	}
 }
 
-func Test_newAdditionalResourceManager(t *testing.T) {
-	scheme := runtime.NewScheme()
-	err := corev1.AddToScheme(scheme)
+func Test_defaultAdditionalResourceManager_cleanupAdditionalResources_withoutComponents(t *testing.T) {
+	// The clients carry no expectations, so no resource may be listed or deleted.
+	c := &defaultAdditionalResourceManager{
+		clients: map[schema.GroupVersionResource]unstructuredClient{
+			corev1.SchemeGroupVersion.WithResource("configmaps"): newMockUnstructuredClient(t),
+		},
+	}
+	var wg sync.WaitGroup
+
+	err := c.cleanupAdditionalResources(t.Context(), &wg, nil)
+
 	assert.NoError(t, err)
-	dynamicClient := fake.NewSimpleDynamicClient(scheme)
+}
 
-	actual := newAdditionalResourceManager(dynamicClient, "test-namespace")
+func Test_newAdditionalResourceManager(t *testing.T) {
+	clients := map[schema.GroupVersionResource]unstructuredClient{
+		corev1.SchemeGroupVersion.WithResource("configmaps"): newMockUnstructuredClient(t),
+	}
 
-	assert.NotEmpty(t, actual)
+	actual := newAdditionalResourceManager(clients)
+
+	assert.Equal(t, clients, actual.clients)
 }
