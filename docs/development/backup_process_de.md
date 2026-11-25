@@ -1,8 +1,8 @@
 # Backup-Prozess
 
 Ein CES-Backup beschreibt einen Sicherungslauf. Für einen neuen Lauf ermittelt der Backup-Controller die benötigten
-Backup-Units und erstellt für jede Einheit ein Velero-Backup. `ProviderSucceeded` fasst die Ergebnisse der Einheiten
-zusammen. Der [Backup-Umfang](backup_scope_de.md) beschreibt, welche Ressourcen zu den Einheiten gehören.
+Backup-Units und erstellt für jede Unit ein Velero-Backup. `ProviderSucceeded` fasst die Ergebnisse der Units
+zusammen. Der [Backup-Umfang](backup_scope_de.md) beschreibt, welche Ressourcen zu den Units gehören.
 
 Der Velero-Synchronisationscontroller importiert ältere Velero-Backups als gleichnamige CES-Backup-Ressourcen.
 Mehr zum Abgleich nach einem Restore steht unter [Backup-Synchronisierung](backup_sync_de.md).
@@ -33,8 +33,8 @@ Eine Löschanforderung an der CES-Backup-CR hat vor dem normalen Ablauf Vorrang.
 
 - Der [Backup-Controller](../../internal/controller/backup/controller.go) wählt den Reconcile-Pfad und steuert
   Wiederholungen.
-- Die [Erzeugung der Velero-Backups](../../internal/controller/backup/unit_backups.go) legt fest, wie jede Einheit
-  gesichert wird. Die [Auswertung der Einheiten](../../internal/controller/backup/unit_completion.go) fasst ihre
+- Die [Erzeugung der Velero-Backups](../../internal/controller/backup/unit_backups.go) legt fest, wie jede Unit
+  gesichert wird. Die [Auswertung der Units](../../internal/controller/backup/unit_completion.go) fasst ihre
   Ergebnisse zusammen.
 - Der [Reconciler](../../internal/controller/backup/reconciler.go) enthält die Prüfungen der Voraussetzungen, die
   Steuerung des Wartungsmodus und die Abbruch- und Löschpfade.

@@ -3,7 +3,7 @@
 ## Backup-Units
 
 Ein Cloudogu-Backup enthält verschiedene Backup-Units, die in der Backup-CR angegeben bzw. ausgeschlossen werden.
-Welche Ressourcen für welche Einheiten gesichert werden, wird in den folgenden Abschnitten beschrieben.
+Welche Ressourcen für welche Units gesichert werden, wird in den folgenden Abschnitten beschrieben.
 
 ### Global-Config
 
@@ -11,8 +11,8 @@ Hierbei wird nur die ConfigMap mit dem Label `k8s.cloudogu.com/type: global-conf
 
 ### V2-Dogus
 
-V2-Dogus können nur alle zusammen in einer Einheit gesichert werden.
-Gibt es im Cluster keine V2-Dogus, wird diese Einheit nicht erzeugt.
+V2-Dogus können nur alle zusammen in einer Unit gesichert werden.
+Gibt es im Cluster keine V2-Dogus, wird diese Unit nicht erzeugt.
 
 Hierbei werden von allen V2-Dogus alle ConfigMaps, Secrets, PersistentVolumeClaims und die Dogu-Ressource selbst
 gesichert, insofern sie dem Label `dogu.name` ODER dem Label `k8s.cloudogu.com/dogu.name` entsprechen.
@@ -30,8 +30,8 @@ insofern der Wert des Labels `k8s.cloudogu.com/dogu.name` mit dem Dogu-Namen üb
 
 ### Komponenten
 
-Komponenten werden alle zusammen in einer Einheit gesichert.
-Gibt es im Cluster keine Komponenten mit Ressourcen, für die ein Backup nötig ist, wird diese Einheit nicht erzeugt.
+Komponenten werden alle zusammen in einer Unit gesichert.
+Gibt es im Cluster keine Komponenten mit Ressourcen, für die ein Backup nötig ist, wird diese Unit nicht erzeugt.
 
 Hierbei werden von allen Komponenten alle ConfigMaps, Secrets, PersistentVolumeClaims und ServiceAccountProducer
 gesichert, insofern sie das Backup-Scope-Label `k8s.cloudogu.com/backup-scope` besitzen UND der Wert des

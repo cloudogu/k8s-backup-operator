@@ -11,7 +11,7 @@ spec:
   # aktuell wird nur Velero unterstützt ("" ist ein Spezialfall und wählt Velero als Provider aus)
   provider: velero
   # Namen der V3-Dogus, die vom Backup ausgeschlossen werden sollen.
-  # V2-Dogus werden immer in einer Einheit gesichert und können daher nur über die Options ausgeschlossen werden.
+  # V2-Dogus werden immer in einer Unit gesichert und können daher nur über die Options ausgeschlossen werden.
   excludedDogus: ["nexus", "baseline"]
   # Namen der Komponenten, die vom Backup ausgeschlossen werden sollen.
   excludedComponents: ["lop-idp", "prometheus"]
