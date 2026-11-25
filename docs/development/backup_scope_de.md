@@ -1,8 +1,8 @@
 # Backup-Umfang
 
-## Backup-Einheiten
+## Backup-Units
 
-Ein Cloudogu-Backup enthält verschiedene Backup-Einheiten, die in der Backup-CR angegeben bzw. ausgeschlossen werden.
+Ein Cloudogu-Backup enthält verschiedene Backup-Units, die in der Backup-CR angegeben bzw. ausgeschlossen werden.
 Welche Ressourcen für welche Einheiten gesichert werden, wird in den folgenden Abschnitten beschrieben.
 
 ### Global-Config

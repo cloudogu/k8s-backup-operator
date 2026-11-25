@@ -1,7 +1,7 @@
 # Backup-Prozess
 
 Ein CES-Backup beschreibt einen Sicherungslauf. Für einen neuen Lauf ermittelt der Backup-Controller die benötigten
-Backup-Einheiten und erstellt für jede Einheit ein Velero-Backup. `ProviderSucceeded` fasst die Ergebnisse der Einheiten
+Backup-Units und erstellt für jede Einheit ein Velero-Backup. `ProviderSucceeded` fasst die Ergebnisse der Einheiten
 zusammen. Der [Backup-Umfang](backup_scope_de.md) beschreibt, welche Ressourcen zu den Einheiten gehören.
 
 Der Velero-Synchronisationscontroller importiert ältere Velero-Backups als gleichnamige CES-Backup-Ressourcen.
