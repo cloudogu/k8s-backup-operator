@@ -20,7 +20,7 @@ func TestEnsureDeletionFinalizedAbortsWithoutWritingWhenTheFinalizerIsAbsent(t *
 	writes := &clientWrites{}
 	reconciler := &restoreReconciler{k8sClient: newTestClientWithParent(t, writes.interceptor(), restore)}
 
-	updated, outcome := reconciler.ensureDeletionFinalized(testCtx, restore)
+	updated, outcome := reconciler.ensureDeletionFinalized(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	assert.Equal(t, abort(), outcome)
@@ -36,7 +36,7 @@ func TestEnsureDeletionFinalizedRemovesTheFinalizerAndLetsKubernetesDeleteTheRes
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := &restoreReconciler{k8sClient: testClient, recorder: recorderMock}
 
-	updated, outcome := reconciler.ensureDeletionFinalized(testCtx, restore)
+	updated, outcome := reconciler.ensureDeletionFinalized(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	assert.Equal(t, abort(), outcome)
@@ -44,7 +44,7 @@ func TestEnsureDeletionFinalizedRemovesTheFinalizerAndLetsKubernetesDeleteTheRes
 	assert.Equal(t, 1, writes.total())
 
 	stored := &k8sv1.Restore{}
-	err := testClient.Get(testCtx, newRestoreRequest(testRestore).NamespacedName, stored)
+	err := testClient.Get(t.Context(), newRestoreRequest(testRestore).NamespacedName, stored)
 	assert.True(t, apierrors.IsNotFound(err), "Kubernetes must finish deletion after the last finalizer is removed")
 }
 
@@ -57,11 +57,11 @@ func TestEnsureDeletionFinalizedOnlyRemovesItsOwnFinalizer(t *testing.T) {
 	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
 	reconciler := &restoreReconciler{k8sClient: testClient, recorder: recorderMock}
 
-	_, outcome := reconciler.ensureDeletionFinalized(testCtx, restore)
+	_, outcome := reconciler.ensureDeletionFinalized(t.Context(), restore)
 
 	assert.Equal(t, abort(), outcome)
 	stored := &k8sv1.Restore{}
-	require.NoError(t, testClient.Get(testCtx, newRestoreRequest(testRestore).NamespacedName, stored))
+	require.NoError(t, testClient.Get(t.Context(), newRestoreRequest(testRestore).NamespacedName, stored))
 	assert.NotContains(t, stored.Finalizers, k8sv1.RestoreFinalizer)
 	assert.Contains(t, stored.Finalizers, "example.com/another-finalizer")
 }
@@ -84,7 +84,7 @@ func TestEnsureDeletionFinalizedRetriesAFailedFinalizerRemoval(t *testing.T) {
 	testClient := newTestClientWithParent(t, failingFinalizerUpdate, restore)
 	reconciler := &restoreReconciler{k8sClient: testClient, recorder: recorderMock}
 
-	updated, outcome := reconciler.ensureDeletionFinalized(testCtx, restore)
+	updated, outcome := reconciler.ensureDeletionFinalized(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	require.Error(t, outcome.err)
@@ -95,7 +95,7 @@ func TestEnsureDeletionFinalizedRetriesAFailedFinalizerRemoval(t *testing.T) {
 	assert.Equal(t, 1, updateAttempts)
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, testClient.Get(testCtx, newRestoreRequest(testRestore).NamespacedName, stored))
+	require.NoError(t, testClient.Get(t.Context(), newRestoreRequest(testRestore).NamespacedName, stored))
 	assert.Contains(t, stored.Finalizers, k8sv1.RestoreFinalizer,
 		"a failed update must leave the persisted finalizer in place")
 }

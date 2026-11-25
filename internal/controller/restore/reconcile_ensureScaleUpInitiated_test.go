@@ -19,12 +19,12 @@ func TestScaleUpInitiationPersistsItsProgressAndRequeues(t *testing.T) {
 	restore := recoverableRestore()
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().ScaleUp(t.Context()).Return(nil).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-	updated, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
+	updated, outcome := reconciler.ensureScaleUpInitiated(t.Context(), restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assert.Equal(t, 1, writes.total(), "the initiation must only persist its progress")
@@ -45,7 +45,7 @@ func TestScaleUpInitiationIsEnsuredAgainBeforeProceeding(t *testing.T) {
 	}})
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().ScaleUp(t.Context()).Return(nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, writes.interceptor(), restore),
@@ -56,7 +56,7 @@ func TestScaleUpInitiationIsEnsuredAgainBeforeProceeding(t *testing.T) {
 		requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	updated, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
+	updated, outcome := reconciler.ensureScaleUpInitiated(t.Context(), restore)
 
 	assert.Equal(t, next(), outcome)
 	assert.Same(t, restore, updated)
@@ -67,13 +67,13 @@ func TestScaleUpInitiationDoesNotResetFinalizedRecoveryProgress(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonScaleUpFinalized)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().ScaleUp(t.Context()).Return(nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	_, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
+	_, outcome := reconciler.ensureScaleUpInitiated(t.Context(), restore)
 
 	assert.Equal(t, next(), outcome)
 	assert.Equal(t, 0, writes.total())
@@ -83,7 +83,7 @@ func TestFailedScaleUpInitiationReportsRecoveryFalseAndRetries(t *testing.T) {
 	restore := recoverableRestore()
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleUp(testCtx).Return(assert.AnError).Once()
+	scaleMock.EXPECT().ScaleUp(t.Context()).Return(assert.AnError).Once()
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(
 		matchesCloudoguRestoreNamed(testRestore),
@@ -104,7 +104,7 @@ func TestFailedScaleUpInitiationReportsRecoveryFalseAndRetries(t *testing.T) {
 	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
 	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-	_, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
+	_, outcome := reconciler.ensureScaleUpInitiated(t.Context(), restore)
 
 	require.Error(t, outcome.err)
 	assert.ErrorIs(t, outcome.err, assert.AnError)
@@ -117,7 +117,7 @@ func TestUnpersistableScaleUpInitiationIsRetried(t *testing.T) {
 	restore := recoverableRestore()
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().ScaleUp(t.Context()).Return(nil).Once()
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore),
 		nil,
@@ -127,7 +127,7 @@ func TestUnpersistableScaleUpInitiationIsRetried(t *testing.T) {
 		requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	_, outcome := reconciler.ensureScaleUpInitiated(testCtx, restore)
+	_, outcome := reconciler.ensureScaleUpInitiated(t.Context(), restore)
 
 	require.Error(t, outcome.err)
 	assert.ErrorIs(t, outcome.err, assert.AnError)

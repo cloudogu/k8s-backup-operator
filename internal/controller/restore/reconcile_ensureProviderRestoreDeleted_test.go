@@ -25,7 +25,7 @@ func TestEnsureProviderRestoreDeletedContinuesWhenTheChildIsAlreadyAbsent(t *tes
 	writes := &clientWrites{}
 	reconciler := &restoreReconciler{k8sClient: newTestClientWithParent(t, writes.interceptor(), restore)}
 
-	updated, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
+	updated, outcome := reconciler.ensureProviderRestoreDeleted(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	assert.Equal(t, next(), outcome)
@@ -40,7 +40,7 @@ func TestEnsureProviderRestoreDeletedDeletesAnOwnedChildAndWaitsForItsDisappeara
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore, child)
 	reconciler := &restoreReconciler{k8sClient: testClient, requeueDelay: requeueAfterTest}
 
-	updated, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
+	updated, outcome := reconciler.ensureProviderRestoreDeleted(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome,
@@ -49,7 +49,7 @@ func TestEnsureProviderRestoreDeletedDeletesAnOwnedChildAndWaitsForItsDisappeara
 	assert.Equal(t, 1, writes.total())
 
 	stored := &velerov1.Restore{}
-	err := testClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: testRestore}, stored)
+	err := testClient.Get(t.Context(), types.NamespacedName{Namespace: testNamespace, Name: testRestore}, stored)
 	assert.True(t, apierrors.IsNotFound(err))
 }
 
@@ -62,7 +62,7 @@ func TestEnsureProviderRestoreDeletedDeletesAnUnownedChildOfALegacyRestore(t *te
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore, child)
 	reconciler := &restoreReconciler{k8sClient: testClient, requeueDelay: requeueAfterTest}
 
-	_, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
+	_, outcome := reconciler.ensureProviderRestoreDeleted(t.Context(), restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assert.Equal(t, 1, writes.child.deletes,
@@ -82,14 +82,14 @@ func TestEnsureProviderRestoreDeletedLeavesAForeignChildUntouched(t *testing.T) 
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore, child)
 	reconciler := &restoreReconciler{k8sClient: testClient, recorder: recorderMock}
 
-	updated, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
+	updated, outcome := reconciler.ensureProviderRestoreDeleted(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	assert.Equal(t, next(), outcome, "a foreign child must not wedge deletion of the parent")
 	assert.Equal(t, 0, writes.total(), "a foreign child must not be mutated")
 
 	stored := &velerov1.Restore{}
-	require.NoError(t, testClient.Get(testCtx, client.ObjectKeyFromObject(child), stored))
+	require.NoError(t, testClient.Get(t.Context(), client.ObjectKeyFromObject(child), stored))
 }
 
 func TestEnsureProviderRestoreDeletedWaitsForATerminatingOwnedChildWithoutDeletingItAgain(t *testing.T) {
@@ -104,7 +104,7 @@ func TestEnsureProviderRestoreDeletedWaitsForATerminatingOwnedChildWithoutDeleti
 		requeueDelay: requeueAfterTest,
 	}
 
-	updated, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
+	updated, outcome := reconciler.ensureProviderRestoreDeleted(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
@@ -124,7 +124,7 @@ func TestEnsureProviderRestoreDeletedRetriesAnUnreadableChild(t *testing.T) {
 	}
 	reconciler := &restoreReconciler{k8sClient: newTestClientWithParent(t, failingChildGet, restore)}
 
-	updated, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
+	updated, outcome := reconciler.ensureProviderRestoreDeleted(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	require.Error(t, outcome.err)
@@ -141,7 +141,7 @@ func TestEnsureProviderRestoreDeletedRetriesAFailedChildDeletion(t *testing.T) {
 		k8sClient: newTestClientWithParent(t, failingDelete(assert.AnError), restore, child),
 	}
 
-	updated, outcome := reconciler.ensureProviderRestoreDeleted(testCtx, restore)
+	updated, outcome := reconciler.ensureProviderRestoreDeleted(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	require.Error(t, outcome.err)

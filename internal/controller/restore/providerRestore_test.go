@@ -34,7 +34,7 @@ func TestProviderRestoreStageCreatesOwnedChildWithoutWaiting(t *testing.T) {
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -44,7 +44,7 @@ func TestProviderRestoreStageCreatesOwnedChildWithoutWaiting(t *testing.T) {
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
@@ -52,7 +52,7 @@ func TestProviderRestoreStageCreatesOwnedChildWithoutWaiting(t *testing.T) {
 		"starting the restore must create the child and write nothing else")
 
 	child := &velerov1.Restore{}
-	require.NoError(t, fixture.client.Get(testCtx, client.ObjectKeyFromObject(restore), child))
+	require.NoError(t, fixture.client.Get(t.Context(), client.ObjectKeyFromObject(restore), child))
 	assert.True(t, velero.IsOwnedRestore(restore, child), "the created child must be owned by the restore")
 	assert.Equal(t, testBackup, child.Spec.BackupName)
 
@@ -66,7 +66,7 @@ func TestARepeatedReconciliationNeverStartsASecondProviderRestore(t *testing.T) 
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -76,9 +76,9 @@ func TestARepeatedReconciliationNeverStartsASecondProviderRestore(t *testing.T) 
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 	request := newRestoreRequest(testRestore)
 
-	firstResults, firstErrs := fixture.reconcileTimes(testCtx, request, 1)
+	firstResults, firstErrs := fixture.reconcileTimes(t.Context(), request, 1)
 	fixture.restart(factory)
-	laterResults, laterErrs := fixture.reconcileTimes(testCtx, request, 2)
+	laterResults, laterErrs := fixture.reconcileTimes(t.Context(), request, 2)
 
 	require.NoError(t, firstErrs[0])
 	require.NoError(t, laterErrs[0])
@@ -103,7 +103,7 @@ func TestAProviderRestoreThatCannotBeStartedIsReportedAndRetried(t *testing.T) {
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, ReasonProviderRestoreFailed, mock.Anything, mock.Anything).Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -112,14 +112,14 @@ func TestAProviderRestoreThatCannotBeStartedIsReportedAndRetried(t *testing.T) {
 	}
 	fixture := newMultiReconcileFixture(t, failingCreate(assert.AnError), factory, restore)
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError)
 	assert.ErrorContains(t, errs[0], "failed to start the provider restore of restore test-restore")
 	assert.Equal(t, ctrl.Result{}, results[0], "an error carries the retry, so there must be no explicit requeue")
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, fixture.client.Get(testCtx, newRestoreRequest(testRestore).NamespacedName, stored))
+	require.NoError(t, fixture.client.Get(t.Context(), newRestoreRequest(testRestore).NamespacedName, stored))
 	assert.False(t, isTerminal(stored), "a child that could not be created must leave the restore resumable")
 }
 
@@ -137,7 +137,7 @@ func TestAConflictingChildFoundWhenStartingTheRestoreIsTerminal(t *testing.T) {
 		k8sClient: newTestClient(t, appearingForeignChild(t, restore), restore),
 	}
 
-	updated, outcome := reconciler.ensureProviderRestore(testCtx, restore)
+	updated, outcome := reconciler.ensureProviderRestore(t.Context(), restore)
 
 	assert.Equal(t, abort(), outcome, "a conflict must not be retried")
 	require.NotNil(t, updated)

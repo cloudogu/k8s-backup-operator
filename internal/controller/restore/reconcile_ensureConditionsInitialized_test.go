@@ -40,7 +40,7 @@ func TestTheFirstReconcileOfANewRestoreInitializesAllWorkflowConditions(t *testi
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 	request := newRestoreRequest(testRestore)
 
-	results, errs := fixture.reconcileTimes(testCtx, request, 2)
+	results, errs := fixture.reconcileTimes(t.Context(), request, 2)
 
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
@@ -50,7 +50,7 @@ func TestTheFirstReconcileOfANewRestoreInitializesAllWorkflowConditions(t *testi
 		"the conditions must be initialized in one write, before the metadata and only once")
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, fixture.client.Get(testCtx, request.NamespacedName, stored))
+	require.NoError(t, fixture.client.Get(t.Context(), request.NamespacedName, stored))
 	assertUnknownWorkflowConditions(t, stored, workflowConditionTypes...)
 	assert.Equal(t, k8sv1.RestoreStatusInProgress, stored.Status.Status,
 		"the deprecated status phase is derived from the initialized conditions")
@@ -71,13 +71,13 @@ func TestConditionInitializationDoesNotResetAResolvedCondition(t *testing.T) {
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 	request := newRestoreRequest(testRestore)
 
-	results, errs := fixture.reconcileTimes(testCtx, request, 1)
+	results, errs := fixture.reconcileTimes(t.Context(), request, 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, fixture.client.Get(testCtx, request.NamespacedName, stored))
+	require.NoError(t, fixture.client.Get(t.Context(), request.NamespacedName, stored))
 	prepared := meta.FindStatusCondition(stored.Status.Conditions, k8sv1.ConditionPrepared)
 	require.NotNil(t, prepared)
 	assert.Equal(t, metav1.ConditionTrue, prepared.Status, "the reached milestone must survive the initialization")
@@ -92,7 +92,7 @@ func TestARestoreInterruptedAtAnUnknownOutcomeContinues(t *testing.T) {
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -101,7 +101,7 @@ func TestARestoreInterruptedAtAnUnknownOutcomeContinues(t *testing.T) {
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
@@ -119,13 +119,13 @@ func TestALegacyRestoreWithAnUninterpretableStatusIsInitializedInstead(t *testin
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 	request := newRestoreRequest(testRestore)
 
-	results, errs := fixture.reconcileTimes(testCtx, request, 1)
+	results, errs := fixture.reconcileTimes(t.Context(), request, 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, fixture.client.Get(testCtx, request.NamespacedName, stored))
+	require.NoError(t, fixture.client.Get(t.Context(), request.NamespacedName, stored))
 	assertUnknownWorkflowConditions(t, stored, workflowConditionTypes...)
 }
 
@@ -138,7 +138,7 @@ func TestAFailedConditionInitializationIsRetriedWithoutStartingTheRestore(t *tes
 	}
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore)
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError)
 	assert.ErrorContains(t, errs[0], "failed to initialize the conditions of restore test-restore")

@@ -22,8 +22,6 @@ import (
 	v1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 )
 
-var testCtx = context.TODO()
-
 var testNamespace = "ecosystem-test"
 var testRestore = "test-restore"
 
@@ -54,7 +52,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 		}
 
 		// when
-		actual, err := sut.Reconcile(testCtx, request)
+		actual, err := sut.Reconcile(t.Context(), request)
 
 		// then
 		require.Error(t, err)
@@ -75,7 +73,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			sut := &restoreReconciler{namespace: testNamespace, k8sClient: testClient}
 
 			// when
-			actual, err := sut.Reconcile(testCtx, request)
+			actual, err := sut.Reconcile(t.Context(), request)
 
 			// then
 			require.NoError(t, err)
@@ -84,7 +82,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			assertSuccessfulCondition(t, testClient, testRestore, metav1.ConditionFalse, ReasonMigratedFromLegacyStatus)
 
 			stored := &v1.Restore{}
-			require.NoError(t, sut.k8sClient.Get(testCtx, client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
+			require.NoError(t, sut.k8sClient.Get(t.Context(), client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
 			assert.Equal(t, v1.RestoreStatusFailed, stored.Status.Status)
 		})
 		t.Run("should ignore a completed restore without writing", func(t *testing.T) {
@@ -106,7 +104,7 @@ func Test_restoreReconciler_Reconcile(t *testing.T) {
 			}
 
 			// when
-			actual, err := sut.Reconcile(testCtx, request)
+			actual, err := sut.Reconcile(t.Context(), request)
 
 			// then
 			require.NoError(t, err)
@@ -134,7 +132,7 @@ func Test_restoreReconciler_SetupWithManager(t *testing.T) {
 		ctrlManMock := newMockControllerManager(t)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
-		logger := log.FromContext(testCtx)
+		logger := log.FromContext(t.Context())
 		ctrlManMock.EXPECT().GetLogger().Return(logger)
 		ctrlManMock.EXPECT().Add(mock.Anything).Return(nil)
 		ctrlManMock.EXPECT().GetCache().Return(nil)

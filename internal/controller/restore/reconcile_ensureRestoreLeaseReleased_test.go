@@ -18,12 +18,12 @@ func TestEnsureRestoreLeaseReleased(t *testing.T) {
 		testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
 		reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-		actual, outcome := reconciler.ensureRestoreLeaseReleased(testCtx, restore)
+		actual, outcome := reconciler.ensureRestoreLeaseReleased(t.Context(), restore)
 
 		assert.Same(t, restore, actual)
 		assert.Equal(t, next(), outcome)
 		lease := &coordinationv1.Lease{}
-		err := testClient.Get(testCtx, leaseKey(), lease)
+		err := testClient.Get(t.Context(), leaseKey(), lease)
 		assert.True(t, apierrors.IsNotFound(err))
 	})
 
@@ -33,11 +33,11 @@ func TestEnsureRestoreLeaseReleased(t *testing.T) {
 		testClient := newTestClient(t, interceptor.Funcs{}, restore, newRestoreLease(other))
 		reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-		_, outcome := reconciler.ensureRestoreLeaseReleased(testCtx, restore)
+		_, outcome := reconciler.ensureRestoreLeaseReleased(t.Context(), restore)
 
 		assert.Equal(t, next(), outcome)
 		lease := &coordinationv1.Lease{}
-		require.NoError(t, testClient.Get(testCtx, leaseKey(), lease))
+		require.NoError(t, testClient.Get(t.Context(), leaseKey(), lease))
 		assert.Equal(t, other.Name, lease.Annotations[restoreLeaseHolderNameAnnotation])
 	})
 
@@ -50,7 +50,7 @@ func TestEnsureRestoreLeaseReleased(t *testing.T) {
 		}, restore)
 		reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-		_, outcome := reconciler.ensureRestoreLeaseReleased(testCtx, restore)
+		_, outcome := reconciler.ensureRestoreLeaseReleased(t.Context(), restore)
 
 		require.Error(t, outcome.err)
 		assert.ErrorIs(t, outcome.err, assert.AnError)

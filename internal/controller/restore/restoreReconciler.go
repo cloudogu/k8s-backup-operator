@@ -368,7 +368,9 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 	}
 	logging.Info(ctx, "collected restore state")
 
-	if err := r.scaleManager.ScaleDown(ctx); err != nil {
+	_, restoredDogus := restoreState.RestoredDogus(restore.Spec)
+	restoredComponents := restoreState.RestoredComponents(restore.Spec)
+	if err := r.scaleManager.ScaleDown(ctx, restoredDogus, restoredComponents); err != nil {
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to scale down workloads before restore: %w", err))
 	}
 	logging.Info(ctx, "scaled down the workloads")

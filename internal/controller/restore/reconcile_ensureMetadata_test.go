@@ -23,7 +23,7 @@ func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -33,7 +33,7 @@ func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 	request := newRestoreRequest(testRestore)
 
-	results, errs := fixture.reconcileTimes(testCtx, request, 2)
+	results, errs := fixture.reconcileTimes(t.Context(), request, 2)
 
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
@@ -51,7 +51,7 @@ func TestEnsureMetadataDoesNotWriteAgain(t *testing.T) {
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -61,7 +61,7 @@ func TestEnsureMetadataDoesNotWriteAgain(t *testing.T) {
 
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "a converged restore must start the provider restore right away")
@@ -78,7 +78,7 @@ func TestEnsureMetadataRetriesAFailedWriteWithoutStartingTheRestore(t *testing.T
 	}
 	fixture := newMultiReconcileFixture(t, failingUpdate(assert.AnError), factory, restore)
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError)
 	assert.ErrorContains(t, errs[0], "failed to converge the metadata of restore test-restore")

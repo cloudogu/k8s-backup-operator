@@ -17,12 +17,12 @@ func TestScaleUpFinalizationPersistsItsProgressAndRequeues(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonWorkloadsReady)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().FinalizeScaleUp(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().FinalizeScaleUp(t.Context()).Return(nil).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-	updated, outcome := reconciler.ensureScaleUpFinalized(testCtx, restore)
+	updated, outcome := reconciler.ensureScaleUpFinalized(t.Context(), restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assert.Equal(t, 1, writes.total())
@@ -36,13 +36,13 @@ func TestScaleUpFinalizationIsEnsuredAgainBeforeProceeding(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonScaleUpFinalized)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().FinalizeScaleUp(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().FinalizeScaleUp(t.Context()).Return(nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	updated, outcome := reconciler.ensureScaleUpFinalized(testCtx, restore)
+	updated, outcome := reconciler.ensureScaleUpFinalized(t.Context(), restore)
 
 	assert.Equal(t, next(), outcome)
 	assert.Same(t, restore, updated)
@@ -53,7 +53,7 @@ func TestFailedScaleUpFinalizationReportsRecoveryFalseAndRetries(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonWorkloadsReady)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().FinalizeScaleUp(testCtx).Return(assert.AnError).Once()
+	scaleMock.EXPECT().FinalizeScaleUp(t.Context()).Return(assert.AnError).Once()
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(
 		matchesCloudoguRestoreNamed(testRestore),
@@ -74,7 +74,7 @@ func TestFailedScaleUpFinalizationReportsRecoveryFalseAndRetries(t *testing.T) {
 	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
 	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-	_, outcome := reconciler.ensureScaleUpFinalized(testCtx, restore)
+	_, outcome := reconciler.ensureScaleUpFinalized(t.Context(), restore)
 
 	require.Error(t, outcome.err)
 	assert.ErrorIs(t, outcome.err, assert.AnError)
@@ -86,13 +86,13 @@ func TestUnpersistableScaleUpFinalizationIsRetried(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonWorkloadsReady)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().FinalizeScaleUp(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().FinalizeScaleUp(t.Context()).Return(nil).Once()
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore),
 		nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	_, outcome := reconciler.ensureScaleUpFinalized(testCtx, restore)
+	_, outcome := reconciler.ensureScaleUpFinalized(t.Context(), restore)
 
 	require.Error(t, outcome.err)
 	assert.ErrorIs(t, outcome.err, assert.AnError)

@@ -23,10 +23,10 @@ func TestSetConditionsDoesNotWriteWhenTheEffectiveStatusIsUnchanged(t *testing.T
 
 	condition := successful(metav1.ConditionUnknown, ReasonPreparing)
 
-	first, err := updater.setConditions(testCtx, restore, condition)
+	first, err := updater.setConditions(t.Context(), restore, condition)
 	require.NoError(t, err)
 
-	second, err := updater.setConditions(testCtx, first, condition)
+	second, err := updater.setConditions(t.Context(), first, condition)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, writes.parent.statusUpdates, "the identical second call must not write")
@@ -42,7 +42,7 @@ func TestSetConditionsPreservesLastTransitionTimeWhileTheConditionStatusStays(t 
 	running := successful(metav1.ConditionUnknown, ReasonProviderRestoreRunning)
 	running.Message = "The provider is restoring."
 
-	first, err := updater.setConditions(testCtx, restore, running)
+	first, err := updater.setConditions(t.Context(), restore, running)
 	require.NoError(t, err)
 	firstCondition := findSuccessfulCondition(first)
 	require.NotNil(t, firstCondition)
@@ -50,7 +50,7 @@ func TestSetConditionsPreservesLastTransitionTimeWhileTheConditionStatusStays(t 
 	require.False(t, transitionedAt.IsZero())
 
 	running.Message = "The provider is still restoring."
-	second, err := updater.setConditions(testCtx, first, running)
+	second, err := updater.setConditions(t.Context(), first, running)
 	require.NoError(t, err)
 
 	require.Equal(t, 2, writes.parent.statusUpdates, "a changed message must be written")
@@ -65,7 +65,7 @@ func TestSetConditionsPreservesLastTransitionTimeWhileTheConditionStatusStays(t 
 	failed := successful(metav1.ConditionFalse, ReasonProviderRestoreFailed)
 	failed.LastTransitionTime = metav1.NewTime(transitionedAt.Add(time.Minute))
 
-	third, err := updater.setConditions(testCtx, second, failed)
+	third, err := updater.setConditions(t.Context(), second, failed)
 	require.NoError(t, err)
 	thirdCondition := findSuccessfulCondition(third)
 	require.NotNil(t, thirdCondition)
@@ -80,7 +80,7 @@ func TestSetConditionsRecordsTheObservedGenerationAndWritesTheLegacyStatus(t *te
 	writes := &clientWrites{}
 	updater := newConditionUpdater(newTestClientWithParent(t, writes.interceptor(), restore))
 
-	updated, err := updater.setConditions(testCtx, restore, successful(metav1.ConditionTrue, ReasonRestoreCompleted))
+	updated, err := updater.setConditions(t.Context(), restore, successful(metav1.ConditionTrue, ReasonRestoreCompleted))
 	require.NoError(t, err)
 
 	condition := findSuccessfulCondition(updated)
@@ -89,7 +89,7 @@ func TestSetConditionsRecordsTheObservedGenerationAndWritesTheLegacyStatus(t *te
 	assert.Equal(t, k8sv1.RestoreStatusCompleted, updated.Status.Status)
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, updater.client.Get(testCtx, client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
+	require.NoError(t, updater.client.Get(t.Context(), client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
 	assert.Equal(t, k8sv1.RestoreStatusCompleted, stored.Status.Status)
 }
 
@@ -108,12 +108,12 @@ func TestSetConditionsRetriesOnConflictAndKeepsAConcurrentlyWrittenCondition(t *
 	updater := newConditionUpdater(newTestClientWithParent(t, writes.interceptor(), restoreWith("", concurrent)))
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, updater.client.Get(testCtx, client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
+	require.NoError(t, updater.client.Get(t.Context(), client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
 	stale := stored.DeepCopy()
 	stale.ResourceVersion = "1"
 	stale.Status.Conditions = nil
 
-	updated, err := updater.setConditions(testCtx, stale, successful(metav1.ConditionTrue, ReasonRestoreCompleted))
+	updated, err := updater.setConditions(t.Context(), stale, successful(metav1.ConditionTrue, ReasonRestoreCompleted))
 	require.NoError(t, err)
 
 	require.Equal(t, 2, writes.parent.statusUpdates, "the conflicting write and the successful retry")
@@ -122,7 +122,7 @@ func TestSetConditionsRetriesOnConflictAndKeepsAConcurrentlyWrittenCondition(t *
 	assert.Equal(t, metav1.ConditionTrue, condition.Status)
 
 	stored2 := &k8sv1.Restore{}
-	require.NoError(t, updater.client.Get(testCtx, client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored2))
+	require.NoError(t, updater.client.Get(t.Context(), client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored2))
 	survivor := meta.FindStatusCondition(stored2.Status.Conditions, k8sv1.ConditionWorkloadsRecovered)
 	require.NotNil(t, survivor, "the concurrently written condition must not be dropped")
 	assert.Equal(t, "Written by someone else while we were updating.", survivor.Message)
@@ -140,7 +140,7 @@ func TestSetConditionsReportsAFailedUpdateWithoutRetrying(t *testing.T) {
 	restore := restoreWith("")
 	updater := newConditionUpdater(newTestClientWithParent(t, failing, restore))
 
-	updated, err := updater.setConditions(testCtx, restore, successful(metav1.ConditionUnknown, ReasonPreparing))
+	updated, err := updater.setConditions(t.Context(), restore, successful(metav1.ConditionUnknown, ReasonPreparing))
 
 	require.ErrorIs(t, err, assert.AnError)
 	assert.Equal(t, 1, writes.parent.statusUpdates, "a non-conflict error must not be retried")
@@ -153,7 +153,7 @@ func TestSetConditionsFromLegacyStatusWritesTheOutcomeOnlyOnce(t *testing.T) {
 	writes := &clientWrites{}
 	updater := newConditionUpdater(newTestClientWithParent(t, writes.interceptor(), legacy))
 
-	restore, err := updater.setConditionsFromLegacyStatus(testCtx, legacy)
+	restore, err := updater.setConditionsFromLegacyStatus(t.Context(), legacy)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, writes.parent.statusUpdates)
@@ -164,7 +164,7 @@ func TestSetConditionsFromLegacyStatusWritesTheOutcomeOnlyOnce(t *testing.T) {
 	assert.Equal(t, k8sv1.RestoreStatusCompleted, restore.Status.Status, "the legacy status must survive the migration")
 	assert.Len(t, restore.Status.Conditions, 1, "milestone conditions must not be derived")
 
-	again, err := updater.setConditionsFromLegacyStatus(testCtx, restore)
+	again, err := updater.setConditionsFromLegacyStatus(t.Context(), restore)
 	require.NoError(t, err)
 	require.Equal(t, 1, writes.parent.statusUpdates, "a restore that already carries the condition must not be written again")
 	assert.Same(t, restore, again)
@@ -178,7 +178,7 @@ func TestSetConditionsFromLegacyStatusLeavesRestoresWithoutALegacyOutcomeAlone(t
 	deleting.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 
 	for _, restore := range []*k8sv1.Restore{restoreWith(k8sv1.RestoreStatusNew), deleting} {
-		result, err := updater.setConditionsFromLegacyStatus(testCtx, restore)
+		result, err := updater.setConditionsFromLegacyStatus(t.Context(), restore)
 
 		require.NoError(t, err)
 		assert.Same(t, restore, result)
