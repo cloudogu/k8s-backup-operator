@@ -23,6 +23,8 @@ to keep the target instance's global configuration. The operator preserves the e
 even if it has the `k8s.cloudogu.com/backup-scope` label. Velero skips the global ConfigMap in the backup even when the
 target instance has no global ConfigMap.
 
+This option requires `k8s-backup-operator-crd` version `1.10.0` or later.
+
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
 kind: Restore

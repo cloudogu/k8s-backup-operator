@@ -18,10 +18,12 @@ da installierte Dogus, die nicht in der Sicherung enthalten sind, nicht mehr fun
 
 ## Globale Konfiguration der Zielinstanz behalten
 
-Bei einem Restore aus dem Backup einer anderen Dogu-v2-Instanz kann mit  `spec.options.ignoreGlobalConfig: true`
-die globale Konfiguration der Zielinstanz behalten werdem. Der Operator erhält die vorhandene globale ConfigMap beim Aufräumen,
+Bei einem Restore aus dem Backup einer anderen Dogu-v2-Instanz kann mit `spec.options.ignoreGlobalConfig: true`
+die globale Konfiguration der Zielinstanz behalten werden. Der Operator erhält die vorhandene globale ConfigMap beim Aufräumen,
 auch wenn sie das Label `k8s.cloudogu.com/backup-scope` trägt. Velero überspringt die globale ConfigMap aus dem Backup
 auch dann, wenn im Ziel keine globale ConfigMap vorhanden ist.
+
+Die Option setzt `k8s-backup-operator-crd` ab Version `1.10.0` voraus.
 
 ```yaml
 apiVersion: k8s.cloudogu.com/v1
