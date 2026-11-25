@@ -132,12 +132,12 @@ Vor Lease und destruktiver Vorbereitung stellt `ensureMetadata` den Operator-Fin
 | Status | Reason | Bedeutung |
 |---|---|---|
 | `Unknown` | `Pending` | Vorbereitung noch nicht abgeschlossen. |
-| `False` | `PreparationFailed` | Scale-down oder Cleanup schlug fehl; der Vorgang wird mit Backoff wiederholt. |
+| `False` | `PreparationFailed` | Sammeln des Restore-States, Scale-down oder Cleanup schlug fehl; der Vorgang wird mit Backoff wiederholt. |
 | `True` | `PreparationCompleted` | Workloads wurden herunterskaliert und Restore-Ressourcen bereinigt. |
 
 Vor der Aktivierung des Wartungsmodus und der destruktiven Vorbereitung prüft `ensureProviderReady`, ob der Provider verfügbar ist. Ist der Restore laut `Prepared`-Condition oder anhand eines eindeutig zugehörigen Provider-Child bereits vorbereitet, wird diese Prüfung übersprungen. So wird ein wiederaufgenommener Restore nicht von einer erneuten Provider-Prüfung blockiert.
 
-Anschließend aktiviert `ensureMaintenanceModeActivated` den Wartungsmodus best-effort. Die Stage prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Sie persistiert keine Condition und darf im selben Reconcile direkt zur Preparation weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein. Existiert bereits ein eindeutig zugehöriger Provider-Child, gilt die Vorbereitung ebenfalls als erfolgt. So wird das kritische Crash-Fenster zwischen Child-Erstellung und Parent-Status-Write nicht mit einem zweiten Cleanup beantwortet.
+Anschließend aktiviert `ensureMaintenanceModeActivated` den Wartungsmodus best-effort. Die Stage prüft zuerst den tatsächlichen Zustand und aktiviert ihn nur, wenn er noch inaktiv ist. Ein Fehler wird protokolliert und als Event gemeldet, verhindert den Restore aber nicht. Sie persistiert keine Condition und darf im selben Reconcile direkt zur Preparation weiterlaufen. Scale-down und Cleanup dagegen müssen erfolgreich sein. Vor dem Scale-down sammelt die Preparation den Restore-State aus dem Quell-Backup; schlägt das fehl, wird zusätzlich ein Warning-Event mit `Reason=CollectStateFailed` erzeugt. Der Cleanup nutzt diesen State: Bei einem Legacy-Backup werden alle Dogus und alle Ressourcen mit `k8s.cloudogu.com/backup-scope` gelöscht. Bei einem Unit-Backup werden nur die wiederhergestellten Dogus samt ihrer PVCs und die zusätzlichen Ressourcen der wiederhergestellten Components gelöscht; per `excludedDogus`, `excludedComponents` oder `options.ignoreV2Dogus` ausgeschlossene bleiben erhalten. Existiert bereits ein eindeutig zugehöriger Provider-Child, gilt die Vorbereitung ebenfalls als erfolgt. So wird das kritische Crash-Fenster zwischen Child-Erstellung und Parent-Status-Write nicht mit einem zweiten Cleanup beantwortet.
 
 ### `ProviderSucceeded`
 

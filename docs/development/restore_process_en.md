@@ -132,12 +132,12 @@ Before acquiring the lease and starting destructive preparation, `ensureMetadata
 | Status | Reason | Meaning |
 |---|---|---|
 | `Unknown` | `Pending` | Preparation has not completed yet. |
-| `False` | `PreparationFailed` | Scale-down or cleanup failed; the operation is retried with backoff. |
+| `False` | `PreparationFailed` | Collecting the restore state, scale-down or cleanup failed; the operation is retried with backoff. |
 | `True` | `PreparationCompleted` | Workloads were scaled down and restore resources were cleaned up. |
 
 Before activating maintenance mode and starting destructive preparation, `ensureProviderReady` checks whether the provider is available. If the restore is already considered prepared based on its `Prepared` condition or an unambiguously associated provider child, this check is skipped. This prevents a resumed restore from being blocked by another provider readiness check.
 
-The dedicated `ensureMaintenanceModeActivated` stage then activates maintenance mode on a best-effort basis. It first checks the actual state and activates maintenance mode only if it is still inactive. An error is logged and reported as an event but does not prevent the restore. The stage does not persist a condition and may proceed directly to preparation during the same reconciliation. Scale-down and cleanup, by contrast, must succeed. If an unambiguously associated provider child already exists, preparation is likewise considered complete. This prevents a second cleanup in the critical crash window between child creation and the parent status write.
+The dedicated `ensureMaintenanceModeActivated` stage then activates maintenance mode on a best-effort basis. It first checks the actual state and activates maintenance mode only if it is still inactive. An error is logged and reported as an event but does not prevent the restore. The stage does not persist a condition and may proceed directly to preparation during the same reconciliation. Scale-down and cleanup, by contrast, must succeed. Before the scale-down, preparation collects the restore state from the source backup; if this fails, a warning event with `Reason=CollectStateFailed` is additionally emitted. The cleanup uses this state: for a legacy backup, all Dogus and all resources with `k8s.cloudogu.com/backup-scope` are deleted. For a unit backup, only the restored Dogus including their PVCs and the additional resources of the restored components are deleted; those excluded via `excludedDogus`, `excludedComponents` or `options.ignoreV2Dogus` are kept. If an unambiguously associated provider child already exists, preparation is likewise considered complete. This prevents a second cleanup in the critical crash window between child creation and the parent status write.
 
 ### `ProviderSucceeded`
 

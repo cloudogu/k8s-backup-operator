@@ -22,6 +22,10 @@ new credentials, so they match the new data.
 
 During restore, the operator deletes all resources that belong to the restore scope before recreating them from the backup.
 This applies both to Dogus and to additional resources selected via `k8s.cloudogu.com/backup-scope`.
+For a restore from backup units, only the restored Dogus and components belong to the restore scope:
+Additional resources are only deleted if their label `k8s.cloudogu.com/component.name` names a restored component.
+Dogus and components excluded via `excludedDogus`, `excludedComponents` or `options.ignoreV2Dogus` are left untouched.
+For a restore from a legacy backup, all Dogus and all resources with `k8s.cloudogu.com/backup-scope` are still deleted.
 
 If a workload mounts one of those additional resources, it must be scaled down before the restore starts and scaled up again after the restore finishes. 
 To participate in this behavior, the workload must be labeled with `k8s.cloudogu.com/restore-scaledown-scope`.
@@ -31,7 +35,7 @@ The restore flow is:
 
 1. Switch the system into maintenance mode.
 2. Scale down workloads marked for restore scaledown.
-3. Delete Dogus and additional resources that are part of the restore scope.
+3. Delete Dogus (including their PVCs) and additional resources that are part of the restore scope.
 4. Trigger the restore at the configured provider.
 5. Scale the previously scaled down workloads back up.
 
