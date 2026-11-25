@@ -8,7 +8,20 @@ kind: Backup
 metadata:
   name: backup-sample
 spec:
-  provider: velero # aktuell wird nur Velero unterstützt ("" ist ein Spezialfall und wählt Velero als Provider aus)
+  # aktuell wird nur Velero unterstützt ("" ist ein Spezialfall und wählt Velero als Provider aus)
+  provider: velero
+  # Namen der V3-Dogus, die vom Backup ausgeschlossen werden sollen.
+  # V2-Dogus werden immer in einer Unit gesichert und können daher nur über die Options ausgeschlossen werden.
+  excludedDogus: ["nexus", "baseline"]
+  # Namen der Komponenten, die vom Backup ausgeschlossen werden sollen.
+  excludedComponents: ["lop-idp", "prometheus"]
+  options:
+    # bestimmt, ob die globale Konfiguration von der Sicherung ausgeschlossen werden soll
+    # Default: false
+    ignoreGlobalConfig: true
+    # bestimmt, ob alle V2-Dogus von der Sicherung ausgeschlossen werden sollen
+    # Default: false
+    ignoreV2Dogus: true
 ```
 
 ## Backup unmittelbar nach einem Restore starten
