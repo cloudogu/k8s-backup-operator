@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
@@ -21,6 +22,7 @@ func restoreLabels() map[string]string {
 // write and reports whether it had to write at all, so that a repeated reconciliation of an already
 // written Restore writes nothing.
 func ensureRestoreMetadata(ctx context.Context, k8sClient k8sClient, restore *k8sv1.Restore) (bool, error) {
+	original := restore.DeepCopy()
 	changed := controllerutil.AddFinalizer(restore, k8sv1.RestoreFinalizer)
 	if applyLabels(restore) {
 		changed = true
@@ -30,7 +32,9 @@ func ensureRestoreMetadata(ctx context.Context, k8sClient k8sClient, restore *k8
 		return false, nil
 	}
 
-	if err := k8sClient.Update(ctx, restore); err != nil {
+	// A full update can omit explicit false values and violate the immutable spec.
+	patch := client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})
+	if err := k8sClient.Patch(ctx, restore, patch); err != nil {
 		return false, fmt.Errorf("failed to write finalizer %s and labels %v of restore: %w", k8sv1.RestoreFinalizer, restoreLabels(), err)
 	}
 
@@ -40,11 +44,13 @@ func ensureRestoreMetadata(ctx context.Context, k8sClient k8sClient, restore *k8
 // removeFinalizer removes the given finalizer and persists the Restore only if the finalizer set
 // actually changed.
 func removeFinalizer(ctx context.Context, k8sClient k8sClient, restore *k8sv1.Restore, finalizer string) error {
+	original := restore.DeepCopy()
 	if !controllerutil.RemoveFinalizer(restore, finalizer) {
 		return nil
 	}
 
-	if err := k8sClient.Update(ctx, restore); err != nil {
+	patch := client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})
+	if err := k8sClient.Patch(ctx, restore, patch); err != nil {
 		return fmt.Errorf("failed to remove finalizer %s from restore: %w", finalizer, err)
 	}
 

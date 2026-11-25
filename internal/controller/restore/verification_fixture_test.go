@@ -208,10 +208,10 @@ func createOf(object client.Object) recordedClientAction {
 	}
 }
 
-// updateOf is the action a write of the given object records.
-func updateOf(object client.Object) recordedClientAction {
+// patchOf is the action a patch of the given object records.
+func patchOf(object client.Object) recordedClientAction {
 	return recordedClientAction{
-		Verb: "update",
+		Verb: "patch",
 		Type: reflect.TypeOf(object),
 		Key:  client.ObjectKeyFromObject(object),
 	}

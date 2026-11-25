@@ -45,7 +45,7 @@ func TestTheFirstReconcileOfANewRestoreInitializesAllWorkflowConditions(t *testi
 	require.NoError(t, errs[1])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the initializing write must end the reconciliation")
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[1], "the second reconciliation belongs to the metadata stage")
-	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), updateOf(restore)}, fixture.clientActions.snapshot(),
+	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), patchOf(restore)}, fixture.clientActions.snapshot(),
 		"the conditions must be initialized in one write, before the metadata and only once")
 
 	stored := &k8sv1.Restore{}

@@ -40,7 +40,7 @@ func TestEnsureDeletionFinalizedRemovesTheFinalizerAndLetsKubernetesDeleteTheRes
 
 	assert.Equal(t, restore, updated)
 	assert.Equal(t, abort(), outcome)
-	assert.Equal(t, 1, writes.parent.updates)
+	assert.Equal(t, 1, writes.parent.patches)
 	assert.Equal(t, 1, writes.total())
 
 	stored := &k8sv1.Restore{}
@@ -68,10 +68,10 @@ func TestEnsureDeletionFinalizedOnlyRemovesItsOwnFinalizer(t *testing.T) {
 
 func TestEnsureDeletionFinalizedRetriesAFailedFinalizerRemoval(t *testing.T) {
 	restore := deletedRestore()
-	updateAttempts := 0
-	failingFinalizerUpdate := interceptor.Funcs{
-		Update: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.UpdateOption) error {
-			updateAttempts++
+	patchAttempts := 0
+	failingFinalizerPatch := interceptor.Funcs{
+		Patch: func(_ context.Context, _ client.WithWatch, _ client.Object, _ client.Patch, _ ...client.PatchOption) error {
+			patchAttempts++
 			return assert.AnError
 		},
 	}
@@ -81,7 +81,7 @@ func TestEnsureDeletionFinalizedRetriesAFailedFinalizerRemoval(t *testing.T) {
 			return assert.Contains(t, message, "Delete failed. Reason: failed to remove finalizer") &&
 				assert.Contains(t, message, "assert.AnError")
 		})).Return()
-	testClient := newTestClientWithParent(t, failingFinalizerUpdate, restore)
+	testClient := newTestClientWithParent(t, failingFinalizerPatch, restore)
 	reconciler := &restoreReconciler{k8sClient: testClient, recorder: recorderMock}
 
 	updated, outcome := reconciler.ensureDeletionFinalized(testCtx, restore)
@@ -92,10 +92,10 @@ func TestEnsureDeletionFinalizedRetriesAFailedFinalizerRemoval(t *testing.T) {
 	assert.ErrorContains(t, outcome.err, "failed to remove finalizer cloudogu-restore-finalizer from restore test-restore")
 	assert.Equal(t, actionRetry, outcome.action)
 	assert.Zero(t, outcome.requeueAfter)
-	assert.Equal(t, 1, updateAttempts)
+	assert.Equal(t, 1, patchAttempts)
 
 	stored := &k8sv1.Restore{}
 	require.NoError(t, testClient.Get(testCtx, newRestoreRequest(testRestore).NamespacedName, stored))
 	assert.Contains(t, stored.Finalizers, k8sv1.RestoreFinalizer,
-		"a failed update must leave the persisted finalizer in place")
+		"a failed patch must leave the persisted finalizer in place")
 }

@@ -158,7 +158,7 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 
 	require.Equal(t, []recordedClientAction{
 		statusUpdateOf(restore),                // the initialized conditions
-		updateOf(restore),                      // the finalizer and the labels
+		patchOf(restore),                       // the finalizer and the labels
 		statusUpdateOf(restore),                // Prepared
 		createOf(velero.BuildRestore(restore)), // the provider restore, started and not awaited
 		statusUpdateOf(restore),                // ProviderRestoreSuccessful=Unknown, pending
