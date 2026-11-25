@@ -23,11 +23,11 @@ Lease-Inhaber. Schlägt die Deaktivierung fehl, bleibt der Lauf in der Abschluss
 
 Ein abgelaufenes Zeitfenster (`retryTimeLimit`) kann den CES-Backup-Lauf beenden, während Velero noch arbeitet.
 Der Controller gibt Wartungsmodus und Lease frei, damit der abgebrochene Lauf das System nicht weiter blockiert.
-Der CES-Backup-CR bleibt als Fehlerhistorie erhalten. Velero-Backups, die zum Zeitpunkt des Abbruchs noch liefen werden
+Die CES-Backup-CR bleibt als Fehlerhistorie erhalten. Velero-Backups, die zum Zeitpunkt des Abbruchs noch liefen werden
 gelöscht. Dies soll verhindern, dass Daten wiederhergestellt werden, die Velero möglicherweise nach Ende des
 Wartungsmodus gesichert hat.
 
-Eine Löschanforderung am CES-Backup-CR hat Vorrang vor dem normalen Ablauf. Zugehörige Velero-Backups werden gelöscht.
+Eine Löschanforderung an der CES-Backup-CR hat vor dem normalen Ablauf Vorrang. Zugehörige Velero-Backups werden gelöscht.
 
 ## Einstieg im Code
 
