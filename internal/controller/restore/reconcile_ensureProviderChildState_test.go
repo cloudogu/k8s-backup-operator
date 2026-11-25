@@ -183,7 +183,8 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment).Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, conflicting, usableSourceBackup())
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, conflicting, usableSourceBackup(),
+		readyStorageLocation(), readyProviderDeployment())
 	request := newRestoreRequest(testRestore)
 
 	results, errs := fixture.reconcileTimes(testCtx, request, 2)
@@ -215,7 +216,8 @@ func TestAnUnreportableProviderChildConflictIsRetried(t *testing.T) {
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment).Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, foreignChild(restore, testLegacyUnit), usableSourceBackup())
+	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, foreignChild(restore, testLegacyUnit), usableSourceBackup(),
+		readyStorageLocation(), readyProviderDeployment())
 
 	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -239,7 +241,8 @@ func TestAnUnreadableProviderChildIsRetried(t *testing.T) {
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment).Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, failingChildGet, factory, restore, usableSourceBackup())
+	fixture := newMultiReconcileFixture(t, failingChildGet, factory, restore, usableSourceBackup(),
+		readyStorageLocation(), readyProviderDeployment())
 
 	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 

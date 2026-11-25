@@ -48,10 +48,19 @@ func (c *RestoreStateCollector) Collect(ctx context.Context, restore *backupv1.R
 
 	result, err := collectUnitState(unitBackups.Items)
 	if err != nil {
-		return RestoreState{}, fmt.Errorf("collect units: %w", err)
+		return RestoreState{}, &MalformedBackupError{Err: fmt.Errorf("collect units: %w", err)}
 	}
 	return result, nil
 }
+
+// MalformedBackupError marks unit backups whose annotations cannot be read; retrying does not help.
+type MalformedBackupError struct {
+	Err error
+}
+
+func (e *MalformedBackupError) Error() string { return e.Err.Error() }
+
+func (e *MalformedBackupError) Unwrap() error { return e.Err }
 
 func collectUnitState(unitBackups []velerov1.Backup) (RestoreState, error) {
 	// every unit backup carries the common annotations

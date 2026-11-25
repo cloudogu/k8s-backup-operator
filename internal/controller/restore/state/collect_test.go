@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"strings"
 	"testing"
@@ -165,10 +166,11 @@ func TestCollect_Errors(t *testing.T) {
 	doguV2 := unitBackup("doguv2", nil)
 
 	tests := []struct {
-		name         string
-		builder      *fake.ClientBuilder
-		wantContains string
-		wantIs       error
+		name          string
+		builder       *fake.ClientBuilder
+		wantContains  string
+		wantIs        error
+		wantMalformed bool
 	}{
 		{
 			name: "get legacy backup",
@@ -190,10 +192,10 @@ func TestCollect_Errors(t *testing.T) {
 			wantContains: "list unit backups",
 			wantIs:       assert.AnError,
 		},
-		{name: "missing units annotation", builder: fakeClientBuilder(t, withoutUnits), wantContains: "collect units: provider backup mybackup-components has no annotation k8s.cloudogu.com/backup-units"},
-		{name: "invalid units annotation", builder: fakeClientBuilder(t, brokenUnits), wantContains: "collect units: get units: unmarshal annotation k8s.cloudogu.com/backup-units"},
-		{name: "invalid v2 dogus annotation", builder: fakeClientBuilder(t, brokenV2Dogus), wantContains: "collect units: get installed V2 dogus: unmarshal annotation k8s.cloudogu.com/backup-installed-dogus-v2"},
-		{name: "invalid components annotation", builder: fakeClientBuilder(t, brokenComponents), wantContains: "collect units: get components: unmarshal annotation k8s.cloudogu.com/backup-components"},
+		{name: "missing units annotation", builder: fakeClientBuilder(t, withoutUnits), wantMalformed: true, wantContains: "collect units: provider backup mybackup-components has no annotation k8s.cloudogu.com/backup-units"},
+		{name: "invalid units annotation", builder: fakeClientBuilder(t, brokenUnits), wantMalformed: true, wantContains: "collect units: get units: unmarshal annotation k8s.cloudogu.com/backup-units"},
+		{name: "invalid v2 dogus annotation", builder: fakeClientBuilder(t, brokenV2Dogus), wantMalformed: true, wantContains: "collect units: get installed V2 dogus: unmarshal annotation k8s.cloudogu.com/backup-installed-dogus-v2"},
+		{name: "invalid components annotation", builder: fakeClientBuilder(t, brokenComponents), wantMalformed: true, wantContains: "collect units: get components: unmarshal annotation k8s.cloudogu.com/backup-components"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -206,6 +208,8 @@ func TestCollect_Errors(t *testing.T) {
 			if tt.wantIs != nil {
 				assert.ErrorIs(t, err, tt.wantIs)
 			}
+			_, malformed := errors.AsType[*MalformedBackupError](err)
+			assert.Equal(t, tt.wantMalformed, malformed, "only unreadable annotations are malformed")
 		})
 	}
 }

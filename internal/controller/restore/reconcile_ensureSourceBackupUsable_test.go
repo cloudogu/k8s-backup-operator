@@ -92,6 +92,30 @@ func TestASourceBackupThatIsNotRestorableFailsTheRestore(t *testing.T) {
 	}
 }
 
+func TestAMalformedSourceBackupFailsTheRestore(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	malformed := completedUnitBackup(testGlobalConfigUnit)
+	malformed.Annotations = nil
+
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, ReasonUnusableUnits, actionCheckSourceBackup,
+		"The backup cannot be read: collect units: provider backup test-backup-global-config has no annotation k8s.cloudogu.com/backup-units.").Once()
+
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, newSourceBackupGateFactory(t, recorderMock),
+		restore, readyStorageLocation(), readyProviderDeployment(), malformed)
+
+	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
+
+	for index := range results {
+		require.NoError(t, errs[index], "a malformed backup is a decided outcome, not an error")
+		assert.Equal(t, ctrl.Result{}, results[index], "a terminal restore must not be requeued")
+	}
+	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), deleteOf(newRestoreLease(restore))}, fixture.clientActions.snapshot(),
+		"the malformed backup must be reported exactly once, the lease released and the ecosystem stay untouched")
+	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, ReasonUnusableUnits)
+	assertSuccessfulCondition(t, fixture.client, testRestore, metav1.ConditionFalse, ReasonUnusableUnits)
+}
+
 func TestARestorableSourceBackupLetsThePreparationRun(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 
