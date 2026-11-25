@@ -21,17 +21,17 @@ func (_m *mockCleanupManager) EXPECT() *mockCleanupManager_Expecter {
 	return &mockCleanupManager_Expecter{mock: &_m.Mock}
 }
 
-// Cleanup provides a mock function with given fields: ctx
-func (_m *mockCleanupManager) Cleanup(ctx context.Context) error {
-	ret := _m.Called(ctx)
+// Cleanup provides a mock function with given fields: ctx, ignoreGlobalConfig
+func (_m *mockCleanupManager) Cleanup(ctx context.Context, ignoreGlobalConfig bool) error {
+	ret := _m.Called(ctx, ignoreGlobalConfig)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Cleanup")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, bool) error); ok {
+		r0 = rf(ctx, ignoreGlobalConfig)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -46,13 +46,14 @@ type mockCleanupManager_Cleanup_Call struct {
 
 // Cleanup is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *mockCleanupManager_Expecter) Cleanup(ctx interface{}) *mockCleanupManager_Cleanup_Call {
-	return &mockCleanupManager_Cleanup_Call{Call: _e.mock.On("Cleanup", ctx)}
+//   - ignoreGlobalConfig bool
+func (_e *mockCleanupManager_Expecter) Cleanup(ctx interface{}, ignoreGlobalConfig interface{}) *mockCleanupManager_Cleanup_Call {
+	return &mockCleanupManager_Cleanup_Call{Call: _e.mock.On("Cleanup", ctx, ignoreGlobalConfig)}
 }
 
-func (_c *mockCleanupManager_Cleanup_Call) Run(run func(ctx context.Context)) *mockCleanupManager_Cleanup_Call {
+func (_c *mockCleanupManager_Cleanup_Call) Run(run func(ctx context.Context, ignoreGlobalConfig bool)) *mockCleanupManager_Cleanup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(bool))
 	})
 	return _c
 }
@@ -62,7 +63,7 @@ func (_c *mockCleanupManager_Cleanup_Call) Return(_a0 error) *mockCleanupManager
 	return _c
 }
 
-func (_c *mockCleanupManager_Cleanup_Call) RunAndReturn(run func(context.Context) error) *mockCleanupManager_Cleanup_Call {
+func (_c *mockCleanupManager_Cleanup_Call) RunAndReturn(run func(context.Context, bool) error) *mockCleanupManager_Cleanup_Call {
 	_c.Call.Return(run)
 	return _c
 }

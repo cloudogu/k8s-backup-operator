@@ -22,17 +22,17 @@ func (_m *mockAdditionalResourceManager) EXPECT() *mockAdditionalResourceManager
 	return &mockAdditionalResourceManager_Expecter{mock: &_m.Mock}
 }
 
-// cleanupAdditionalResources provides a mock function with given fields: ctx, wg
-func (_m *mockAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup) error {
-	ret := _m.Called(ctx, wg)
+// cleanupAdditionalResources provides a mock function with given fields: ctx, wg, ignoreGlobalConfig
+func (_m *mockAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, ignoreGlobalConfig bool) error {
+	ret := _m.Called(ctx, wg, ignoreGlobalConfig)
 
 	if len(ret) == 0 {
 		panic("no return value specified for cleanupAdditionalResources")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *sync.WaitGroup) error); ok {
-		r0 = rf(ctx, wg)
+	if rf, ok := ret.Get(0).(func(context.Context, *sync.WaitGroup, bool) error); ok {
+		r0 = rf(ctx, wg, ignoreGlobalConfig)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -48,13 +48,14 @@ type mockAdditionalResourceManager_cleanupAdditionalResources_Call struct {
 // cleanupAdditionalResources is a helper method to define mock.On call
 //   - ctx context.Context
 //   - wg *sync.WaitGroup
-func (_e *mockAdditionalResourceManager_Expecter) cleanupAdditionalResources(ctx interface{}, wg interface{}) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
-	return &mockAdditionalResourceManager_cleanupAdditionalResources_Call{Call: _e.mock.On("cleanupAdditionalResources", ctx, wg)}
+//   - ignoreGlobalConfig bool
+func (_e *mockAdditionalResourceManager_Expecter) cleanupAdditionalResources(ctx interface{}, wg interface{}, ignoreGlobalConfig interface{}) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
+	return &mockAdditionalResourceManager_cleanupAdditionalResources_Call{Call: _e.mock.On("cleanupAdditionalResources", ctx, wg, ignoreGlobalConfig)}
 }
 
-func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) Run(run func(ctx context.Context, wg *sync.WaitGroup)) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
+func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) Run(run func(ctx context.Context, wg *sync.WaitGroup, ignoreGlobalConfig bool)) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*sync.WaitGroup))
+		run(args[0].(context.Context), args[1].(*sync.WaitGroup), args[2].(bool))
 	})
 	return _c
 }
@@ -64,7 +65,7 @@ func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) Return(
 	return _c
 }
 
-func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) RunAndReturn(run func(context.Context, *sync.WaitGroup) error) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
+func (_c *mockAdditionalResourceManager_cleanupAdditionalResources_Call) RunAndReturn(run func(context.Context, *sync.WaitGroup, bool) error) *mockAdditionalResourceManager_cleanupAdditionalResources_Call {
 	_c.Call.Return(run)
 	return _c
 }

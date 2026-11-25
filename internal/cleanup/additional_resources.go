@@ -52,7 +52,7 @@ func newAdditionalResourceManager(dynamicClient dynamicClient, namespace string)
 
 // cleanupAdditionalResources deletes all additional resources that need to be deleted before restoring the backup.
 // It adds those deletions to the wait group.
-func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup) error {
+func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, ignoreGlobalConfig bool) error {
 	logging.Info(ctx, "starting cleanup of additional resources before restore...")
 
 	sortedKeys := slices.SortedFunc(maps.Keys(c.clients), func(a schema.GroupVersionResource, b schema.GroupVersionResource) int {
@@ -61,8 +61,13 @@ func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx contex
 	for _, gvr := range sortedKeys {
 		logging.Debug(ctx, "listing additional resources", "gvr", gvr.String())
 
+		labelSelector := backupScopeLabelKey
+		if ignoreGlobalConfig && gvr == corev1.SchemeGroupVersion.WithResource("configmaps") {
+			labelSelector += ",k8s.cloudogu.com/type!=global-config"
+		}
+
 		client := c.clients[gvr]
-		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: backupScopeLabelKey})
+		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
 			return fmt.Errorf("failed to list %s: %w", gvr.Resource, err)
 		}

@@ -5,7 +5,7 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/cloudogu/k8s-backup-lib/api/ecosystem"
+	backupclient "github.com/cloudogu/k8s-backup-lib/client"
 	schedulecontroller "github.com/cloudogu/k8s-backup-operator/internal/controller/schedule"
 	"github.com/cloudogu/k8s-backup-operator/internal/garbagecollection"
 	"github.com/cloudogu/k8s-backup-operator/internal/scheduledbackup"
@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/config"
@@ -152,9 +153,8 @@ func Test_startOperator(t *testing.T) {
 		}()
 
 		restConfig := &rest.Config{}
-		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(&events.FakeRecorder{})
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		skipNameValidation := true
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
@@ -203,9 +203,8 @@ func Test_startOperator(t *testing.T) {
 		}()
 
 		restConfig := &rest.Config{}
-		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(&events.FakeRecorder{})
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(runtime.NewScheme())
@@ -247,9 +246,8 @@ func Test_startOperator(t *testing.T) {
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logMock)
 
 		restConfig := &rest.Config{}
-		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(&events.FakeRecorder{})
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
@@ -305,9 +303,8 @@ func Test_startOperator(t *testing.T) {
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logMock)
 
 		restConfig := &rest.Config{}
-		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(&events.FakeRecorder{})
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
@@ -364,9 +361,8 @@ func Test_startOperator(t *testing.T) {
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logMock)
 
 		restConfig := &rest.Config{}
-		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(&events.FakeRecorder{})
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
@@ -422,9 +418,8 @@ func Test_startOperator(t *testing.T) {
 		logMock.EXPECT().WithValues(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logMock)
 
 		restConfig := &rest.Config{}
-		recorderMock := newMockEventRecorder(t)
 		ctrlManMock := newMockControllerManager(t)
-		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(recorderMock)
+		ctrlManMock.EXPECT().GetEventRecorder("k8s-backup-operator").Return(&events.FakeRecorder{})
 		ctrlManMock.EXPECT().GetConfig().Return(restConfig)
 		ctrlManMock.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		ctrlManMock.EXPECT().GetScheme().Return(createScheme(t))
@@ -480,7 +475,7 @@ func Test_startGarbageCollector(t *testing.T) {
 
 		gcManagerMock := newMockGcManager(t)
 		gcManagerMock.EXPECT().CollectGarbage(testCtx).Return(assert.AnError)
-		newGarbageCollectionManager = func(clientSet ecosystem.Interface, namespace string, strategyName string) garbagecollection.Manager {
+		newGarbageCollectionManager = func(clientSet backupclient.Interface, namespace string, strategyName string) garbagecollection.Manager {
 			return gcManagerMock
 		}
 
@@ -512,7 +507,7 @@ func Test_startGarbageCollector(t *testing.T) {
 
 		gcManagerMock := newMockGcManager(t)
 		gcManagerMock.EXPECT().CollectGarbage(testCtx).Return(nil)
-		newGarbageCollectionManager = func(clientSet ecosystem.Interface, namespace string, strategyName string) garbagecollection.Manager {
+		newGarbageCollectionManager = func(clientSet backupclient.Interface, namespace string, strategyName string) garbagecollection.Manager {
 			return gcManagerMock
 		}
 
@@ -546,7 +541,7 @@ func Test_startScheduledBackup(t *testing.T) {
 
 		scheduledBackupManagerMock := newMockScheduledBackupManager(t)
 		scheduledBackupManagerMock.EXPECT().ScheduleBackup(testCtx).Return(assert.AnError)
-		newScheduledBackupManager = func(clientSet ecosystem.Interface, options scheduledbackup.Options) scheduledbackup.Manager {
+		newScheduledBackupManager = func(clientSet backupclient.Interface, options scheduledbackup.Options) scheduledbackup.Manager {
 			return scheduledBackupManagerMock
 		}
 
@@ -578,7 +573,7 @@ func Test_startScheduledBackup(t *testing.T) {
 
 		scheduledBackupManagerMock := newMockScheduledBackupManager(t)
 		scheduledBackupManagerMock.EXPECT().ScheduleBackup(testCtx).Return(nil)
-		newScheduledBackupManager = func(clientSet ecosystem.Interface, options scheduledbackup.Options) scheduledbackup.Manager {
+		newScheduledBackupManager = func(clientSet backupclient.Interface, options scheduledbackup.Options) scheduledbackup.Manager {
 			return scheduledBackupManagerMock
 		}
 

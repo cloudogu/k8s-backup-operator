@@ -1,8 +1,11 @@
 package restore
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
@@ -13,10 +16,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-// The metadata stage writes the finalizer and the labels in one update and ends the reconciliation,
+// The metadata stage writes the finalizer and the labels in one patch and ends the reconciliation,
 // so the following reconciliation is the one that starts the restore.
 func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing.T) {
 	restore := withPreparation(withInitializedConditions(newParentRestore()))
+	restore.Spec.Options = &k8sv1.UnitOptions{IgnoreGlobalConfig: false}
 
 	// The manager is nil, so the workflow must start the provider restore and stop there.
 	recorderMock := newMockEventRecorder(t)
@@ -30,7 +34,16 @@ func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
+	assertMetadataPatch := interceptor.Funcs{
+		Patch: func(ctx context.Context, wrapped client.WithWatch, object client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			data, err := patch.Data(object)
+			require.NoError(t, err)
+			assert.JSONEq(t, fmt.Sprintf(`{"metadata":{"finalizers":["cloudogu-restore-finalizer"],"labels":{"app":"ces","k8s.cloudogu.com/part-of":"backup"},"resourceVersion":%q}}`,
+				object.GetResourceVersion()), string(data))
+			return wrapped.Patch(ctx, object, patch, opts...)
+		},
+	}
+	fixture := newMultiReconcileFixture(t, assertMetadataPatch, factory, restore)
 	request := newRestoreRequest(testRestore)
 
 	results, errs := fixture.reconcileTimes(testCtx, request, 2)
@@ -39,8 +52,8 @@ func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing
 	require.NoError(t, errs[1])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the metadata write must end the reconciliation")
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[1], "the started provider restore must end the reconciliation")
-	assert.Equal(t, []recordedClientAction{updateOf(restore), createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
-		"the finalizer and the labels must be written in one update, and only once, before the restore starts")
+	assert.Equal(t, []recordedClientAction{patchOf(restore), createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
+		"the finalizer and the labels must be written in one patch, and only once, before the restore starts")
 	assertPersistedMetadata(t, fixture.client, testRestore)
 }
 
@@ -76,7 +89,7 @@ func TestEnsureMetadataRetriesAFailedWriteWithoutStartingTheRestore(t *testing.T
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment).Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, failingUpdate(assert.AnError), factory, restore)
+	fixture := newMultiReconcileFixture(t, failingPatch(assert.AnError), factory, restore)
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 

@@ -221,11 +221,11 @@ func conflictOnFirstStatusUpdate(t *testing.T, concurrent metav1.Condition) inte
 	}
 }
 
-// failingUpdate makes every update of the whole object fail with the given error, for the metadata
+// failingPatch makes every patch of the main resource fail with the given error, for the metadata
 // paths. Status writes are left working, so a test can fail a finalizer or label write in isolation.
-func failingUpdate(err error) interceptor.Funcs {
+func failingPatch(err error) interceptor.Funcs {
 	return interceptor.Funcs{
-		Update: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.UpdateOption) error {
+		Patch: func(_ context.Context, _ client.WithWatch, _ client.Object, _ client.Patch, _ ...client.PatchOption) error {
 			return err
 		},
 	}

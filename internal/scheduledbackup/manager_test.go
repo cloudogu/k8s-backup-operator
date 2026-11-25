@@ -48,12 +48,12 @@ func TestDefaultManager_ScheduleBackup(t *testing.T) {
 		clockMock := newMockTimeProvider(t)
 		clockMock.EXPECT().Now().Return(time.Date(2023, time.November, 30, 10, 30, 00, 00, time.Local))
 
-		backupClientMock := newMockEcosystemBackupInterface(t)
+		backupClientMock := newMockBackupClient(t)
 		backupClientMock.EXPECT().Create(testCtx, expectedBackup, metav1.CreateOptions{}).Return(nil, assert.AnError)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		clientSetMock := newMockEcosystemClientSet(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		v1Mock := newMockBackupV1Client(t)
+		v1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
+		clientSetMock := newMockBackupClientSet(t)
+		clientSetMock.EXPECT().BackupV1().Return(v1Mock)
 
 		options := Options{Name: "banana", Namespace: testNamespace, Provider: "velero"}
 
@@ -90,12 +90,12 @@ func TestDefaultManager_ScheduleBackup(t *testing.T) {
 		clockMock := newMockTimeProvider(t)
 		clockMock.EXPECT().Now().Return(time.Date(2023, time.November, 30, 10, 30, 00, 00, time.Local))
 
-		backupClientMock := newMockEcosystemBackupInterface(t)
+		backupClientMock := newMockBackupClient(t)
 		backupClientMock.EXPECT().Create(testCtx, expectedBackup, metav1.CreateOptions{}).Return(expectedBackup, nil)
-		v1Alpha1Mock := newMockEcosystemV1Alpha1Interface(t)
-		v1Alpha1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
-		clientSetMock := newMockEcosystemClientSet(t)
-		clientSetMock.EXPECT().EcosystemV1Alpha1().Return(v1Alpha1Mock)
+		v1Mock := newMockBackupV1Client(t)
+		v1Mock.EXPECT().Backups(testNamespace).Return(backupClientMock)
+		clientSetMock := newMockBackupClientSet(t)
+		clientSetMock.EXPECT().BackupV1().Return(v1Mock)
 
 		options := Options{Name: "banana", Namespace: testNamespace, Provider: "velero"}
 
