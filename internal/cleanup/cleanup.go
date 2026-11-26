@@ -11,6 +11,7 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
+	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -123,7 +124,7 @@ func newCleanupSelectors(restoreState state.RestoreState, spec backupv1.RestoreS
 // legacyCleanupSelectors select all dogus and all resources with a backup scope.
 // The pvcs of v2 dogus are deleted with their dogu; those of v3 dogus are selected by their dogu label.
 func legacyCleanupSelectors() (cleanupSelectors, error) {
-	doguPVCs, err := selectorOf(doguNameLabelKey, selection.Exists)
+	doguPVCs, err := selectorOf(doguv3.DoguLabelName, selection.Exists)
 	if err != nil {
 		return cleanupSelectors{}, err
 	}
@@ -141,7 +142,7 @@ func unitCleanupSelectors(dogus, components []string) (cleanupSelectors, error) 
 	var selectors cleanupSelectors
 
 	if len(dogus) > 0 {
-		doguSelector, err := selectorOf(doguNameLabelKey, selection.In, dogus...)
+		doguSelector, err := selectorOf(doguv3.DoguLabelName, selection.In, dogus...)
 		if err != nil {
 			return cleanupSelectors{}, err
 		}

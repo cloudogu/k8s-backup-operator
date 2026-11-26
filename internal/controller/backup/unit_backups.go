@@ -8,13 +8,13 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/controller/backup/state"
 	veleroprovider "github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v3/api/v2"
+	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	v2DoguNameLabelKey         = "dogu.name"
-	doguNameLabelKey           = "k8s.cloudogu.com/dogu.name"
 	backupScopeLabelKey        = "k8s.cloudogu.com/backup-scope"
 	typeLabelKey               = "k8s.cloudogu.com/type"
 	globalConfigTypeLabelValue = "global-config"
@@ -91,7 +91,7 @@ func unitTypeAnnotations(backupState state.BackupState, unit backupv1.UnitIdenti
 func unitSelector(backupState state.BackupState, unit backupv1.UnitIdentifier) (*metav1.LabelSelector, []*metav1.LabelSelector, error) {
 	switch unit.Type {
 	case backupv1.UnitTypeDogu:
-		return &metav1.LabelSelector{MatchLabels: map[string]string{doguNameLabelKey: unit.Name}}, nil, nil
+		return &metav1.LabelSelector{MatchLabels: map[string]string{doguv3.DoguLabelName: unit.Name}}, nil, nil
 	case backupv1.UnitTypeDoguV2:
 		// The dogu-operator does not add the k8s.cloudogu.com/dogu.name label to resources of v2 dogus; they only
 		// carry the legacy dogu.name label.
@@ -100,10 +100,10 @@ func unitSelector(backupState state.BackupState, unit backupv1.UnitIdentifier) (
 			names = append(names, dogu.Name)
 		}
 		doguLabelSelector := &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
-			{Key: doguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: names},
+			{Key: doguv3.DoguLabelName, Operator: metav1.LabelSelectorOpIn, Values: names},
 		}}
 		v2DoguLabelSelector := &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
-			{Key: v2DoguNameLabelKey, Operator: metav1.LabelSelectorOpIn, Values: names},
+			{Key: doguv2.DoguLabelName, Operator: metav1.LabelSelectorOpIn, Values: names},
 		}}
 		return nil, []*metav1.LabelSelector{doguLabelSelector, v2DoguLabelSelector}, nil
 	case backupv1.UnitTypeGlobalConfig:

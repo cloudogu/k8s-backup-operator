@@ -13,8 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-const doguNameLabelKey = "k8s.cloudogu.com/dogu.name"
-
 var doguDeleteWaitTime = defaultWaitTime
 
 type doguClient interface {
