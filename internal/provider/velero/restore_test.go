@@ -294,7 +294,7 @@ func TestGetRestoreTreatsAnAbsentChildAsNoChild(t *testing.T) {
 	writes := &writeCounter{}
 	k8sClient := newTestClient(t, writes)
 
-	child, err := GetRestore(testCtx, k8sClient, newParentRestore())
+	child, err := GetLegacyRestore(testCtx, k8sClient, newParentRestore())
 
 	require.NoError(t, err)
 	assert.Nil(t, child)
@@ -351,7 +351,7 @@ func TestAMatchingRunningChildIsFoundAndReported(t *testing.T) {
 	writes := &writeCounter{}
 	k8sClient := newTestClient(t, writes, parent, running)
 
-	found, err := GetRestore(testCtx, k8sClient, parent)
+	found, err := GetLegacyRestore(testCtx, k8sClient, parent)
 
 	require.NoError(t, err)
 	require.NotNil(t, found)

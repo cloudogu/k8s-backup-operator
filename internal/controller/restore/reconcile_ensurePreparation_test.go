@@ -164,7 +164,7 @@ func TestAnUnlistableProviderChildRetriesThePreparation(t *testing.T) {
 	_, outcome := reconciler.ensurePreparation(testCtx, restore)
 
 	require.ErrorIs(t, outcome.err, assert.AnError)
-	assert.ErrorContains(t, outcome.err, "failed to list the provider restores of restore test-restore")
+	assert.ErrorContains(t, outcome.err, "failed to determine the owned children of restore test-restore")
 }
 
 func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.T) {

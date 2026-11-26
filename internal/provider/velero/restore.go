@@ -73,9 +73,9 @@ func BuildRestore(parent *k8sv1.Restore) *velerov1.Restore {
 	}
 }
 
-// GetRestore reads the Velero restore at the expected name of the given Cloudogu Restore. An
+// GetLegacyRestore reads the Velero restore at the expected name of the given Cloudogu Restore. An
 // absent child is not an error.
-func GetRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.Restore) (*velerov1.Restore, error) {
+func GetLegacyRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.Restore) (*velerov1.Restore, error) {
 	return GetRestoreByName(ctx, k8sClient, parent.Namespace, parent.Name)
 }
 
@@ -142,7 +142,7 @@ func CheckRestoreForConflicts(parent *k8sv1.Restore, child *velerov1.Restore, ex
 // not usable yields a *ConflictError and is neither deleted, mutated nor claimed.
 func EnsureRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.Restore) (*velerov1.Restore, error) {
 
-	existing, err := GetRestore(ctx, k8sClient, parent)
+	existing, err := GetLegacyRestore(ctx, k8sClient, parent)
 	if err != nil {
 		return nil, err
 	}
