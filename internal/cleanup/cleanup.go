@@ -11,48 +11,50 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
 	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v3/api/v2"
 	doguv3 "github.com/cloudogu/k8s-dogu-lib/v3/api/v3beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const defaultWaitTime = time.Second * 3
 const defaultCleanupTimeout = time.Minute * 30
+const backupScopeLabelKey = "k8s.cloudogu.com/backup-scope"
 
 var cleanupTimeout = defaultCleanupTimeout
 
-type doguManager interface {
-	cleanupDogus(ctx context.Context, wg *sync.WaitGroup, doguSelector, pvcSelector labels.Selector) error
+var (
+	doguGVK = doguv2.GroupVersion.WithKind("Dogu")
+	pvcGVK  = corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim")
+	// componentResourceGVKs are the kinds of the resources with a backup scope, in the order of their deletion.
+	componentResourceGVKs = []schema.GroupVersionKind{
+		corev1.SchemeGroupVersion.WithKind("ConfigMap"),
+		pvcGVK,
+		corev1.SchemeGroupVersion.WithKind("Secret"),
+	}
+)
+
+type k8sClient interface {
+	Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error
+	List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
+	Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error
 }
 
-type componentResourceManager interface {
-	cleanupComponentResources(ctx context.Context, wg *sync.WaitGroup, selector labels.Selector) error
-}
-
+// DefaultCleanupManager deletes the resources in its namespace that a restore replaces.
 type DefaultCleanupManager struct {
-	doguManager
-	componentResourceManager
+	client    k8sClient
+	namespace string
+	// deleteWaitTime is the interval in which a deleted resource is checked for being gone.
+	deleteWaitTime time.Duration
 }
 
 // NewManager creates a new instance of DefaultCleanupManager.
-func NewManager(doguClient doguClient, dynamicClient dynamicClient, namespace string) *DefaultCleanupManager {
-	pvcGroupVersionResource := corev1.SchemeGroupVersion.WithResource("persistentvolumeclaims")
-	gvrs := []schema.GroupVersionResource{
-		corev1.SchemeGroupVersion.WithResource("configmaps"),
-		corev1.SchemeGroupVersion.WithResource("secrets"),
-		pvcGroupVersionResource,
-	}
-	clients := make(map[schema.GroupVersionResource]unstructuredClient, len(gvrs))
-	for _, gvr := range gvrs {
-		clients[gvr] = dynamicClient.Resource(gvr).Namespace(namespace)
-	}
-
-	return &DefaultCleanupManager{
-		doguManager:              newDoguManager(doguClient, clients[pvcGroupVersionResource]),
-		componentResourceManager: newComponentResourceManager(clients),
-	}
+// The client should read uncached, because the cleanup waits for the deletions to be visible.
+func NewManager(client k8sClient, namespace string) *DefaultCleanupManager {
+	return &DefaultCleanupManager{client: client, namespace: namespace, deleteWaitTime: defaultWaitTime}
 }
 
 // Cleanup deletes all resources that need to be deleted before restoring the backup.
@@ -76,14 +78,14 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context, restoreState state.
 
 	if selectors.dogus == nil {
 		logging.Info(ctx, "no dogus to clean up")
-	} else if err := c.cleanupDogus(ctx, &wg, selectors.dogus, selectors.doguPVCs); err != nil {
-		return fmt.Errorf("failed to cleanup dogus: %w", err)
+	} else if cleanupErr := c.cleanupDogus(ctx, &wg, selectors.dogus, selectors.doguPVCs); cleanupErr != nil {
+		return cleanupErr
 	}
 
 	if selectors.componentResources == nil {
 		logging.Info(ctx, "no components to clean up component resources for")
-	} else if err := c.cleanupComponentResources(ctx, &wg, selectors.componentResources); err != nil {
-		return fmt.Errorf("failed to cleanup component resources: %w", err)
+	} else if cleanupErr := c.cleanupComponentResources(ctx, &wg, selectors.componentResources); cleanupErr != nil {
+		return cleanupErr
 	}
 
 	// Wait for all goroutines OR timeout
@@ -100,6 +102,28 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context, restoreState state.
 	case <-ctx.Done():
 		return fmt.Errorf("cleanup timed out: %w", ctx.Err())
 	}
+}
+
+// cleanupDogus deletes the dogus and the dogu pvcs matching the selectors.
+// The pvcs are deleted separately because the statefulset pvcs of v3 dogus are not owned by their dogu.
+func (c *DefaultCleanupManager) cleanupDogus(ctx context.Context, wg *sync.WaitGroup, doguSelector, pvcSelector labels.Selector) error {
+	if err := c.deleteMatching(ctx, wg, doguGVK, doguSelector); err != nil {
+		return fmt.Errorf("failed to cleanup dogus: %w", err)
+	}
+	if err := c.deleteMatching(ctx, wg, pvcGVK, pvcSelector); err != nil {
+		return fmt.Errorf("failed to cleanup dogu pvcs: %w", err)
+	}
+	return nil
+}
+
+// cleanupComponentResources deletes all component resources matching the selector
+func (c *DefaultCleanupManager) cleanupComponentResources(ctx context.Context, wg *sync.WaitGroup, componentResourcesSelector labels.Selector) error {
+	for _, gvk := range componentResourceGVKs {
+		if cleanupErr := c.deleteMatching(ctx, wg, gvk, componentResourcesSelector); cleanupErr != nil {
+			return fmt.Errorf("failed to cleanup component resources: %w", cleanupErr)
+		}
+	}
+	return nil
 }
 
 // cleanupSelectors select the resources to delete before the restore; a nil selector means nothing to delete.
