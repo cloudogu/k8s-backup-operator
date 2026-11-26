@@ -65,12 +65,11 @@ func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx contex
 
 		for _, resource := range list.Items {
 			name := resource.GetName()
-
-			if deleteErr := client.Delete(ctx, name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}); deleteErr != nil && !k8sErr.IsNotFound(deleteErr) {
-				return fmt.Errorf("failed to delete %s %q: %w", resource.GetKind(), name, deleteErr)
-			} else if k8sErr.IsNotFound(deleteErr) {
+			if deleteErr := client.Delete(ctx, name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicyForeground}); k8sErr.IsNotFound(deleteErr) {
 				logging.Debug(ctx, "resource was already deleted", "resource", name, "kind", resource.GetKind())
 				continue
+			} else if deleteErr != nil {
+				return fmt.Errorf("failed to delete %s %q: %w", resource.GetKind(), name, deleteErr)
 			}
 
 			wg.Go(func() { waitForResourceDeletion(ctx, client, &resource) })
