@@ -1,16 +1,44 @@
 # Backup-Umfang
 
-Aktuell wird das Backup einzelner Dogus noch nicht unterstützt.
-Derzeit werden die Daten aller Dogus und die globale Konfiguration gesichert.
-Konkret werden Ressourcen mit dem Label-Schlüssel `dogu.name` sowie dem Label `k8s.cloudogu.com/type: global-config` ausgewählt.
-Gesichert werden nur ConfigMaps, Secrets, PersistentVolumeClaims und die Dogu-Ressource selbst.
-Da die Dogu-Ressource gesichert wird, kann der Dogu-Operator alle anderen Ressourcen, die nicht im Backup enthalten sind, erneut erzeugen.
+## Backup-Units
 
-Zusätzliche Ressourcen können in das Backup aufgenommen werden, indem ihnen das Label `k8s.cloudogu.com/backup-scope` gesetzt wird, zum Beispiel auf `PersistentVolumeClaims` von Komponenten.
-Dabei gilt weiterhin die Beschränkung auf die zuvor genannten Ressourcentypen.
-Zusätzlich werden `ServiceAccountProducer` von Komponenten mit diesem Label gesichert.
+Ein Cloudogu-Backup enthält verschiedene Backup-Units, die in der Backup-CR angegeben bzw. ausgeschlossen werden.
+Welche Ressourcen für welche Units gesichert werden, wird in den folgenden Abschnitten beschrieben.
 
-### Komponenten als Service-Account-Producer
+### Global-Config
+
+Hierbei wird nur die ConfigMap mit dem Label `k8s.cloudogu.com/type: global-config` gesichert.
+
+### V2-Dogus
+
+V2-Dogus können nur alle zusammen in einer Unit gesichert werden.
+Gibt es im Cluster keine V2-Dogus, wird diese Unit nicht erzeugt.
+
+Hierbei werden von allen V2-Dogus alle ConfigMaps, Secrets, PersistentVolumeClaims und die Dogu-Ressource selbst
+gesichert, insofern sie dem Label `dogu.name` ODER dem Label `k8s.cloudogu.com/dogu.name` entsprechen.
+Der Wert des Labels muss hierbei dem Dogu-Namen entsprechen.
+Die Labels müssen nur an der Dogu-Ressource explizit gesetzt werden,
+was durch einen ValidatingAdmissionWebhook erzwungen wird.
+An allen anderen Ressourcen werden die Labels automatisch vom Dogu-Operator gesetzt.
+
+### Dogus
+
+Hiermit sind aktuell V3-Dogus gemeint. Diese werden einzeln gesichert und können somit auch einzeln ausgeschlossen werden.
+
+Hierbei werden je Dogu ConfigMaps, Secrets, PersistentVolumeClaims und die Dogu-Ressource selbst gesichert,
+insofern der Wert des Labels `k8s.cloudogu.com/dogu.name` mit dem Dogu-Namen übereinstimmt.
+
+### Komponenten
+
+Komponenten werden alle zusammen in einer Unit gesichert.
+Gibt es im Cluster keine Komponenten mit Ressourcen, für die ein Backup nötig ist, wird diese Unit nicht erzeugt.
+
+Hierbei werden von allen Komponenten alle ConfigMaps, Secrets, PersistentVolumeClaims und ServiceAccountProducer
+gesichert, insofern sie das Backup-Scope-Label `k8s.cloudogu.com/backup-scope` besitzen UND der Wert des
+`k8s.cloudogu.com/component.name`-Labels mit einem der im Backup nicht ausgeschlossenen und im Cluster vorhandenen
+Komponenten-Namen übereinstimmt.
+
+#### Komponenten als Service-Account-Producer
 
 Der Component-Operator setzt das Label `k8s.cloudogu.com/backup-scope` an jeden `ServiceAccountProducer` einer Component.
 Der Cleanup vor einem Restore löscht dann den Producer, und der Service-Account-Operator löscht die Secrets aller
