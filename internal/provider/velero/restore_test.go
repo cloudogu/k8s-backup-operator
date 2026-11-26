@@ -2,6 +2,7 @@ package velero
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -97,14 +98,30 @@ func getPersistedRestore(t *testing.T, k8sClient client.WithWatch) *velerov1.Res
 	return persisted
 }
 
-func TestBuildRestore(t *testing.T) {
-	child := BuildRestore(newParentRestore())
+// legacyRequest is the request of a legacy restore: named like the parent, whole backup, no extra labels.
+func legacyRequest() RestoreRequest {
+	return RestoreRequest{Name: testRestore, BackupName: testBackup}
+}
 
-	assert.Equal(t, testRestore, child.Name)
+func TestBuildRestore(t *testing.T) {
+	// a components unit restore with a label selector for an excluded component
+	selector := &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+		{Key: "k8s.cloudogu.com/component.name", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"k8s-loki"}},
+	}}
+	child := BuildRestore(newParentRestore(), RestoreRequest{
+		Name:          "test-restore-components",
+		BackupName:    "test-backup-components",
+		Labels:        map[string]string{"k8s.cloudogu.com/backup": testBackup, "k8s.cloudogu.com/backup-type": "components"},
+		LabelSelector: selector,
+	})
+
+	assert.Equal(t, "test-restore-components", child.Name)
 	assert.Equal(t, testNamespace, child.Namespace)
 	assert.Equal(t, map[string]string{
-		RestoreSourceNameLabel: testRestore,
-		RestoreSourceUIDLabel:  string(testRestoreUID),
+		RestoreSourceNameLabel:         testRestore,
+		RestoreSourceUIDLabel:          string(testRestoreUID),
+		"k8s.cloudogu.com/backup":      testBackup,
+		"k8s.cloudogu.com/backup-type": "components",
 	}, child.Labels)
 
 	controller := metav1.GetControllerOf(child)
@@ -115,7 +132,8 @@ func TestBuildRestore(t *testing.T) {
 	assert.Equal(t, testRestoreUID, controller.UID)
 	require.NotNil(t, controller.BlockOwnerDeletion)
 	assert.True(t, *controller.BlockOwnerDeletion)
-	assert.Equal(t, testBackup, child.Spec.BackupName)
+	assert.Equal(t, "test-backup-components", child.Spec.BackupName)
+	assert.Equal(t, selector, child.Spec.LabelSelector)
 	assert.Equal(t, velerov1.PolicyTypeUpdate, child.Spec.ExistingResourcePolicy)
 	require.NotNil(t, child.Spec.ResourceModifier)
 	require.NotNil(t, child.Spec.ResourceModifier.APIGroup)
@@ -124,12 +142,64 @@ func TestBuildRestore(t *testing.T) {
 	assert.Equal(t, restoreDoguModifierConfigMapName, child.Spec.ResourceModifier.Name)
 }
 
+func TestBuildRestoreTruncatesTheSourceNameLabel(t *testing.T) {
+	parent := newParentRestore()
+	parent.Name = strings.Repeat("r", 70)
+
+	child := BuildRestore(parent, legacyRequest())
+
+	assert.Equal(t, k8sv1.GetTruncatedName(parent.Name), child.Labels[RestoreSourceNameLabel])
+	assert.Len(t, child.Labels[RestoreSourceNameLabel], 63)
+}
+
+func TestBuildRestoreOfALegacyRequestRestoresTheWholeBackup(t *testing.T) {
+	child := BuildRestore(newParentRestore(), legacyRequest())
+
+	assert.Equal(t, testRestore, child.Name)
+	assert.Equal(t, testBackup, child.Spec.BackupName)
+	assert.Equal(t, map[string]string{
+		RestoreSourceNameLabel: testRestore,
+		RestoreSourceUIDLabel:  string(testRestoreUID),
+	}, child.Labels)
+	assert.Nil(t, child.Spec.LabelSelector)
+}
+
+func TestEnsureRestoreCreatesAUnitChildAtTheRequestedName(t *testing.T) {
+	parent := newParentRestore()
+	writes := &writeCounter{}
+	k8sClient := newTestClient(t, writes, parent)
+	request := RestoreRequest{Name: "test-restore-global-config", BackupName: "test-backup-global-config"}
+
+	_, err := EnsureRestore(testCtx, k8sClient, parent, request)
+	require.NoError(t, err)
+	again, err := EnsureRestore(testCtx, k8sClient, parent, request)
+
+	require.NoError(t, err)
+	assert.Equal(t, "test-backup-global-config", again.Spec.BackupName)
+	// Two calls result in just one write, because the child is not created again
+	assert.Equal(t, 1, writes.total())
+}
+
+func TestEnsureRestoreReportsAChildRestoringAnotherBackupThanRequested(t *testing.T) {
+	parent := newParentRestore()
+	existing := BuildRestore(parent, RestoreRequest{Name: "test-restore-global-config", BackupName: testBackup})
+	writes := &writeCounter{}
+	k8sClient := newTestClient(t, writes, parent, existing)
+
+	child, err := EnsureRestore(testCtx, k8sClient, parent, RestoreRequest{Name: "test-restore-global-config", BackupName: "test-backup-global-config"})
+
+	var conflictErr *ConflictError
+	require.ErrorAs(t, err, &conflictErr)
+	assert.Nil(t, child)
+	assert.Equal(t, 0, writes.total())
+}
+
 func TestEnsureRestoreCreatesTheChild(t *testing.T) {
 	parent := newParentRestore()
 	writes := &writeCounter{}
 	k8sClient := newTestClient(t, writes, parent)
 
-	created, err := EnsureRestore(testCtx, k8sClient, parent)
+	created, err := EnsureRestore(testCtx, k8sClient, parent, legacyRequest())
 
 	require.NoError(t, err)
 	require.NotNil(t, created)
@@ -147,11 +217,11 @@ func TestEnsureRestoreReusesItsOwnChildWithoutWriting(t *testing.T) {
 	writes := &writeCounter{}
 	k8sClient := newTestClient(t, writes, parent)
 
-	first, err := EnsureRestore(testCtx, k8sClient, parent)
+	first, err := EnsureRestore(testCtx, k8sClient, parent, legacyRequest())
 	require.NoError(t, err)
 	firstResourceVersion := getPersistedRestore(t, k8sClient).ResourceVersion
 
-	second, err := EnsureRestore(testCtx, k8sClient, parent)
+	second, err := EnsureRestore(testCtx, k8sClient, parent, legacyRequest())
 
 	require.NoError(t, err)
 	require.NotNil(t, second)
@@ -163,7 +233,7 @@ func TestEnsureRestoreReusesItsOwnChildWithoutWriting(t *testing.T) {
 
 func TestCheckRestoreForConflictsComparesTheExpectedBackupName(t *testing.T) {
 	parent := newParentRestore()
-	child := BuildRestore(parent)
+	child := BuildRestore(parent, legacyRequest())
 	child.Spec.BackupName = "test-backup-global-config"
 
 	require.NoError(t, CheckRestoreForConflicts(parent, child, "test-backup-global-config"))
@@ -191,13 +261,13 @@ func TestEnsureRestoreReportsConflicts(t *testing.T) {
 				foreignParent := newParentRestore()
 				foreignParent.UID = types.UID("22222222-2222-2222-2222-222222222222")
 
-				return BuildRestore(foreignParent)
+				return BuildRestore(foreignParent, legacyRequest())
 			}(),
 			reason: "must not be adopted",
 		},
 		"our own child restores a different backup than the parent now expects": {
 			existing: func() *velerov1.Restore {
-				child := BuildRestore(newParentRestore())
+				child := BuildRestore(newParentRestore(), legacyRequest())
 				child.Spec.BackupName = "some-other-backup"
 
 				return child
@@ -213,7 +283,7 @@ func TestEnsureRestoreReportsConflicts(t *testing.T) {
 			k8sClient := newTestClient(t, writes, parent, test.existing)
 			untouched := getPersistedRestore(t, k8sClient)
 
-			child, err := EnsureRestore(testCtx, k8sClient, parent)
+			child, err := EnsureRestore(testCtx, k8sClient, parent, legacyRequest())
 
 			require.Error(t, err)
 			assert.Nil(t, child)
@@ -237,7 +307,7 @@ func TestEnsureRestorePropagatesClientErrors(t *testing.T) {
 		require.NoError(t, velerov1.AddToScheme(testScheme))
 		k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithInterceptorFuncs(funcs).Build()
 
-		child, err := EnsureRestore(testCtx, k8sClient, newParentRestore())
+		child, err := EnsureRestore(testCtx, k8sClient, newParentRestore(), legacyRequest())
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to get velero restore [test-restore]")
@@ -256,7 +326,7 @@ func TestEnsureRestorePropagatesClientErrors(t *testing.T) {
 		require.NoError(t, velerov1.AddToScheme(testScheme))
 		k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithInterceptorFuncs(funcs).Build()
 
-		child, err := EnsureRestore(testCtx, k8sClient, parent)
+		child, err := EnsureRestore(testCtx, k8sClient, parent, legacyRequest())
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to create velero restore [test-restore]")
@@ -266,10 +336,10 @@ func TestEnsureRestorePropagatesClientErrors(t *testing.T) {
 
 func TestHasOwnedRestoreRequiresTheOwnerReference(t *testing.T) {
 	parent := newParentRestore()
-	unownedRestore := BuildRestore(parent)
+	unownedRestore := BuildRestore(parent, legacyRequest())
 	unownedRestore.Name = "a-unowned-with-uid-label"
 	unownedRestore.OwnerReferences = nil
-	owned := BuildRestore(parent)
+	owned := BuildRestore(parent, legacyRequest())
 	owned.Name = "b-owned"
 
 	tests := []struct {
@@ -303,7 +373,7 @@ func TestGetRestoreTreatsAnAbsentChildAsNoChild(t *testing.T) {
 func TestDeleteRestore(t *testing.T) {
 	t.Run("deletes the child", func(t *testing.T) {
 		parent := newParentRestore()
-		child := BuildRestore(parent)
+		child := BuildRestore(parent, legacyRequest())
 		child.UID = "22222222-2222-2222-2222-222222222222"
 		writes := &writeCounter{}
 		k8sClient := newTestClient(t, writes, parent, child)
@@ -316,7 +386,7 @@ func TestDeleteRestore(t *testing.T) {
 	})
 
 	t.Run("tolerates an already absent child", func(t *testing.T) {
-		child := BuildRestore(newParentRestore())
+		child := BuildRestore(newParentRestore(), legacyRequest())
 		child.UID = "22222222-2222-2222-2222-222222222222"
 		writes := &writeCounter{}
 		k8sClient := newTestClient(t, writes)
@@ -333,7 +403,7 @@ func TestDeleteRestore(t *testing.T) {
 		testScheme := runtime.NewScheme()
 		require.NoError(t, velerov1.AddToScheme(testScheme))
 		k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithInterceptorFuncs(funcs).Build()
-		child := BuildRestore(newParentRestore())
+		child := BuildRestore(newParentRestore(), legacyRequest())
 		child.UID = "22222222-2222-2222-2222-222222222222"
 
 		err := DeleteRestore(testCtx, k8sClient, child)
@@ -346,7 +416,7 @@ func TestDeleteRestore(t *testing.T) {
 func TestAMatchingRunningChildIsFoundAndReported(t *testing.T) {
 	parent := newParentRestore()
 	require.Empty(t, parent.Status.Conditions, "the scenario starts from a parent whose conditions were never persisted")
-	running := BuildRestore(parent)
+	running := BuildRestore(parent, legacyRequest())
 	running.Status.Phase = velerov1.RestorePhaseInProgress
 	writes := &writeCounter{}
 	k8sClient := newTestClient(t, writes, parent, running)
@@ -360,7 +430,7 @@ func TestAMatchingRunningChildIsFoundAndReported(t *testing.T) {
 	assert.Equal(t, RestoreRunning, ObserveRestorePhase(found.Status.Phase))
 
 	// the running child is reused, never restarted
-	ensured, err := EnsureRestore(testCtx, k8sClient, parent)
+	ensured, err := EnsureRestore(testCtx, k8sClient, parent, legacyRequest())
 
 	require.NoError(t, err)
 	require.NotNil(t, ensured)

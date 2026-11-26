@@ -20,12 +20,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
+// ownedChild returns the provider restore the given Restore creates for the given unit.
+func ownedChild(parent *k8sv1.Restore, unit k8sv1.UnitIdentifier) *velerov1.Restore {
+	return velero.BuildRestore(parent, providerRestoreRequest(parent, unit))
+}
+
 // ownedRunningChild returns the provider restore of the given unit of the given Restore, executing.
 func ownedRunningChild(parent *k8sv1.Restore, unit k8sv1.UnitIdentifier) *velerov1.Restore {
-	child := velero.BuildRestore(parent)
+	child := ownedChild(parent, unit)
 	child.Status.Phase = velerov1.RestorePhaseInProgress
-	child.Name = state.ProviderRestoreName(parent.Name, unit)
-	child.Spec.BackupName = state.ProviderBackupName(parent.Spec.BackupName, unit)
 
 	return child
 }

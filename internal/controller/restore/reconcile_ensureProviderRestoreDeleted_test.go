@@ -7,7 +7,6 @@ import (
 	"time"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -35,7 +34,7 @@ func TestEnsureProviderRestoreDeletedContinuesWhenTheChildIsAlreadyAbsent(t *tes
 func TestEnsureProviderRestoreDeletedDeletesAnOwnedChildAndWaitsForItsDisappearance(t *testing.T) {
 	restore := deletedRestore()
 	restore.UID = testRestoreUID
-	child := velero.BuildRestore(restore)
+	child := ownedChild(restore, testLegacyUnit)
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore, child)
 	reconciler := &restoreReconciler{k8sClient: testClient, requeueDelay: requeueAfterTest}
@@ -56,7 +55,7 @@ func TestEnsureProviderRestoreDeletedDeletesAnOwnedChildAndWaitsForItsDisappeara
 func TestEnsureProviderRestoreDeletedDeletesAnUnownedChildOfALegacyRestore(t *testing.T) {
 	restore := deletedRestore()
 	restore.Status.Status = k8sv1.RestoreStatusCompleted
-	child := velero.BuildRestore(restore)
+	child := ownedChild(restore, testLegacyUnit)
 	child.OwnerReferences = nil
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore, child)
@@ -71,7 +70,7 @@ func TestEnsureProviderRestoreDeletedDeletesAnUnownedChildOfALegacyRestore(t *te
 
 func TestEnsureProviderRestoreDeletedLeavesAForeignChildUntouched(t *testing.T) {
 	restore := deletedRestore()
-	child := velero.BuildRestore(restore)
+	child := ownedChild(restore, testLegacyUnit)
 	child.OwnerReferences = nil
 	writes := &clientWrites{}
 	recorderMock := newMockEventRecorder(t)
@@ -95,7 +94,7 @@ func TestEnsureProviderRestoreDeletedLeavesAForeignChildUntouched(t *testing.T) 
 func TestEnsureProviderRestoreDeletedWaitsForATerminatingOwnedChildWithoutDeletingItAgain(t *testing.T) {
 	restore := deletedRestore()
 	restore.UID = testRestoreUID
-	child := velero.BuildRestore(restore)
+	child := ownedChild(restore, testLegacyUnit)
 	child.Finalizers = []string{"velero.io/test-finalizer"}
 	child.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	writes := &clientWrites{}
@@ -136,7 +135,7 @@ func TestEnsureProviderRestoreDeletedRetriesAnUnreadableChild(t *testing.T) {
 func TestEnsureProviderRestoreDeletedRetriesAFailedChildDeletion(t *testing.T) {
 	restore := deletedRestore()
 	restore.UID = testRestoreUID
-	child := velero.BuildRestore(restore)
+	child := ownedChild(restore, testLegacyUnit)
 	reconciler := &restoreReconciler{
 		k8sClient: newTestClientWithParent(t, failingDelete(assert.AnError), restore, child),
 	}

@@ -6,7 +6,6 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,13 +98,13 @@ func TestARestoreInterruptedAtAnUnknownOutcomeContinues(t *testing.T) {
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
-	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
+	assert.Equal(t, []recordedClientAction{createOf(ownedChild(restore, testLegacyUnit))}, fixture.clientActions.snapshot(),
 		"the restore must continue with the provider restore instead of being written again")
 }
 

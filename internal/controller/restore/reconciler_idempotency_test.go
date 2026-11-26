@@ -6,7 +6,6 @@ import (
 	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
 
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -47,7 +46,7 @@ func reconcilerWithoutExternals(fakeClient client.WithWatch) reconcileFunction {
 
 func TestRepeatedReconciliationOfAReadyRestoreWithACompletedChildPerformsNoWritesOrExternalActions(t *testing.T) {
 	restore := newReadyRestore()
-	child := velero.BuildRestore(restore)
+	child := ownedChild(restore, testLegacyUnit)
 	child.Status.Phase = velerov1.RestorePhaseCompleted
 
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, reconcilerWithoutExternals, restore, child)
@@ -156,18 +155,18 @@ func TestTheWorkflowRunsToSuccessOneStagePerReconciliationWithoutBlocking(t *tes
 	require.Equal(t, ctrl.Result{}, finishing[5], "the finished workflow must not be requeued")
 
 	require.Equal(t, []recordedClientAction{
-		statusUpdateOf(restore),                // the initialized conditions
-		updateOf(restore),                      // the finalizer and the labels
-		statusUpdateOf(restore),                // Prepared
-		createOf(velero.BuildRestore(restore)), // the provider restore, started and not awaited
-		statusUpdateOf(restore),                // ProviderRestoreSuccessful=Unknown, pending
-		statusUpdateOf(restore),                // ProviderRestoreSuccessful=Unknown, running
-		statusUpdateOf(restore),                // ProviderRestoreSuccessful=True
-		statusUpdateOf(restore),                // ScaleUpInitiated
-		statusUpdateOf(restore),                // WorkloadsReady
-		statusUpdateOf(restore),                // ScaleUpFinalized
-		statusUpdateOf(restore),                // MaintenanceModeDeactivated
-		statusUpdateOf(restore),                // WorkloadsRecovered=True and Successful=True
+		statusUpdateOf(restore),                       // the initialized conditions
+		updateOf(restore),                             // the finalizer and the labels
+		statusUpdateOf(restore),                       // Prepared
+		createOf(ownedChild(restore, testLegacyUnit)), // the provider restore, started and not awaited
+		statusUpdateOf(restore),                       // ProviderRestoreSuccessful=Unknown, pending
+		statusUpdateOf(restore),                       // ProviderRestoreSuccessful=Unknown, running
+		statusUpdateOf(restore),                       // ProviderRestoreSuccessful=True
+		statusUpdateOf(restore),                       // ScaleUpInitiated
+		statusUpdateOf(restore),                       // WorkloadsReady
+		statusUpdateOf(restore),                       // ScaleUpFinalized
+		statusUpdateOf(restore),                       // MaintenanceModeDeactivated
+		statusUpdateOf(restore),                       // WorkloadsRecovered=True and Successful=True
 	}, fixture.clientActions.snapshot(), "one write per stage, and the child is created but never written")
 
 	stored := &backupv1.Restore{}
@@ -232,8 +231,8 @@ func TestARestoreInterruptedBeforeItsChildRepeatsThePreparationAndThenStartsTheP
 	require.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, continued[0], "the started provider restore ends its reconciliation")
 
 	require.Equal(t, []recordedClientAction{
-		statusUpdateOf(restore),                // Prepared, reached the second time around
-		createOf(velero.BuildRestore(restore)), // and only then the child
+		statusUpdateOf(restore),                       // Prepared, reached the second time around
+		createOf(ownedChild(restore, testLegacyUnit)), // and only then the child
 	}, fixture.clientActions.snapshot(), "the repeated preparation must be persisted before the child is created")
 
 	assertPersistedCondition(t, fixture.client, backupv1.ConditionPrepared, metav1.ConditionTrue, ReasonPreparationCompleted)

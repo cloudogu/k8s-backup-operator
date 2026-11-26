@@ -101,7 +101,7 @@ func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testi
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
-	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
+	assert.Equal(t, []recordedClientAction{createOf(ownedChild(restore, testLegacyUnit))}, fixture.clientActions.snapshot(),
 		"a prepared restore must not be written again, it must start the provider restore")
 }
 
