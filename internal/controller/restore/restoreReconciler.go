@@ -251,17 +251,17 @@ func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restor
 
 	for _, unit := range restoreState.UnitsToRestore(restore.Spec) {
 		childName := state.ProviderRestoreName(restore.Name, unit.UnitIdentifier)
-		child, err := velero.GetRestoreByName(ctx, r.k8sClient, restore.Namespace, childName)
+		existingChild, err := velero.GetRestoreByName(ctx, r.k8sClient, restore.Namespace, childName)
 		if err != nil {
 			return restore, retryOnError(fmt.Errorf("failed to read the provider restore of restore %s: %w", restore.Name, err))
 		}
-		if child == nil {
+		if existingChild == nil {
 			continue
 		}
 
 		expectedBackupName := state.ProviderBackupName(restore.Spec.BackupName, unit.UnitIdentifier)
-		if conflictErr := velero.CheckRestoreForConflicts(restore, child, expectedBackupName); conflictErr != nil {
-			return r.failOnProviderChildConflict(ctx, restore, child, conflictErr)
+		if conflictErr := velero.CheckRestoreForConflicts(restore, existingChild, expectedBackupName); conflictErr != nil {
+			return r.failOnProviderChildConflict(ctx, restore, existingChild, conflictErr)
 		}
 	}
 

@@ -42,27 +42,27 @@ func (e *ConflictError) Error() string {
 
 // BuildRestore returns the Velero restore that the given Cloudogu Restore expects. The child
 // takes the parent's name and namespace, so two Cloudogu Restores can never collide on it.
-func BuildRestore(parent *k8sv1.Restore) *velerov1.Restore {
+func BuildRestore(cesRestore *k8sv1.Restore) *velerov1.Restore {
 	coreAPIGroup := ""
 	isController := true
 
 	return &velerov1.Restore{
-		Name:      parent.Name,
-		Namespace: parent.Namespace,
+		Name:      cesRestore.Name,
+		Namespace: cesRestore.Namespace,
 		Labels: map[string]string{
-			RestoreSourceNameLabel: parent.Name,
-			RestoreSourceUIDLabel:  string(parent.UID),
+			RestoreSourceNameLabel: cesRestore.Name,
+			RestoreSourceUIDLabel:  string(cesRestore.UID),
 		},
 		OwnerReferences: []metav1.OwnerReference{{
 			APIVersion:         k8sv1.GroupVersion.String(),
 			Kind:               restoreKind,
-			Name:               parent.Name,
-			UID:                parent.UID,
+			Name:               cesRestore.Name,
+			UID:                cesRestore.UID,
 			Controller:         &isController,
 			BlockOwnerDeletion: &isController,
 		}},
 		Spec: velerov1.RestoreSpec{
-			BackupName:             parent.Spec.BackupName,
+			BackupName:             cesRestore.Spec.BackupName,
 			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
 			ResourceModifier: &corev1.TypedLocalObjectReference{
 				APIGroup: &coreAPIGroup,
@@ -75,14 +75,14 @@ func BuildRestore(parent *k8sv1.Restore) *velerov1.Restore {
 
 // GetLegacyRestore reads the Velero restore at the expected name of the given Cloudogu Restore. An
 // absent child is not an error.
-func GetLegacyRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.Restore) (*velerov1.Restore, error) {
-	return GetRestoreByName(ctx, k8sClient, parent.Namespace, parent.Name)
+func GetLegacyRestore(ctx context.Context, k8sClient client.Client, cesRestore *k8sv1.Restore) (*velerov1.Restore, error) {
+	return GetRestoreByName(ctx, k8sClient, cesRestore.Namespace, cesRestore.Name)
 }
 
 // GetRestoreByName reads the Velero restore with the given name. An absent restore is not an error.
 func GetRestoreByName(ctx context.Context, k8sClient client.Client, namespace, name string) (*velerov1.Restore, error) {
-	child := &velerov1.Restore{}
-	err := k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, child)
+	veleroRestore := &velerov1.Restore{}
+	err := k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, veleroRestore)
 	if apierrors.IsNotFound(err) {
 		return nil, nil // has yet to be created
 	}
@@ -90,46 +90,45 @@ func GetRestoreByName(ctx context.Context, k8sClient client.Client, namespace, n
 		return nil, fmt.Errorf("failed to get velero restore [%s]: %w", name, err)
 	}
 
-	return child, nil
+	return veleroRestore, nil
 }
 
 // HasOwnedRestore reports whether any Velero restore with the UID label of the given Cloudogu Restore is controlled by it.
-func HasOwnedRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.Restore) (bool, error) {
-	children := &velerov1.RestoreList{}
-	err := k8sClient.List(ctx, children, client.InNamespace(parent.Namespace),
-		client.MatchingLabels{RestoreSourceUIDLabel: string(parent.UID)})
+func HasOwnedRestore(ctx context.Context, k8sClient client.Client, cesRestore *k8sv1.Restore) (bool, error) {
+	veleroRestores := &velerov1.RestoreList{}
+	err := k8sClient.List(ctx, veleroRestores, client.InNamespace(cesRestore.Namespace),
+		client.MatchingLabels{RestoreSourceUIDLabel: string(cesRestore.UID)})
 	if err != nil {
-		return false, fmt.Errorf("failed to list velero restores of [%s]: %w", parent.Name, err)
+		return false, fmt.Errorf("failed to list velero restores of [%s]: %w", cesRestore.Name, err)
 	}
 
-	return slices.ContainsFunc(children.Items, func(child velerov1.Restore) bool {
-		return IsOwnedRestore(parent, &child)
+	return slices.ContainsFunc(veleroRestores.Items, func(veleroRestore velerov1.Restore) bool {
+		return IsOwnedRestore(cesRestore, &veleroRestore)
 	}), nil
 }
 
 // IsOwnedRestore reports whether the given Velero restore is controlled by the given Cloudogu Restore.
-func IsOwnedRestore(parent *k8sv1.Restore, child *velerov1.Restore) bool {
-	controller := metav1.GetControllerOf(child)
+func IsOwnedRestore(cesRestore *k8sv1.Restore, veleroRestore *velerov1.Restore) bool {
+	controller := metav1.GetControllerOf(veleroRestore)
 
-	return controller != nil && controller.UID != "" && controller.UID == parent.UID
+	return controller != nil && controller.UID != "" && controller.UID == cesRestore.UID
 }
 
-// CheckRestoreForConflicts reports whether an existing child restoring the expected provider backup may be
-// used as the given Cloudogu Restore's child. It returns a *ConflictError when it may not, and never proposes a
-// write: the child's spec is never mutated, because Velero has already acted on it.
-func CheckRestoreForConflicts(parent *k8sv1.Restore, child *velerov1.Restore, expectedBackupName string) error {
-	if !IsOwnedRestore(parent, child) {
+// CheckRestoreForConflicts reports whether an existing velero restore is from a given Cloudogu Restore.
+// It returns a *ConflictError when it is not.
+func CheckRestoreForConflicts(cesRestore *k8sv1.Restore, veleroRestore *velerov1.Restore, expectedBackupName string) error {
+	if !IsOwnedRestore(cesRestore, veleroRestore) {
 		return &ConflictError{
-			name:   child.Name,
-			reason: fmt.Sprintf("it is not controlled by restore [%s] and must not be adopted", parent.Name),
+			name:   veleroRestore.Name,
+			reason: fmt.Sprintf("it is not controlled by restore [%s] and must not be adopted", cesRestore.Name),
 		}
 	}
 
-	if child.Spec.BackupName != expectedBackupName {
+	if veleroRestore.Spec.BackupName != expectedBackupName {
 		return &ConflictError{
-			name: child.Name,
+			name: veleroRestore.Name,
 			reason: fmt.Sprintf("it restores backup [%s] but restore [%s] expects backup [%s]",
-				child.Spec.BackupName, parent.Name, expectedBackupName),
+				veleroRestore.Spec.BackupName, cesRestore.Name, expectedBackupName),
 		}
 	}
 
@@ -140,15 +139,15 @@ func CheckRestoreForConflicts(parent *k8sv1.Restore, child *velerov1.Restore, ex
 // once. An existing own child is returned without any write, which is what makes a repeated attempt
 // after a crash between child creation and parent status persistence safe. An existing child that is
 // not usable yields a *ConflictError and is neither deleted, mutated nor claimed.
-func EnsureRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.Restore) (*velerov1.Restore, error) {
+func EnsureRestore(ctx context.Context, k8sClient client.Client, cesRestore *k8sv1.Restore) (*velerov1.Restore, error) {
 
-	existing, err := GetLegacyRestore(ctx, k8sClient, parent)
+	existing, err := GetLegacyRestore(ctx, k8sClient, cesRestore)
 	if err != nil {
 		return nil, err
 	}
 
 	if existing != nil {
-		if conflictErr := CheckRestoreForConflicts(parent, existing, parent.Spec.BackupName); conflictErr != nil {
+		if conflictErr := CheckRestoreForConflicts(cesRestore, existing, cesRestore.Spec.BackupName); conflictErr != nil {
 			return nil, conflictErr
 		}
 
@@ -157,29 +156,28 @@ func EnsureRestore(ctx context.Context, k8sClient client.Client, parent *k8sv1.R
 		return existing, nil
 	}
 
-	child := BuildRestore(parent)
-	err = k8sClient.Create(ctx, child)
+	veleroRestore := BuildRestore(cesRestore)
+	err = k8sClient.Create(ctx, veleroRestore)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create velero restore [%s]: %w", child.Name, err)
+		return nil, fmt.Errorf("failed to create velero restore [%s]: %w", veleroRestore.Name, err)
 	}
 
-	return child, nil
+	return veleroRestore, nil
 }
 
 // DeleteRestore deletes a Velero restore that the caller already classified as safe to delete.
 // The UID precondition prevents a namesake that replaced the classified child from being deleted.
 // An already absent child is not an error.
-func DeleteRestore(ctx context.Context, k8sClient client.Client, child *velerov1.Restore) error {
-
-	uid := child.UID
-	err := k8sClient.Delete(ctx, child, client.Preconditions{UID: &uid})
+func DeleteRestore(ctx context.Context, k8sClient client.Client, veleroRestore *velerov1.Restore) error {
+	uid := veleroRestore.UID
+	err := k8sClient.Delete(ctx, veleroRestore, client.Preconditions{UID: &uid})
 	if apierrors.IsNotFound(err) {
-		logging.Info(ctx, fmt.Sprintf("velero restore [%s] is already gone: ignore", child.Name))
+		logging.Info(ctx, fmt.Sprintf("velero restore [%s] is already gone: ignore", veleroRestore.Name))
 
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("failed to delete velero restore [%s]: %w", child.Name, err)
+		return fmt.Errorf("failed to delete velero restore [%s]: %w", veleroRestore.Name, err)
 	}
 
 	return nil
