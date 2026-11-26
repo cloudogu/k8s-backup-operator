@@ -271,9 +271,9 @@ func Test_defaultDoguManager_cleanupDogus(t *testing.T) {
 			previousWaitTime := doguDeleteWaitTime
 			doguDeleteWaitTime = 10 * time.Millisecond
 			defer func() { doguDeleteWaitTime = previousWaitTime }()
-			previousResourceWaitTime := additionalResourceDeleteWaitTime
-			additionalResourceDeleteWaitTime = 10 * time.Millisecond
-			defer func() { additionalResourceDeleteWaitTime = previousResourceWaitTime }()
+			previousResourceWaitTime := componentResourceDeleteWaitTime
+			componentResourceDeleteWaitTime = 10 * time.Millisecond
+			defer func() { componentResourceDeleteWaitTime = previousResourceWaitTime }()
 
 			pvcClient := newMockUnstructuredClient(t)
 			if tt.pvcClientFn != nil {

@@ -6,7 +6,7 @@ Specifically, the resources with the label key `dogu.name` and the `k8s.cloudogu
 Only ConfigMaps, Secrets, PersistentVolumeClaims and the Dogu resource itself are backed up.
 Because the Dogu resource is backed up, the Dogu operator can recreate any other resources that are not included in the backup.
 
-Additional resources can be included in the backup by adding the label `k8s.cloudogu.com/backup-scope` to them, for example on component `PersistentVolumeClaims`.
+Component resources can be included in the backup by adding the label `k8s.cloudogu.com/backup-scope` to them, for example on component `PersistentVolumeClaims`.
 Be aware that the limitation to the aforementioned kinds of resources still applies.
 In addition, `ServiceAccountProducers` of components with this label are backed up as well.
 
@@ -18,16 +18,16 @@ The cleanup before a restore then deletes the producer, and the service-account-
 Once the restore recreates the producer, the service-account-operator rotates the account and recreates the secrets with
 new credentials, so they match the new data.
 
-## Restore Behavior For Additional Resources
+## Restore Behavior For Component Resources
 
 During restore, the operator deletes all resources that belong to the restore scope before recreating them from the backup.
-This applies both to Dogus and to additional resources selected via `k8s.cloudogu.com/backup-scope`.
+This applies both to Dogus and to Component resources selected via `k8s.cloudogu.com/backup-scope`.
 For a restore from backup units, only the restored Dogus and components belong to the restore scope:
-Additional resources are only deleted if their label `k8s.cloudogu.com/component.name` names a restored component.
+Component resources are only deleted if their label `k8s.cloudogu.com/component.name` names a restored component.
 Dogus and components excluded via `excludedDogus`, `excludedComponents` or `options.ignoreV2Dogus` are left untouched.
 For a restore from a legacy backup, all Dogus and all resources with `k8s.cloudogu.com/backup-scope` are still deleted.
 
-If a workload mounts one of those additional resources, it must be scaled down before the restore starts and scaled up again after the restore finishes. 
+If a workload mounts one of those Component resources, it must be scaled down before the restore starts and scaled up again after the restore finishes. 
 To participate in this behavior, the workload must be labeled with `k8s.cloudogu.com/restore-scaledown-scope`.
 Otherwise, Pods may continue to access resources that are being deleted and recreated.
 
@@ -35,7 +35,7 @@ The restore flow is:
 
 1. Switch the system into maintenance mode.
 2. Scale down workloads marked for restore scaledown.
-3. Delete Dogus (including their PVCs) and additional resources that are part of the restore scope.
+3. Delete Dogus (including their PVCs) and Component resources that are part of the restore scope.
 4. Trigger the restore at the configured provider.
 5. Scale the previously scaled down workloads back up.
 
@@ -45,7 +45,7 @@ The following labels are used together:
 
 ### `k8s.cloudogu.com/backup-scope`
 
-Use this label on additional resources that should be part of the backup and restore scope.
+Use this label on Component resources that should be part of the backup and restore scope.
 
 Example:
 

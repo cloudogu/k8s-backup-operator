@@ -27,13 +27,13 @@ type doguManager interface {
 	cleanupDogus(ctx context.Context, wg *sync.WaitGroup, doguSelector, pvcSelector labels.Selector) error
 }
 
-type additionalResourceManager interface {
-	cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, selector labels.Selector) error
+type componentResourceManager interface {
+	cleanupComponentResources(ctx context.Context, wg *sync.WaitGroup, selector labels.Selector) error
 }
 
 type DefaultCleanupManager struct {
 	doguManager
-	additionalResourceManager
+	componentResourceManager
 }
 
 // NewManager creates a new instance of DefaultCleanupManager.
@@ -50,8 +50,8 @@ func NewManager(doguClient doguClient, dynamicClient dynamicClient, namespace st
 	}
 
 	return &DefaultCleanupManager{
-		doguManager:               newDoguManager(doguClient, clients[pvcGroupVersionResource]),
-		additionalResourceManager: newAdditionalResourceManager(clients),
+		doguManager:              newDoguManager(doguClient, clients[pvcGroupVersionResource]),
+		componentResourceManager: newComponentResourceManager(clients),
 	}
 }
 
@@ -80,10 +80,10 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context, restoreState state.
 		return fmt.Errorf("failed to cleanup dogus: %w", err)
 	}
 
-	if selectors.additionalResources == nil {
-		logging.Info(ctx, "no components to clean up additional resources for")
-	} else if err := c.cleanupAdditionalResources(ctx, &wg, selectors.additionalResources); err != nil {
-		return fmt.Errorf("failed to cleanup additional resources: %w", err)
+	if selectors.componentResources == nil {
+		logging.Info(ctx, "no components to clean up component resources for")
+	} else if err := c.cleanupComponentResources(ctx, &wg, selectors.componentResources); err != nil {
+		return fmt.Errorf("failed to cleanup component resources: %w", err)
 	}
 
 	// Wait for all goroutines OR timeout
@@ -104,9 +104,9 @@ func (c *DefaultCleanupManager) Cleanup(ctx context.Context, restoreState state.
 
 // cleanupSelectors select the resources to delete before the restore; a nil selector means nothing to delete.
 type cleanupSelectors struct {
-	dogus               labels.Selector
-	doguPVCs            labels.Selector
-	additionalResources labels.Selector
+	dogus              labels.Selector
+	doguPVCs           labels.Selector
+	componentResources labels.Selector
 }
 
 func newCleanupSelectors(restoreState state.RestoreState, spec backupv1.RestoreSpec) (cleanupSelectors, error) {
@@ -128,12 +128,12 @@ func legacyCleanupSelectors() (cleanupSelectors, error) {
 	if err != nil {
 		return cleanupSelectors{}, err
 	}
-	additionalResources, err := selectorOf(backupScopeLabelKey, selection.Exists)
+	componentResources, err := selectorOf(backupScopeLabelKey, selection.Exists)
 	if err != nil {
 		return cleanupSelectors{}, err
 	}
 
-	return cleanupSelectors{dogus: labels.Everything(), doguPVCs: doguPVCs, additionalResources: additionalResources}, nil
+	return cleanupSelectors{dogus: labels.Everything(), doguPVCs: doguPVCs, componentResources: componentResources}, nil
 }
 
 // unitCleanupSelectors select the given dogus and the resources with a backup scope of the given components.
@@ -151,7 +151,7 @@ func unitCleanupSelectors(dogus, components []string) (cleanupSelectors, error) 
 	}
 
 	if len(components) > 0 {
-		additionalResources, err := selectorOf(backupScopeLabelKey, selection.Exists)
+		componentResources, err := selectorOf(backupScopeLabelKey, selection.Exists)
 		if err != nil {
 			return cleanupSelectors{}, err
 		}
@@ -159,7 +159,7 @@ func unitCleanupSelectors(dogus, components []string) (cleanupSelectors, error) 
 		if err != nil {
 			return cleanupSelectors{}, fmt.Errorf("failed to create label selector: %w", err)
 		}
-		selectors.additionalResources = additionalResources.Add(*componentRequirement)
+		selectors.componentResources = componentResources.Add(*componentRequirement)
 	}
 
 	return selectors, nil

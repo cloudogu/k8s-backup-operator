@@ -22,7 +22,7 @@ const (
 	backupScopeLabelKey = "k8s.cloudogu.com/backup-scope"
 )
 
-var additionalResourceDeleteWaitTime = defaultWaitTime
+var componentResourceDeleteWaitTime = defaultWaitTime
 
 type dynamicClient interface {
 	Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface
@@ -34,25 +34,25 @@ type unstructuredClient interface {
 	Delete(ctx context.Context, name string, options metav1.DeleteOptions, subresources ...string) error
 }
 
-type defaultAdditionalResourceManager struct {
+type defaultComponentResourceManager struct {
 	clients map[schema.GroupVersionResource]unstructuredClient
 }
 
-// newAdditionalResourceManager creates a new instance of defaultAdditionalResourceManager.
-func newAdditionalResourceManager(clients map[schema.GroupVersionResource]unstructuredClient) *defaultAdditionalResourceManager {
-	return &defaultAdditionalResourceManager{clients: clients}
+// newComponentResourceManager creates a new instance of defaultComponentResourceManager.
+func newComponentResourceManager(clients map[schema.GroupVersionResource]unstructuredClient) *defaultComponentResourceManager {
+	return &defaultComponentResourceManager{clients: clients}
 }
 
-// cleanupAdditionalResources deletes the additional resources matching the selector before restoring the backup.
+// cleanupComponentResources deletes the component resources matching the selector before restoring the backup.
 // It adds those deletions to the wait group.
-func (c *defaultAdditionalResourceManager) cleanupAdditionalResources(ctx context.Context, wg *sync.WaitGroup, selector labels.Selector) error {
-	logging.Info(ctx, "starting cleanup of additional resources before restore...", "selector", selector.String())
+func (c *defaultComponentResourceManager) cleanupComponentResources(ctx context.Context, wg *sync.WaitGroup, selector labels.Selector) error {
+	logging.Info(ctx, "starting cleanup of component resources before restore...", "selector", selector.String())
 
 	sortedKeys := slices.SortedFunc(maps.Keys(c.clients), func(a schema.GroupVersionResource, b schema.GroupVersionResource) int {
 		return strings.Compare(a.Group+a.Version+a.Resource, b.Group+b.Version+b.Resource)
 	})
 	for _, gvr := range sortedKeys {
-		logging.Debug(ctx, "listing additional resources", "gvr", gvr.String())
+		logging.Debug(ctx, "listing component resources", "gvr", gvr.String())
 
 		client := c.clients[gvr]
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
@@ -90,7 +90,7 @@ func waitForResourceDeletion(ctx context.Context, client unstructuredClient, res
 			break
 		} else if exists := !k8sErr.IsNotFound(err); exists {
 			// wait for 3 seconds and try again
-			time.Sleep(additionalResourceDeleteWaitTime)
+			time.Sleep(componentResourceDeleteWaitTime)
 		} else {
 			logging.Info(ctx, "resource was deleted successfully", "ns", resource.GetNamespace(), "kind", resource.GetKind(), "Name", resource.GetName())
 			break

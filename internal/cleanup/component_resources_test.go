@@ -286,10 +286,10 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			previousWaitTime := doguDeleteWaitTime
-			additionalResourceDeleteWaitTime = 10 * time.Millisecond
-			defer func() { additionalResourceDeleteWaitTime = previousWaitTime }()
+			componentResourceDeleteWaitTime = 10 * time.Millisecond
+			defer func() { componentResourceDeleteWaitTime = previousWaitTime }()
 
-			c := &defaultAdditionalResourceManager{
+			c := &defaultComponentResourceManager{
 				clients: map[schema.GroupVersionResource]unstructuredClient{
 					corev1.SchemeGroupVersion.WithResource("configmaps"):             tt.configMapClientFn(t),
 					corev1.SchemeGroupVersion.WithResource("persistentvolumeclaims"): tt.pvcClientFn(t),
@@ -300,7 +300,7 @@ func Test_defaultAdditionalResourceManager_cleanupAdditionalResources(t *testing
 			defer cancel()
 			var wg sync.WaitGroup
 
-			tt.wantErr(t, c.cleanupAdditionalResources(tt.ctxFn(t), &wg, mustParseSelector(t, componentResourceSelector)))
+			tt.wantErr(t, c.cleanupComponentResources(tt.ctxFn(t), &wg, mustParseSelector(t, componentResourceSelector)))
 
 			done := make(chan struct{})
 			go func() {
@@ -326,7 +326,7 @@ func Test_newAdditionalResourceManager(t *testing.T) {
 		corev1.SchemeGroupVersion.WithResource("configmaps"): newMockUnstructuredClient(t),
 	}
 
-	actual := newAdditionalResourceManager(clients)
+	actual := newComponentResourceManager(clients)
 
 	assert.Equal(t, clients, actual.clients)
 }
