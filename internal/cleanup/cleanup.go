@@ -10,6 +10,7 @@ import (
 	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
+	componentv1 "github.com/cloudogu/k8s-component-lib/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -153,7 +154,7 @@ func unitCleanupSelectors(dogus, components []string) (cleanupSelectors, error) 
 		if err != nil {
 			return cleanupSelectors{}, err
 		}
-		componentRequirement, err := labels.NewRequirement(componentNameLabelKey, selection.In, components)
+		componentRequirement, err := labels.NewRequirement(componentv1.ComponentNameLabelKey, selection.In, components)
 		if err != nil {
 			return cleanupSelectors{}, fmt.Errorf("failed to create label selector: %w", err)
 		}

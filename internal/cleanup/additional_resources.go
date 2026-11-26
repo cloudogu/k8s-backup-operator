@@ -19,8 +19,7 @@ import (
 )
 
 const (
-	backupScopeLabelKey   = "k8s.cloudogu.com/backup-scope"
-	componentNameLabelKey = "k8s.cloudogu.com/component.name"
+	backupScopeLabelKey = "k8s.cloudogu.com/backup-scope"
 )
 
 var additionalResourceDeleteWaitTime = defaultWaitTime
