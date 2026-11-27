@@ -84,10 +84,10 @@ type restoreReconciler struct {
 	cleanup                cleanupManager
 	scaleManager           scaleManager
 	maintenanceModeSwitch  maintenanceModeSwitch
-	stateCollector         restoreStateCollector
 	requeueDelay           time.Duration
 	backupStorageName      string
 	providerDeploymentName string
+	stateCollector         stateCollector
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -373,12 +373,19 @@ func (r *restoreReconciler) ensurePreparation(ctx context.Context, restore *k8sv
 
 	r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonPreparing, actionPrepareRestore, "Preparation in progress - scale down and cleanup")
 
+	restoreState, err := r.stateCollector.Collect(ctx, restore)
+	if err != nil {
+		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonCollectStateFailed, actionPrepareRestore, "Collect restore state failed")
+		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to collect restore state: %w", err))
+	}
+	logging.Info(ctx, "collected restore state")
+
 	if err := r.scaleManager.ScaleDown(ctx); err != nil {
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to scale down workloads before restore: %w", err))
 	}
 	logging.Info(ctx, "scaled down the workloads")
 
-	if err := r.cleanup.Cleanup(ctx); err != nil {
+	if err := r.cleanup.Cleanup(ctx, restoreState, restore.Spec); err != nil {
 		r.recorder.Eventf(restore, nil, corev1.EventTypeWarning, ReasonCleanupFailed, actionPrepareRestore, "Cleanup before restore failed")
 		return r.reportFailedPreparation(ctx, restore, fmt.Errorf("failed to cleanup before restore: %w", err))
 	}

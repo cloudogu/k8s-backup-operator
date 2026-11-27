@@ -3,7 +3,7 @@ package restore
 import (
 	"context"
 
-	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	backupv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -34,14 +34,10 @@ type maintenanceModeSwitch interface {
 	GetStatus(ctx context.Context) (repository.MaintenanceModeDescription, bool, error)
 }
 
-type restoreStateCollector interface {
-	// Collect returns the restore state of the legacy backup or the backup units.
-	Collect(ctx context.Context, restore *k8sv1.Restore) (state.RestoreState, error)
-}
-
 type cleanupManager interface {
 	// Cleanup deletes all resources that need to be deleted before restoring the backup.
-	Cleanup(ctx context.Context) error
+	// Ignored or excluded dogus and components are kept.
+	Cleanup(ctx context.Context, restoreState state.RestoreState, spec backupv1.RestoreSpec) error
 }
 
 type scaleManager interface {
@@ -56,6 +52,11 @@ type scaleManager interface {
 	AreWorkloadsReady(ctx context.Context) (bool, error)
 	// FinalizeScaleUp removes the stored replica labels after workload readiness was observed.
 	FinalizeScaleUp(ctx context.Context) error
+}
+
+type stateCollector interface {
+	// Collect returns the restore state of the legacy backup or the backup units.
+	Collect(ctx context.Context, restore *backupv1.Restore) (state.RestoreState, error)
 }
 
 // used for mocks

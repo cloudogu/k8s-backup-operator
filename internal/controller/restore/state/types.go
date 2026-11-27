@@ -46,6 +46,8 @@ type RestoreState struct {
 	Units []UnitBackup
 	// V2Dogus are the dogus of the V2 blob.
 	V2Dogus []string
+	// V3Dogus are the dogus of all v3 dogu units.
+	V3Dogus []string
 	// Components are the components of the components unit.
 	Components []string
 }
@@ -73,6 +75,17 @@ func (s RestoreState) RestoredComponents(spec backupv1.RestoreSpec) []string {
 	return slices.DeleteFunc(slices.Clone(s.Components), func(component string) bool {
 		return slices.Contains(spec.ExcludedComponents, component)
 	})
+}
+
+// RestoredDogus returns the V2 and V3 dogus without the ignored or excluded ones.
+func (s RestoreState) RestoredDogus(spec backupv1.RestoreSpec) (v2Dogus, v3Dogus []string) {
+	if !ptr.Deref(spec.Options, backupv1.UnitOptions{}).IgnoreV2Dogus {
+		v2Dogus = slices.Clone(s.V2Dogus)
+	}
+	v3Dogus = slices.DeleteFunc(slices.Clone(s.V3Dogus), func(dogu string) bool {
+		return slices.Contains(spec.ExcludedDogus, dogu)
+	})
+	return v2Dogus, v3Dogus
 }
 
 // InvalidExclusions describes each exclusion or option not matching the backup; empty if all match.

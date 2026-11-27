@@ -29,7 +29,7 @@ const (
 	// scaledownReplicasLabel holds the replica count captured at scale-down
 	// time. A leftover value means a previous restore did not finish.
 	scaledownReplicasLabel = "k8s.cloudogu.com/restore-scaledown-replicas"
-	// backupScopeLabel marks additional resources that the restore flow deletes
+	// backupScopeLabel marks component resources that the restore flow deletes
 	// before restoring.
 	backupScopeLabel = "k8s.cloudogu.com/backup-scope"
 	// acceptanceProviderHoldFinalizer keeps the Velero restore observable after its deletion was
@@ -79,7 +79,7 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 
 		// Created only after the backup completed, so it is absent
 		// from the backup. Cleanup must delete it and we assert that nothing brings it back.
-		By("creating a throwaway additional resource labeled for backup scope")
+		By("creating a throwaway component resource labeled for backup scope")
 		configMap := newThrowawayConfigMap(configMapKey)
 		Expect(k8sClient.Create(ctx, configMap)).Should(Succeed())
 		DeferCleanup(func(ctx SpecContext) {
@@ -126,7 +126,7 @@ var _ = Describe("Restore", Serial, Ordered, Label("restore"), func() {
 				Should(Succeed())
 		})
 
-		It("the labeled additional resource was deleted by the cleanup", func(ctx SpecContext) {
+		It("the labeled component resource was deleted by the cleanup", func(ctx SpecContext) {
 			configMap := &corev1.ConfigMap{}
 			err := k8sClient.Get(ctx, configMapKey, configMap)
 			Expect(apierrors.IsNotFound(err)).To(BeTrue(),
@@ -528,7 +528,7 @@ func newThrowawayDeployment(objectKey client.ObjectKey, replicas int32) *appsv1.
 	}
 }
 
-// newThrowawayConfigMap builds an additional resource that the restore cleanup
+// newThrowawayConfigMap builds a component resource that the restore cleanup
 // must delete because of its backup scope label.
 func newThrowawayConfigMap(objectKey client.ObjectKey) *corev1.ConfigMap {
 	return &corev1.ConfigMap{

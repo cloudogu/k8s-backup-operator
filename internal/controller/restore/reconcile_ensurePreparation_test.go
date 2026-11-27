@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
@@ -53,7 +54,9 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 		stageOrder = append(stageOrder, "scale-down")
 	}).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Run(func(context.Context) {
+	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Run(func(_ context.Context, restoreState state.RestoreState, spec k8sv1.RestoreSpec) {
+		assert.Equal(t, state.KindLegacy, restoreState.Kind, "the cleanup must get the collected state of the source backup")
+		assert.Equal(t, restore.Spec, spec, "the cleanup must get the spec to keep ignored or excluded units")
 		stageOrder = append(stageOrder, "cleanup")
 	}).Return(nil).Once()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
@@ -184,7 +187,7 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -243,7 +246,7 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Return(assert.AnError).Once()
+	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(assert.AnError).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -260,6 +263,34 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, ReasonPreparationFailed)
 }
 
+func TestAFailedStateCollectionReportsPreparedFalseWithoutTouchingTheEcosystem(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonPreparing, actionPrepareRestore, "Preparation in progress - scale down and cleanup").Once()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, ReasonCollectStateFailed, actionPrepareRestore, "Collect restore state failed").Once()
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, ReasonPreparationFailed, actionPrepareRestore, "The preparation of the ecosystem failed -> retrying").Once()
+
+	stateCollectorMock := newMockStateCollector(t)
+	stateCollectorMock.EXPECT().Collect(testCtx, restore).Return(state.RestoreState{}, assert.AnError).Once()
+
+	testClient := newTestClient(t, interceptor.Funcs{}, restore)
+	// The cleanup and scale mocks carry no expectations, so the ecosystem must stay untouched.
+	reconciler := &restoreReconciler{
+		namespace:      testNamespace,
+		recorder:       recorderMock,
+		k8sClient:      testClient,
+		cleanup:        newMockCleanupManager(t),
+		scaleManager:   newMockScaleManager(t),
+		stateCollector: stateCollectorMock,
+	}
+
+	_, outcome := reconciler.ensurePreparation(testCtx, restore)
+
+	require.ErrorIs(t, outcome.err, assert.AnError)
+	assert.ErrorContains(t, outcome.err, "failed to collect restore state")
+	assertPreparedCondition(t, testClient, metav1.ConditionFalse, ReasonPreparationFailed)
+}
+
 func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 	recorderMock := newMockEventRecorder(t)
@@ -271,7 +302,7 @@ func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -356,7 +387,7 @@ func TestAnUnreadyProviderIsReportedOnceAndTheRecoveryIsReportedOnce(t *testing.
 	scaleMock := newMockScaleManager(t)
 	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
