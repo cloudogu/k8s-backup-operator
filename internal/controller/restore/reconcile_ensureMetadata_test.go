@@ -3,7 +3,6 @@ package restore
 import (
 	"testing"
 
-	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +29,7 @@ func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, usableSourceBackup())
 	request := newRestoreRequest(testRestore)
 
 	results, errs := fixture.reconcileTimes(testCtx, request, 2)
@@ -39,7 +38,7 @@ func TestEnsureMetadataWritesTheParentOnceAndThenLetsTheWorkflowStart(t *testing
 	require.NoError(t, errs[1])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the metadata write must end the reconciliation")
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[1], "the started provider restore must end the reconciliation")
-	assert.Equal(t, []recordedClientAction{updateOf(restore), createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
+	assert.Equal(t, []recordedClientAction{updateOf(restore), createOf(ownedChild(restore, testLegacyUnit))}, fixture.clientActions.snapshot(),
 		"the finalizer and the labels must be written in one update, and only once, before the restore starts")
 	assertPersistedMetadata(t, fixture.client, testRestore)
 }
@@ -59,13 +58,13 @@ func TestEnsureMetadataDoesNotWriteAgain(t *testing.T) {
 		return reconciler.Reconcile
 	}
 
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "a converged restore must start the provider restore right away")
-	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
+	assert.Equal(t, []recordedClientAction{createOf(ownedChild(restore, testLegacyUnit))}, fixture.clientActions.snapshot(),
 		"a restore with metadata must not be written again")
 }
 

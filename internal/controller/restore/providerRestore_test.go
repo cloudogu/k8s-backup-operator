@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
+	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
@@ -42,13 +43,13 @@ func TestProviderRestoreStageCreatesOwnedChildWithoutWaiting(t *testing.T) {
 		// no manager - reaching a further stage would panic
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
-	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore))}, fixture.clientActions.snapshot(),
+	assert.Equal(t, []recordedClientAction{createOf(ownedChild(restore, testLegacyUnit))}, fixture.clientActions.snapshot(),
 		"starting the restore must create the child and write nothing else")
 
 	child := &velerov1.Restore{}
@@ -73,7 +74,7 @@ func TestARepeatedReconciliationNeverStartsASecondProviderRestore(t *testing.T) 
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, usableSourceBackup())
 	request := newRestoreRequest(testRestore)
 
 	firstResults, firstErrs := fixture.reconcileTimes(testCtx, request, 1)
@@ -90,7 +91,7 @@ func TestARepeatedReconciliationNeverStartsASecondProviderRestore(t *testing.T) 
 	}
 
 	// The second reconciliation observes the pending child once; the third one changes nothing.
-	assert.Equal(t, []recordedClientAction{createOf(velero.BuildRestore(restore)), statusUpdateOf(restore)},
+	assert.Equal(t, []recordedClientAction{createOf(ownedChild(restore, testLegacyUnit)), statusUpdateOf(restore)},
 		fixture.clientActions.snapshot(), "the child must be created exactly once")
 	assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionUnknown, ReasonProviderRestorePending)
 }
@@ -110,7 +111,7 @@ func TestAProviderRestoreThatCannotBeStartedIsReportedAndRetried(t *testing.T) {
 		reconciler.maintenanceModeSwitch = maintenanceMock
 		return reconciler.Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, failingCreate(assert.AnError), factory, restore)
+	fixture := newMultiReconcileFixture(t, failingCreate(assert.AnError), factory, restore, usableSourceBackup())
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -130,11 +131,15 @@ func TestAConflictingChildFoundWhenStartingTheRestoreIsTerminal(t *testing.T) {
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), (*velerov1.Restore)(nil), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore, mock.Anything).Return()
 
+	collectorMock := newMockRestoreStateCollector(t)
+	collectorMock.EXPECT().Collect(testCtx, restore).
+		Return(state.RestoreState{Kind: state.KindLegacy, Units: []state.UnitBackup{{UnitIdentifier: testLegacyUnit}}}, nil)
 	reconciler := &restoreReconciler{
 		namespace: testNamespace,
 		recorder:  recorderMock,
 		// the foreign child appears after this stage read the child state
-		k8sClient: newTestClient(t, appearingForeignChild(t, restore), restore),
+		k8sClient:      newTestClient(t, appearingForeignChild(t, restore), restore),
+		stateCollector: collectorMock,
 	}
 
 	updated, outcome := reconciler.ensureProviderRestore(testCtx, restore)

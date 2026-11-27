@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
-	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,7 +19,7 @@ import (
 
 // ownedChildInPhase returns the provider restore of the given Restore in the given phase.
 func ownedChildInPhase(parent *k8sv1.Restore, phase velerov1.RestorePhase) *velerov1.Restore {
-	child := velero.BuildRestore(parent)
+	child := ownedChild(parent, testLegacyUnit)
 	child.Status.Phase = phase
 
 	return child

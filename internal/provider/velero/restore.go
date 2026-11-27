@@ -3,6 +3,7 @@ package velero
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/logging"
@@ -18,6 +19,7 @@ import (
 const (
 	// RestoreSourceNameLabel names the Cloudogu Restore a Velero restore was created for.
 	// It is secondary evidence for debugging and for listing children without a cache index
+	// It carries the truncated name; the owner reference carries the full one.
 	RestoreSourceNameLabel = "k8s.cloudogu.com/restore-source-name"
 	// RestoreSourceUIDLabel carries the UID of the Cloudogu Restore a Velero restore was
 	// created for.
@@ -40,19 +42,32 @@ func (e *ConflictError) Error() string {
 	return fmt.Sprintf("velero restore [%s] conflicts with the expected child: %s", e.name, e.reason)
 }
 
-// BuildRestore returns the Velero restore that the given Cloudogu Restore expects. The child
-// takes the parent's name and namespace, so two Cloudogu Restores can never collide on it.
-func BuildRestore(cesRestore *k8sv1.Restore) *velerov1.Restore {
+// RestoreRequest describes one Velero restore of a Cloudogu Restore.
+type RestoreRequest struct {
+	Name       string
+	BackupName string
+	// Labels are added to the restore source labels.
+	Labels map[string]string
+	// LabelSelector is nil to restore the whole backup.
+	LabelSelector *metav1.LabelSelector
+}
+
+// BuildRestore returns the requested Velero restore of the given Cloudogu Restore in its namespace.
+func BuildRestore(cesRestore *k8sv1.Restore, request RestoreRequest) *velerov1.Restore {
 	coreAPIGroup := ""
 	isController := true
 
+	labels := maps.Clone(request.Labels)
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[RestoreSourceNameLabel] = k8sv1.GetTruncatedName(cesRestore.Name)
+	labels[RestoreSourceUIDLabel] = string(cesRestore.UID)
+
 	return &velerov1.Restore{
-		Name:      cesRestore.Name,
+		Name:      request.Name,
 		Namespace: cesRestore.Namespace,
-		Labels: map[string]string{
-			RestoreSourceNameLabel: cesRestore.Name,
-			RestoreSourceUIDLabel:  string(cesRestore.UID),
-		},
+		Labels:    labels,
 		OwnerReferences: []metav1.OwnerReference{{
 			APIVersion:         k8sv1.GroupVersion.String(),
 			Kind:               restoreKind,
@@ -62,7 +77,8 @@ func BuildRestore(cesRestore *k8sv1.Restore) *velerov1.Restore {
 			BlockOwnerDeletion: &isController,
 		}},
 		Spec: velerov1.RestoreSpec{
-			BackupName:             cesRestore.Spec.BackupName,
+			BackupName:             request.BackupName,
+			LabelSelector:          request.LabelSelector,
 			ExistingResourcePolicy: velerov1.PolicyTypeUpdate,
 			ResourceModifier: &corev1.TypedLocalObjectReference{
 				APIGroup: &coreAPIGroup,
@@ -135,19 +151,19 @@ func CheckRestoreForConflicts(cesRestore *k8sv1.Restore, veleroRestore *velerov1
 	return nil
 }
 
-// EnsureRestore returns the Velero restore of the given Cloudogu Restore, creating it exactly
+// EnsureRestore returns the requested Velero restore of the given Cloudogu Restore, creating it exactly
 // once. An existing own child is returned without any write, which is what makes a repeated attempt
 // after a crash between child creation and parent status persistence safe. An existing child that is
 // not usable yields a *ConflictError and is neither deleted, mutated nor claimed.
-func EnsureRestore(ctx context.Context, k8sClient client.Client, cesRestore *k8sv1.Restore) (*velerov1.Restore, error) {
+func EnsureRestore(ctx context.Context, k8sClient client.Client, cesRestore *k8sv1.Restore, request RestoreRequest) (*velerov1.Restore, error) {
 
-	existing, err := GetLegacyRestore(ctx, k8sClient, cesRestore)
+	existing, err := GetRestoreByName(ctx, k8sClient, cesRestore.Namespace, request.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	if existing != nil {
-		if conflictErr := CheckRestoreForConflicts(cesRestore, existing, cesRestore.Spec.BackupName); conflictErr != nil {
+		if conflictErr := CheckRestoreForConflicts(cesRestore, existing, request.BackupName); conflictErr != nil {
 			return nil, conflictErr
 		}
 
@@ -156,7 +172,7 @@ func EnsureRestore(ctx context.Context, k8sClient client.Client, cesRestore *k8s
 		return existing, nil
 	}
 
-	veleroRestore := BuildRestore(cesRestore)
+	veleroRestore := BuildRestore(cesRestore, request)
 	err = k8sClient.Create(ctx, veleroRestore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create velero restore [%s]: %w", veleroRestore.Name, err)

@@ -434,30 +434,52 @@ func (r *restoreReconciler) reportFailedPreparation(ctx context.Context, restore
 	return updated, retryOnError(preparationErr)
 }
 
-// ensureProviderRestore starts the provider restore and returns without waiting for it, so no worker
-// is occupied while the provider runs. Creating the child is idempotent, an existing owned child will be used
-// instead of starting a second restore.
+// ensureProviderRestore starts the provider restores of the units one after another and returns without
+// waiting for them, so no worker is occupied while the provider runs. The next unit starts once the
+// previous one finished, successfully or not; a missing child is created again.
 func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	// A provider restore already succeeded -> skip
 	if meta.IsStatusConditionTrue(restore.Status.Conditions, k8sv1.ConditionProviderSucceeded) {
 		return restore, next()
 	}
 
-	existing, err := velero.GetLegacyRestore(ctx, r.k8sClient, restore)
+	restoreState, err := r.stateCollector.Collect(ctx, restore)
 	if err != nil {
-		return restore, retryOnError(fmt.Errorf("failed to read the provider restore of restore %s: %w", restore.Name, err))
-	}
-	if existing != nil {
-		return restore, next()
+		return restore, retryOnError(fmt.Errorf("failed to collect the backup of restore %s: %w", restore.Name, err))
 	}
 
+	for _, unit := range restoreState.UnitsToRestore(restore.Spec) {
+		request := providerRestoreRequest(restore, unit.UnitIdentifier)
+		child, err := velero.GetRestoreByName(ctx, r.k8sClient, restore.Namespace, request.Name)
+		if err != nil {
+			return restore, retryOnError(fmt.Errorf("failed to read the provider restore of restore %s: %w", restore.Name, err))
+		}
+		if child == nil {
+			return r.startProviderRestore(ctx, restore, request)
+		}
+		// Do not create more restores, if there is still one in progress
+		if !isProviderRestoreFinished(child) {
+			return restore, next()
+		}
+	}
+
+	return restore, next()
+}
+
+// isProviderRestoreFinished reports whether the provider will not change the child's outcome anymore.
+func isProviderRestoreFinished(child *velerov1.Restore) bool {
+	observation := velero.ObserveRestorePhase(child.Status.Phase)
+	return observation == velero.RestoreSucceeded || observation == velero.RestoreFailed
+}
+
+// startProviderRestore creates the requested provider restore; an existing owned child is used instead.
+func (r *restoreReconciler) startProviderRestore(ctx context.Context, restore *k8sv1.Restore, request velero.RestoreRequest) (*k8sv1.Restore, stageOutcome) {
 	r.recorder.Eventf(restore, nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process")
 
-	if _, err := velero.EnsureRestore(ctx, r.k8sClient, restore); err != nil {
+	if _, err := velero.EnsureRestore(ctx, r.k8sClient, restore, request); err != nil {
 		// A conflict is not transient: another restore's child occupies the expected name, and no
 		// number of retries will change that.
-		var conflictErr *velero.ConflictError
-		if errors.As(err, &conflictErr) {
+		if conflictErr, ok := errors.AsType[*velero.ConflictError](err); ok {
 			return r.failOnProviderChildConflict(ctx, restore, nil, conflictErr)
 		}
 
@@ -466,7 +488,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 		return restore, retryOnError(fmt.Errorf("failed to start the provider restore of restore %s: %w", restore.Name, err))
 	}
 
-	logging.Info(ctx, "created the velero restore", "backup", restore.Spec.BackupName)
+	logging.Info(ctx, "created the velero restore", "name", request.Name, "backup", request.BackupName)
 	// The child's own events drive the next reconciliation; the delay is only the fallback.
 	logging.Debug(ctx, "Retrying restore reconciliation", "reason", "the provider restore was created")
 	return restore, retryAfter(r.requeueDelay)
