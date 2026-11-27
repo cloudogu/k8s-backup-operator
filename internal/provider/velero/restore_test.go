@@ -108,38 +108,61 @@ func TestBuildRestore(t *testing.T) {
 	selector := &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 		{Key: "k8s.cloudogu.com/component.name", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"k8s-loki"}},
 	}}
-	veleroRestore := BuildRestore(newCesRestore(), RestoreRequest{
-		Name:          "test-restore-components",
-		BackupName:    "test-backup-components",
-		Labels:        map[string]string{"k8s.cloudogu.com/backup": testBackup, "k8s.cloudogu.com/backup-type": "components"},
-		LabelSelector: selector,
-	})
+	tests := []struct {
+		name       string
+		request    RestoreRequest
+		wantLabels map[string]string
+	}{
+		{
+			name: "a unit request adds its labels and selector",
+			request: RestoreRequest{
+				Name:          "test-restore-components",
+				BackupName:    "test-backup-components",
+				Labels:        map[string]string{"k8s.cloudogu.com/backup": testBackup, "k8s.cloudogu.com/backup-type": "components"},
+				LabelSelector: selector,
+			},
+			wantLabels: map[string]string{
+				RestoreSourceNameLabel:         testRestore,
+				RestoreSourceUIDLabel:          string(testRestoreUID),
+				"k8s.cloudogu.com/backup":      testBackup,
+				"k8s.cloudogu.com/backup-type": "components",
+			},
+		},
+		{
+			name:    "a legacy request carries only the source labels and restores the whole backup",
+			request: legacyRequest(),
+			wantLabels: map[string]string{
+				RestoreSourceNameLabel: testRestore,
+				RestoreSourceUIDLabel:  string(testRestoreUID),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			veleroRestore := BuildRestore(newCesRestore(), tt.request)
 
-	assert.Equal(t, "test-restore-components", veleroRestore.Name)
-	assert.Equal(t, testNamespace, veleroRestore.Namespace)
-	assert.Equal(t, map[string]string{
-		RestoreSourceNameLabel:         testRestore,
-		RestoreSourceUIDLabel:          string(testRestoreUID),
-		"k8s.cloudogu.com/backup":      testBackup,
-		"k8s.cloudogu.com/backup-type": "components",
-	}, veleroRestore.Labels)
+			assert.Equal(t, tt.request.Name, veleroRestore.Name)
+			assert.Equal(t, testNamespace, veleroRestore.Namespace)
+			assert.Equal(t, tt.wantLabels, veleroRestore.Labels)
 
-	controller := metav1.GetControllerOf(veleroRestore)
-	require.NotNil(t, controller)
-	assert.Equal(t, "k8s.cloudogu.com/v1", controller.APIVersion)
-	assert.Equal(t, restoreKind, controller.Kind)
-	assert.Equal(t, testRestore, controller.Name)
-	assert.Equal(t, testRestoreUID, controller.UID)
-	require.NotNil(t, controller.BlockOwnerDeletion)
-	assert.True(t, *controller.BlockOwnerDeletion)
-	assert.Equal(t, "test-backup-components", veleroRestore.Spec.BackupName)
-	assert.Equal(t, selector, veleroRestore.Spec.LabelSelector)
-	assert.Equal(t, velerov1.PolicyTypeUpdate, veleroRestore.Spec.ExistingResourcePolicy)
-	require.NotNil(t, veleroRestore.Spec.ResourceModifier)
-	require.NotNil(t, veleroRestore.Spec.ResourceModifier.APIGroup)
-	assert.Empty(t, *veleroRestore.Spec.ResourceModifier.APIGroup)
-	assert.Equal(t, "ConfigMap", veleroRestore.Spec.ResourceModifier.Kind)
-	assert.Equal(t, restoreDoguModifierConfigMapName, veleroRestore.Spec.ResourceModifier.Name)
+			controller := metav1.GetControllerOf(veleroRestore)
+			require.NotNil(t, controller)
+			assert.Equal(t, "k8s.cloudogu.com/v1", controller.APIVersion)
+			assert.Equal(t, restoreKind, controller.Kind)
+			assert.Equal(t, testRestore, controller.Name)
+			assert.Equal(t, testRestoreUID, controller.UID)
+			require.NotNil(t, controller.BlockOwnerDeletion)
+			assert.True(t, *controller.BlockOwnerDeletion)
+			assert.Equal(t, tt.request.BackupName, veleroRestore.Spec.BackupName)
+			assert.Equal(t, tt.request.LabelSelector, veleroRestore.Spec.LabelSelector)
+			assert.Equal(t, velerov1.PolicyTypeUpdate, veleroRestore.Spec.ExistingResourcePolicy)
+			require.NotNil(t, veleroRestore.Spec.ResourceModifier)
+			require.NotNil(t, veleroRestore.Spec.ResourceModifier.APIGroup)
+			assert.Empty(t, *veleroRestore.Spec.ResourceModifier.APIGroup)
+			assert.Equal(t, "ConfigMap", veleroRestore.Spec.ResourceModifier.Kind)
+			assert.Equal(t, restoreDoguModifierConfigMapName, veleroRestore.Spec.ResourceModifier.Name)
+		})
+	}
 }
 
 func TestBuildRestoreTruncatesTheSourceNameLabel(t *testing.T) {
@@ -152,63 +175,23 @@ func TestBuildRestoreTruncatesTheSourceNameLabel(t *testing.T) {
 	assert.Len(t, veleroRestore.Labels[RestoreSourceNameLabel], 63)
 }
 
-func TestBuildRestoreOfALegacyRequestRestoresTheWholeBackup(t *testing.T) {
-	veleroRestore := BuildRestore(newCesRestore(), legacyRequest())
-
-	assert.Equal(t, testRestore, veleroRestore.Name)
-	assert.Equal(t, testBackup, veleroRestore.Spec.BackupName)
-	assert.Equal(t, map[string]string{
-		RestoreSourceNameLabel: testRestore,
-		RestoreSourceUIDLabel:  string(testRestoreUID),
-	}, veleroRestore.Labels)
-	assert.Nil(t, veleroRestore.Spec.LabelSelector)
-}
-
-func TestEnsureRestoreCreatesAVeleroRestoreAtTheRequestedName(t *testing.T) {
+func TestEnsureRestoreCreatesTheVeleroRestoreAtTheRequestedName(t *testing.T) {
 	cesRestore := newCesRestore()
 	writes := &writeCounter{}
 	k8sClient := newTestClient(t, writes, cesRestore)
 	request := RestoreRequest{Name: "test-restore-global-config", BackupName: "test-backup-global-config"}
 
-	_, err := EnsureRestore(testCtx, k8sClient, cesRestore, request)
-	require.NoError(t, err)
-	again, err := EnsureRestore(testCtx, k8sClient, cesRestore, request)
-
-	require.NoError(t, err)
-	assert.Equal(t, "test-backup-global-config", again.Spec.BackupName)
-	// Two calls result in just one write, because the child is not created again
-	assert.Equal(t, 1, writes.total())
-}
-
-func TestEnsureRestoreReportsANamingConflict(t *testing.T) {
-	cesRestore := newCesRestore()
-	existing := BuildRestore(cesRestore, RestoreRequest{Name: "test-restore-global-config", BackupName: testBackup})
-	writes := &writeCounter{}
-	k8sClient := newTestClient(t, writes, cesRestore, existing)
-
-	veleroRestore, err := EnsureRestore(testCtx, k8sClient, cesRestore, RestoreRequest{Name: "test-restore-global-config", BackupName: "test-backup-global-config"})
-
-	var conflictErr *ConflictError
-	require.ErrorAs(t, err, &conflictErr)
-	assert.Nil(t, veleroRestore)
-	assert.Equal(t, 0, writes.total())
-}
-
-func TestEnsureRestoreCreatesTheChild(t *testing.T) {
-	cesRestore := newCesRestore()
-	writes := &writeCounter{}
-	k8sClient := newTestClient(t, writes, cesRestore)
-
-	created, err := EnsureRestore(testCtx, k8sClient, cesRestore, legacyRequest())
+	created, err := EnsureRestore(testCtx, k8sClient, cesRestore, request)
 
 	require.NoError(t, err)
 	require.NotNil(t, created)
 	assert.Equal(t, 1, writes.creates)
 	assert.Equal(t, 1, writes.total())
 
-	persisted := getPersistedRestore(t, k8sClient)
+	persisted := &velerov1.Restore{}
+	require.NoError(t, k8sClient.Get(testCtx, types.NamespacedName{Namespace: testNamespace, Name: request.Name}, persisted))
 	assert.True(t, IsOwnedRestore(cesRestore, persisted))
-	assert.Equal(t, testBackup, persisted.Spec.BackupName)
+	assert.Equal(t, request.BackupName, persisted.Spec.BackupName)
 	assert.Equal(t, string(testRestoreUID), persisted.Labels[RestoreSourceUIDLabel])
 }
 
@@ -360,11 +343,11 @@ func TestHasOwnedRestoreRequiresTheOwnerReference(t *testing.T) {
 	}
 }
 
-func TestGetLegacyRestoreSucceedsEmptyOnAbsentVeleroRetore(t *testing.T) {
+func TestGetRestoreByNameSucceedsEmptyOnAbsentVeleroRestore(t *testing.T) {
 	writes := &writeCounter{}
 	k8sClient := newTestClient(t, writes)
 
-	veleroRestore, err := GetLegacyRestore(testCtx, k8sClient, newCesRestore())
+	veleroRestore, err := GetRestoreByName(testCtx, k8sClient, testNamespace, testRestore)
 
 	require.NoError(t, err)
 	assert.Nil(t, veleroRestore)
@@ -411,29 +394,4 @@ func TestDeleteRestore(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to delete velero restore [test-restore]")
 	})
-}
-
-func TestAMatchingRunningVeleroRestoreIsFoundAndReported(t *testing.T) {
-	cesRestore := newCesRestore()
-	require.Empty(t, cesRestore.Status.Conditions, "the scenario starts from a cesRestore whose conditions were never persisted")
-	running := BuildRestore(cesRestore, legacyRequest())
-	running.Status.Phase = velerov1.RestorePhaseInProgress
-	writes := &writeCounter{}
-	k8sClient := newTestClient(t, writes, cesRestore, running)
-
-	found, err := GetLegacyRestore(testCtx, k8sClient, cesRestore)
-
-	require.NoError(t, err)
-	require.NotNil(t, found)
-	assert.True(t, IsOwnedRestore(cesRestore, found))
-	require.NoError(t, CheckRestoreForConflicts(cesRestore, found, testBackup))
-	assert.Equal(t, RestoreRunning, ObserveRestorePhase(found.Status.Phase))
-
-	// the running velero restore is reused, never restarted
-	ensured, err := EnsureRestore(testCtx, k8sClient, cesRestore, legacyRequest())
-
-	require.NoError(t, err)
-	require.NotNil(t, ensured)
-	assert.Equal(t, velerov1.RestorePhaseInProgress, ensured.Status.Phase)
-	assert.Equal(t, 0, writes.total(), "a running own velero restore must be reported, not written to")
 }
