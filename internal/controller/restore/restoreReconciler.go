@@ -73,7 +73,6 @@ func NewRestoreReconciler(
 		requeueDelay:           requeueDelay,
 		backupStorageName:      backupStorageName,
 		providerDeploymentName: providerDeploymentName,
-		stateCollector:         state.NewCollector(k8sClient),
 	}
 }
 
@@ -85,7 +84,6 @@ type restoreReconciler struct {
 	cleanup                cleanupManager
 	scaleManager           scaleManager
 	maintenanceModeSwitch  maintenanceModeSwitch
-	stateCollector         restoreStateCollector
 	requeueDelay           time.Duration
 	backupStorageName      string
 	providerDeploymentName string
