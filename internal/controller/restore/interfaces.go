@@ -43,7 +43,7 @@ type cleanupManager interface {
 type scaleManager interface {
 	// ScaleDown finds all resources labeled with the scaledown scope label,
 	// stores their current replica count, and scales them to zero.
-	ScaleDown(ctx context.Context) error
+	ScaleDown(ctx context.Context, restoredDogus, restoredComponents []string) error
 	// ScaleUp finds all resources labeled with the scaledown scope label and restores
 	// the stored replica count. It retains the replicas label for recovery observation.
 	ScaleUp(ctx context.Context) error

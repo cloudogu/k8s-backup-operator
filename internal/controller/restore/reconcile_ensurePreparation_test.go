@@ -24,7 +24,7 @@ func assertPreparedCondition(t *testing.T, testClient client.Client, status meta
 	t.Helper()
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, testClient.Get(testCtx, client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
+	require.NoError(t, testClient.Get(t.Context(), client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
 
 	condition := meta.FindStatusCondition(stored.Status.Conditions, k8sv1.ConditionPrepared)
 	require.NotNil(t, condition, "no Prepared condition was persisted")
@@ -50,17 +50,17 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 		},
 	}
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleDown(testCtx).Run(func(context.Context) {
+	scaleMock.EXPECT().ScaleDown(t.Context(), []string(nil), []string(nil)).Run(func(context.Context, []string, []string) {
 		stageOrder = append(stageOrder, "scale-down")
 	}).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Run(func(_ context.Context, restoreState state.RestoreState, spec k8sv1.RestoreSpec) {
+	cleanupMock.EXPECT().Cleanup(t.Context(), mock.Anything, mock.Anything).Run(func(_ context.Context, restoreState state.RestoreState, spec k8sv1.RestoreSpec) {
 		assert.Equal(t, state.KindLegacy, restoreState.Kind, "the cleanup must get the collected state of the source backup")
 		assert.Equal(t, restore.Spec, spec, "the cleanup must get the spec to keep ignored or excluded units")
 		stageOrder = append(stageOrder, "cleanup")
 	}).Return(nil).Once()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Run(func(context.Context) {
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Run(func(context.Context) {
 		stageOrder = append(stageOrder, "maintenance")
 	}).Return(repository.MaintenanceModeDescription{}, true, nil).Once()
 
@@ -72,7 +72,7 @@ func TestPreparationScalesDownCleansUpAndPersistsItsMilestoneWithoutStartingTheR
 	}
 	fixture := newMultiReconcileFixture(t, recordProviderCheck, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0], "the preparation must end the reconciliation")
@@ -89,7 +89,7 @@ func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testi
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	// The cleanup, scale and maintenance mocks carry no expectations, so any preparation step would fail.
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
@@ -100,7 +100,7 @@ func TestAPreparedRestoreSkipsThePreparationAndStartsTheProviderRestore(t *testi
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{RequeueAfter: defaultRequeueDelay}, results[0])
@@ -126,7 +126,7 @@ func TestPreparationIsSkippedForAnUnpreparedRestoreThatAlreadyHasAProviderChild(
 		maintenanceModeSwitch: newMockMaintenanceModeSwitch(t),
 	}
 
-	updated, outcome := reconciler.ensurePreparation(testCtx, restore)
+	updated, outcome := reconciler.ensurePreparation(t.Context(), restore)
 
 	assert.Equal(t, next(), outcome, "the workflow must continue without preparing again")
 	assert.Equal(t, restore, updated)
@@ -142,15 +142,15 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonPreparationCompleted, actionPrepareRestore, "Preparation completed").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
-	maintenanceMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
+	maintenanceMock.EXPECT().Activate(t.Context(), repository.MaintenanceModeDescription{
 		Title: maintenanceModeTitle,
 		Text:  maintenanceModeText,
 	}, false).Return(assert.AnError).Once()
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().ScaleDown(t.Context(), []string(nil), []string(nil)).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(t.Context(), mock.Anything, mock.Anything).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -159,7 +159,7 @@ func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	// expected requeue, because of condition write
@@ -174,9 +174,9 @@ func TestAFailedScaleDownReportsPreparedFalseAndRetriesWithoutCleaningUp(t *test
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, ReasonPreparationFailed, actionPrepareRestore, "The preparation of the ecosystem failed -> retrying").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleDown(testCtx).Return(assert.AnError).Once()
+	scaleMock.EXPECT().ScaleDown(t.Context(), []string(nil), []string(nil)).Return(assert.AnError).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -185,7 +185,7 @@ func TestAFailedScaleDownReportsPreparedFalseAndRetriesWithoutCleaningUp(t *test
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError)
 	assert.ErrorContains(t, errs[0], "failed to scale down workloads before restore")
@@ -193,7 +193,7 @@ func TestAFailedScaleDownReportsPreparedFalseAndRetriesWithoutCleaningUp(t *test
 	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, ReasonPreparationFailed)
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, fixture.client.Get(testCtx, newRestoreRequest(testRestore).NamespacedName, stored))
+	require.NoError(t, fixture.client.Get(t.Context(), newRestoreRequest(testRestore).NamespacedName, stored))
 	assert.False(t, isTerminal(stored), "a failed preparation must leave the restore resumable")
 }
 
@@ -205,11 +205,11 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, ReasonPreparationFailed, actionPrepareRestore, "The preparation of the ecosystem failed -> retrying").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().ScaleDown(t.Context(), []string(nil), []string(nil)).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(assert.AnError).Once()
+	cleanupMock.EXPECT().Cleanup(t.Context(), mock.Anything, mock.Anything).Return(assert.AnError).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -218,7 +218,7 @@ func TestAFailedCleanupReportsPreparedFalseAndRetries(t *testing.T) {
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError)
 	assert.ErrorContains(t, errs[0], "failed to cleanup before restore")
@@ -234,7 +234,7 @@ func TestAFailedStateCollectionReportsPreparedFalseWithoutTouchingTheEcosystem(t
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, ReasonPreparationFailed, actionPrepareRestore, "The preparation of the ecosystem failed -> retrying").Once()
 
 	stateCollectorMock := newMockStateCollector(t)
-	stateCollectorMock.EXPECT().Collect(testCtx, restore).Return(state.RestoreState{}, assert.AnError).Once()
+	stateCollectorMock.EXPECT().Collect(t.Context(), restore).Return(state.RestoreState{}, assert.AnError).Once()
 
 	testClient := newTestClient(t, interceptor.Funcs{}, restore)
 	// The cleanup and scale mocks carry no expectations, so the ecosystem must stay untouched.
@@ -247,7 +247,7 @@ func TestAFailedStateCollectionReportsPreparedFalseWithoutTouchingTheEcosystem(t
 		stateCollector: stateCollectorMock,
 	}
 
-	_, outcome := reconciler.ensurePreparation(testCtx, restore)
+	_, outcome := reconciler.ensurePreparation(t.Context(), restore)
 
 	require.ErrorIs(t, outcome.err, assert.AnError)
 	assert.ErrorContains(t, outcome.err, "failed to collect restore state")
@@ -261,11 +261,11 @@ func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonCleanupCompleted, actionPrepareRestore, "Cleanup before restore completed").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().ScaleDown(t.Context(), []string(nil), []string(nil)).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(t.Context(), mock.Anything, mock.Anything).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -274,7 +274,7 @@ func TestAnUnpersistablePreparationMilestoneIsRetriedWithoutStartingTheRestore(t
 	}
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError)
 	assert.ErrorContains(t, errs[0], "failed to persist the preparation of restore test-restore")
@@ -299,7 +299,7 @@ func TestAnUnreadyProviderPreventsMaintenanceAndPreparationWithoutTouchingTheEco
 	unavailableProvider := backupStorageLocation(velerov1.BackupStorageLocationPhaseUnavailable)
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, unavailableProvider)
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0], "an unready provider is an expected wait, not an error")
 	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0])
@@ -323,7 +323,7 @@ func TestAVeleroDeploymentWithoutReadyReplicasPreventsMaintenanceAndPreparation(
 	}
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), providerDeployment(0))
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0], "a velero that is not running yet is an expected wait, not an error")
 	assert.Equal(t, ctrl.Result{RequeueAfter: requeueAfterTest}, results[0])
@@ -346,11 +346,11 @@ func TestAnUnreadyProviderIsReportedOnceAndTheRecoveryIsReportedOnce(t *testing.
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonPreparationCompleted, mock.Anything, mock.Anything).Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().ScaleDown(t.Context(), []string(nil), []string(nil)).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(t.Context(), mock.Anything, mock.Anything).Return(nil).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -361,23 +361,23 @@ func TestAnUnreadyProviderIsReportedOnceAndTheRecoveryIsReportedOnce(t *testing.
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore)
 
 	// two passes without a provider: only the first one may report it
-	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
+	_, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 2)
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
 	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, velero.ReasonVeleroBackupStorageLocationNotFound)
 
 	fixture.simulateExternalWrite(t, func(testClient client.WithWatch) error {
-		if err := testClient.Create(testCtx, readyProviderDeployment()); err != nil {
+		if err := testClient.Create(t.Context(), readyProviderDeployment()); err != nil {
 			return err
 		}
-		if err := testClient.Create(testCtx, usableSourceBackup()); err != nil {
+		if err := testClient.Create(t.Context(), usableSourceBackup()); err != nil {
 			return err
 		}
 
-		return testClient.Create(testCtx, readyStorageLocation())
+		return testClient.Create(t.Context(), readyStorageLocation())
 	})
 
-	_, errs = fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	_, errs = fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assertPreparedCondition(t, fixture.client, metav1.ConditionTrue, ReasonPreparationCompleted)

@@ -28,12 +28,12 @@ func TestWorkloadsNotReadyPersistWaitingReasonAndRequeue(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonScaleUpInitiated)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(false, nil).Once()
+	scaleMock.EXPECT().AreWorkloadsReady(t.Context()).Return(false, nil).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-	updated, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
+	updated, outcome := reconciler.ensureWorkloadsReady(t.Context(), restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assert.Equal(t, 1, writes.total())
@@ -47,13 +47,13 @@ func TestWorkloadsStillNotReadyRequeueWithoutAnotherStatusWrite(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonWaitingForWorkloads)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(false, nil).Once()
+	scaleMock.EXPECT().AreWorkloadsReady(t.Context()).Return(false, nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	updated, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
+	updated, outcome := reconciler.ensureWorkloadsReady(t.Context(), restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assert.Same(t, restore, updated)
@@ -64,12 +64,12 @@ func TestReadyWorkloadsPersistReadyReasonAndRequeue(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonWaitingForWorkloads)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(true, nil).Once()
+	scaleMock.EXPECT().AreWorkloadsReady(t.Context()).Return(true, nil).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-	_, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
+	_, outcome := reconciler.ensureWorkloadsReady(t.Context(), restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assert.Equal(t, 1, writes.total())
@@ -80,13 +80,13 @@ func TestPersistedReadyReasonIsRecheckedBeforeProceeding(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonWorkloadsReady)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(true, nil).Once()
+	scaleMock.EXPECT().AreWorkloadsReady(t.Context()).Return(true, nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	updated, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
+	updated, outcome := reconciler.ensureWorkloadsReady(t.Context(), restore)
 
 	assert.Equal(t, next(), outcome)
 	assert.Same(t, restore, updated)
@@ -97,13 +97,13 @@ func TestWorkloadReadinessDoesNotResetFinalizedRecoveryProgress(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonScaleUpFinalized)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(true, nil).Once()
+	scaleMock.EXPECT().AreWorkloadsReady(t.Context()).Return(true, nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	_, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
+	_, outcome := reconciler.ensureWorkloadsReady(t.Context(), restore)
 
 	assert.Equal(t, next(), outcome)
 	assert.Equal(t, 0, writes.total())
@@ -113,11 +113,11 @@ func TestWorkloadReadinessRegressionReturnsToWaiting(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonWorkloadsReady)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(false, nil).Once()
+	scaleMock.EXPECT().AreWorkloadsReady(t.Context()).Return(false, nil).Once()
 	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
 	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-	_, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
+	_, outcome := reconciler.ensureWorkloadsReady(t.Context(), restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assertPersistedCondition(t, testClient, k8sv1.ConditionWorkloadsRecovered, metav1.ConditionUnknown, ReasonWaitingForWorkloads)
@@ -127,13 +127,13 @@ func TestWorkloadReadinessObservationErrorUsesBackoffWithoutChangingStatus(t *te
 	restore := restoreWithWorkloadRecoveryReason(ReasonWaitingForWorkloads)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(false, assert.AnError).Once()
+	scaleMock.EXPECT().AreWorkloadsReady(t.Context()).Return(false, assert.AnError).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	updated, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
+	updated, outcome := reconciler.ensureWorkloadsReady(t.Context(), restore)
 
 	require.Error(t, outcome.err)
 	assert.ErrorIs(t, outcome.err, assert.AnError)
@@ -146,13 +146,13 @@ func TestUnpersistableWorkloadReadinessIsRetried(t *testing.T) {
 	restore := restoreWithWorkloadRecoveryReason(ReasonWaitingForWorkloads)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().AreWorkloadsReady(testCtx).Return(true, nil).Once()
+	scaleMock.EXPECT().AreWorkloadsReady(t.Context()).Return(true, nil).Once()
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore),
 		nil, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	_, outcome := reconciler.ensureWorkloadsReady(testCtx, restore)
+	_, outcome := reconciler.ensureWorkloadsReady(t.Context(), restore)
 
 	require.Error(t, outcome.err)
 	assert.ErrorIs(t, outcome.err, assert.AnError)

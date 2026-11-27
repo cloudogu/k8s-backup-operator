@@ -45,7 +45,7 @@ func TestAMissingSourceBackupFailsTheRestoreBeforeMaintenanceAndPreparation(t *t
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, newSourceBackupGateFactory(t, recorderMock),
 		restore, readyStorageLocation(), readyProviderDeployment())
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 2)
 
 	for index := range results {
 		require.NoError(t, errs[index], "a backup that cannot be restored is a decided outcome, not an error")
@@ -78,7 +78,7 @@ func TestASourceBackupThatIsNotRestorableFailsTheRestore(t *testing.T) {
 			fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, newSourceBackupGateFactory(t, recorderMock),
 				restore, readyStorageLocation(), readyProviderDeployment(), sourceBackup(phase))
 
-			results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
+			results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 2)
 
 			for index := range results {
 				require.NoError(t, errs[index], "a backup that cannot be restored is a decided outcome, not an error")
@@ -99,11 +99,11 @@ func TestARestorableSourceBackupLetsThePreparationRun(t *testing.T) {
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, mock.Anything, mock.Anything, mock.Anything).Times(3)
 
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleDown(testCtx).Return(nil).Once()
+	scaleMock.EXPECT().ScaleDown(t.Context(), []string(nil), []string(nil)).Return(nil).Once()
 	cleanupMock := newMockCleanupManager(t)
-	cleanupMock.EXPECT().Cleanup(testCtx, mock.Anything, mock.Anything).Return(nil).Once()
+	cleanupMock.EXPECT().Cleanup(t.Context(), mock.Anything, mock.Anything).Return(nil).Once()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, cleanupMock, scaleMock,
@@ -115,7 +115,7 @@ func TestARestorableSourceBackupLetsThePreparationRun(t *testing.T) {
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory,
 		restore, readyStorageLocation(), readyProviderDeployment(), sourceBackup(velerov1.BackupPhaseCompleted))
 
-	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	_, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assertPreparedCondition(t, fixture.client, metav1.ConditionTrue, ReasonPreparationCompleted)
@@ -128,7 +128,7 @@ func TestAnAlreadyPreparedRestoreIsNotFailedByAMissingSourceBackup(t *testing.T)
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, mock.Anything, mock.Anything, mock.Anything).Maybe()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, newMockCleanupManager(t), newMockScaleManager(t),
@@ -140,13 +140,13 @@ func TestAnAlreadyPreparedRestoreIsNotFailedByAMissingSourceBackup(t *testing.T)
 	// no backup in client
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, readyStorageLocation(), readyProviderDeployment())
 
-	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	_, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assertPreparedCondition(t, fixture.client, metav1.ConditionTrue, ReasonPreparationCompleted)
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, fixture.client.Get(testCtx, client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
+	require.NoError(t, fixture.client.Get(t.Context(), client.ObjectKey{Namespace: testNamespace, Name: testRestore}, stored))
 	assert.False(t, isTerminal(stored), "a prepared restore must not be failed by the source backup gate")
 }
 
@@ -165,7 +165,7 @@ func TestAFailedSourceBackupReadIsRetriedWithoutTouchingTheEcosystem(t *testing.
 	fixture := newMultiReconcileFixture(t, failingBackupRead, newSourceBackupGateFactory(t, newMockEventRecorder(t)),
 		restore, readyStorageLocation(), readyProviderDeployment(), usableSourceBackup())
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError, "an unreadable backup is transient and must be retried")
 	assert.Equal(t, ctrl.Result{}, results[0])

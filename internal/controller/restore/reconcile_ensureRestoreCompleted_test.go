@@ -24,7 +24,7 @@ func TestRestoreCompletionPersistsTerminalConditionsWithoutExternalRecoveryActio
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
 
-	updated, outcome := reconciler.ensureRestoreCompleted(testCtx, restore)
+	updated, outcome := reconciler.ensureRestoreCompleted(t.Context(), restore)
 
 	assert.Equal(t, abort(), outcome)
 	assert.Equal(t, 1, writes.total())
@@ -41,7 +41,7 @@ func TestRestoreCompletionDoesNotCompleteBeforeMaintenanceModeDeactivation(t *te
 		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	updated, outcome := reconciler.ensureRestoreCompleted(testCtx, restore)
+	updated, outcome := reconciler.ensureRestoreCompleted(t.Context(), restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assert.Same(t, restore, updated)
@@ -60,7 +60,7 @@ func TestRepeatedRestoreCompletionIsANoOp(t *testing.T) {
 		newTestClientWithParent(t, writes.interceptor(), restore), nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	updated, outcome := reconciler.ensureRestoreCompleted(testCtx, restore)
+	updated, outcome := reconciler.ensureRestoreCompleted(t.Context(), restore)
 
 	assert.Equal(t, abort(), outcome)
 	assert.Same(t, restore, updated)
@@ -75,7 +75,7 @@ func TestUnpersistableRestoreCompletionIsRetriedWithoutSuccessEvent(t *testing.T
 		nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 
-	_, outcome := reconciler.ensureRestoreCompleted(testCtx, restore)
+	_, outcome := reconciler.ensureRestoreCompleted(t.Context(), restore)
 
 	require.Error(t, outcome.err)
 	assert.ErrorIs(t, outcome.err, assert.AnError)

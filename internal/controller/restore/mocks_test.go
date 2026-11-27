@@ -2815,16 +2815,16 @@ func (_c *mockScaleManager_FinalizeScaleUp_Call) RunAndReturn(run func(ctx conte
 }
 
 // ScaleDown provides a mock function for the type mockScaleManager
-func (_mock *mockScaleManager) ScaleDown(ctx context.Context) error {
-	ret := _mock.Called(ctx)
+func (_mock *mockScaleManager) ScaleDown(ctx context.Context, restoredDogus []string, restoredComponents []string) error {
+	ret := _mock.Called(ctx, restoredDogus, restoredComponents)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ScaleDown")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, []string) error); ok {
+		r0 = returnFunc(ctx, restoredDogus, restoredComponents)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2838,18 +2838,30 @@ type mockScaleManager_ScaleDown_Call struct {
 
 // ScaleDown is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *mockScaleManager_Expecter) ScaleDown(ctx any) *mockScaleManager_ScaleDown_Call {
-	return &mockScaleManager_ScaleDown_Call{Call: _e.mock.On("ScaleDown", ctx)}
+//   - restoredDogus []string
+//   - restoredComponents []string
+func (_e *mockScaleManager_Expecter) ScaleDown(ctx any, restoredDogus any, restoredComponents any) *mockScaleManager_ScaleDown_Call {
+	return &mockScaleManager_ScaleDown_Call{Call: _e.mock.On("ScaleDown", ctx, restoredDogus, restoredComponents)}
 }
 
-func (_c *mockScaleManager_ScaleDown_Call) Run(run func(ctx context.Context)) *mockScaleManager_ScaleDown_Call {
+func (_c *mockScaleManager_ScaleDown_Call) Run(run func(ctx context.Context, restoredDogus []string, restoredComponents []string)) *mockScaleManager_ScaleDown_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
+		var arg1 []string
+		if args[1] != nil {
+			arg1 = args[1].([]string)
+		}
+		var arg2 []string
+		if args[2] != nil {
+			arg2 = args[2].([]string)
+		}
 		run(
 			arg0,
+			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -2860,7 +2872,7 @@ func (_c *mockScaleManager_ScaleDown_Call) Return(err error) *mockScaleManager_S
 	return _c
 }
 
-func (_c *mockScaleManager_ScaleDown_Call) RunAndReturn(run func(ctx context.Context) error) *mockScaleManager_ScaleDown_Call {
+func (_c *mockScaleManager_ScaleDown_Call) RunAndReturn(run func(ctx context.Context, restoredDogus []string, restoredComponents []string) error) *mockScaleManager_ScaleDown_Call {
 	_c.Call.Return(run)
 	return _c
 }

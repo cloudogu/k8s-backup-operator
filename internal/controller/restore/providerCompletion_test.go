@@ -50,7 +50,7 @@ func TestAnUndecidedProviderRestoreEndsTheReconciliationWithoutAnOutcome(t *test
 			}
 			fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedChildInPhase(restore, test.phase))
 
-			results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+			results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 			require.NoError(t, errs[0])
 			assert.Equal(t, ctrl.Result{RequeueAfter: providerObservationRecoveryDelay}, results[0],
@@ -58,7 +58,7 @@ func TestAnUndecidedProviderRestoreEndsTheReconciliationWithoutAnOutcome(t *test
 			assertPersistedCondition(t, fixture.client, k8sv1.ConditionProviderSucceeded, metav1.ConditionUnknown, test.reason)
 
 			stored := &k8sv1.Restore{}
-			require.NoError(t, fixture.client.Get(testCtx, newRestoreRequest(testRestore).NamespacedName, stored))
+			require.NoError(t, fixture.client.Get(t.Context(), newRestoreRequest(testRestore).NamespacedName, stored))
 			assert.False(t, isTerminal(stored), "an undecided provider restore must not end the restore")
 		})
 	}
@@ -71,9 +71,9 @@ func TestACompletedProviderRestoreResolvesItsMilestoneAndThenContinuesTheWorkflo
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeNormal, k8sv1.CreateEventReason,
 		actionCompleteProviderRestore, "Successfully completed the provider restore [%s]", []any{testRestore}).Return()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 	scaleMock := newMockScaleManager(t)
-	scaleMock.EXPECT().ScaleUp(testCtx).Return(nil)
+	scaleMock.EXPECT().ScaleUp(t.Context()).Return(nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, scaleMock, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -83,7 +83,7 @@ func TestACompletedProviderRestoreResolvesItsMilestoneAndThenContinuesTheWorkflo
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore,
 		ownedChildInPhase(restore, velerov1.RestorePhaseCompleted))
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 2)
 
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
@@ -107,8 +107,8 @@ func TestAFailedProviderRestoreIsTerminalWithoutRecoveringTheWorkloads(t *testin
 			recorderMock := newMockEventRecorder(t)
 			recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCompleteProviderRestore, mock.Anything).Return()
 			maintenanceMock := newMockMaintenanceModeSwitch(t)
-			maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
-			maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
+			maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
+			maintenanceMock.EXPECT().Deactivate(t.Context(), false).Return(nil).Once()
 
 			factory := func(fakeClient client.WithWatch) reconcileFunction {
 				reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, newMockScaleManager(t), requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -118,7 +118,7 @@ func TestAFailedProviderRestoreIsTerminalWithoutRecoveringTheWorkloads(t *testin
 			}
 			fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedChildInPhase(restore, phase))
 
-			results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
+			results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 2)
 
 			require.NoError(t, errs[0])
 			require.NoError(t, errs[1])
@@ -141,8 +141,8 @@ func TestAFailedProviderRestoreIsReportedEvenWhenTheMaintenanceModeStaysOn(t *te
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCompleteProviderRestore, mock.Anything).Return()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
-	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(assert.AnError).Once()
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().Deactivate(t.Context(), false).Return(assert.AnError).Once()
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -153,7 +153,7 @@ func TestAFailedProviderRestoreIsReportedEvenWhenTheMaintenanceModeStaysOn(t *te
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore,
 		ownedChildInPhase(restore, velerov1.RestorePhaseFailed))
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.NoError(t, errs[0])
 	assert.Equal(t, ctrl.Result{}, results[0])
@@ -171,7 +171,7 @@ func TestAnUnpersistableProviderRestoreStateIsRetried(t *testing.T) {
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore,
 		ownedChildInPhase(restore, velerov1.RestorePhaseInProgress))
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError)
 	assert.ErrorContains(t, errs[0], "failed to persist the provider restore state of restore test-restore")
@@ -184,8 +184,8 @@ func TestAnUnreportableProviderRestoreFailureIsRetried(t *testing.T) {
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCompleteProviderRestore, mock.Anything).Return()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
-	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().Deactivate(t.Context(), false).Return(nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -196,7 +196,7 @@ func TestAnUnreportableProviderRestoreFailureIsRetried(t *testing.T) {
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore,
 		ownedChildInPhase(restore, velerov1.RestorePhaseFailed))
 
-	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	_, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError)
 	assert.ErrorContains(t, errs[0], "failed to report the failed provider restore of restore test-restore")
@@ -208,7 +208,7 @@ func TestAResolvedProviderRestoreIsNotObservedAgain(t *testing.T) {
 
 	reconciler := &restoreReconciler{namespace: testNamespace, k8sClient: newTestClient(t, interceptor.Funcs{}, restore)}
 
-	updated, outcome := reconciler.ensureProviderCompletion(testCtx, restore)
+	updated, outcome := reconciler.ensureProviderCompletion(t.Context(), restore)
 
 	assert.Equal(t, next(), outcome)
 	assert.Equal(t, restore, updated)
@@ -230,7 +230,7 @@ func TestAnUnreadableChildStopsTheObservation(t *testing.T) {
 	}
 	reconciler := &restoreReconciler{namespace: testNamespace, k8sClient: newTestClient(t, failingChildGet, restore)}
 
-	updated, outcome := reconciler.ensureProviderCompletion(testCtx, restore)
+	updated, outcome := reconciler.ensureProviderCompletion(t.Context(), restore)
 
 	require.ErrorIs(t, outcome.err, assert.AnError)
 	assert.ErrorContains(t, outcome.err, "failed to read the provider restore of restore test-restore")
@@ -244,7 +244,7 @@ func TestAVanishedChildLeavesTheRestoreResumable(t *testing.T) {
 
 	reconciler := &restoreReconciler{namespace: testNamespace, k8sClient: newTestClient(t, interceptor.Funcs{}, restore), requeueDelay: requeueAfterTest}
 
-	updated, outcome := reconciler.ensureProviderCompletion(testCtx, restore)
+	updated, outcome := reconciler.ensureProviderCompletion(t.Context(), restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assert.False(t, isTerminal(updated), "a missing child is not an outcome")

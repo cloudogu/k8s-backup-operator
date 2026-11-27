@@ -15,10 +15,10 @@ import (
 func TestMaintenanceModeActivationSkipsAnAlreadyActiveMode(t *testing.T) {
 	restore := newParentRestore()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil).Once()
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil).Once()
 
 	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock}
-	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
+	actual, outcome := sut.ensureMaintenanceModeActivated(t.Context(), restore)
 
 	require.Same(t, restore, actual)
 	assert.Equal(t, actionNext, outcome.action)
@@ -29,14 +29,14 @@ func TestMaintenanceModeActivationActivatesAnInactiveMode(t *testing.T) {
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, actionActivateMaintenanceMode, "Maintenance mode activated").Once()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
-	maintenanceMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
+	maintenanceMock.EXPECT().Activate(t.Context(), repository.MaintenanceModeDescription{
 		Title: maintenanceModeTitle,
 		Text:  maintenanceModeText,
 	}, false).Return(nil).Once()
 
 	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
-	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
+	actual, outcome := sut.ensureMaintenanceModeActivated(t.Context(), restore)
 
 	require.Same(t, restore, actual)
 	assert.Equal(t, actionNext, outcome.action)
@@ -46,10 +46,10 @@ func TestMaintenanceModeActivationStillActivatesWhenStatusCheckFailsAndReportsIn
 	restore := newParentRestore()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().
-		GetStatus(testCtx).
+		GetStatus(t.Context()).
 		Return(repository.MaintenanceModeDescription{}, false, assert.AnError).
 		Once()
-	maintenanceMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{
+	maintenanceMock.EXPECT().Activate(t.Context(), repository.MaintenanceModeDescription{
 		Title: maintenanceModeTitle,
 		Text:  maintenanceModeText,
 	}, false).Return(nil).Once()
@@ -65,7 +65,7 @@ func TestMaintenanceModeActivationStillActivatesWhenStatusCheckFailsAndReportsIn
 	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeNormal, ReasonMaintenanceModeActivated, actionActivateMaintenanceMode, "Maintenance mode activated").Once()
 
 	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
-	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
+	actual, outcome := sut.ensureMaintenanceModeActivated(t.Context(), restore)
 
 	require.Same(t, restore, actual)
 	assert.Equal(t, actionNext, outcome.action)
@@ -76,7 +76,7 @@ func TestMaintenanceModeActivationSkipsActivationWhenStatusCheckReportsActiveWit
 	restore := newParentRestore()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
 	maintenanceMock.EXPECT().
-		GetStatus(testCtx).
+		GetStatus(t.Context()).
 		Return(repository.MaintenanceModeDescription{}, true, assert.AnError).
 		Once()
 	recorderMock := newMockEventRecorder(t)
@@ -90,7 +90,7 @@ func TestMaintenanceModeActivationSkipsActivationWhenStatusCheckReportsActiveWit
 	).Once()
 
 	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
-	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
+	actual, outcome := sut.ensureMaintenanceModeActivated(t.Context(), restore)
 
 	require.Same(t, restore, actual)
 	assert.Equal(t, actionNext, outcome.action)
@@ -100,8 +100,8 @@ func TestMaintenanceModeActivationSkipsActivationWhenStatusCheckReportsActiveWit
 func TestMaintenanceModeActivationFailureIsReportedButDoesNotStopTheRestore(t *testing.T) {
 	restore := newParentRestore()
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
-	maintenanceMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
+	maintenanceMock.EXPECT().Activate(t.Context(), repository.MaintenanceModeDescription{
 		Title: maintenanceModeTitle,
 		Text:  maintenanceModeText,
 	}, false).Return(assert.AnError).Once()
@@ -116,7 +116,7 @@ func TestMaintenanceModeActivationFailureIsReportedButDoesNotStopTheRestore(t *t
 	).Once()
 
 	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
-	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
+	actual, outcome := sut.ensureMaintenanceModeActivated(t.Context(), restore)
 
 	require.Same(t, restore, actual)
 	assert.Equal(t, actionNext, outcome.action)
@@ -141,7 +141,7 @@ func TestMaintenanceModeActivationSkipsAfterTheWorkflowDeactivatedIt(t *testing.
 			// A mock without expectations fails the test as soon as the switch is touched at all.
 			sut := &restoreReconciler{maintenanceModeSwitch: newMockMaintenanceModeSwitch(t)}
 
-			actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
+			actual, outcome := sut.ensureMaintenanceModeActivated(t.Context(), restore)
 
 			require.Same(t, restore, actual)
 			assert.Equal(t, actionNext, outcome.action)
@@ -161,14 +161,14 @@ func TestMaintenanceModeActivationStillActivatesWhileTheRestoreIsRunning(t *test
 		LastTransitionTime: metav1.Now(),
 	}}
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
-	maintenanceMock.EXPECT().Activate(testCtx, repository.MaintenanceModeDescription{
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, false, nil).Once()
+	maintenanceMock.EXPECT().Activate(t.Context(), repository.MaintenanceModeDescription{
 		Title: maintenanceModeTitle,
 		Text:  maintenanceModeText,
 	}, false).Return(nil).Once()
 
 	sut := &restoreReconciler{maintenanceModeSwitch: maintenanceMock, recorder: recorderMock}
-	actual, outcome := sut.ensureMaintenanceModeActivated(testCtx, restore)
+	actual, outcome := sut.ensureMaintenanceModeActivated(t.Context(), restore)
 
 	require.Same(t, restore, actual)
 	assert.Equal(t, actionNext, outcome.action)

@@ -27,8 +27,8 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonRestoreStarted, actionStartRestore, "The restore has started",
 		).Return()
 		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().Get(testCtx, leaseKey(), mock.Anything).Return(leaseNotFound())
-		clientMock.EXPECT().Create(testCtx, mock.Anything).
+		clientMock.EXPECT().Get(t.Context(), leaseKey(), mock.Anything).Return(leaseNotFound())
+		clientMock.EXPECT().Create(t.Context(), mock.Anything).
 			Run(func(_ context.Context, object client.Object, _ ...client.CreateOption) {
 				lease, ok := object.(*coordinationv1.Lease)
 				require.True(t, ok)
@@ -43,7 +43,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			Return(nil)
 		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace, recorder: recorderMock}
 
-		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 		assert.Same(t, restore, actualRestore)
 		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
@@ -77,13 +77,13 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			restore := newParentRestore()
 			clientMock := newMockK8sClient(t)
-			clientMock.EXPECT().Get(testCtx, leaseKey(), mock.Anything).Return(test.getError)
+			clientMock.EXPECT().Get(t.Context(), leaseKey(), mock.Anything).Return(test.getError)
 			if apierrors.IsNotFound(test.getError) {
-				clientMock.EXPECT().Create(testCtx, mock.Anything).Return(test.createError)
+				clientMock.EXPECT().Create(t.Context(), mock.Anything).Return(test.createError)
 			}
 			sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
 
-			actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+			actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 			assert.Same(t, restore, actualRestore)
 			if test.wantRetry {
@@ -102,7 +102,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		expectLeaseRead(t, clientMock, newRestoreLease(restore))
 		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
 
-		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 		assert.Same(t, restore, actualRestore)
 		assert.Equal(t, next(), actualOutcome)
@@ -116,12 +116,12 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 		expectLeaseRead(t, clientMock, newRestoreLease(restore))
 		statusClient := newTestClient(t, interceptor.Funcs{}, restore.DeepCopy())
-		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		err := statusClient.Get(t.Context(), client.ObjectKeyFromObject(restore), restore)
 		require.NoError(t, err)
 		clientMock.EXPECT().Status().Return(statusClient.Status())
 		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
 
-		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
 		condition := findSuccessfulCondition(actualRestore)
@@ -139,12 +139,12 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 		expectLeaseRead(t, clientMock, newRestoreLease(restore))
 		statusClient := newTestClient(t, failingStatusUpdate(assert.AnError), restore.DeepCopy())
-		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		err := statusClient.Get(t.Context(), client.ObjectKeyFromObject(restore), restore)
 		require.NoError(t, err)
 		clientMock.EXPECT().Status().Return(statusClient.Status())
 		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
 
-		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 		assert.Same(t, restore, actualRestore)
 		require.Error(t, actualOutcome.err)
@@ -160,12 +160,12 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 		expectLeaseRead(t, clientMock, newRestoreLease(restore))
 		statusClient := newTestClient(t, interceptor.Funcs{}, restore.DeepCopy())
-		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		err := statusClient.Get(t.Context(), client.ObjectKeyFromObject(restore), restore)
 		require.NoError(t, err)
 		clientMock.EXPECT().Status().Return(statusClient.Status())
 		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
 
-		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
 		condition := findSuccessfulCondition(actualRestore)
@@ -179,12 +179,12 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 		expectLeaseRead(t, clientMock, lease)
 		statusClient := newTestClient(t, interceptor.Funcs{}, restore.DeepCopy())
-		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		err := statusClient.Get(t.Context(), client.ObjectKeyFromObject(restore), restore)
 		require.NoError(t, err)
 		clientMock.EXPECT().Status().Return(statusClient.Status())
 		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
 
-		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 		require.Error(t, actualOutcome.err)
 		assert.ErrorContains(t, actualOutcome.err, "without a resolvable holder")
@@ -201,12 +201,12 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 		expectLeaseRead(t, clientMock, lease)
 		statusClient := newTestClient(t, failingStatusUpdate(assert.AnError), restore.DeepCopy())
-		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		err := statusClient.Get(t.Context(), client.ObjectKeyFromObject(restore), restore)
 		require.NoError(t, err)
 		clientMock.EXPECT().Status().Return(statusClient.Status())
 		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
 
-		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 		assert.Same(t, restore, actualRestore)
 		require.Error(t, actualOutcome.err)
@@ -221,12 +221,12 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		expectLeaseRead(t, clientMock, newRestoreLease(holder))
 		expectRestoreRead(t, clientMock, holder)
 		statusClient := newTestClient(t, interceptor.Funcs{}, restore.DeepCopy())
-		err := statusClient.Get(testCtx, client.ObjectKeyFromObject(restore), restore)
+		err := statusClient.Get(t.Context(), client.ObjectKeyFromObject(restore), restore)
 		require.NoError(t, err)
 		clientMock.EXPECT().Status().Return(statusClient.Status())
 		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
 
-		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 		assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
 		condition := findSuccessfulCondition(actualRestore)
@@ -244,7 +244,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			name: "holder no longer exists",
 			prepareMock: func(t *testing.T, clientMock *mockK8sClient, holder *backupv1.Restore) {
 				key := client.ObjectKey{Namespace: testNamespace, Name: holder.Name}
-				clientMock.EXPECT().Get(testCtx, key, mock.Anything).
+				clientMock.EXPECT().Get(t.Context(), key, mock.Anything).
 					Return(apierrors.NewNotFound(restoreResource(), holder.Name))
 			},
 		},
@@ -280,7 +280,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			clientMock := newMockK8sClient(t)
 			expectLeaseRead(t, clientMock, lease)
 			test.prepareMock(t, clientMock, holder)
-			clientMock.EXPECT().Update(testCtx, mock.Anything).
+			clientMock.EXPECT().Update(t.Context(), mock.Anything).
 				Run(func(_ context.Context, object client.Object, _ ...client.UpdateOption) {
 					updatedLease, ok := object.(*coordinationv1.Lease)
 					require.True(t, ok)
@@ -292,7 +292,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 				Return(nil)
 			sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace, recorder: recorderMock}
 
-			actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+			actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 			assert.Same(t, restore, actualRestore)
 			assert.Equal(t, retryAfter(defaultRequeueDelay), actualOutcome)
@@ -305,10 +305,10 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 		clientMock := newMockK8sClient(t)
 		expectLeaseRead(t, clientMock, newRestoreLease(holder))
 		holderKey := client.ObjectKey{Namespace: testNamespace, Name: holder.Name}
-		clientMock.EXPECT().Get(testCtx, holderKey, mock.Anything).Return(assert.AnError)
+		clientMock.EXPECT().Get(t.Context(), holderKey, mock.Anything).Return(assert.AnError)
 		sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
 
-		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+		actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 		assert.Same(t, restore, actualRestore)
 		require.Error(t, actualOutcome.err)
@@ -337,12 +337,12 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 			clientMock := newMockK8sClient(t)
 			expectLeaseRead(t, clientMock, newRestoreLease(holder))
 			holderKey := client.ObjectKey{Namespace: testNamespace, Name: holder.Name}
-			clientMock.EXPECT().Get(testCtx, holderKey, mock.Anything).
+			clientMock.EXPECT().Get(t.Context(), holderKey, mock.Anything).
 				Return(apierrors.NewNotFound(restoreResource(), holder.Name))
-			clientMock.EXPECT().Update(testCtx, mock.Anything).Return(test.updateError)
+			clientMock.EXPECT().Update(t.Context(), mock.Anything).Return(test.updateError)
 			sut := &restoreReconciler{k8sClient: clientMock, namespace: testNamespace}
 
-			actualRestore, actualOutcome := sut.ensureActiveRestoreLease(testCtx, restore)
+			actualRestore, actualOutcome := sut.ensureActiveRestoreLease(t.Context(), restore)
 
 			assert.Same(t, restore, actualRestore)
 			if test.wantError {
@@ -358,7 +358,7 @@ func TestReconcileEnsureActiveRestoreLease(t *testing.T) {
 
 func expectLeaseRead(t *testing.T, clientMock *mockK8sClient, lease *coordinationv1.Lease) {
 	t.Helper()
-	clientMock.EXPECT().Get(testCtx, leaseKey(), mock.Anything).
+	clientMock.EXPECT().Get(t.Context(), leaseKey(), mock.Anything).
 		Run(func(_ context.Context, _ types.NamespacedName, object client.Object, _ ...client.GetOption) {
 			actual, ok := object.(*coordinationv1.Lease)
 			require.True(t, ok)
@@ -370,7 +370,7 @@ func expectLeaseRead(t *testing.T, clientMock *mockK8sClient, lease *coordinatio
 func expectRestoreRead(t *testing.T, clientMock *mockK8sClient, restore *backupv1.Restore) {
 	t.Helper()
 	key := client.ObjectKey{Namespace: testNamespace, Name: restore.Name}
-	clientMock.EXPECT().Get(testCtx, key, mock.Anything).
+	clientMock.EXPECT().Get(t.Context(), key, mock.Anything).
 		Run(func(_ context.Context, _ types.NamespacedName, object client.Object, _ ...client.GetOption) {
 			actual, ok := object.(*backupv1.Restore)
 			require.True(t, ok)

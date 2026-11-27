@@ -15,7 +15,7 @@ func TestEnsureDeletingStatusDoesNotWriteAnAlreadyPersistedDeletingStatusAgain(t
 	writes := &clientWrites{}
 	reconciler := &restoreReconciler{k8sClient: newTestClientWithParent(t, writes.interceptor(), restore)}
 
-	updated, outcome := reconciler.ensureDeletingStatus(testCtx, restore)
+	updated, outcome := reconciler.ensureDeletingStatus(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	assert.Equal(t, next(), outcome)
@@ -28,7 +28,7 @@ func TestEnsureDeletingStatusPersistsTheLegacyStatusAndEndsTheReconciliation(t *
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := &restoreReconciler{k8sClient: testClient, requeueDelay: requeueAfterTest}
 
-	updated, outcome := reconciler.ensureDeletingStatus(testCtx, restore)
+	updated, outcome := reconciler.ensureDeletingStatus(t.Context(), restore)
 
 	require.NotNil(t, updated)
 	assert.Equal(t, k8sv1.RestoreStatusDeleting, updated.Status.Status) //nolint:staticcheck // legacy restore status compatibility
@@ -38,7 +38,7 @@ func TestEnsureDeletingStatusPersistsTheLegacyStatusAndEndsTheReconciliation(t *
 	assert.Equal(t, 1, writes.total())
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, testClient.Get(testCtx, newRestoreRequest(testRestore).NamespacedName, stored))
+	require.NoError(t, testClient.Get(t.Context(), newRestoreRequest(testRestore).NamespacedName, stored))
 	assert.Equal(t, k8sv1.RestoreStatusDeleting, stored.Status.Status) //nolint:staticcheck // legacy restore status compatibility
 }
 
@@ -48,7 +48,7 @@ func TestEnsureDeletingStatusRetriesAFailedStatusWrite(t *testing.T) {
 		k8sClient: newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore),
 	}
 
-	updated, outcome := reconciler.ensureDeletingStatus(testCtx, restore)
+	updated, outcome := reconciler.ensureDeletingStatus(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	require.Error(t, outcome.err)
@@ -63,7 +63,7 @@ func TestEnsureDeletingStatusUsesANoopStatusUpdateWithoutLosingTheWorkflow(t *te
 	restore.Status.Status = k8sv1.RestoreStatusDeleting //nolint:staticcheck // legacy restore status compatibility
 	reconciler := &restoreReconciler{k8sClient: newTestClient(t, interceptor.Funcs{}, restore)}
 
-	updated, outcome := reconciler.ensureDeletingStatus(testCtx, restore)
+	updated, outcome := reconciler.ensureDeletingStatus(t.Context(), restore)
 
 	assert.Equal(t, restore, updated)
 	assert.Equal(t, next(), outcome)

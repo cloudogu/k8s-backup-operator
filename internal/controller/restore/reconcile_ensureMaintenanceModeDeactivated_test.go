@@ -16,13 +16,13 @@ func TestMaintenanceModeDeactivationPersistsItsProgressAndRequeues(t *testing.T)
 	restore := restoreWithWorkloadRecoveryReason(ReasonScaleUpFinalized)
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
+	maintenanceMock.EXPECT().Deactivate(t.Context(), false).Return(nil).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := NewRestoreReconciler(testClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
-	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(testCtx, restore)
+	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(t.Context(), restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	assert.Equal(t, 1, writes.total())
@@ -39,14 +39,14 @@ func TestMaintenanceModeDeactivationIsEnsuredAgainBeforeProceeding(t *testing.T)
 	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeNormal, ReasonMaintenanceModeDeactivated, actionDeactivateMaintenanceMode, "Maintenance mode deactivated").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
+	maintenanceMock.EXPECT().Deactivate(t.Context(), false).Return(nil).Once()
 	writes := &clientWrites{}
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, writes.interceptor(), restore), recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
-	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(testCtx, restore)
+	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(t.Context(), restore)
 
 	assert.Equal(t, next(), outcome)
 	assert.Same(t, restore, updated)
@@ -59,13 +59,13 @@ func TestFailedMaintenanceModeDeactivationUsesBackoffWithoutChangingProgress(t *
 	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, actionDeactivateMaintenanceMode, "Failed to deactivate maintenance mode after restore").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(assert.AnError).Once()
+	maintenanceMock.EXPECT().Deactivate(t.Context(), false).Return(assert.AnError).Once()
 	writes := &clientWrites{}
 	testClient := newTestClientWithParent(t, writes.interceptor(), restore)
 	reconciler := NewRestoreReconciler(testClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
-	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(testCtx, restore)
+	updated, outcome := reconciler.ensureMaintenanceModeDeactivated(t.Context(), restore)
 
 	require.Error(t, outcome.err)
 	assert.ErrorIs(t, outcome.err, assert.AnError)
@@ -81,14 +81,14 @@ func TestUnpersistableMaintenanceModeDeactivationIsRetried(t *testing.T) {
 	recorderMock.EXPECT().Eventf(restore, nil, corev1.EventTypeWarning, ReasonMaintenanceModeDeactivated, actionDeactivateMaintenanceMode, "Failed to persist maintenance mode deactivation for restore").Once()
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().Deactivate(testCtx, false).Return(nil).Once()
+	maintenanceMock.EXPECT().Deactivate(t.Context(), false).Return(nil).Once()
 	reconciler := NewRestoreReconciler(
 		newTestClientWithParent(t, failingStatusUpdate(assert.AnError), restore),
 		recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment,
 	)
 	reconciler.maintenanceModeSwitch = maintenanceMock
 
-	_, outcome := reconciler.ensureMaintenanceModeDeactivated(testCtx, restore)
+	_, outcome := reconciler.ensureMaintenanceModeDeactivated(t.Context(), restore)
 
 	require.Error(t, outcome.err)
 	assert.ErrorIs(t, outcome.err, assert.AnError)

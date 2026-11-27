@@ -43,7 +43,7 @@ func TestAnExistingOwnedProviderChildSkipsThePreparationAndIsObservedInstead(t *
 	recorderMock := newMockEventRecorder(t)
 
 	maintenanceMock := newMockMaintenanceModeSwitch(t)
-	maintenanceMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
+	maintenanceMock.EXPECT().GetStatus(t.Context()).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		reconciler := NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
@@ -53,7 +53,7 @@ func TestAnExistingOwnedProviderChildSkipsThePreparationAndIsObservedInstead(t *
 	// with owned child
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedRunningChild(restore))
 
-	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
+	results, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 2)
 
 	for index := range results {
 		require.NoError(t, errs[index])
@@ -79,7 +79,7 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, conflicting)
 	request := newRestoreRequest(testRestore)
 
-	results, errs := fixture.reconcileTimes(testCtx, request, 2)
+	results, errs := fixture.reconcileTimes(t.Context(), request, 2)
 
 	for index := range results {
 		require.NoError(t, errs[index])
@@ -89,7 +89,7 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 		"the conflict must be reported exactly once and the child must not be touched")
 
 	stored := &k8sv1.Restore{}
-	require.NoError(t, fixture.client.Get(testCtx, request.NamespacedName, stored))
+	require.NoError(t, fixture.client.Get(t.Context(), request.NamespacedName, stored))
 	assert.Equal(t, k8sv1.RestoreStatusFailed, stored.Status.Status)
 	assert.Equal(t, metav1.ConditionFalse, findSuccessfulCondition(stored).Status)
 	assert.Equal(t, ReasonProviderRestoreConflict, findSuccessfulCondition(stored).Reason)
@@ -110,7 +110,7 @@ func TestAnUnreportableProviderChildConflictIsRetried(t *testing.T) {
 	}
 	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, foreignChild(restore))
 
-	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	_, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError)
 	assert.ErrorContains(t, errs[0], "failed to report the provider restore conflict of restore test-restore")
@@ -134,7 +134,7 @@ func TestAnUnreadableProviderChildIsRetried(t *testing.T) {
 	}
 	fixture := newMultiReconcileFixture(t, failingChildGet, factory, restore)
 
-	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
+	_, errs := fixture.reconcileTimes(t.Context(), newRestoreRequest(testRestore), 1)
 
 	require.ErrorIs(t, errs[0], assert.AnError)
 	assert.ErrorContains(t, errs[0], "failed to read the provider restore of restore test-restore")
