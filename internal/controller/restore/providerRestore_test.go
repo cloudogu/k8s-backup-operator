@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cloudogu/k8s-backup-operator/internal/conditions"
+	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
@@ -130,11 +131,13 @@ func TestAConflictingChildFoundWhenStartingTheRestoreIsTerminal(t *testing.T) {
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), (*velerov1.Restore)(nil), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore, mock.Anything).Return()
 
+	testClient := newTestClient(t, appearingForeignChild(t, restore), restore, usableSourceBackup())
 	reconciler := &restoreReconciler{
 		namespace: testNamespace,
 		recorder:  recorderMock,
 		// the foreign child appears after this stage read the child state
-		k8sClient: newTestClient(t, appearingForeignChild(t, restore), restore, usableSourceBackup()),
+		k8sClient:      testClient,
+		stateCollector: state.NewCollector(testClient),
 	}
 
 	updated, outcome := reconciler.ensureProviderRestore(testCtx, restore)

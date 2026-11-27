@@ -443,7 +443,7 @@ func (r *restoreReconciler) ensureProviderRestore(ctx context.Context, restore *
 		return restore, next()
 	}
 
-	restoreState, err := state.NewCollector(r.k8sClient).Collect(ctx, restore)
+	restoreState, err := r.stateCollector.Collect(ctx, restore)
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to collect the backup of restore %s: %w", restore.Name, err))
 	}
