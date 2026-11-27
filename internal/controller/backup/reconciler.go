@@ -552,7 +552,7 @@ func (c *defaultReconciler) ensureBackupIsPrepared(ctx context.Context, backup *
 	}
 
 	if err := c.validateExclusions(ctx, backup); err != nil {
-		if errors.As(err, &invalidExclusionsError{}) {
+		if _, ok := errors.AsType[*invalidExclusionsError](err); ok {
 			return c.failBackupWithInvalidExclusions(ctx, backup, err.Error())
 		}
 		return Abort, err
