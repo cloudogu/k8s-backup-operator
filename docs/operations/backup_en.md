@@ -8,7 +8,20 @@ kind: Backup
 metadata:
   name: backup-sample
 spec:
-  provider: velero # only velero and "" (defaults to velero) is supported.
+  # Velero is currently the only supported provider. An empty string ("") also selects Velero.
+  provider: velero
+  # Names of V3 Dogus to exclude from the backup.
+  # V2 Dogus are backed up as a single unit. Use options.ignoreV2Dogus to exclude that unit.
+  excludedDogus: ["nexus", "baseline"]
+  # Names of components to exclude from the backup.
+  excludedComponents: ["lop-idp", "prometheus"]
+  options:
+    # Set to true to exclude the global configuration from the backup.
+    # Defaults to false.
+    ignoreGlobalConfig: true
+    # Set to true to exclude all V2 Dogus from the backup.
+    # Defaults to false.
+    ignoreV2Dogus: true
 ```
 
 ## Starting a backup immediately after a restore

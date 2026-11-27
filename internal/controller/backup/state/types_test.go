@@ -60,7 +60,7 @@ func TestBackupState_CommonUnitAnnotations(t *testing.T) {
 			},
 		},
 		{
-			name: "should not add empty annotations for v3/v3 dogus, components and blueprint id",
+			name: "should not add empty annotations for v2/v3 dogus, components and blueprint id",
 			fields: fields{
 				BlueprintId: "",
 				Units: []backupv1.UnitIdentifier{

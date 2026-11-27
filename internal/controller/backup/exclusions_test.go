@@ -42,27 +42,27 @@ func TestFindInvalidExclusions(t *testing.T) {
 		{
 			name: "dogus which are not installed are invalid",
 			spec: backupv1.BackupSpec{ExcludedDogus: []string{"scm", "ldap", "jenkins"}},
-			want: invalidExclusionsError{missingDogus: []string{"scm", "jenkins"}},
+			want: &invalidExclusionsError{missingDogus: []string{"scm", "jenkins"}},
 		},
 		{
 			name: "dogus with an unknown api version are not installed as v3 dogus",
 			spec: backupv1.BackupSpec{ExcludedDogus: []string{"unknown-api"}},
-			want: invalidExclusionsError{missingDogus: []string{"unknown-api"}},
+			want: &invalidExclusionsError{missingDogus: []string{"unknown-api"}},
 		},
 		{
 			name: "v2 dogus are invalid",
 			spec: backupv1.BackupSpec{ExcludedDogus: []string{"cas"}},
-			want: invalidExclusionsError{v2Dogus: []string{"cas"}},
+			want: &invalidExclusionsError{v2Dogus: []string{"cas"}},
 		},
 		{
 			name: "components which are not installed are invalid",
 			spec: backupv1.BackupSpec{ExcludedComponents: []string{"k8s-dogu-operator", "k8s-longhorn", "k8s-cert-manager"}},
-			want: invalidExclusionsError{missingComponents: []string{"k8s-longhorn", "k8s-cert-manager"}},
+			want: &invalidExclusionsError{missingComponents: []string{"k8s-longhorn", "k8s-cert-manager"}},
 		},
 		{
 			name: "all kinds of invalid exclusions are collected",
 			spec: backupv1.BackupSpec{ExcludedDogus: []string{"cas", "scm"}, ExcludedComponents: []string{"k8s-longhorn"}},
-			want: invalidExclusionsError{missingDogus: []string{"scm"}, v2Dogus: []string{"cas"}, missingComponents: []string{"k8s-longhorn"}},
+			want: &invalidExclusionsError{missingDogus: []string{"scm"}, v2Dogus: []string{"cas"}, missingComponents: []string{"k8s-longhorn"}},
 		},
 	}
 	for _, tt := range tests {
@@ -73,10 +73,10 @@ func TestFindInvalidExclusions(t *testing.T) {
 }
 
 func TestInvalidExclusionsError_isEmpty(t *testing.T) {
-	assert.True(t, invalidExclusionsError{}.isEmpty())
-	assert.False(t, invalidExclusionsError{missingDogus: []string{"scm"}}.isEmpty())
-	assert.False(t, invalidExclusionsError{v2Dogus: []string{"cas"}}.isEmpty())
-	assert.False(t, invalidExclusionsError{missingComponents: []string{"k8s-longhorn"}}.isEmpty())
+	assert.True(t, (&invalidExclusionsError{}).isEmpty())
+	assert.False(t, (&invalidExclusionsError{missingDogus: []string{"scm"}}).isEmpty())
+	assert.False(t, (&invalidExclusionsError{v2Dogus: []string{"cas"}}).isEmpty())
+	assert.False(t, (&invalidExclusionsError{missingComponents: []string{"k8s-longhorn"}}).isEmpty())
 }
 
 func TestInvalidExclusionsError_Error(t *testing.T) {

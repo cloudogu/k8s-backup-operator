@@ -55,6 +55,7 @@ type scaleManager interface {
 }
 
 type stateCollector interface {
+	// Collect returns the restore state of the legacy backup or the backup units.
 	Collect(ctx context.Context, restore *backupv1.Restore) (state.RestoreState, error)
 }
 

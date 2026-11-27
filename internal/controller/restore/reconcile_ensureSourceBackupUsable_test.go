@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -90,6 +91,37 @@ func TestASourceBackupThatIsNotRestorableFailsTheRestore(t *testing.T) {
 			assertSuccessfulCondition(t, fixture.client, testRestore, metav1.ConditionFalse, ReasonUnusableUnits)
 		})
 	}
+}
+
+func TestAMalformedSourceBackupFailsTheRestore(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	malformed := &velerov1.Backup{
+		Name: velero.UnitObjectName(testBackup, testGlobalConfigUnit), Namespace: testNamespace,
+		Labels: map[string]string{
+			k8sv1.BackupLabelKey:     k8sv1.GetTruncatedName(testBackup),
+			k8sv1.BackupTypeLabelKey: string(testGlobalConfigUnit.Type),
+		},
+		Annotations: nil, // <- no Annotations
+		Status:      velerov1.BackupStatus{Phase: velerov1.BackupPhaseCompleted},
+	}
+
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, ReasonUnusableUnits, actionCheckSourceBackup,
+		"The backup cannot be read: collect units: provider backup test-backup-global-config has no annotation k8s.cloudogu.com/backup-units.").Once()
+
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, newSourceBackupGateFactory(t, recorderMock),
+		restore, readyStorageLocation(), readyProviderDeployment(), malformed)
+
+	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
+
+	for index := range results {
+		require.NoError(t, errs[index], "a malformed backup is a decided outcome, not an error")
+		assert.Equal(t, ctrl.Result{}, results[index], "a terminal restore must not be requeued")
+	}
+	assert.Equal(t, []recordedClientAction{statusUpdateOf(restore), deleteOf(newRestoreLease(restore))}, fixture.clientActions.snapshot(),
+		"the malformed backup must be reported exactly once, the lease released and the ecosystem stay untouched")
+	assertPreparedCondition(t, fixture.client, metav1.ConditionFalse, ReasonUnusableUnits)
+	assertSuccessfulCondition(t, fixture.client, testRestore, metav1.ConditionFalse, ReasonUnusableUnits)
 }
 
 func TestARestorableSourceBackupLetsThePreparationRun(t *testing.T) {

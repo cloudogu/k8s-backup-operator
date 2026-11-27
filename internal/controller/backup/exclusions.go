@@ -21,11 +21,11 @@ type invalidExclusionsError struct {
 	missingComponents []string
 }
 
-func (i invalidExclusionsError) isEmpty() bool {
+func (i *invalidExclusionsError) isEmpty() bool {
 	return len(i.missingDogus) == 0 && len(i.v2Dogus) == 0 && len(i.missingComponents) == 0
 }
 
-func (i invalidExclusionsError) Error() string {
+func (i *invalidExclusionsError) Error() string {
 	var parts []string
 	if len(i.missingDogus) > 0 {
 		parts = append(parts, fmt.Sprintf("The excluded dogus %v are not installed as v3 dogus.", i.missingDogus))
@@ -76,7 +76,7 @@ func findInvalidExclusions(spec backupv1.BackupSpec, dogus []doguv3.Dogu, compon
 	if result.isEmpty() {
 		return nil
 	}
-	return result
+	return &result
 }
 
 // validateExclusions lists the installed dogus and components and checks the exclusions of the backup against them.
