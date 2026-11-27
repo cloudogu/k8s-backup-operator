@@ -1,7 +1,6 @@
 package restore
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,6 +11,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+
+	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 )
 
 // unitChildInPhase returns the provider restore of the given unit and Restore in the specified phase.
@@ -22,20 +23,16 @@ func unitChildInPhase(parent *k8sv1.Restore, unit k8sv1.UnitIdentifier, phase ve
 	return child
 }
 
-// unitBackups are the completed provider backups for the given units.
-func unitBackups(t *testing.T, units ...k8sv1.UnitIdentifier) []client.Object {
+// newUnitRestoreReconciler returns a reconciler whose collector reports the global-config and ldap units.
+func newUnitRestoreReconciler(t *testing.T, k8sClient k8sClient, recorder eventRecorder, restore *k8sv1.Restore) *restoreReconciler {
 	t.Helper()
 
-	annotation, err := json.Marshal(units)
-	require.NoError(t, err)
-	var backups []client.Object
-	for _, unit := range units {
-		backup := completedUnitBackup(unit)
-		backup.Annotations[k8sv1.UnitsAnnotationKey] = string(annotation)
-		backups = append(backups, backup)
-	}
+	collectorMock := newMockRestoreStateCollector(t)
+	collectorMock.EXPECT().Collect(testCtx, restore).Return(globalConfigAndLdapUnits(), nil)
+	reconciler := NewRestoreReconciler(k8sClient, recorder, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
+	reconciler.stateCollector = collectorMock
 
-	return backups
+	return reconciler
 }
 
 // expectProviderRestoreStart expects the event of starting a provider restore once per expected start.
@@ -92,9 +89,8 @@ func TestProviderRestoreStageRestoresTheUnitsOneAfterAnother(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			restore := startableRestore()
-			objects := append(unitBackups(t, testGlobalConfigUnit, testLdapUnit), tt.children(restore)...)
-			k8sClient := newTestClientWithParent(t, interceptor.Funcs{}, restore, objects...)
-			reconciler := NewRestoreReconciler(k8sClient, expectProviderRestoreStart(t, 1), testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
+			k8sClient := newTestClientWithParent(t, interceptor.Funcs{}, restore, tt.children(restore)...)
+			reconciler := newUnitRestoreReconciler(t, k8sClient, expectProviderRestoreStart(t, 1), restore)
 
 			_, outcome := reconciler.ensureProviderRestore(testCtx, restore)
 
@@ -138,9 +134,8 @@ func TestProviderRestoreStageCreatesNoChildWhenNoUnitIsDue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			restore := startableRestore()
 			children := tt.children(restore)
-			objects := append(unitBackups(t, testGlobalConfigUnit, testLdapUnit), children...)
-			k8sClient := newTestClientWithParent(t, interceptor.Funcs{}, restore, objects...)
-			reconciler := NewRestoreReconciler(k8sClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
+			k8sClient := newTestClientWithParent(t, interceptor.Funcs{}, restore, children...)
+			reconciler := newUnitRestoreReconciler(t, k8sClient, nil, restore)
 
 			_, outcome := reconciler.ensureProviderRestore(testCtx, restore)
 
@@ -154,14 +149,28 @@ func TestProviderRestoreStageSkipsExcludedUnits(t *testing.T) {
 	restore := startableRestore()
 	restore.Spec.Options = &k8sv1.UnitOptions{IgnoreGlobalConfig: true}
 	// no restore units, yet
-	k8sClient := newTestClientWithParent(t, interceptor.Funcs{}, restore, unitBackups(t, testGlobalConfigUnit, testLdapUnit)...)
-	reconciler := NewRestoreReconciler(k8sClient, expectProviderRestoreStart(t, 1), testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment)
+	k8sClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
+	reconciler := newUnitRestoreReconciler(t, k8sClient, expectProviderRestoreStart(t, 1), restore)
 
 	_, outcome := reconciler.ensureProviderRestore(testCtx, restore)
 
 	assert.Equal(t, retryAfter(defaultRequeueDelay), outcome)
 	// global config was skipped
 	assert.Equal(t, []string{"test-restore-dogu-ldap"}, childNames(t, k8sClient))
+}
+
+func TestProviderRestoreStageRetriesAFailedBackupCollection(t *testing.T) {
+	restore := startableRestore()
+	collectorMock := newMockRestoreStateCollector(t)
+	collectorMock.EXPECT().Collect(testCtx, restore).Return(state.RestoreState{}, assert.AnError)
+	k8sClient := newTestClientWithParent(t, interceptor.Funcs{}, restore)
+	reconciler := &restoreReconciler{k8sClient: k8sClient, stateCollector: collectorMock}
+
+	_, outcome := reconciler.ensureProviderRestore(testCtx, restore)
+
+	require.ErrorIs(t, outcome.err, assert.AnError)
+	assert.ErrorContains(t, outcome.err, "failed to collect the backup of restore test-restore")
+	assert.Empty(t, childNames(t, k8sClient), "no child may be started without the collected units")
 }
 
 func childNames(t *testing.T, k8sClient client.Client) []string {

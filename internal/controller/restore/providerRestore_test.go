@@ -131,13 +131,15 @@ func TestAConflictingChildFoundWhenStartingTheRestoreIsTerminal(t *testing.T) {
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeNormal, ReasonProviderRestoreRunning, actionCreateProviderRestore, "Start provider restore process").Once()
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), (*velerov1.Restore)(nil), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore, mock.Anything).Return()
 
-	testClient := newTestClient(t, appearingForeignChild(t, restore), restore, usableSourceBackup())
+	collectorMock := newMockRestoreStateCollector(t)
+	collectorMock.EXPECT().Collect(testCtx, restore).
+		Return(state.RestoreState{Kind: state.KindLegacy, Units: []state.UnitBackup{{UnitIdentifier: testLegacyUnit}}}, nil)
 	reconciler := &restoreReconciler{
 		namespace: testNamespace,
 		recorder:  recorderMock,
 		// the foreign child appears after this stage read the child state
-		k8sClient:      testClient,
-		stateCollector: state.NewCollector(testClient),
+		k8sClient:      newTestClient(t, appearingForeignChild(t, restore), restore),
+		stateCollector: collectorMock,
 	}
 
 	updated, outcome := reconciler.ensureProviderRestore(testCtx, restore)
