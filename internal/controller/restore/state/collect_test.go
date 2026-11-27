@@ -208,8 +208,7 @@ func TestCollect_Errors(t *testing.T) {
 			if tt.wantIs != nil {
 				assert.ErrorIs(t, err, tt.wantIs)
 			}
-			_, malformed := errors.AsType[*MalformedBackupError](err)
-			assert.Equal(t, tt.wantMalformed, malformed, "only unreadable annotations are malformed")
+			assert.Equal(t, tt.wantMalformed, errors.As(err, new(*MalformedBackupError)), "only unreadable annotations are malformed")
 		})
 	}
 }
