@@ -3,6 +3,8 @@ package restore
 import (
 	"context"
 
+	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -30,6 +32,11 @@ type maintenanceModeSwitch interface {
 	Deactivate(ctx context.Context, force bool) error
 	// GetStatus checks if the maintenance mode is active and returns its contents.
 	GetStatus(ctx context.Context) (repository.MaintenanceModeDescription, bool, error)
+}
+
+type restoreStateCollector interface {
+	// Collect returns the restore state of the legacy backup or the backup units.
+	Collect(ctx context.Context, restore *k8sv1.Restore) (state.RestoreState, error)
 }
 
 type cleanupManager interface {

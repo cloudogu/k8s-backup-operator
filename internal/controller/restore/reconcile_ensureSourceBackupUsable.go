@@ -25,7 +25,7 @@ func (r *restoreReconciler) ensureSourceBackupUsable(ctx context.Context, restor
 		return restore, next()
 	}
 
-	restoreState, err := state.NewCollector(r.k8sClient).Collect(ctx, restore)
+	restoreState, err := r.stateCollector.Collect(ctx, restore)
 	if malformedErr, ok := errors.AsType[*state.MalformedBackupError](err); ok {
 		return r.failOnUnusableSourceBackup(ctx, restore, ReasonUnusableUnits, fmt.Sprintf("The backup cannot be read: %v.", malformedErr))
 	}

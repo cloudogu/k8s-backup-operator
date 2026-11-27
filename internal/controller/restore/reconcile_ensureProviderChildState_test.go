@@ -73,11 +73,9 @@ func TestNameConflictsFailsTheRestoreBeforePreparation(t *testing.T) {
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(conflicting.Name), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore,
 		"velero restore [test-restore-dogu-ldap] conflicts with the expected child: it is not controlled by restore [test-restore] and must not be adopted").Return()
-	reconciler := &restoreReconciler{
-		recorder: recorderMock,
-		k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore,
-			completedUnitBackup(testGlobalConfigUnit), completedUnitBackup(testLdapUnit), conflicting),
-	}
+	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore,
+		completedUnitBackup(testGlobalConfigUnit), completedUnitBackup(testLdapUnit), conflicting)
+	reconciler := &restoreReconciler{recorder: recorderMock, k8sClient: testClient, stateCollector: state.NewCollector(testClient)}
 
 	updated, outcome := reconciler.ensureProviderChildState(testCtx, restore)
 
@@ -109,10 +107,9 @@ func TestForeignRestoreOfAnExcludedUnitChildIsNoConflict(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
 	restore.Spec.ExcludedDogus = []string{testLdapUnit.Name}
 
-	reconciler := &restoreReconciler{
-		k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore,
-			completedUnitBackup(testGlobalConfigUnit), completedUnitBackup(testLdapUnit), foreignChild(restore, testLdapUnit)),
-	}
+	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore,
+		completedUnitBackup(testGlobalConfigUnit), completedUnitBackup(testLdapUnit), foreignChild(restore, testLdapUnit))
+	reconciler := &restoreReconciler{k8sClient: testClient, stateCollector: state.NewCollector(testClient)}
 
 	_, outcome := reconciler.ensureProviderChildState(testCtx, restore)
 
@@ -121,7 +118,8 @@ func TestForeignRestoreOfAnExcludedUnitChildIsNoConflict(t *testing.T) {
 
 func TestBackupIsMissingCannotConflict(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
-	reconciler := &restoreReconciler{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore, foreignChild(restore, testLegacyUnit))}
+	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore, foreignChild(restore, testLegacyUnit))
+	reconciler := &restoreReconciler{k8sClient: testClient, stateCollector: state.NewCollector(testClient)}
 
 	_, outcome := reconciler.ensureProviderChildState(testCtx, restore)
 
@@ -139,7 +137,8 @@ func TestBackupListErrorIsRetried(t *testing.T) {
 			return wrapped.List(ctx, list, opts...)
 		},
 	}
-	reconciler := &restoreReconciler{k8sClient: newTestClientWithParent(t, failingBackupList, restore)}
+	testClient := newTestClientWithParent(t, failingBackupList, restore)
+	reconciler := &restoreReconciler{k8sClient: testClient, stateCollector: state.NewCollector(testClient)}
 
 	_, outcome := reconciler.ensureProviderChildState(testCtx, restore)
 

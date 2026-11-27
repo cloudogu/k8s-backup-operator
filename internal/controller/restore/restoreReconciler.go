@@ -69,6 +69,7 @@ func NewRestoreReconciler(
 		cleanup:                cleanup,
 		scaleManager:           scaleManager,
 		maintenanceModeSwitch:  repository.NewMaintenanceModeAdapter("k8s-backup-operator", k8sClient, namespace),
+		stateCollector:         state.NewCollector(k8sClient),
 		requeueDelay:           requeueDelay,
 		backupStorageName:      backupStorageName,
 		providerDeploymentName: providerDeploymentName,
@@ -83,6 +84,7 @@ type restoreReconciler struct {
 	cleanup                cleanupManager
 	scaleManager           scaleManager
 	maintenanceModeSwitch  maintenanceModeSwitch
+	stateCollector         restoreStateCollector
 	requeueDelay           time.Duration
 	backupStorageName      string
 	providerDeploymentName string
@@ -242,24 +244,24 @@ func (r *restoreReconciler) ensureProviderChildState(ctx context.Context, restor
 		return restore, next()
 	}
 
-	restoreState, err := state.NewCollector(r.k8sClient).Collect(ctx, restore)
+	restoreState, err := r.stateCollector.Collect(ctx, restore)
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to collect the backup of restore %s: %w", restore.Name, err))
 	}
 
 	for _, unit := range restoreState.UnitsToRestore(restore.Spec) {
 		childName := state.ProviderRestoreName(restore.Name, unit.UnitIdentifier)
-		child, err := velero.GetRestoreByName(ctx, r.k8sClient, restore.Namespace, childName)
+		existingChild, err := velero.GetRestoreByName(ctx, r.k8sClient, restore.Namespace, childName)
 		if err != nil {
 			return restore, retryOnError(fmt.Errorf("failed to read the provider restore of restore %s: %w", restore.Name, err))
 		}
-		if child == nil {
+		if existingChild == nil {
 			continue
 		}
 
 		expectedBackupName := state.ProviderBackupName(restore.Spec.BackupName, unit.UnitIdentifier)
-		if conflictErr := velero.CheckRestoreForConflicts(restore, child, expectedBackupName); conflictErr != nil {
-			return r.failOnProviderChildConflict(ctx, restore, child, conflictErr)
+		if conflictErr := velero.CheckRestoreForConflicts(restore, existingChild, expectedBackupName); conflictErr != nil {
+			return r.failOnProviderChildConflict(ctx, restore, existingChild, conflictErr)
 		}
 	}
 
@@ -409,7 +411,7 @@ func (r *restoreReconciler) isAlreadyPrepared(ctx context.Context, restore *k8sv
 	// The condition is not the single source of truth: If any owned child exists, the preparation already happened.
 	hasChild, err := velero.HasOwnedRestore(ctx, r.k8sClient, restore)
 	if err != nil {
-		return false, fmt.Errorf("failed to list the provider restores of restore %s: %w", restore.Name, err)
+		return false, fmt.Errorf("failed to determine the owned children of restore %s: %w", restore.Name, err)
 	}
 
 	return hasChild, nil
@@ -500,7 +502,7 @@ func (r *restoreReconciler) ensureProviderCompletion(ctx context.Context, restor
 		return restore, next()
 	}
 
-	child, err := velero.GetRestore(ctx, r.k8sClient, restore)
+	child, err := velero.GetLegacyRestore(ctx, r.k8sClient, restore)
 	if err != nil {
 		return restore, retryOnError(fmt.Errorf("failed to read the provider restore of restore %s: %w", restore.Name, err))
 	}
@@ -627,7 +629,7 @@ func (r *restoreReconciler) ensureDeletingStatus(ctx context.Context, restore *k
 // of the parent. An accepted child deletion is verified by a later reconciliation before continuing.
 func (r *restoreReconciler) ensureProviderRestoreDeleted(ctx context.Context, restore *k8sv1.Restore) (*k8sv1.Restore, stageOutcome) {
 	// Check if provider (velero for now) Restore exists
-	child, err := velero.GetRestore(ctx, r.k8sClient, restore)
+	child, err := velero.GetLegacyRestore(ctx, r.k8sClient, restore)
 	if err != nil {
 		// notfound is not an error - child would be nil in this case
 		return restore, retryOnError(fmt.Errorf(
