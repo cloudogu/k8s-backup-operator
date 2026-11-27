@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	k8sv1 "github.com/cloudogu/k8s-backup-lib/api/v1"
+	"github.com/cloudogu/k8s-backup-operator/internal/controller/restore/state"
 	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
@@ -19,22 +20,114 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-// ownedRunningChild returns the provider restore of the given Restore, executing.
-func ownedRunningChild(parent *k8sv1.Restore) *velerov1.Restore {
+// ownedRunningChild returns the provider restore of the given unit of the given Restore, executing.
+func ownedRunningChild(parent *k8sv1.Restore, unit k8sv1.UnitIdentifier) *velerov1.Restore {
 	child := velero.BuildRestore(parent)
 	child.Status.Phase = velerov1.RestorePhaseInProgress
+	child.Name = state.ProviderRestoreName(parent.Name, unit)
+	child.Spec.BackupName = state.ProviderBackupName(parent.Spec.BackupName, unit)
 
 	return child
 }
 
-// foreignChild returns a provider restore occupying the name the given Restore expects, without an
-// owner reference, so it must never be adopted.
-func foreignChild(parent *k8sv1.Restore) *velerov1.Restore {
-	child := velero.BuildRestore(parent)
+// foreignChild returns a provider restore occupying the child name of the given unit of the given Restore, without
+// an owner reference, so it must never be adopted.
+func foreignChild(parent *k8sv1.Restore, unit k8sv1.UnitIdentifier) *velerov1.Restore {
+	child := ownedRunningChild(parent, unit)
 	child.OwnerReferences = nil
-	child.Status.Phase = velerov1.RestorePhaseInProgress
+	child.Labels = nil
 
 	return child
+}
+
+var (
+	testLegacyUnit       = k8sv1.UnitIdentifier{Type: state.UnitTypeLegacy}
+	testGlobalConfigUnit = k8sv1.UnitIdentifier{Type: k8sv1.UnitTypeGlobalConfig}
+	testLdapUnit         = k8sv1.UnitIdentifier{Type: k8sv1.UnitTypeDogu, Name: "ldap"}
+)
+
+// globalConfigAndLdapUnits is the collected state of a unit backup containing global-config and ldap units.
+func globalConfigAndLdapUnits() state.RestoreState {
+	return state.RestoreState{
+		Kind:  state.KindUnits,
+		Units: []state.UnitBackup{{UnitIdentifier: testGlobalConfigUnit}, {UnitIdentifier: testLdapUnit}},
+	}
+}
+
+func TestNameConflictsFailsTheRestoreBeforePreparation(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	conflicting := foreignChild(restore, testLdapUnit)
+
+	recorderMock := newMockEventRecorder(t)
+	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(conflicting.Name), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore,
+		"velero restore [test-restore-dogu-ldap] conflicts with the expected child: it is not controlled by restore [test-restore] and must not be adopted").Return()
+	collectorMock := newMockRestoreStateCollector(t)
+	collectorMock.EXPECT().Collect(testCtx, restore).Return(globalConfigAndLdapUnits(), nil)
+	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore, conflicting)
+	reconciler := &restoreReconciler{recorder: recorderMock, k8sClient: testClient, stateCollector: collectorMock}
+
+	updated, outcome := reconciler.ensureProviderChildState(testCtx, restore)
+
+	assert.Equal(t, abort(), outcome, "a conflict is terminal")
+	successfulCondition := findSuccessfulCondition(updated)
+	require.NotNil(t, successfulCondition)
+	assert.Equal(t, metav1.ConditionFalse, successfulCondition.Status)
+	assert.Equal(t, ReasonProviderRestoreConflict, successfulCondition.Reason)
+	providerCondition := meta.FindStatusCondition(updated.Status.Conditions, k8sv1.ConditionProviderSucceeded)
+	require.NotNil(t, providerCondition)
+	assert.Equal(t, metav1.ConditionFalse, providerCondition.Status)
+	assert.Equal(t, ReasonProviderRestoreConflict, providerCondition.Reason)
+}
+
+func TestNameConflictsAreNotCheckedOnceThePreparationHappened(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	reconciler := &restoreReconciler{
+		k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore,
+			ownedRunningChild(restore, testGlobalConfigUnit), foreignChild(restore, testLdapUnit)),
+		stateCollector: newMockRestoreStateCollector(t),
+	}
+
+	_, outcome := reconciler.ensureProviderChildState(testCtx, restore)
+
+	assert.Equal(t, next(), outcome, "the check only protects the preparation")
+}
+
+func TestForeignRestoreOfAnExcludedUnitChildIsNoConflict(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	restore.Spec.ExcludedDogus = []string{testLdapUnit.Name}
+
+	collectorMock := newMockRestoreStateCollector(t)
+	collectorMock.EXPECT().Collect(testCtx, restore).Return(globalConfigAndLdapUnits(), nil)
+	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore, foreignChild(restore, testLdapUnit))
+	reconciler := &restoreReconciler{k8sClient: testClient, stateCollector: collectorMock}
+
+	_, outcome := reconciler.ensureProviderChildState(testCtx, restore)
+
+	assert.Equal(t, next(), outcome, "only the children of the units to restore can conflict")
+}
+
+func TestBackupIsMissingCannotConflict(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	collectorMock := newMockRestoreStateCollector(t)
+	collectorMock.EXPECT().Collect(testCtx, restore).Return(state.RestoreState{Kind: state.KindNotFound}, nil)
+	testClient := newTestClientWithParent(t, interceptor.Funcs{}, restore, foreignChild(restore, testLegacyUnit))
+	reconciler := &restoreReconciler{k8sClient: testClient, stateCollector: collectorMock}
+
+	_, outcome := reconciler.ensureProviderChildState(testCtx, restore)
+
+	assert.Equal(t, next(), outcome, "the source backup check reports the missing backup")
+}
+
+func TestBackupListErrorIsRetried(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	collectorMock := newMockRestoreStateCollector(t)
+	collectorMock.EXPECT().Collect(testCtx, restore).Return(state.RestoreState{}, assert.AnError)
+	reconciler := &restoreReconciler{k8sClient: newTestClientWithParent(t, interceptor.Funcs{}, restore), stateCollector: collectorMock}
+
+	_, outcome := reconciler.ensureProviderChildState(testCtx, restore)
+
+	require.ErrorIs(t, outcome.err, assert.AnError)
+	assert.ErrorContains(t, outcome.err, "failed to collect the backup of restore test-restore")
 }
 
 // An existing owned child must send the workflow past preparation even without a set condition
@@ -51,7 +144,7 @@ func TestAnExistingOwnedProviderChildSkipsThePreparationAndIsObservedInstead(t *
 		return reconciler.Reconcile
 	}
 	// with owned child
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedRunningChild(restore))
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, ownedRunningChild(restore, testLegacyUnit))
 
 	results, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 2)
 
@@ -67,7 +160,7 @@ func TestAnExistingOwnedProviderChildSkipsThePreparationAndIsObservedInstead(t *
 
 func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
-	conflicting := foreignChild(restore)
+	conflicting := foreignChild(restore, testLegacyUnit)
 
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), matchesVeleroRestoreNamed(testRestore), corev1.EventTypeWarning, k8sv1.ErrorOnCreateEventReason, actionCreateProviderRestore,
@@ -76,7 +169,8 @@ func TestAConflictingProviderChildFailsTheRestoreBeforePreparation(t *testing.T)
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment).Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, conflicting)
+	fixture := newMultiReconcileFixture(t, interceptor.Funcs{}, factory, restore, conflicting, usableSourceBackup(),
+		readyStorageLocation(), readyProviderDeployment())
 	request := newRestoreRequest(testRestore)
 
 	results, errs := fixture.reconcileTimes(testCtx, request, 2)
@@ -108,7 +202,8 @@ func TestAnUnreportableProviderChildConflictIsRetried(t *testing.T) {
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		return NewRestoreReconciler(fakeClient, recorderMock, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment).Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, foreignChild(restore))
+	fixture := newMultiReconcileFixture(t, failingStatusUpdate(assert.AnError), factory, restore, foreignChild(restore, testLegacyUnit), usableSourceBackup(),
+		readyStorageLocation(), readyProviderDeployment())
 
 	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 
@@ -132,7 +227,8 @@ func TestAnUnreadableProviderChildIsRetried(t *testing.T) {
 	factory := func(fakeClient client.WithWatch) reconcileFunction {
 		return NewRestoreReconciler(fakeClient, nil, testNamespace, nil, nil, requeueAfterTest, testBackupStorage, testProviderDeployment).Reconcile
 	}
-	fixture := newMultiReconcileFixture(t, failingChildGet, factory, restore)
+	fixture := newMultiReconcileFixture(t, failingChildGet, factory, restore, usableSourceBackup(),
+		readyStorageLocation(), readyProviderDeployment())
 
 	_, errs := fixture.reconcileTimes(testCtx, newRestoreRequest(testRestore), 1)
 

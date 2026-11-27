@@ -22,6 +22,14 @@ func ProviderRestoreName(restoreName string, unit backupv1.UnitIdentifier) strin
 	return velero.UnitObjectName(restoreName, unit)
 }
 
+// ProviderBackupName returns the provider backup name of the unit; a legacy backup keeps the backup name.
+func ProviderBackupName(backupName string, unit backupv1.UnitIdentifier) string {
+	if unit.Type == UnitTypeLegacy {
+		return backupName
+	}
+	return velero.UnitObjectName(backupName, unit)
+}
+
 // Kind tells how the backup of a restore was resolved.
 type Kind string
 

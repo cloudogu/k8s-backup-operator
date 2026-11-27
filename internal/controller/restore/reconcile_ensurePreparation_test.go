@@ -117,7 +117,7 @@ func TestPreparationIsSkippedForAnUnpreparedRestoreThatAlreadyHasAProviderChild(
 		namespace: testNamespace,
 		recorder:  recorderMock,
 		// with owned child in the client
-		k8sClient:             newTestClient(t, writes.interceptor(), restore, ownedRunningChild(restore)),
+		k8sClient:             newTestClient(t, writes.interceptor(), restore, ownedRunningChild(restore, testLegacyUnit)),
 		cleanup:               newMockCleanupManager(t),
 		scaleManager:          newMockScaleManager(t),
 		maintenanceModeSwitch: newMockMaintenanceModeSwitch(t),
@@ -128,6 +128,43 @@ func TestPreparationIsSkippedForAnUnpreparedRestoreThatAlreadyHasAProviderChild(
 	assert.Equal(t, next(), outcome, "the workflow must continue without preparing again")
 	assert.Equal(t, restore, updated)
 	assert.Equal(t, 0, writes.total(), "an inferred preparation must not be written")
+}
+
+// A crash after the first unit child was created must not repeat the preparation.
+func TestPreparationIsSkippedForAnUnpreparedRestoreThatAlreadyHasAUnitChild(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	reconciler := &restoreReconciler{
+		k8sClient:    newTestClient(t, interceptor.Funcs{}, restore, ownedRunningChild(restore, testLdapUnit)),
+		cleanup:      newMockCleanupManager(t),
+		scaleManager: newMockScaleManager(t),
+	}
+
+	_, outcome := reconciler.ensurePreparation(testCtx, restore)
+
+	assert.Equal(t, next(), outcome, "the workflow must continue without preparing again")
+}
+
+func TestAnUnlistableProviderChildRetriesThePreparation(t *testing.T) {
+	restore := withInitializedConditions(withMetadata(newParentRestore()))
+	failingChildList := interceptor.Funcs{
+		List: func(ctx context.Context, wrapped client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			if _, isChildList := list.(*velerov1.RestoreList); isChildList {
+				return assert.AnError
+			}
+
+			return wrapped.List(ctx, list, opts...)
+		},
+	}
+	reconciler := &restoreReconciler{
+		k8sClient:    newTestClient(t, failingChildList, restore),
+		cleanup:      newMockCleanupManager(t),
+		scaleManager: newMockScaleManager(t),
+	}
+
+	_, outcome := reconciler.ensurePreparation(testCtx, restore)
+
+	require.ErrorIs(t, outcome.err, assert.AnError)
+	assert.ErrorContains(t, outcome.err, "failed to determine the owned children of restore test-restore")
 }
 
 func TestPreparationContinuesWhenTheMaintenanceModeCannotBeActivated(t *testing.T) {

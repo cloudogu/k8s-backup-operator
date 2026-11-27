@@ -172,7 +172,7 @@ func appearingForeignChild(t *testing.T, parent *k8sv1.Restore) interceptor.Func
 				return apierrors.NewNotFound(schema.GroupResource{Group: velerov1.SchemeGroupVersion.Group, Resource: "restores"}, key.Name)
 			}
 
-			foreignChild(parent).DeepCopyInto(child)
+			foreignChild(parent, testLegacyUnit).DeepCopyInto(child)
 
 			return nil
 		},
