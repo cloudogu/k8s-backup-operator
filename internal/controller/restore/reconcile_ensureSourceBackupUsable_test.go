@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cloudogu/k8s-backup-operator/internal/provider/velero"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -94,8 +95,15 @@ func TestASourceBackupThatIsNotRestorableFailsTheRestore(t *testing.T) {
 
 func TestAMalformedSourceBackupFailsTheRestore(t *testing.T) {
 	restore := withInitializedConditions(withMetadata(newParentRestore()))
-	malformed := completedUnitBackup(testGlobalConfigUnit)
-	malformed.Annotations = nil
+	malformed := &velerov1.Backup{
+		Name: velero.UnitObjectName(testBackup, testGlobalConfigUnit), Namespace: testNamespace,
+		Labels: map[string]string{
+			k8sv1.BackupLabelKey:     k8sv1.GetTruncatedName(testBackup),
+			k8sv1.BackupTypeLabelKey: string(testGlobalConfigUnit.Type),
+		},
+		Annotations: nil, // <- no Annotations
+		Status:      velerov1.BackupStatus{Phase: velerov1.BackupPhaseCompleted},
+	}
 
 	recorderMock := newMockEventRecorder(t)
 	recorderMock.EXPECT().Eventf(matchesCloudoguRestoreNamed(testRestore), nil, corev1.EventTypeWarning, ReasonUnusableUnits, actionCheckSourceBackup,
